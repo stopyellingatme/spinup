@@ -85,10 +85,10 @@ npm:
   renovate: 44.155.8
 
 images:
-  postgres:          { tag: "18.6-trixie",  digest: "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336" }
-  postgres-17:       { tag: "17.11",        digest: "sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3" }
-  postgres-16:       { tag: "16.15",        digest: "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d" }
-  caddy:             { tag: "2.11.7",       digest: "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772" }
+  postgres:          { image: postgres, tag: "18.6-trixie",  digest: "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336" }
+  postgres-17:       { image: postgres, tag: "17.11",        digest: "sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3" }
+  postgres-16:       { image: postgres, tag: "16.15",        digest: "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d" }
+  caddy:             { image: caddy, tag: "2.11.7",       digest: "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772" }
   grafana:           { image: grafana/grafana, tag: "13.2.4", digest: "sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f" }
   loki:              { image: grafana/loki,    tag: "3.7.8",  digest: "sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193" }
   tempo:             { image: grafana/tempo,   tag: "3.1.0",  digest: "sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd" }
@@ -101,8 +101,8 @@ images:
   blackbox-exporter: { image: prom/blackbox-exporter, tag: "v0.29.0", digest: "sha256:9613f2884689b6fad9f1939f6a3b0388c93a022cfaededb19545b329b5c83dea" }
   mailpit:           { image: axllent/mailpit, tag: "v1.31.5", digest: "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea" }
   seaweedfs:         { image: chrislusf/seaweedfs, tag: "4.48", digest: "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d" }   # S3 for tests; MinIO is archived
-  node:              { tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0
-  golang:            { tag: "1.27-alpine", digest: "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d" }   # recheck: tag moved 2026-10-14
+  node:              { image: node, tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0
+  golang:            { image: golang, tag: "1.27-alpine", digest: "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d" }   # recheck: tag moved 2026-10-14
   distroless-static: { image: gcr.io/distroless/static-debian12, tag: "nonroot", digest: "sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab" }
   docker-dind:       { image: docker, tag: "29.9.0-dind", digest: "sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c2218643d03ccfddc65995470" }
   trivy:             { image: aquasec/trivy, tag: "0.75.0", digest: "sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa" }
