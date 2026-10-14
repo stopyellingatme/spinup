@@ -31,10 +31,10 @@ vuln: ## govulncheck on every module (needs network; milestone gate only)
 	@for m in $(MODULES); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...); done
 
 golden: ## Golden-tree tests. PACK=<name> narrows, UPDATE=1 rewrites
-	@SPINUP_GOLDEN_PACK='$(PACK)' SPINUP_GOLDEN_UPDATE='$(UPDATE)' go test ./... -run 'TestGolden'
+	@SPINUP_GOLDEN_PACK='$(or $(PACK),$(SPINUP_GOLDEN_PACK))' SPINUP_GOLDEN_UPDATE='$(or $(UPDATE),$(SPINUP_GOLDEN_UPDATE))' go test ./... -run 'TestGolden'
 
 script: ## testscript CLI scripts. RUN=<glob> narrows (app_gate_* is skipped here)
-	@SPINUP_SCRIPT_RUN='$(RUN)' go test ./internal/testutil/scripttest -run 'TestScripts' -count=1
+	@SPINUP_SCRIPT_RUN='$(or $(RUN),$(SPINUP_SCRIPT_RUN))' go test ./internal/testutil/scripttest -run 'TestScripts' -count=1
 
 app-gate: ## Generate apps and build/test them (Docker + network; gate check)
 	@SPINUP_SCRIPT_RUN='app_gate_*' SPINUP_APP_GATE=1 go test ./internal/testutil/scripttest -run 'TestScripts' -count=1 -timeout 30m
