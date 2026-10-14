@@ -1,0 +1,17 @@
+# build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# spinup local state in generated apps under test
+.spinup/
+
+# web
+node_modules/
+
+# editors and OS
+.DS_Store
+.idea/
+.vscode/

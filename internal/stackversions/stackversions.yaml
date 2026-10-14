@@ -1,0 +1,162 @@
+# Pinned stack versions. The single source for templates, `spinup doctor`, `tools install`, and docs.
+# Only the main loop edits this file (see CLAUDE.md). Lanes read it and never fetch versions from the network.
+#
+# Verified on 2026-10-13 with go list, npm view, docker buildx imagetools inspect, and the GitHub API.
+# Images are pinned by multi-arch index digest. Actions are pinned by full commit SHA.
+
+schema: 1
+verified: "2026-10-13"
+
+go:
+  toolchain: go1.27.2
+  min: "1.26"          # generated apps declare `go 1.26.0`; CI tests 1.26 and 1.27
+  notes:
+    - "Go 1.27 enables encoding/json v2 by default (GOEXPERIMENT JSONv2=true). Keep the kit error-format golden tests."
+
+go_modules:
+  # CLI
+  github.com/spf13/cobra: v1.10.2
+  charm.land/huh/v2: v2.0.3               # NOT github.com/charmbracelet/huh v1 (needs Bubble Tea v1)
+  charm.land/bubbletea/v2: v2.1.0         # module path is charm.land, not github.com/charmbracelet
+  charm.land/bubbles/v2: v2.0.0
+  charm.land/lipgloss/v2: v2.0.1
+  github.com/pelletier/go-toml/v2: v2.4.3 # no comment round trip; use its unstable.Parser AST for edits
+  go.yaml.in/yaml/v3: v3.0.5              # maintained fork; gopkg.in/yaml.v3 is archived
+  github.com/rogpeppe/go-internal: v1.16.0  # testscript
+  github.com/klauspost/compress: v1.20.3  # zstd; released 2026-10-12, recheck before release
+  golang.org/x/tools: v0.52.0
+  golang.org/x/term: v0.47.0
+
+  # kit and generated API
+  github.com/oapi-codegen/oapi-codegen/v2: v2.8.0
+  github.com/jackc/pgx/v5: v5.11.0        # above the CVE-2026-41889 fix (5.9.2); pin explicitly, pgxstore wants 5.5.4
+  github.com/pressly/goose/v3: v3.29.0
+  github.com/riverqueue/river: v0.49.0
+  github.com/riverqueue/river/riverdriver/riverpgxv5: v0.49.0   # keep equal to river
+  github.com/alexedwards/scs/v2: v2.9.0
+  github.com/alexedwards/scs/pgxstore: v0.0.0-20251002162104-209de6e426de   # no tags upstream
+  github.com/coreos/go-oidc/v3: v3.21.0
+  golang.org/x/oauth2: v0.37.0
+  github.com/wneessen/go-mail: v0.8.1
+  github.com/testcontainers/testcontainers-go: v0.44.0
+  github.com/testcontainers/testcontainers-go/modules/postgres: v0.44.0
+  go.opentelemetry.io/otel: v1.47.0       # also otel/sdk, otlptracehttp, otlpmetrichttp at v1.47.0
+  go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp: v0.23.0
+  go.opentelemetry.io/contrib/bridges/otelslog: v0.21.0
+  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp: v0.72.0
+  github.com/exaring/otelpgx: v0.13.0
+
+go_tools:   # generated apps install these through api/tools.mod (go tool -modfile=tools.mod)
+  github.com/sqlc-dev/sqlc/cmd/sqlc: v1.31.1
+  github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen: v2.8.0
+  github.com/pressly/goose/v3/cmd/goose: v3.29.0
+  github.com/air-verse/air: v1.67.4
+  github.com/bokwoon95/wgo: v0.7.2        # fallback watcher
+  golang.org/x/vuln/cmd/govulncheck: v1.9.0
+
+npm:
+  "@sveltejs/kit": 3.0.1                  # stable since 2026-10-01; ADR 0002
+  svelte: 5.57.2
+  vite: 8.3.4
+  "@sveltejs/vite-plugin-svelte": 7.3.1
+  "@sveltejs/adapter-node": 6.0.0         # no ORIGIN env: origin is baked from paths.origin at build time
+  "@sveltejs/adapter-static": 4.0.0       # embed mode (M10)
+  typescript: 6.0.3                       # NOT 7.x: kit 3.0.1 and svelte-check need ^6
+  svelte-check: 4.7.6
+  sv: 1.1.1                               # `sv migrate` in upgrade codemods
+  pnpm: 12.11.2
+  tailwindcss: 4.3.3
+  "@tailwindcss/vite": 4.3.3
+  shadcn-svelte: 1.7.0
+  bits-ui: 2.19.5
+  openapi-typescript: 7.13.0
+  openapi-fetch: 0.17.0
+  "@hey-api/openapi-ts": 0.99.0           # opt-in client (M10)
+  vitest: 5.0.4
+  "@playwright/test": 1.64.0
+  "@opentelemetry/api": 1.9.1
+  "@opentelemetry/sdk-node": 0.223.0
+  "@opentelemetry/exporter-trace-otlp-http": 0.223.0
+  "@opentelemetry/instrumentation-undici": 0.33.0   # required: without it fetch to Go carries no traceparent
+  "@opentelemetry/auto-instrumentations-node": 0.81.0
+  import-in-the-middle: 3.5.2
+  prettier: 3.9.10
+  eslint: 10.12.0
+  renovate: 44.155.8
+
+images:
+  postgres:          { tag: "18.6-trixie",  digest: "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336" }
+  postgres-17:       { tag: "17.11",        digest: "sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3" }
+  postgres-16:       { tag: "16.15",        digest: "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d" }
+  caddy:             { tag: "2.11.7",       digest: "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772" }
+  grafana:           { image: grafana/grafana, tag: "13.2.4", digest: "sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f" }
+  loki:              { image: grafana/loki,    tag: "3.7.8",  digest: "sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193" }
+  tempo:             { image: grafana/tempo,   tag: "3.1.0",  digest: "sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd" }
+  prometheus:        { image: prom/prometheus, tag: "v3.15.0", digest: "sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e" }
+  alloy:             { image: grafana/alloy,   tag: "v1.20.1", digest: "sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f" }
+  otel-lgtm:         { image: grafana/otel-lgtm, tag: "0.36.0", digest: "sha256:57c04cbd8e7022f32bb84c4ac005d79baf8b08e2c5be44facf11f5f1f9944ba2" }   # dev only
+  node-exporter:     { image: prom/node-exporter, tag: "v1.12.1", digest: "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0" }
+  cadvisor:          { image: ghcr.io/google/cadvisor, tag: "v0.60.6", digest: "sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a" }
+  postgres-exporter: { image: prometheuscommunity/postgres-exporter, tag: "v0.20.1", digest: "sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e" }
+  blackbox-exporter: { image: prom/blackbox-exporter, tag: "v0.29.0", digest: "sha256:9613f2884689b6fad9f1939f6a3b0388c93a022cfaededb19545b329b5c83dea" }
+  mailpit:           { image: axllent/mailpit, tag: "v1.31.5", digest: "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea" }
+  seaweedfs:         { image: chrislusf/seaweedfs, tag: "4.48", digest: "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d" }   # S3 for tests; MinIO is archived
+  node:              { tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0
+  golang:            { tag: "1.27-alpine", digest: "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d" }   # recheck: tag moved 2026-10-14
+  distroless-static: { image: gcr.io/distroless/static-debian12, tag: "nonroot", digest: "sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab" }
+  docker-dind:       { image: docker, tag: "29.9.0-dind", digest: "sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c2218643d03ccfddc65995470" }
+  trivy:             { image: aquasec/trivy, tag: "0.75.0", digest: "sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa" }
+
+apt:
+  pgbackrest: "2.59.3"   # from apt.postgresql.org into the postgres:18.6-trixie image (2.59.3-1.pgdg13+1)
+
+binaries:   # `spinup tools install` verifies these sha256 values; they are compiled into the CLI
+  sops:
+    version: "3.13.3"
+    repo: getsops/sops
+    assets:
+      darwin-arm64:  { name: sops-v3.13.3.darwin.arm64, sha256: b97c0d434aab577dc40310e8d22ff9e45eef4c80638ab978daae9b4681c59286 }
+      darwin-amd64:  { name: sops-v3.13.3.darwin.amd64, sha256: 42162d5cef10b74fcf80a045a70e658d7ce6e63d6ea1be6f347e44015714468d }
+      linux-amd64:   { name: sops-v3.13.3.linux.amd64,  sha256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b }
+      linux-arm64:   { name: sops-v3.13.3.linux.arm64,  sha256: 53b0abacd38ef1b12a66d6c100956691b9cefce018d91f81e73ddf7438b94d77 }
+      windows-amd64: { name: sops-v3.13.3.amd64.exe,    sha256: a4a9a398858fe8b2ef72d9686d930bf7c5cece9be74ad83ac3b53cfdd70e6b1c }
+    checksums: { name: sops-v3.13.3.checksums.txt, sha256: 91710ede6a3218e5b62286412543768a92d0c3449434951bd148d21043aad538, sigstore_bundle: sops-v3.13.3.checksums.sigstore.json }
+  age:
+    version: "1.3.2"
+    repo: FiloSottile/age
+    assets:   # age publishes no checksums file; values are the GitHub asset digests
+      darwin-arm64:  { name: age-v1.3.2-darwin-arm64.tar.gz,  sha256: e2020b073c44f692685a24d6abc378817eb81ffaaf49fd0531ef8565f767f2f5 }
+      darwin-amd64:  { name: age-v1.3.2-darwin-amd64.tar.gz,  sha256: 1d1e4bc66e1427edad7739ae7616157de0e79db8b6d2a1497d7d9925fb06a539 }
+      linux-amd64:   { name: age-v1.3.2-linux-amd64.tar.gz,   sha256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10 }
+      linux-arm64:   { name: age-v1.3.2-linux-arm64.tar.gz,   sha256: 6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4 }
+      windows-amd64: { name: age-v1.3.2-windows-amd64.zip,    sha256: f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7 }
+
+actions:   # GitHub Actions pinned by commit SHA (annotated tags dereferenced)
+  actions/checkout:                { tag: v7.0.1,  sha: 3d3c42e5aac5ba805825da76410c181273ba90b1 }
+  actions/setup-go:                { tag: v7.0.0,  sha: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e }
+  actions/setup-node:              { tag: v7.1.0,  sha: 949feb2413d6458794dcd2491c4babbbce0c15c1 }
+  actions/cache:                   { tag: v6.1.0,  sha: 55cc8345863c7cc4c66a329aec7e433d2d1c52a9 }
+  actions/upload-artifact:         { tag: v7.0.2,  sha: cf430e030ddbb5b0abf93d22962f4752f3646cd9 }
+  actions/download-artifact:       { tag: v8.0.2,  sha: 9000827ccba6bdab643e8b6fd33ac0654aef8333 }
+  pnpm/action-setup:               { tag: v6.1.0,  sha: ea17c68df8912ef543352723c149a84f56e3d413 }
+  docker/setup-buildx-action:      { tag: v4.4.1,  sha: f87e5991a6d7451dcb8d9637bfbc97413f497069 }
+  docker/setup-qemu-action:        { tag: v4.4.0,  sha: 99012661954931238ded8c8b007157a8430204e1 }
+  docker/login-action:             { tag: v4.6.0,  sha: dbcb813823bdd20940b903addbd779551569679f }
+  docker/build-push-action:        { tag: v7.4.0,  sha: c3c9e263c25d99ce0380d002d59b67737d91b0dc }
+  docker/metadata-action:          { tag: v6.2.0,  sha: dc802804100637a589fabce1cb79ff13a1411302 }
+  golangci/golangci-lint-action:   { tag: v9.3.0,  sha: ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a }
+  goreleaser/goreleaser-action:    { tag: v7.3.0,  sha: a4f02ab5355a589de60d917a659ce617ed19b3de }
+  sigstore/cosign-installer:       { tag: v4.1.2,  sha: 6f9f17788090df1f26f669e9d70d6ae9567deba6 }
+  anchore/sbom-action:             { tag: v0.24.3, sha: 66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c }
+  actions/attest-build-provenance: { tag: v4.2.2,  sha: 4d101475d8b20a2381f78447822ac1eab6504dd8 }
+  peter-evans/create-pull-request: { tag: v8.1.1,  sha: 5f6978faf089d4d20b00c7766989d076bb2fc7f1 }
+  renovatebot/github-action:       { tag: v46.3.8, sha: f0f41e5f2e706165f6814b1d0f0d0e319de7d1d9 }
+  # actionlint has no action.yml: install the binary (rhysd/actionlint v1.7.12) in workflows.
+
+tools:   # host tools that `make tools-check` and CI install
+  golangci-lint: 2.14.0
+  goreleaser: 2.18.3
+  actionlint: 1.7.12
+  syft: 1.54.1
+  cosign: 3.1.3
+  promtool: 3.15.0
