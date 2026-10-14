@@ -1,0 +1,18 @@
+# The version command supports text and JSON output.
+exec spinup version
+stdout '^spinup '
+
+exec spinup version --json
+stdout '"version"[[:space:]]*:'
+
+# Invalid commands explain the next action.
+! exec spinup nope
+stderr 'Try:'
+
+# No arguments show the getting-started card.
+exec spinup
+stdout '^spinup creates and operates a full-stack app\.'
+stdout 'Get started:'
+stdout 'spinup new <name>'
+stdout 'spinup dev'
+stdout 'spinup --help'
