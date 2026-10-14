@@ -1,6 +1,18 @@
 // Command spinup is the spinup CLI.
-//
-// STUB from the M0 pre-seed commit. Unit M0.1 owns this file and replaces it.
 package main
 
-func main() {}
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/stopyellingatme/spinup/internal/cli"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := cli.Execute(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
+}
