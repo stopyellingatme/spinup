@@ -1,4 +1,8 @@
 // Package vfs stores generated file changes before they reach the disk.
+//
+// Apply is atomic for each file. It rolls back when one of its own operations
+// fails. A process kill during an apply can leave a partial tree. Callers that
+// need full recovery, such as upgrade, run inside a git worktree.
 package vfs
 
 import (
@@ -13,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"testing/fstest"
+	"unicode"
 )
 
 const defaultMode fs.FileMode = 0o644
@@ -33,20 +38,46 @@ type Plan struct {
 }
 
 // CleanPath validates and normalizes a slash-separated relative file path.
+// It rejects colons, backslashes, NUL, and control characters. It also rejects
+// Windows device names, regardless of case or extension, and segments that end
+// with a space or dot.
 func CleanPath(p string) (string, error) {
-	if p == "" || p == "." || path.IsAbs(p) || filepath.IsAbs(p) || strings.Contains(p, "\\") {
-		return "", fmt.Errorf("invalid file path %q: use a relative slash-separated path", p)
+	if p == "" || p == "." || path.IsAbs(p) || filepath.IsAbs(p) {
+		return "", invalidPath(p, "use a relative slash-separated path")
+	}
+	if strings.ContainsAny(p, ":\\") || strings.ContainsFunc(p, unicode.IsControl) {
+		return "", invalidPath(p, "colons, backslashes, and control characters are not allowed")
 	}
 	for _, part := range strings.Split(p, "/") {
 		if part == ".." {
-			return "", fmt.Errorf("invalid file path %q: parent paths are not allowed", p)
+			return "", invalidPath(p, "parent paths are not allowed")
+		}
+		if strings.HasSuffix(part, " ") || strings.HasSuffix(part, ".") {
+			return "", invalidPath(p, "path segments cannot end with a space or dot")
+		}
+		base, _, _ := strings.Cut(part, ".")
+		if reservedDevice(base) {
+			return "", invalidPath(p, "Windows device names are not allowed")
 		}
 	}
 	clean := path.Clean(p)
 	if clean == "." || clean == "" || strings.HasPrefix(clean, "../") {
-		return "", fmt.Errorf("invalid file path %q: use a file path", p)
+		return "", invalidPath(p, "use a file path")
 	}
 	return clean, nil
+}
+
+func invalidPath(name, reason string) error {
+	return fmt.Errorf("invalid file path %q: %s\nTry: use a portable relative file path", name, reason)
+}
+
+func reservedDevice(base string) bool {
+	switch strings.ToUpper(base) {
+	case "CON", "PRN", "AUX", "NUL":
+		return true
+	}
+	return len(base) == 4 && base[3] >= '1' && base[3] <= '9' &&
+		(strings.EqualFold(base[:3], "COM") || strings.EqualFold(base[:3], "LPT"))
 }
 
 // Add adds a file to the plan.
@@ -56,8 +87,8 @@ func (p *Plan) Add(f File) error {
 		return err
 	}
 	for _, existing := range p.Files {
-		if existing.Path == clean {
-			return fmt.Errorf("add file %q: the plan already has this path", clean)
+		if strings.EqualFold(existing.Path, clean) {
+			return fmt.Errorf("add file %q: path conflicts with %q under case folding\nTry: give each file a distinct path", clean, existing.Path)
 		}
 	}
 	f.Path = clean
@@ -104,13 +135,12 @@ func (p Plan) Sorted() Plan {
 
 // Merge combines two plans when their paths do not conflict.
 func (p Plan) Merge(other Plan) (Plan, error) {
-	merged := p.Sorted()
-	for _, file := range other.Files {
-		if _, ok := merged.Get(file.Path); ok {
-			return Plan{}, fmt.Errorf("merge plans: path conflict at %q", file.Path)
-		}
-		if err := merged.Add(file); err != nil {
-			return Plan{}, fmt.Errorf("merge plans: %w", err)
+	var merged Plan
+	for _, plan := range []Plan{p, other} {
+		for _, file := range plan.Files {
+			if err := merged.Add(file); err != nil {
+				return Plan{}, fmt.Errorf("merge plans: %w", err)
+			}
 		}
 	}
 	return merged.Sorted(), nil
@@ -163,12 +193,20 @@ type Change struct {
 
 // Diff compares the plan with files below root.
 func Diff(root string, p Plan) ([]Change, error) {
+	return compare(root, p, true)
+}
+
+func compare(root string, p Plan, includeDiff bool) ([]Change, error) {
 	root, err := resolvedRoot(root)
 	if err != nil {
 		return nil, err
 	}
+	p, err = p.Merge(Plan{})
+	if err != nil {
+		return nil, err
+	}
 	changes := make([]Change, 0, len(p.Files))
-	for _, file := range p.Sorted().Files {
+	for _, file := range p.Files {
 		clean, err := CleanPath(file.Path)
 		if err != nil {
 			return nil, err
@@ -181,6 +219,9 @@ func Diff(root string, p Plan) ([]Change, error) {
 		if err != nil {
 			return nil, fmt.Errorf("diff %q: %w", clean, err)
 		}
+		if includeDiff && (change.Kind == Create || change.Kind == Update || change.Kind == Remove) {
+			change.UnifiedDiff = fileDiff(clean, change.Old, change.New)
+		}
 		changes = append(changes, change)
 	}
 	return changes, nil
@@ -189,18 +230,20 @@ func Diff(root string, p Plan) ([]Change, error) {
 func diffFile(name, filename string, file File) (Change, error) {
 	newMode := fileMode(file.Mode)
 	change := Change{Path: name, New: bytes.Clone(file.Data), NewMode: newMode}
-	info, err := os.Stat(filename)
+	info, err := os.Lstat(filename)
 	if errors.Is(err, fs.ErrNotExist) {
 		if file.Delete {
 			change.Kind = Unchanged
 			return change, nil
 		}
 		change.Kind = Create
-		change.UnifiedDiff = fileDiff(name, nil, file.Data)
 		return change, nil
 	}
 	if err != nil {
 		return Change{}, err
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return Change{}, symlinkError(name)
 	}
 	if !info.Mode().IsRegular() {
 		return Change{}, fmt.Errorf("target is not a regular file")
@@ -213,7 +256,6 @@ func diffFile(name, filename string, file File) (Change, error) {
 	if file.Delete {
 		change.Kind = Remove
 		change.New, change.NewMode = nil, 0
-		change.UnifiedDiff = fileDiff(name, old, nil)
 		return change, nil
 	}
 	if bytes.Equal(old, file.Data) {
@@ -225,13 +267,13 @@ func diffFile(name, filename string, file File) (Change, error) {
 		return change, nil
 	}
 	change.Kind = Update
-	change.UnifiedDiff = fileDiff(name, old, file.Data)
 	return change, nil
 }
 
 // Apply applies a plan to root. It does not write when DryRun is true.
+// Returned changes contain text diffs only when DryRun is true.
 func Apply(root string, p Plan, opts ApplyOptions) ([]Change, error) {
-	changes, err := Diff(root, p)
+	changes, err := compare(root, p, opts.DryRun)
 	if err != nil || opts.DryRun {
 		return changes, err
 	}
@@ -402,7 +444,10 @@ func copyFile(source, destination string, mode fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	err = copyAndSync(out, in)
+	err = out.Chmod(mode)
+	if err == nil {
+		err = copyAndSync(out, in)
+	}
 	if closeErr := out.Close(); err == nil {
 		err = closeErr
 	}
@@ -431,7 +476,21 @@ func safePath(root, name string) (string, error) {
 	}
 	filename := filepath.Join(root, filepath.FromSlash(clean))
 	current := root
-	for _, part := range strings.Split(clean, "/") {
+	parts := strings.Split(clean, "/")
+	for i, part := range parts {
+		entries, err := os.ReadDir(current)
+		if errors.Is(err, fs.ErrNotExist) {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("inspect directory for %q: %w\nTry: check the target directory and its permissions", name, err)
+		}
+		for _, entry := range entries {
+			if entry.Name() != part && strings.EqualFold(entry.Name(), part) {
+				existing := path.Join(path.Join(parts[:i]...), entry.Name())
+				return "", fmt.Errorf("path %q conflicts with existing entry %q under case folding\nTry: use the existing spelling or rename the entry", name, existing)
+			}
+		}
 		current = filepath.Join(current, part)
 		info, err := os.Lstat(current)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -441,13 +500,20 @@ func safePath(root, name string) (string, error) {
 			return "", err
 		}
 		if info.Mode()&fs.ModeSymlink != 0 {
+			if i == len(parts)-1 {
+				return "", symlinkError(name)
+			}
 			resolved, err := filepath.EvalSymlinks(current)
 			if err != nil || !within(root, resolved) {
-				return "", fmt.Errorf("path %q uses a symlink outside the root", name)
+				return "", fmt.Errorf("path %q uses a symlink outside the root\nTry: replace the symlink with a directory inside the root", name)
 			}
 		}
 	}
 	return filename, nil
+}
+
+func symlinkError(name string) error {
+	return fmt.Errorf("path %q is a symlink\nTry: replace the symlink with a regular file, or remove it from the template", name)
 }
 
 func within(root, target string) bool {
@@ -479,145 +545,9 @@ func copyAndSync(destination *os.File, source *os.File) error {
 	return destination.Sync()
 }
 
-type diffLine struct {
-	kind byte
-	text string
-}
-
-func fileDiff(name string, old, new []byte) string {
-	if isBinary(old) || isBinary(new) {
-		return "Binary files differ"
-	}
-	oldLines := splitLines(old)
-	newLines := splitLines(new)
-	lines := lcsDiff(oldLines, newLines)
-	changed := make([]bool, len(lines))
-	for i, line := range lines {
-		changed[i] = line.kind != ' '
-	}
-	hunks := make([][2]int, 0)
-	for i, hasChange := range changed {
-		if !hasChange {
-			continue
-		}
-		start, end := max(0, i-3), min(len(lines), i+4)
-		if len(hunks) > 0 && start <= hunks[len(hunks)-1][1] {
-			if end > hunks[len(hunks)-1][1] {
-				hunks[len(hunks)-1][1] = end
-			}
-			continue
-		}
-		hunks = append(hunks, [2]int{start, end})
-	}
-	if len(hunks) == 0 {
-		return ""
-	}
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "--- a/%s\n+++ b/%s\n", name, name)
-	for _, hunk := range hunks {
-		oldStart, oldCount, newStart, newCount := hunkRange(lines, hunk[0], hunk[1])
-		fmt.Fprintf(&builder, "@@ -%s +%s @@\n", rangeText(oldStart, oldCount), rangeText(newStart, newCount))
-		for _, line := range lines[hunk[0]:hunk[1]] {
-			builder.WriteByte(line.kind)
-			builder.WriteString(line.text)
-			builder.WriteByte('\n')
-		}
-	}
-	return builder.String()
-}
-
-func isBinary(data []byte) bool {
-	if len(data) > 8000 {
-		data = data[:8000]
-	}
-	return bytes.IndexByte(data, 0) >= 0
-}
-
-func splitLines(data []byte) []string {
-	if len(data) == 0 {
-		return nil
-	}
-	text := string(data)
-	text = strings.TrimSuffix(text, "\n")
-	if text == "" {
-		return []string{""}
-	}
-	return strings.Split(text, "\n")
-}
-
-func lcsDiff(old, new []string) []diffLine {
-	lengths := make([][]int, len(old)+1)
-	for i := range lengths {
-		lengths[i] = make([]int, len(new)+1)
-	}
-	for i := len(old) - 1; i >= 0; i-- {
-		for j := len(new) - 1; j >= 0; j-- {
-			if old[i] == new[j] {
-				lengths[i][j] = lengths[i+1][j+1] + 1
-			} else {
-				lengths[i][j] = max(lengths[i+1][j], lengths[i][j+1])
-			}
-		}
-	}
-	lines := make([]diffLine, 0, len(old)+len(new))
-	for i, j := 0, 0; i < len(old) || j < len(new); {
-		switch {
-		case i == len(old):
-			lines = append(lines, diffLine{kind: '+', text: new[j]})
-			j++
-		case j == len(new):
-			lines = append(lines, diffLine{kind: '-', text: old[i]})
-			i++
-		case old[i] == new[j]:
-			lines = append(lines, diffLine{kind: ' ', text: old[i]})
-			i++
-			j++
-		case lengths[i+1][j] >= lengths[i][j+1]:
-			lines = append(lines, diffLine{kind: '-', text: old[i]})
-			i++
-		default:
-			lines = append(lines, diffLine{kind: '+', text: new[j]})
-			j++
-		}
-	}
-	return lines
-}
-
-func hunkRange(lines []diffLine, start, end int) (int, int, int, int) {
-	oldStart, newStart := 1, 1
-	for _, line := range lines[:start] {
-		if line.kind != '+' {
-			oldStart++
-		}
-		if line.kind != '-' {
-			newStart++
-		}
-	}
-	oldCount, newCount := 0, 0
-	for _, line := range lines[start:end] {
-		if line.kind != '+' {
-			oldCount++
-		}
-		if line.kind != '-' {
-			newCount++
-		}
-	}
-	if oldCount == 0 {
-		oldStart--
-	}
-	if newCount == 0 {
-		newStart--
-	}
-	return oldStart, oldCount, newStart, newCount
-}
-
-func rangeText(start, count int) string {
-	if count == 1 {
-		return fmt.Sprint(start)
-	}
-	return fmt.Sprintf("%d,%d", start, count)
-}
-
 func applyError(name string, err error) error {
+	if strings.Contains(err.Error(), "\nTry:") {
+		return fmt.Errorf("apply %q failed: %w", name, err)
+	}
 	return fmt.Errorf("apply %q failed: %w\nTry: check the target path and its permissions", name, err)
 }

@@ -173,6 +173,9 @@ func TestApplyDryRunAndSuccess(t *testing.T) {
 func TestApplyRollsBack(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "first.txt", "first")
+	if err := os.Chmod(filepath.Join(root, "first.txt"), 0o775); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, root, "second.txt", "second")
 	oldHook := applyHook
 	applyHook = func(path string) error {
@@ -192,6 +195,13 @@ func TestApplyRollsBack(t *testing.T) {
 	}
 	if got := readFile(t, root, "first.txt"); got != "first" {
 		t.Fatalf("first.txt after rollback = %q", got)
+	}
+	info, statErr := os.Stat(filepath.Join(root, "first.txt"))
+	if statErr != nil {
+		t.Fatal(statErr)
+	}
+	if info.Mode().Perm() != 0o775 {
+		t.Fatalf("first.txt mode after rollback = %o; want 775", info.Mode().Perm())
 	}
 	if got := readFile(t, root, "second.txt"); got != "second" {
 		t.Fatalf("second.txt after rollback = %q", got)
