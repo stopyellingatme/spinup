@@ -1,4 +1,5 @@
-// Package ui renders output, errors with Try: lines, prompts, and --json.
+// Package ui renders output and errors with Try: lines, and writes --json.
 //
-// STUB from the M0 pre-seed commit. Unit M0.1 owns this package and replaces this file.
+// It holds exit codes, the Error type, and the Printer. It imports no other
+// spinup package.
 package ui
