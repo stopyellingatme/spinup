@@ -76,6 +76,11 @@ func (l *Lock) Status(root string) ([]FileStatus, error) {
 
 // ReconcileMissing tombstones absent scaffold files and reports absent managed files.
 // It skips seed files and tombstones. An error leaves the lock unchanged.
+//
+// Managed files are never tombstoned here, by design. The CLI owns them, so a
+// missing managed file is drift: `spinup check` warns about it and the next
+// upgrade restores it. A user who wants to keep a managed file deleted runs
+// `spinup eject` first, which turns it into a scaffold file.
 func (l *Lock) ReconcileMissing(root string) (tombstoned []string, missingManaged []string, err error) {
 	paths, err := l.comparedPaths()
 	if err != nil {
