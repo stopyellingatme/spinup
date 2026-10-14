@@ -54,4 +54,4 @@ tools-check: ## Fail when a required tool is missing or has the wrong version
 bump-stack: ## Regenerate the template-pack lockfiles from stackversions.yaml (main loop only)
 	@scripts/bump-stack.sh
 
-GOVULNCHECK_VERSION ?= latest
+GOVULNCHECK_VERSION ?= v1.9.0
