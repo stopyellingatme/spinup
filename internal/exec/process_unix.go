@@ -7,13 +7,16 @@ import (
 	"syscall"
 )
 
-func configureProcess(command *osexec.Cmd) {
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+func configureProcess(command *osexec.Cmd, interactive bool) {
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: !interactive}
 }
 
 func killProcess(command *osexec.Cmd) error {
 	if command.Process == nil {
 		return nil
+	}
+	if command.SysProcAttr == nil || !command.SysProcAttr.Setpgid {
+		return command.Process.Kill()
 	}
 	err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
 	if err == syscall.ESRCH {

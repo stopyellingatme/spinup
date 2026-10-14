@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	osexec "os/exec"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -26,7 +28,15 @@ type Cmd struct {
 	Redact  []string
 	Stdout  io.Writer
 	Stderr  io.Writer
+
+	// Interactive preserves the parent's process group for terminal reads on Unix.
+	// Timeout or cancellation kills only the child. Descendants can survive.
+	// On Windows, cancellation always kills only the direct child.
+	Interactive bool
 }
+
+// processWaitDelay bounds pipe draining after cancellation or child exit.
+const processWaitDelay = 2 * time.Second
 
 // String returns a shell-quoted command line without secret values.
 func (c Cmd) String() string {
@@ -57,7 +67,7 @@ type OSRunner struct{}
 
 // Run runs c and captures its redacted output.
 func (OSRunner) Run(ctx context.Context, c Cmd) (Result, error) {
-	path, err := LookPath(c.Name)
+	path, err := lookPath(c)
 	if err != nil {
 		return Result{}, err
 	}
@@ -73,7 +83,8 @@ func (OSRunner) Run(ctx context.Context, c Cmd) (Result, error) {
 	command.Dir = c.Dir
 	command.Env = append(os.Environ(), c.Env...)
 	command.Stdin = c.Stdin
-	configureProcess(command)
+	command.WaitDelay = processWaitDelay
+	configureProcess(command, c.Interactive)
 	command.Cancel = func() error { return killProcess(command) }
 
 	var stdout, stderr bytes.Buffer
@@ -84,7 +95,20 @@ func (OSRunner) Run(ctx context.Context, c Cmd) (Result, error) {
 	command.Stderr = io.MultiWriter(&stderr, stderrSink)
 
 	started := time.Now()
-	err = command.Run()
+	err = command.Start()
+	if err == nil {
+		// os/exec stops watching the context when the direct child exits.
+		// Continue watching until Wait finishes draining the inherited pipes.
+		killed := make(chan struct{})
+		stop := context.AfterFunc(runCtx, func() {
+			_ = killProcess(command)
+			close(killed)
+		})
+		err = command.Wait()
+		if !stop() {
+			<-killed
+		}
+	}
 	duration := time.Since(started)
 	stdoutSink.Flush()
 	stderrSink.Flush()
@@ -149,6 +173,43 @@ func LookPath(name string) (string, error) {
 	return path, nil
 }
 
+func lookPath(c Cmd) (string, error) {
+	dir, err := filepath.Abs(c.Dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve command directory %q: %w\nTry: check the working directory", c.Dir, err)
+	}
+	resolve := func(name string) (string, error) {
+		if !filepath.IsAbs(name) {
+			name = filepath.Join(dir, name)
+		}
+		return osexec.LookPath(name)
+	}
+	if strings.ContainsAny(c.Name, "/"+string(filepath.Separator)) {
+		if path, err := resolve(c.Name); err == nil {
+			return path, nil
+		}
+		return "", &NotFoundError{Name: c.Name}
+	}
+	searchPath := os.Getenv("PATH")
+	pathSet := false
+	for _, entry := range c.Env {
+		key, value, ok := strings.Cut(entry, "=")
+		if ok && (key == "PATH" || runtime.GOOS == "windows" && strings.EqualFold(key, "PATH")) {
+			searchPath = value
+			pathSet = true
+		}
+	}
+	if c.Dir == "" && !pathSet {
+		return LookPath(c.Name)
+	}
+	for _, entry := range filepath.SplitList(searchPath) {
+		if path, err := resolve(filepath.Join(entry, c.Name)); err == nil {
+			return path, nil
+		}
+	}
+	return "", &NotFoundError{Name: c.Name}
+}
+
 // RunJSON runs c and decodes its standard output as JSON into v.
 func RunJSON(ctx context.Context, r Runner, c Cmd, v any) error {
 	result, err := r.Run(ctx, c)
@@ -180,16 +241,20 @@ func redactBytes(value []byte, secrets []string) []byte {
 }
 
 func redactString(value string, secrets []string) string {
-	secrets = append([]string(nil), secrets...)
-	sort.Slice(secrets, func(first, second int) bool {
-		return len(secrets[first]) > len(secrets[second])
-	})
-	for _, secret := range secrets {
+	for _, secret := range orderedSecrets(secrets) {
 		if secret != "" {
 			value = strings.ReplaceAll(value, secret, "***")
 		}
 	}
 	return value
+}
+
+func orderedSecrets(secrets []string) []string {
+	secrets = append([]string(nil), secrets...)
+	sort.Slice(secrets, func(first, second int) bool {
+		return len(secrets[first]) > len(secrets[second])
+	})
+	return secrets
 }
 
 func stderrTail(stderr string) string {
@@ -205,24 +270,25 @@ func stderrTail(stderr string) string {
 
 type redactingSink struct {
 	dst     io.Writer
-	buffer  bytes.Buffer
-	secrets []string
+	stages  []redactionStage
 	writeMu *sync.Mutex
 }
 
 func newRedactingSink(dst io.Writer, secrets []string, writeMu *sync.Mutex) *redactingSink {
-	return &redactingSink{dst: dst, secrets: append([]string(nil), secrets...), writeMu: writeMu}
+	sink := &redactingSink{dst: dst, writeMu: writeMu}
+	for _, secret := range orderedSecrets(secrets) {
+		if secret != "" {
+			sink.stages = append(sink.stages, redactionStage{secret: secret})
+		}
+	}
+	return sink
 }
 
 func (s *redactingSink) Write(data []byte) (int, error) {
 	if s.dst == nil {
 		return len(data), nil
 	}
-	written, err := s.buffer.Write(data)
-	if err != nil {
-		return written, err
-	}
-	s.drain(false)
+	s.drain(data, false)
 	return len(data), nil
 }
 
@@ -230,34 +296,53 @@ func (s *redactingSink) Flush() {
 	if s.dst == nil {
 		return
 	}
-	s.drain(true)
+	s.drain(nil, true)
 }
 
-func (s *redactingSink) drain(final bool) {
-	if s.buffer.Len() == 0 {
-		return
+func (s *redactingSink) drain(data []byte, final bool) {
+	// Apply the same ordered replacements as captured output, one stage per secret.
+	for index := range s.stages {
+		data = s.stages[index].redact(data, final)
 	}
-	data := s.buffer.Bytes()
-	limit := len(data)
-	if !final {
-		limit -= longestSecretPrefixSuffix(data, s.secrets)
-	}
-	if limit == 0 {
+	if len(data) == 0 {
 		return
 	}
 	s.writeMu.Lock()
-	_, _ = s.dst.Write(redactBytes(data[:limit], s.secrets))
+	_, _ = s.dst.Write(data)
 	s.writeMu.Unlock()
-	s.buffer.Next(limit)
 }
 
-func longestSecretPrefixSuffix(data []byte, secrets []string) int {
-	longest := 0
-	for _, secret := range secrets {
-		for length := 1; length < len(secret) && length <= len(data); length++ {
-			if bytes.HasSuffix(data, []byte(secret[:length])) && length > longest {
-				longest = length
+type redactionStage struct {
+	secret  string
+	pending []byte
+}
+
+func (s *redactionStage) redact(data []byte, final bool) []byte {
+	s.pending = append(s.pending, data...)
+	limit := len(s.pending)
+	if !final {
+		// Preserve greedy, non-overlapping matches before retaining a partial tail.
+		// A tail must never begin inside a complete match.
+		matched := 0
+		for {
+			index := bytes.Index(s.pending[matched:], []byte(s.secret))
+			if index < 0 {
+				break
 			}
+			matched += index + len(s.secret)
+		}
+		limit -= longestSecretPrefixSuffix(s.pending[matched:], s.secret)
+	}
+	output := []byte(strings.ReplaceAll(string(s.pending[:limit]), s.secret, "***"))
+	s.pending = append(s.pending[:0], s.pending[limit:]...)
+	return output
+}
+
+func longestSecretPrefixSuffix(data []byte, secret string) int {
+	longest := 0
+	for length := 1; length < len(secret) && length <= len(data); length++ {
+		if bytes.HasSuffix(data, []byte(secret[:length])) {
+			longest = length
 		}
 	}
 	return longest

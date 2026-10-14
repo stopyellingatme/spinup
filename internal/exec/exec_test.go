@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 	"sync"
@@ -152,6 +153,72 @@ func TestRedactingSinkRedactsValuesAcrossWrites(t *testing.T) {
 	sink.Flush()
 	if got, want := output.String(), "before *** after"; got != want {
 		t.Fatalf("sink output = %q, want %q", got, want)
+	}
+}
+
+func TestRedactingSinkMatchesCapturedOutputForEverySplit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		secrets []string
+		input   string
+	}{
+		{"overlapping secrets", []string{"ab", "bcd"}, "xabz\n"},
+		{"self overlap", []string{"abab"}, "xababab"},
+		{"longer match crosses shorter", []string{"ab", "bcd"}, "xabcd"},
+		{"nested secrets", []string{"sec", "secret"}, "secret sec secret"},
+		{"equal lengths", []string{"ab", "bc"}, "abcabc"},
+		{"repeated prefix", []string{"aaaa"}, "xaaaaaaaayaaa"},
+		{"partial final value", []string{"secret"}, "secret sec"},
+		{"empty and duplicate secrets", []string{"", "secret", "secret"}, "secret secret"},
+		{"no secrets", nil, "unchanged\n"},
+		{"empty input", []string{"secret"}, ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := (OSRunner{}).Run(context.Background(), Cmd{
+				Name:   "sh",
+				Args:   []string{"-c", "printf '%s' \"$INPUT\""},
+				Env:    []string{"INPUT=" + test.input},
+				Redact: test.secrets,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			check := func(t *testing.T, chunks []string) {
+				t.Helper()
+				var stream bytes.Buffer
+				sink := newRedactingSink(&stream, test.secrets, &sync.Mutex{})
+				for _, chunk := range chunks {
+					if _, err := sink.Write([]byte(chunk)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				sink.Flush()
+				if !bytes.Equal(stream.Bytes(), result.Stdout) {
+					t.Fatalf("stream = %q, Result.Stdout = %q", stream.String(), result.Stdout)
+				}
+				for _, secret := range test.secrets {
+					if secret != "" && strings.Contains(stream.String(), secret) {
+						t.Fatalf("stream exposes secret %q: %q", secret, stream.String())
+					}
+				}
+			}
+			for split := 0; split <= len(test.input); split++ {
+				t.Run(fmt.Sprintf("split-%d", split), func(t *testing.T) {
+					check(t, []string{test.input[:split], test.input[split:]})
+				})
+			}
+			t.Run("one-byte-writes", func(t *testing.T) {
+				chunks := make([]string, len(test.input))
+				for index := range chunks {
+					chunks[index] = test.input[index : index+1]
+				}
+				check(t, chunks)
+			})
+		})
 	}
 }
 
