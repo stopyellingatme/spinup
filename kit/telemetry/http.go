@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"net"
 	"net/http"
 	"strings"
 
@@ -38,7 +39,7 @@ func HTTPMiddleware(name string) func(http.Handler) http.Handler {
 				attribute.String("http.route", route),
 				attribute.Int("http.response.status_code", result.Code),
 			))
-		}), name, otelhttp.WithSpanNameFormatter(func(fallback string, r *http.Request) string {
+		}), name, otelhttp.WithServerName(net.JoinHostPort(name, "8080")), otelhttp.WithSpanNameFormatter(func(fallback string, r *http.Request) string {
 			if r.Pattern != "" {
 				return r.Pattern
 			}
