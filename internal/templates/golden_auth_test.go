@@ -49,6 +49,9 @@ func TestGoldenAuth(t *testing.T) {
 			selected[path] = &fstest.MapFile{Data: data, Mode: info.Mode()}
 			return nil
 		})
+		if err == nil {
+			err = oidcGoldenFiles(t, selected)
+		}
 		return selected, err
 	}
 	fsys, err := render()

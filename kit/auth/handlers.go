@@ -37,6 +37,7 @@ type userResponse struct {
 // Errors are problem details. A 422 problem lists field errors for "email" and
 // "password". Register and login set the session cookie with a new token.
 func (a *Auth) Routes(mux *http.ServeMux) {
+	a.oidcRoutes(mux)
 	mux.Handle("POST /api/auth/register", a.endpoint(a.register))
 	mux.Handle("POST /api/auth/login", a.endpoint(a.login))
 	mux.Handle("POST /api/auth/logout", a.endpoint(a.logout))
