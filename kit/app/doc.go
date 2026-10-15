@@ -1,4 +1,2 @@
-// Package app builds and runs a spinup API server.
-//
-// STUB from the M1 pre-seed commit. Unit M1.1 owns this package and replaces this file.
+// Package app builds and runs HTTP APIs with health routes and graceful shutdown.
 package app

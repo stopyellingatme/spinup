@@ -1,0 +1,5 @@
+HTTP 500
+Content-Type: application/problem+json
+X-Request-ID: golden-request
+
+{"type":"about:blank","title":"Internal Server Error","status":500,"request_id":"golden-request"}
