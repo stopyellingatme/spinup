@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"sort"
 	"sync"
 
@@ -43,6 +44,7 @@ type GlobalFlags struct {
 	DryRun         bool
 	Verbose        bool
 	NoColor        bool
+	Offline        bool
 }
 
 // App is the shared state passed to every command builder.
@@ -111,6 +113,7 @@ func newRoot(app *App, in io.Reader, out, errOut io.Writer, entered *bool) *cobr
 	pf.BoolVar(&f.DryRun, "dry-run", false, "show changes without writing")
 	pf.BoolVar(&f.Verbose, "verbose", false, "write extra detail")
 	pf.BoolVar(&f.NoColor, "no-color", false, "turn off color")
+	pf.BoolVar(&f.Offline, "offline", os.Getenv("SPINUP_OFFLINE") == "1", "never download template versions")
 
 	regMu.Lock()
 	regs := make([]registration, len(registry))
