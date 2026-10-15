@@ -11,6 +11,9 @@ import (
 
  "[[ .module ]]/api/db/migrations"
  "[[ .module ]]/api/internal/routes"
+[[- if has "mail" .modules ]]
+ mailapp "[[ .module ]]/api/internal/mail"
+[[- end ]]
  "github.com/stopyellingatme/spinup/kit/app"
 [[- if has "auth" .modules ]]
  "github.com/stopyellingatme/spinup/kit/auth"
@@ -50,6 +53,11 @@ func run() (err error) {
  if err != nil {
   return err
  }
+[[- if has "mail" .modules ]]
+ mailers, err := mailapp.New(pool)
+ if err != nil { return err }
+ _ = mailers // Pass this dependency to application handlers that send mail.
+[[- end ]]
 [[- if has "auth" .modules ]]
  // The web app posts its form actions from PUBLIC_ORIGIN, so the CSRF check trusts it.
  var web struct {
@@ -62,6 +70,10 @@ func run() (err error) {
  if err != nil {
   return err
  }
+[[- if has "mail" .modules ]]
+ resetRoutes, err := passwordResetRoutes(authn, mailers, web.PublicOrigin)
+ if err != nil { return err }
+[[- end ]]
 [[- end ]]
  a := app.New(
   app.WithName([[ quote .app_name ]]),
@@ -71,6 +83,14 @@ func run() (err error) {
 [[- if has "auth" .modules ]]
   app.WithMiddleware(authn.Middleware()),
   app.WithRoutes(authn.Routes),
+[[- if has "mail" .modules ]]
+  app.WithRoutes(resetRoutes),
+[[- end ]]
+[[- end ]]
+[[- if has "mail" .modules ]]
+[[- if has "jobs" .modules ]]
+  app.WithCommand("mail-worker", mailers.WorkerCommand(pool)),
+[[- end ]]
 [[- end ]]
   app.WithReadiness("db", pool.Ping),
   app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),

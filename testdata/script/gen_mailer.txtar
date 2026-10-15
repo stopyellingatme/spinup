@@ -1,0 +1,39 @@
+# Typed mailers, seeds, reset routes, and offline API builds.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --module example.com/todo --modules ci,auth,mail --no-git --non-interactive
+cd todo
+exists api/internal/mail/mailers.go api/cmd/api/reset.go
+exists api/db/migrations/00003_password_resets.sql
+exists web/src/routes/reset/+page.svelte web/src/routes/reset/[token]/+page.svelte
+exec spinup g mailer welcome name:string --dry-run
+stdout 'create api/internal/mail/welcome_gen.go \(managed\)'
+! exists api/internal/mail/welcome_gen.go
+exec spinup g mailer welcome name:string
+stdout 'Created 4, updated 0 files'
+grep 'Name string' api/internal/mail/welcome_gen.go
+grep 'SendWelcome\(ctx context.Context, to string, data WelcomeData\)' api/internal/mail/welcome_gen.go
+exists api/internal/mail/templates/welcome.subject.tmpl api/internal/mail/templates/welcome.txt.tmpl api/internal/mail/templates/welcome.html.tmpl
+exec spinup check
+exec spinup g mailer receipt sent_at:time due:date? key:uuid count:int payload:json
+cd api
+exec go build ./...
+exec go vet ./...
+cd ../..
+
+# Jobs enable River delivery, retry registration, and the mail-worker command.
+exec spinup new queued --module example.com/queued --modules ci,auth,mail,jobs --no-git --non-interactive
+cd queued
+exists api/internal/mail/worker.go
+grep 'mail-worker' api/cmd/api/main.go
+exec spinup g mailer welcome name:string
+cd api
+exec go build ./...
+exec go vet ./...
+cd ../..
+
+exec spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g mailer welcome
+stderr 'no mail module'
+stderr 'Try: spinup module add mail'
+! exists api/internal/mail

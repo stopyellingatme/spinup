@@ -1,4 +1,3 @@
-// Package mail sends email from a spinup app (ADR 0013 §2).
-//
-// Stub from the M9 pre-seed. Unit M9.2 replaces it.
+// Package mail sends multipart email through SMTP, logs delivery metadata, and
+// captures messages in tests. Render escapes HTML and requires a plain-text part.
 package mail

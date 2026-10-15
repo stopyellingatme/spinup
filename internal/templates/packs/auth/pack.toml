@@ -24,7 +24,7 @@ class = "managed"
 
 [[files]]
 path = "web/src/routes/login/+page.svelte"
-source = "files/web/src/routes/login/+page.svelte"
+source = "files/web/src/routes/login/+page.svelte.tmpl"
 class = "scaffold"
 
 [[files]]
