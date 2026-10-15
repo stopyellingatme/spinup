@@ -269,8 +269,11 @@ The M7 pre-seed (ADR 0011) adds the contract files `internal/backup/registry.go`
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
 | M8.1 | Full `ci` pack (replaces the M1.6 pack): `ci`, `e2e`, `deploy`, `backup-verify`, and `upgrade-check` workflows, with the SHA table and least-privilege permissions | `G ci`, then `actionlint` on the output | `packs/ci/`, `internal/ci/`, `testdata/golden/ci/` | – |
+| M8.1b | Playwright e2e scaffold in the web pack (`playwright.config.ts`, a smoke test) that `e2e.yml` runs | `G web`, `G auth`, then `playwright test --list` | `packs/web/pack.d/e2e.toml` and its files, `testdata/golden/{web,auth}/` | – |
 | M8.2 | `ci generate` and `ci verify`. CLI repo workflows: `bump`, `shas`, `canary-pins`, and `kit-compat` (the last frozen app built against the new kit) | `S ci_verify`, then `actionlint` | `internal/cli/ci.go`, `.github/workflows/{bump,shas,canary-pins,kit-compat}.yml`, `testdata/script/ci_verify.txtar` | M8.1 |
 | M8.3 | Release pipeline (extends M0.8): a script that enforces lockstep minors, the kit tag, syft SBOM, cosign keyless signing, attestation, assets (templates tarball, `compat.json`, `stack-versions.json`), the Homebrew tap, `install.sh`, the GHCR CI image, and a CHANGELOG template | `goreleaser release --snapshot --clean`, then `actionlint` | `.goreleaser.yaml`, `scripts/release/`, `install.sh`, `Dockerfile.ci`, `.github/workflows/release.yml`, `CHANGELOG.md` | – |
+
+The M8 pre-seed adds ADR 0012 (release assets, signing, the installer, the generated workflows, and `spinup ci`) and the stub package `internal/ci`.
 
 #### M9 — Modules and plugins → a third-party pack adds a generator and upgrades cleanly
 

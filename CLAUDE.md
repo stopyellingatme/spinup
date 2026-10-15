@@ -28,6 +28,7 @@ Read these before you change anything:
 - The M5 contracts (ssh access, the VM layout, the deploy lock and journal, hooks, image transport, secrets, production Compose, the test VM) are in `docs/adr/0009-m5-contracts.md`.
 - The M6 contracts (telemetry configuration, the monitoring pack and profiles, monitor commands, web tracing) are in `docs/adr/0010-m6-contracts.md`.
 - The M7 contracts (backup configuration, backends, in-place restore, backup metrics, the schedule, maintenance, the remote doctor, test storage) are in `docs/adr/0011-m7-contracts.md`.
+- The M8 contracts (release assets, versions and signing, installing spinup, generated workflows, `spinup ci`) are in `docs/adr/0012-m8-contracts.md`.
 
 ## Commands
 
