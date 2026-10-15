@@ -27,6 +27,15 @@ exec spinup g job cleanupSessions
 stdout 'Created 2, updated 1 files'
 cmp api/internal/jobs/register_gen.go ../want/register_gen.go
 
+# Go filename selectors cannot be job names. Pascal names must also stay unique.
+! exec spinup g job sync_linux
+stderr 'GOOS or GOARCH'
+stderr 'Try: spinup g job send_digest'
+exec spinup g job send_2fa
+! exec spinup g job send2fa
+stderr 'Send2fa is already declared'
+stderr 'Try: use a different job name'
+
 # The same job again changes nothing. After an edit, it needs --force.
 exec spinup g job send_digest
 stdout 'Created 0, updated 0 files'

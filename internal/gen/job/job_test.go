@@ -31,6 +31,9 @@ func TestParseName(t *testing.T) {
 		{in: "Deps", err: "reserved"},
 		{in: "load_test", err: "_test"},
 		{in: "routes_gen", err: "_gen"},
+		{in: "sync_linux", err: "GOOS or GOARCH"},
+		{in: "sync_arm64", err: "GOOS or GOARCH"},
+		{in: "sync_linux_arm64", err: "GOOS or GOARCH"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
@@ -49,6 +52,33 @@ func TestParseName(t *testing.T) {
 				t.Fatalf("ParseName(%q) = %+v", tt.in, got)
 			}
 		})
+	}
+}
+
+func TestPlanRefusesExistingPascalName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dir := filepath.Join(root, "api", "internal", "jobs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "send_2fa.go"), []byte(`package jobs
+
+type Send2faArgs struct{}
+
+func (Send2faArgs) Kind() string { return "send_2fa" }
+
+func Send2fa(d Deps) any { return nil }
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := generator(t).Run(context.Background(), gen.Input{
+		Root: root,
+		Lock: lock("base", "api", "jobs"),
+		Args: []string{"send2fa"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "Send2fa") || !strings.Contains(err.Error(), "Try: use a different job name") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
