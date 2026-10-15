@@ -39,7 +39,7 @@ func TestLintRules(t *testing.T) {
 		{"build image", "services:\n  app:\n    image: local:dev\n    build: .\n", "unpinned-image", 0},
 		{"literal secret map", "services:\n  app:\n    environment:\n      PASSWORD: value\n      TOKEN_FILE: /run/token\n", "literal-secret", 1},
 		{"literal secret list", "services:\n  app:\n    environment: ['API_KEY=value', 'PRIVATE_KEY=${KEY}', 'SECRET=$SECRET']\n", "literal-secret", 1},
-		{"secret negative", "services:\n  app:\n    environment:\n      PASSWORD: ${PASSWORD:-default}\n", "literal-secret", 0},
+		{"secret default", "services:\n  app:\n    environment:\n      PASSWORD: ${PASSWORD:-default}\n", "literal-secret", 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
