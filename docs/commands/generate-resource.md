@@ -24,11 +24,12 @@ create api/db/queries/todos.sql (scaffold)
 create api/internal/handlers/server.go (scaffold)
 create api/internal/handlers/todos.go (scaffold)
 create api/internal/handlers/todos_test.go (scaffold)
+create api/internal/handlers/validation.go (scaffold)
 update api/internal/routes/routes_gen.go (managed)
 create api/openapi/paths/todos.yaml (scaffold)
 create api/openapi/schemas/todo.yaml (scaffold)
 $ spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high'
-Created 7, updated 1 files
+Created 8, updated 1 files
 Next: spinup db migrate up
 Next: cd api && go test ./...
 $ test -s api/internal/store/todos.sql.go
@@ -69,6 +70,7 @@ The generator writes these files:
 | `api/internal/handlers/<plural>.go` | scaffold | The strict-server methods and the conversions between the store and API types. |
 | `api/internal/handlers/<plural>_test.go` | scaffold | A create, get, list, update, and delete round trip, and the error cases. |
 | `api/internal/handlers/server.go` | scaffold | The `Server` type and the error mapping. Only the first resource writes it. |
+| `api/internal/handlers/validation.go` | scaffold | The check that rejects a create or update body with a missing or null required field (422 with one field error per key). Only the first resource writes it. |
 | `api/internal/routes/routes_gen.go` | managed | The OpenAPI router. Its content is the same for every resource. |
 
 After the write, the generator bundles the OpenAPI files and runs oapi-codegen, then sqlc, then gofmt.
