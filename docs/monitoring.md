@@ -88,7 +88,7 @@ Measured on an idle stack, the services use about this much memory:
 | `monitoring/prometheus/rules/*.yml` | managed | The default alert rules. |
 | `monitoring/alerts/custom.yml` | seed | Your own Prometheus rules. |
 | `monitoring/blackbox/blackbox.yml` | managed | The probe of the public URL (profile `full`). |
-| `monitoring/grafana/entrypoint.sh` | managed | Reads the secrets and writes the contact points. Then it starts Grafana. |
+| `monitoring/grafana/entrypoint.sh` | managed | Reads the secrets, writes the contact points, and starts Grafana. Resets the admin password after startup. |
 | `monitoring/grafana/provisioning/` | managed | The datasources, the dashboard folders, and the alert rule. |
 | `monitoring/grafana/dashboards/stack/` | managed | spinup's dashboards and the vendored community dashboards. |
 | `monitoring/grafana/dashboards/custom/` | seed | Your own dashboards. |
@@ -100,7 +100,7 @@ spinup never changes a seed file after `spinup new`.
 - The app sends OTLP to `http://alloy:4318` on the `<app>-app` network. `spinup deploy` configures this endpoint for the API and web services.
 - Alloy removes secrets, batches the data, and sends it on.
   Metrics go to Prometheus with remote write. Logs go to Loki over OTLP. Traces go to Tempo (profile `full`).
-- Alloy scrapes Loki, Grafana, Caddy (`caddy:2020`), and itself.
+- Alloy scrapes Loki, Grafana, Caddy (`caddy:2020`), and itself with `job="alloy"`.
   In the profile `full`, it also scrapes Tempo and the exporters, and it probes `PUBLIC_URL`.
 - Prometheus evaluates the alert rules. Grafana sends the notifications. The stack has no Alertmanager.
 
@@ -128,16 +128,24 @@ Alloy is the second line. For logs and spans:
 
 | Alert | Profile | Fires when |
 | --- | --- | --- |
-| `HighErrorRate` | all | More than 5% of the requests of a service fail with 5xx for 10 minutes. |
-| `HighLatencyP95` | all | The p95 request duration is above 1 s for 10 minutes. |
+| `HighErrorRate` | all | More than 5% of the API requests fail with 5xx for 10 minutes. |
+| `HighLatencyP95` | all | The p95 duration of API requests is above 1 s for 10 minutes. |
 | `BackupStale` | all | The newest backup is older than 26 hours. |
 | `MonitoringTargetDown` | all | A scrape fails for 5 minutes. |
+| `AlloyMissing` | all | No Alloy self-scrape data arrives for 5 minutes. |
+| `APIRequestMetricsMissing` | all | No API request metrics arrive for 10 minutes. |
 | `Heartbeat` | all | Always. This is the dead-man's switch. |
 | `DiskSpaceLow`, `DiskWillFillIn24Hours` | full | A filesystem has less than 10% free, or it fills up within 24 hours. |
 | `ContainerRestartLoop` | full | A container restarts 3 times in 15 minutes. |
 | `PostgresDown`, `PostgresConnectionsHigh` | full | Postgres is down, or it uses more than 80% of `max_connections`. |
 | `WalArchiveLag`, `WalArchiveFailing` | full | The last WAL archive is older than 15 minutes, or an archive fails. |
 | `PublicURLDown`, `CertificateExpiresSoon` | full | The public URL fails, or its certificate expires in less than 14 days. |
+
+HTTP RED and its error and latency alerts cover the API.
+The web service exports traces only. Web request metrics are outside the scope of M6.
+`APIRequestMetricsMissing` can also fire before the API receives its first request.
+Check the API and Alloy when this warning fires.
+`AlloyMissing` detects a stopped collector even when no `up == 0` sample arrives.
 
 Put your own rules in `monitoring/alerts/custom.yml`.
 Grafana sends a notification for each firing Prometheus alert.
@@ -175,6 +183,25 @@ These values are secrets in `/opt/<app>/secrets`:
 - `SMTP_PASSWORD` (optional).
 
 Set the password from standard input with `spinup secrets set --env staging GRAFANA_ADMIN_PASSWORD`.
+Deploy the changed secret with `spinup deploy --env staging`.
+If Grafana remains running after deployment, restart it on the VM:
+
+```sh
+docker compose -p <app>-monitoring -f /opt/<app>/monitoring/compose.monitoring.yml restart grafana
+```
+
+Replace `<app>` with the app name.
+On each start, the entrypoint waits for Grafana to become healthy.
+It then resets the admin password from `GRAFANA_ADMIN_PASSWORD`, including when the database already exists.
+The reset uses the server configuration and data directory.
+The CLI receives the password through standard input. Password characters cannot become shell commands.
+
+The entrypoint checks whether the CLI supports `--password-from-stdin`.
+If this option is absent, Grafana starts with a manual reset message.
+The secret then sets the password only when Grafana creates its database.
+For a manual reset, sign in with the existing admin password.
+Change the admin password in Grafana to match `GRAFANA_ADMIN_PASSWORD`.
+If an automatic reset fails, the entrypoint stops Grafana and reports the failure.
 
 If you set no channel, Grafana still shows the alerts, but it sends nothing.
 Point the heartbeat at an external service, for example a healthchecks.io check with a 5-minute period.
@@ -186,8 +213,9 @@ The folder Stack holds spinup's dashboards: HTTP RED, Go runtime, Caddy, Backups
 In the profile `full`, it also holds the vendored Node Exporter Full, cAdvisor, and PostgreSQL dashboards.
 The folder Custom holds your own dashboards from `monitoring/grafana/dashboards/custom/`.
 
-- HTTP RED reads `http_server_request_duration_seconds`, the kit request metric.
-- Backups reads `backup_last_age_seconds`, the kit gauge `backup.last_age`, and the Postgres archiver metrics.
+- HTTP RED reads `http_server_request_duration_seconds`, the kit metric for API requests. It does not cover web requests.
+- Backups reads `backup_last_age_seconds`. Only the profile `full` includes panels for Postgres archiver metrics.
+  M7 adds the backup age producer and its recording rule. Until then, backup age panels show no data.
 - Deploys shows the Grafana annotations with the tag `deploy`.
 - Go runtime reads the kit runtime metrics (`go_goroutine_count`, `go_memory_used_bytes`, and the others). `telemetry.Setup` starts them.
 - Caddy reads the Caddy metrics on `caddy:2020`. The deploy Caddyfile serves them there, and it does not publish the port.

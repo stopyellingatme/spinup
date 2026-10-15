@@ -67,9 +67,9 @@ otelcol.processor.transform "redact" {
 			`replace_all_patterns(attributes, "value", "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@")`,
 			`replace_all_patterns(attributes, "value", "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key)=)[^&\\s]+", "$1[REDACTED]")`,
 			`replace_all_patterns(attributes, "value", "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+", "[REDACTED_JWT]")`,
-			`replace_pattern(body, "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key|authorization)[\"']?\\s*[:=]\\s*[\"']?)[^\"'&\\s,}]+", "$1[REDACTED]") where IsString(body)`,
-			`replace_pattern(body, "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@") where IsString(body)`,
 			`replace_pattern(body, "(?i)(bearer|basic) [a-z0-9._~+/=-]{8,}", "$1 [REDACTED]") where IsString(body)`,
+			`replace_pattern(body, "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key|authorization)[\"']?\\s*[:=]\\s*)(?:\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|(?:(?:bearer|basic)\\s+)?[^\"'&\\s,}]+)", "$1[REDACTED]") where IsString(body)`,
+			`replace_pattern(body, "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@") where IsString(body)`,
 			`replace_pattern(body, "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+", "[REDACTED_JWT]") where IsString(body)`,
 		]
 	}
@@ -130,8 +130,17 @@ otelcol.exporter.otlphttp "tempo" {
 
 prometheus.exporter.self "alloy" { }
 
+// The self exporter sets job="integrations/self". Replace it before the scrape.
+discovery.relabel "alloy" {
+	targets = prometheus.exporter.self.alloy.targets
+	rule {
+		target_label = "job"
+		replacement = "alloy"
+	}
+}
+
 prometheus.scrape "alloy" {
-	targets         = prometheus.exporter.self.alloy.targets
+	targets         = discovery.relabel.alloy.output
 	job_name        = "alloy"
 	scrape_interval = "30s"
 	forward_to      = [prometheus.remote_write.default.receiver]

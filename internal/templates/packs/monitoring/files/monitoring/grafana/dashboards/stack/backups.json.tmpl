@@ -82,7 +82,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": [[ if eq .monitoring_profile "full" ]]8[[ else ]]24[[ end ]],
         "x": 0,
         "y": 1
       },
@@ -116,7 +116,7 @@
       ],
       "title": "Newest backup age",
       "type": "stat"
-    },
+    }[[ if eq .monitoring_profile "full" ]],
     {
       "datasource": {
         "type": "prometheus",
@@ -144,7 +144,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": [[ if eq .monitoring_profile "full" ]]8[[ else ]]24[[ end ]],
         "x": 8,
         "y": 1
       },
@@ -178,7 +178,7 @@
       ],
       "title": "Last WAL archive age",
       "type": "stat"
-    },
+    }[[ end ]][[ if eq .monitoring_profile "full" ]],
     {
       "datasource": {
         "type": "prometheus",
@@ -206,7 +206,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": [[ if eq .monitoring_profile "full" ]]8[[ else ]]24[[ end ]],
         "x": 16,
         "y": 1
       },
@@ -240,7 +240,7 @@
       ],
       "title": "Failed WAL archives (24 h)",
       "type": "stat"
-    },
+    }[[ end ]],
     {
       "datasource": {
         "type": "prometheus",
@@ -265,7 +265,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": [[ if eq .monitoring_profile "full" ]]12[[ else ]]24[[ end ]],
         "x": 0,
         "y": 7
       },
@@ -294,7 +294,7 @@
       ],
       "title": "Newest backup age",
       "type": "timeseries"
-    },
+    }[[ if eq .monitoring_profile "full" ]],
     {
       "datasource": {
         "type": "prometheus",
@@ -319,7 +319,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": [[ if eq .monitoring_profile "full" ]]12[[ else ]]24[[ end ]],
         "x": 12,
         "y": 7
       },
@@ -357,7 +357,7 @@
       ],
       "title": "WAL segments archived",
       "type": "timeseries"
-    }
+    }[[ end ]]
   ],
   "refresh": "1m",
   "schemaVersion": 39,

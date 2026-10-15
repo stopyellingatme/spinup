@@ -24,3 +24,12 @@ groups:
         annotations:
           summary: "{{ $labels.job }}: the scrape of {{ $labels.instance }} fails"
           description: "Alloy cannot scrape {{ $labels.instance }} (job {{ $labels.job }}) for 5 minutes."
+
+      # Alloy writes every stack scrape. A stopped collector cannot send up=0.
+      - alert: AlloyMissing
+        expr: absent_over_time(up{job="alloy"}[5m])
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alloy: no self-scrape data for 5 minutes"
+          description: "Alloy stopped sending metrics. Check the collector and its connection to Prometheus."

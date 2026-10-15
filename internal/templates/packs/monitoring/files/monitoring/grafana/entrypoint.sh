@@ -3,8 +3,8 @@
 #
 # The Grafana start script (compose.monitoring.yml). It reads the secret files, copies the
 # managed provisioning to $GF_PATHS_PROVISIONING, and writes the notification settings from
-# the environment. Then it starts Grafana. The secret values never enter the Compose file, the
-# image, or `docker inspect`.
+# the environment. It starts Grafana and resets the admin password from the secret.
+# The secret values never enter the Compose file, the image, or `docker inspect`.
 #
 # It writes alerting/notifications.yml: the contact points and the notification policy.
 # Contact point "spinup": one integration for each channel that is set.
@@ -138,4 +138,52 @@ if [ -n "${ALERT_NTFY_URL:-}" ]; then channels="$channels ntfy"; fi
 	fi
 } >"$provisioning/alerting/notifications.yml"
 
-exec /run.sh "$@"
+# Older CLI versions need a manual reset. Detect stdin support without exposing the secret.
+if ! grafana cli admin reset-admin-password --help 2>/dev/null | grep -q -- '--password-from-stdin'; then
+	echo "grafana: automatic password rotation unavailable: the CLI needs a manual reset." >&2
+	echo "Try: sign in with the existing password and change it to match GRAFANA_ADMIN_PASSWORD." >&2
+	exec /run.sh "$@"
+fi
+
+# Grafana creates the admin user on its first start. Wait for its database migrations before
+# resetting the password. This also applies a rotated secret to an existing grafana_data volume.
+/run.sh "$@" &
+server_pid=$!
+stop_server() {
+	kill -TERM "$server_pid" 2>/dev/null || :
+	wait "$server_pid" || :
+}
+trap 'stop_server; exit 143' TERM
+trap 'stop_server; exit 130' INT
+
+attempts=0
+until wget -q -O /dev/null http://127.0.0.1:3000/api/health; do
+	if ! kill -0 "$server_pid" 2>/dev/null || [ "$attempts" -ge 120 ]; then
+		echo "grafana: password reset failed: the server did not become healthy." >&2
+		echo "Try: inspect the Grafana logs, then restart the monitoring stack." >&2
+		stop_server
+		exit 1
+	fi
+	attempts=$((attempts + 1))
+	sleep 1
+done
+
+# Use the same configuration and database as the server. Never put the password in an argument
+# or interpolate it into shell code. The CLI reads the secret through standard input.
+if ! printf '%s\n' "$GF_SECURITY_ADMIN_PASSWORD" | grafana cli \
+	--homepath "${GF_PATHS_HOME:-/usr/share/grafana}" \
+	--config "${GF_PATHS_CONFIG:-/etc/grafana/grafana.ini}" \
+	--configOverrides "cfg:default.paths.data=${GF_PATHS_DATA:-/var/lib/grafana}" \
+	admin reset-admin-password --password-from-stdin; then
+	echo "grafana: password reset failed: the CLI could not update the admin user." >&2
+	echo "Try: inspect the Grafana logs and the secret, then restart the monitoring stack." >&2
+	stop_server
+	exit 1
+fi
+
+# Preserve the server exit status and forward container shutdown signals.
+set +e
+wait "$server_pid"
+status=$?
+trap - TERM INT
+exit "$status"
