@@ -4,64 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/stopyellingatme/spinup/internal/compat"
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/merge"
 )
 
-// CheckGitVersion is the version-check adapter until the merge implementation is installed.
-var CheckGitVersion = checkGitVersion
-
-// NewMerger constructs the Git merger until merge.NewGit is installed.
-var NewMerger = func(r exec.Runner) merge.Merger { return gitMerger{runner: r} }
-
-func checkGitVersion(ctx context.Context, runner exec.Runner) error {
-	result, err := runner.Run(ctx, exec.Cmd{Name: "git", Args: []string{"--version"}})
-	if err != nil {
-		return fmt.Errorf("check Git version: %w\nTry: install Git 2.44.0 or later", err)
-	}
-	fields := strings.Fields(string(result.Stdout))
-	if len(fields) < 3 {
-		return fmt.Errorf("check Git version: invalid version output\nTry: install Git 2.44.0 or later")
-	}
-	parts := strings.Split(fields[2], ".")
-	if len(parts) > 3 {
-		parts = parts[:3]
-	}
-	version, err := compat.ParseVersion(strings.Join(parts, "."))
-	if err != nil || version.Compare(compat.Version{Major: 2, Minor: 44}) < 0 {
-		return fmt.Errorf("check Git version: Git 2.44.0 or later is required\nTry: update Git")
-	}
-	return nil
+// CheckGitVersion checks the minimum Git version. Tests may replace it.
+var CheckGitVersion = func(ctx context.Context, runner exec.Runner) error {
+	_, err := merge.CheckGitVersion(ctx, runner)
+	return err
 }
 
-type gitMerger struct{ runner exec.Runner }
-
-func (m gitMerger) Merge(ctx context.Context, in merge.Input) (merge.Result, error) {
-	dir, err := os.MkdirTemp("", "spinup-merge-")
-	if err != nil {
-		return merge.Result{}, err
-	}
-	defer os.RemoveAll(dir)
-	names := []string{"ours", "base", "theirs"}
-	for i, data := range [][]byte{in.Ours, in.Base, in.Theirs} {
-		if err := os.WriteFile(filepath.Join(dir, names[i]), data, 0600); err != nil {
-			return merge.Result{}, err
-		}
-	}
-	result, err := m.runner.Run(ctx, exec.Cmd{Name: "git", Dir: dir, Args: []string{"merge-file", "-p", "--diff3", "--diff-algorithm=histogram", "-L", "ours: " + in.Path, "-L", "base: " + in.Path, "-L", "theirs: " + in.Path, "ours", "base", "theirs"}})
-	if err != nil {
-		var exit *exec.ExitError
-		if !errors.As(err, &exit) || result.ExitCode < 1 || result.ExitCode > 127 {
-			return merge.Result{}, err
-		}
-	}
-	return merge.Result{Data: result.Stdout, Conflicted: result.ExitCode != 0}, nil
-}
+// NewMerger constructs the merger for an upgrade. Tests may replace it.
+var NewMerger = merge.NewGit
 
 func (r *Runner) git(ctx context.Context, dir string, args ...string) (string, error) {
 	result, err := r.Exec.Run(ctx, exec.Cmd{Name: "git", Args: args, Dir: dir})

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/merge"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 )
 
@@ -279,7 +280,7 @@ func TestWorktreeGitVersion(t *testing.T) {
 			t.Parallel()
 			fake := &exec.Fake{}
 			fake.Expect("git", "--version").Return(tc.version, "", 0)
-			err := checkGitVersion(context.Background(), fake)
+			_, err := merge.CheckGitVersion(context.Background(), fake)
 			if (err != nil) != tc.fail {
 				t.Fatalf("error=%v", err)
 			}
