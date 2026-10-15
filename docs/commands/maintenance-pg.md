@@ -56,7 +56,13 @@ It compares all records in `goose_db_version` and exact counts for every user ta
 A mismatch stops the command before the swap.
 The command then stops the old server and changes the VM Compose image and volume.
 It builds the postgres image with pgBackRest and starts the new server.
-It runs the release migrations and starts the live color.
+
+If the backups module uses pgBackRest, the command updates the VM configuration for the new data path.
+It loads the `PGBACKREST_*` secrets and runs `pgbackrest --stanza=<app> stanza-upgrade` inside the new server.
+An empty backend setting selects pgBackRest.
+If the stanza upgrade fails, the command fails with a `Try:` line.
+It does not report completion while the stanza requires repair.
+It then runs the release migrations and starts the live color.
 
 The smoke check uses the deploy paths: `/healthz`, the configured smoke URLs, and `/version`.
 The version must contain the release commit.
@@ -74,10 +80,18 @@ The major command stores recovery files in `/opt/<app>/pg-upgrade`.
 It refuses another major upgrade while that directory exists.
 Use `--cleanup --i-know` after you verify the upgraded app.
 Cleanup requires the new volume to be active and the upgrade to be complete.
+
+It also requires `answers.db_version` in `spinup.lock` to match the active major.
+In `deploy/compose.edge.yml`, `volumes.postgres_data` must have `external: true` and the new volume name.
+If these repository changes are missing, cleanup refuses and lists the required changes.
+
 It removes the anchor container and the old volume.
 It then removes the recovery files.
 Cleanup permanently removes this recovery path.
+
 The minor command stores its recovery files in `/opt/<app>/pg-minor-upgrade`.
+Before each attempt, it removes an existing anchor with the same name without removing any volume.
+A failed attempt therefore permits a retry.
 
 Commit the repository changes before the next deploy.
 The VM swap survives the next `spinup deploy` only after these changes.
@@ -105,6 +119,17 @@ The restore commands render from the changed answer and update the hashes in the
 Keep the named volume mapping when you review future template merges.
 For a minor upgrade, update the repository pins with `spinup upgrade` before the next deploy.
 
-If you use pgBackRest, review its stanza after a major upgrade.
-Use the pgBackRest procedure for a new PostgreSQL major and take a new full backup.
+If you use pgBackRest, render and commit its configuration after you change the lock answer.
+Then take a new full backup immediately.
+The upgrade prints this requirement as a warning.
+The backup command uploads the repository configuration, so render that configuration before the backup.
+
+<!-- doctest: skip -->
+```console
+$ spinup restore deploy/pgbackrest/pgbackrest.conf --force
+...
+$ spinup backup now --env production --type full
+...
+```
+
 The upgrade retains the original physical backups and takes a logical dump for the upgrade.
