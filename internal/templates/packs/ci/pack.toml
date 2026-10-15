@@ -1,0 +1,8 @@
+name = "ci"
+description = "Build and test the Go API with PostgreSQL in GitHub Actions."
+requires = []
+
+[[files]]
+path = ".github/workflows/ci.yml"
+source = "files/.github/workflows/ci.yml.tmpl"
+class = "managed"
