@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/project"
@@ -71,5 +72,11 @@ func migrateError(err error) error {
 		code = exit.Code
 		why = fmt.Sprintf("%s exited with status %d", exit.Cmd, exit.Code)
 	}
-	return &ui.Error{What: "Cannot run migration", Why: why, Try: "check the command output and environment, then retry", Code: code, Err: err}
+	try := "check the command output and environment, then retry"
+	// Errors from internal/project carry their own "Try:" hint. Show it once, in the Try field.
+	if before, after, ok := strings.Cut(why, "Try:"); ok {
+		why = strings.TrimRight(strings.TrimSpace(before), ".")
+		try = strings.TrimSpace(after)
+	}
+	return &ui.Error{What: "Cannot run migration", Why: why, Try: try, Code: code, Err: err}
 }

@@ -144,7 +144,7 @@ func TestMigrateProcessErrors(t *testing.T) {
 		wantWhy  string
 	}{
 		{name: "nonzero exit", wantWhy: "go run ./cmd/api migrate up exited with status 1"},
-		{name: "cannot start", startErr: &run.NotFoundError{Name: "go"}, wantWhy: (&run.NotFoundError{Name: "go"}).Error()},
+		{name: "cannot start", startErr: &run.NotFoundError{Name: "go"}, wantWhy: `command "go" was not found`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -172,5 +172,17 @@ func TestMigrateProcessErrors(t *testing.T) {
 			}
 			fake.AssertDone(t)
 		})
+	}
+}
+
+func TestMigrateErrorMovesEmbeddedTry(t *testing.T) {
+	t.Parallel()
+	err := migrateError(errors.New(`cannot db migrate down in protected environment "prod". Try: re-run in a terminal, or pass --yes in CI`))
+	var uiErr *ui.Error
+	if !errors.As(err, &uiErr) {
+		t.Fatalf("error = %T, want *ui.Error", err)
+	}
+	if uiErr.Why != `cannot db migrate down in protected environment "prod"` || uiErr.Try != "re-run in a terminal, or pass --yes in CI" {
+		t.Fatalf("Why = %q, Try = %q", uiErr.Why, uiErr.Try)
 	}
 }
