@@ -62,7 +62,7 @@ func TestNewJSONAndDryRun(t *testing.T) {
 			if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 				t.Fatal(err)
 			}
-			if got.Dir != filepath.Join(dir, "todo") || len(got.Packs) != 3 || got.Files == 0 {
+			if got.Dir != filepath.Join(dir, "todo") || len(got.Packs) != 4 || got.Files == 0 {
 				t.Fatalf("JSON=%s", out.String())
 			}
 			_, err := os.Stat(got.Dir)

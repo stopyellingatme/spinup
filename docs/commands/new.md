@@ -1,7 +1,7 @@
 # Create an application
 
 `spinup new <name>` composes template packs and creates an application directory.
-The default packs are `base`, `api`, `web`, and `ci`.
+The default packs are `base`, `api`, `web`, `ci`, and `deploy`.
 Pass `--api-only` to create the Go API without the web frontend.
 
 ```console
@@ -26,7 +26,7 @@ It excludes `.env` and `spinup.lock`.
 | --- | --- |
 | `--api-only` | Create the Go API without a web frontend. |
 | `--module <path>` | Set the Go module path. The API module adds `/api`. |
-| `--modules <names>` | Select optional packs with comma-separated names. The default is `ci`. Use `--modules=''` for none. |
+| `--modules <names>` | Select optional packs with comma-separated names. The default is `ci,deploy`. Use `--modules=''` for none. |
 | `--db-version <major>` | Select PostgreSQL `18`, `17`, or `16`. The default is `18`. |
 | `--shadcn-registry <version>` | Record the shadcn-svelte registry version of the web components. The default is `1.7.0`. |
 | `--no-git` | Do not initialize a git repository. |

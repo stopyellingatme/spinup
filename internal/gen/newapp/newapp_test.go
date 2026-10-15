@@ -36,7 +36,7 @@ func TestGenerateAndApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(result.Packs, []string{"base", "api", "ci"}) {
+	if !reflect.DeepEqual(result.Packs, []string{"base", "api", "ci", "deploy"}) {
 		t.Fatalf("packs=%q", result.Packs)
 	}
 	if _, err := os.Stat(result.Dir); !os.IsNotExist(err) {
