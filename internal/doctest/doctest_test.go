@@ -147,6 +147,9 @@ func TestDocs(t *testing.T) {
 	// Pages run with their own HOME: pnpm (scripts/bin/pnpm) and corepack use the real one.
 	if home, err := os.UserHomeDir(); err == nil {
 		vars = append(vars, "SPINUP_PNPM_HOME="+home)
+		if os.Getenv("DOCKER_CONFIG") == "" {
+			vars = append(vars, "DOCKER_CONFIG="+filepath.Join(home, ".docker"))
+		}
 		if os.Getenv("COREPACK_HOME") == "" {
 			vars = append(vars, "COREPACK_HOME="+filepath.Join(home, ".cache", "node", "corepack"))
 		}

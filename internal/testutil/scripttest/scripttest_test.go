@@ -196,6 +196,12 @@ func nodeCaches() map[string]string {
 		return caches
 	}
 	caches["SPINUP_PNPM_HOME"] = home
+	// The docker CLI finds its context (Docker Desktop's socket) through ~/.docker.
+	if value := os.Getenv("DOCKER_CONFIG"); value != "" {
+		caches["DOCKER_CONFIG"] = value
+	} else {
+		caches["DOCKER_CONFIG"] = filepath.Join(home, ".docker")
+	}
 	if value := os.Getenv("COREPACK_HOME"); value != "" {
 		caches["COREPACK_HOME"] = value
 	} else {
