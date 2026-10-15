@@ -3,6 +3,7 @@ package upgrade
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -220,5 +221,39 @@ func TestGoFixAndVerifySkipCommittedConflicts(t *testing.T) {
 	s.Runner.(*exec.Fake).AssertDone(t)
 	if !strings.Contains(out.String(), "Skipped go fix") || !strings.Contains(out.String(), "Skipped verify") {
 		t.Fatalf("output=%q", out.String())
+	}
+}
+
+func TestDepsRefreshesWebLockfile(t *testing.T) {
+	t.Parallel()
+	for _, conflict := range []bool{false, true} {
+		t.Run(fmt.Sprint("conflict=", conflict), func(t *testing.T) {
+			t.Parallel()
+			s := phaseStep(t)
+			if err := os.MkdirAll(filepath.Join(s.Worktree, "web"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(s.Worktree, "web/package.json"), []byte("{}\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			s.Plan = &Plan{}
+			if conflict {
+				s.Plan.Files = []FileDecision{{Path: "web/package.json", Action: ActionConflict}}
+			}
+			fake := s.Runner.(*exec.Fake)
+			fake.Expect("go", "mod", "edit", "-json").Return(`{"Require":[]}`, "", 0)
+			fake.Expect("go", "mod", "tidy")
+			api, web := filepath.Join(s.Worktree, "api"), filepath.Join(s.Worktree, "web")
+			dirs, commands := []string{api, api}, []string{"go mod edit -json", "go mod tidy"}
+			if !conflict {
+				fake.Expect("pnpm", "install", "--lockfile-only", "--prefer-offline", "--ignore-scripts")
+				dirs, commands = append(dirs, web), append(commands, "pnpm install --lockfile-only --prefer-offline --ignore-scripts")
+			}
+			s.To.Version = "0.0.0-dev"
+			if err := phaseDeps(context.Background(), s); err != nil {
+				t.Fatal(err)
+			}
+			assertPhaseCalls(t, fake, dirs, commands...)
+		})
 	}
 }

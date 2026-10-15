@@ -68,6 +68,9 @@ The managed `api/tools.mod` file receives its pins through the template changes.
 
 The upgrade runs `go mod tidy` with the user's environment.
 This command can need network access for modules missing from the cache.
+If the app has `web/package.json`, the upgrade then runs `pnpm install --lockfile-only --prefer-offline --ignore-scripts` in `web/`.
+`web/pnpm-lock.yaml` is a seed file, so the upgrade regenerates it instead of merging it.
+If `web/package.json` has a conflict, the upgrade skips this step and tells you to run `pnpm install` after you resolve it.
 The upgrade then runs `go fix ./...` in `api/`.
 Changes from `go fix` receive a separate commit.
 
