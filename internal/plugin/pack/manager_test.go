@@ -214,6 +214,7 @@ func TestResolveFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "bad-lock":
+				recordRenderedPlugins(t, m)
 				l, err := manifest.Load(filepath.Join(m.Root, "spinup.lock"))
 				if err != nil {
 					t.Fatal(err)
@@ -225,7 +226,11 @@ func TestResolveFailures(t *testing.T) {
 			case "offline-miss":
 				m.CacheDir = t.TempDir()
 			}
-			_, err := m.resolve(t.Context(), plugin.Options{Root: m.Root, Offline: kind == "offline-miss"})
+			opts := plugin.Options{Root: m.Root, Offline: kind == "offline-miss"}
+			if kind == "bad-lock" {
+				opts.Versions = map[string]string{"example": "1.0.0"}
+			}
+			_, err := m.resolve(t.Context(), opts)
 			if err == nil || !strings.Contains(err.Error(), "Try:") {
 				t.Fatalf("got %v", err)
 			}
@@ -284,11 +289,11 @@ func TestVersionOverrideAndCacheTamper(t *testing.T) {
 	if _, err := m.resolve(t.Context(), plugin.Options{Root: m.Root, Offline: true}); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := manifest.Load(filepath.Join(m.Root, "spinup.lock"))
+	all, err := m.resolve(t.Context(), plugin.Options{Root: m.Root, Offline: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir, err := m.cacheDir("example", "v2.0.0", "path:"+root, lock.Plugins[0].SHA256)
+	dir, err := m.cacheDir("example", "v2.0.0", "path:"+root, all[0].SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}

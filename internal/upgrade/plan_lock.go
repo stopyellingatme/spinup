@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	pluginrender "github.com/stopyellingatme/spinup/internal/plugin/render"
 	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
@@ -37,7 +38,7 @@ func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[st
 	next.FormatterGo = runtime.Version()
 	next.Answers = clonePlanAnswers(answers)
 	next.Packs = slices.Clone(packs)
-	next.Plugins = slices.Clone(old.Plugins)
+	next.Plugins = pluginrender.Plugins(version.Packs)
 	next.AppliedMigrations = slices.Clone(old.AppliedMigrations)
 	next.Tombstones = slices.Clone(old.Tombstones)
 	next.Orphans = slices.Clone(old.Orphans)

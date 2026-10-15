@@ -1,0 +1,146 @@
+# Exercise plugin rendering with offline tool shims for dependency phases.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go
+# Keep real go available while the script harness builds spinup.
+env PATH=$WORK/tools:$PATH
+mkversion 0.0.1
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec cp -R $SPINUP_REPO/testdata/plugins/example plugin
+cp initial-content plugin/files/example.txt.tmpl
+exec spinup new demo --api-only --modules '' --module example.com/demo --non-interactive
+cd demo
+cp spinup.lock ../before-add.lock
+exec spinup plugin add path:$WORK/plugin --trust
+cmp spinup.lock ../before-add.lock
+exec git add -A
+exec git commit -m 'Trust example'
+! exists example.txt
+exec spinup upgrade --to 0.0.0-dev --yes --no-verify
+stdout 'example.txt'
+exec git merge spinup/upgrade-0.0.0-dev
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec git branch -D spinup/upgrade-0.0.0-dev
+exists example.txt
+grep 'plugin/example/files/example.txt.tmpl' spinup.lock
+
+# Plugin generators use the normal runner for previews, diffs, and forced writes.
+exec spinup generate --help
+stdout greeting
+exec spinup generate greeting --help
+stdout 'Create a greeting'
+stdout 'greeting <Name>'
+exec spinup generate greeting Ada --dry-run
+stdout 'greetings/Ada.txt'
+! exists greetings/Ada.txt
+exec spinup generate greeting Ada --diff
+stdout 'Hello, Ada!'
+! exists greetings/Ada.txt
+exec spinup generate greeting Ada
+grep 'Hello, Ada!' greetings/Ada.txt
+grep 'plugin/example/gen/greeting' spinup.lock
+cp ../user-greeting greetings/Ada.txt
+! exec spinup generate greeting Ada
+stderr '--force'
+exec spinup generate greeting Ada --force
+exec git add -A
+exec git commit -m 'Generate greeting'
+
+# A new approval changes NEW. OLD must retain version 1 from the cache.
+cp ../version2 ../plugin/plugin.toml
+cp ../content2 ../plugin/files/example.txt.tmpl
+cp ../user-content example.txt
+cp spinup.lock ../before-update.lock
+exec spinup plugin update example --version 2.0.0 --trust
+cmp spinup.lock ../before-update.lock
+exec git add -A
+exec git commit -m 'Update example and edit app'
+exec spinup upgrade --to 0.0.1 --yes --no-verify --offline
+exec git merge spinup/upgrade-0.0.1
+exec git worktree remove .spinup/upgrade/0.0.1
+grep 'Plugin version two.' example.txt
+grep '"version": "2.0.0"' spinup.lock
+grep 'User extension.' example.txt
+grep 'Hello, Ada!' greetings/Ada.txt
+grep 'plugin/example/gen/greeting' spinup.lock
+
+# New apps can select plugins directly. Missing consent leaves no target directory.
+cd $WORK
+! exec spinup new denied --api-only --modules '' --plugin path:$SPINUP_REPO/testdata/plugins/example --non-interactive
+stderr '--trust'
+! exists denied
+exec spinup new direct --api-only --modules '' --plugin path:$SPINUP_REPO/testdata/plugins/example@1.0.0 --trust --no-git --non-interactive
+exists direct/example.txt
+exists direct/.spinup/plugins.allow
+exists direct/.spinup/plugins.history
+exec spinup --dir direct generate greeting Grace
+grep 'Hello, Grace!' direct/greetings/Grace.txt
+cd direct
+exec git init -b main
+exec git add -A
+exec git commit -m 'New app with plugin'
+exec git ls-files --error-unmatch .spinup/plugins.allow .spinup/plugins.history
+exec spinup upgrade --to 0.0.1 --yes --no-verify --offline
+exec git merge spinup/upgrade-0.0.1
+grep 'name = .example.' spinup.toml
+grep 'Hello, Grace!' greetings/Grace.txt
+rm .spinup/plugins.allow
+! exec spinup generate greeting Denied --dry-run
+stderr 'allowlist'
+stderr 'Try:'
+! exists greetings/Denied.txt
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+-- user-greeting --
+User greeting.
+-- initial-content --
+This file came from the example plugin.
+2
+3
+4
+5
+6
+7
+8
+Extension area.
+-- user-content --
+This file came from the example plugin.
+2
+3
+4
+5
+6
+7
+8
+User extension.
+-- content2 --
+Plugin version two.
+2
+3
+4
+5
+6
+7
+8
+Extension area.
+-- version2 --
+name = "example"
+version = "2.0.0"
+api = 1
+spinup = ">=0.0.0"
+description = "Example version two."
+
+[[generators]]
+name = "greeting"
+short = "Create a greeting"
+args = ["Name"]
+
+[[generators.files]]
+path = "greetings/{{.Name}}.txt"
+source = "files/greeting.txt.tmpl"
+class = "scaffold"

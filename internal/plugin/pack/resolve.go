@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -42,70 +43,25 @@ func (m *Manager) resolveAll(ctx context.Context, o plugin.Options, refresh bool
 	if err != nil {
 		return nil, problem("load plugin declarations", err)
 	}
-	if len(cfg.Plugins) == 0 {
-		return nil, nil
-	}
-	lock, err := manifest.Load(m.Root + "/" + project.LockFile)
+	inputs, err := m.resolveInputs(cfg, o.Versions)
 	if err != nil {
 		return nil, err
 	}
-	allow, err := readAllowlist(m.Root, false)
-	if err != nil {
-		return nil, err
-	}
-	locked := map[string]manifest.Plugin{}
-	for _, entry := range lock.Plugins {
-		if _, ok := locked[entry.Name]; ok {
-			return nil, problem("resolve plugins", fmt.Errorf("duplicate lock entry %q", entry.Name))
-		}
-		locked[entry.Name] = entry
-	}
-	seen := map[string]bool{}
+	return m.loadInputs(ctx, o, inputs, refresh)
+}
+
+func (m *Manager) loadInputs(ctx context.Context, o plugin.Options, inputs []resolveInput, refresh bool) ([]plugin.Loaded, error) {
+	var err error
 	var result []plugin.Loaded
-	for _, decl := range cfg.Plugins {
-		if seen[decl.Name] || !namePattern.MatchString(decl.Name) || !safeVersion(decl.Version) {
-			return nil, problem("resolve plugin", fmt.Errorf("invalid or duplicate declaration %q", decl.Name))
-		}
-		seen[decl.Name] = true
-		entry, ok := locked[decl.Name]
-		approved, trusted := allow[decl.Name]
-		if !ok || !trusted || entry.API != plugin.API || approved.Source != decl.Source || approved.SHA256 != entry.SHA256 || !validHash(entry.SHA256) {
-			return nil, problem("resolve plugin", fmt.Errorf("plugin %q differs from the lock or allowlist", decl.Name))
-		}
-		version := decl.Version
-		if override, ok := o.Versions[decl.Name]; ok {
-			version = override
-		}
-		if !safeVersion(version) {
-			return nil, problem("resolve plugin", fmt.Errorf("invalid version %q", version))
-		}
+	for _, input := range inputs {
+		decl, expectedHash := input.Plugin, input.hash
 		var tr tree
-		// Historical overrides require a hash approved in this project's history.
-		historical := !sameVersion(version, entry.Version)
-		if historical && o.Versions[decl.Name] == "" {
-			return nil, problem("resolve plugin", fmt.Errorf("plugin %q version differs from lock", decl.Name))
-		}
-		expectedHash := entry.SHA256
-		if _, overridden := o.Versions[decl.Name]; overridden {
-			historyHash, historyErr := m.historyHash(decl.Name, version, decl.Source)
-			if historyErr != nil {
-				return nil, historyErr
-			}
-			if historical && historyHash == "" {
-				return nil, problem("resolve historical plugin", fmt.Errorf("project history has no approved hash for %s@%s", decl.Name, version))
-			}
-			if historical {
-				expectedHash = historyHash
-			} else if historyHash != "" && historyHash != expectedHash {
-				return nil, problem("resolve historical plugin", fmt.Errorf("project history differs from the lock for %s@%s", decl.Name, version))
-			}
-		}
-		useCache := m.Offline || o.Offline || historical || (!refresh && strings.HasPrefix(decl.Source, "git:"))
+		useCache := m.Offline || o.Offline || input.historical || (!refresh && strings.HasPrefix(decl.Source, "git:"))
 		if useCache {
-			tr, err = m.cached(decl.Name, version, decl.Source, expectedHash)
+			tr, err = m.cached(decl.Name, decl.Version, decl.Source, expectedHash)
 		}
-		if !useCache || errors.Is(err, fs.ErrNotExist) && !m.Offline && !o.Offline && !historical {
-			tr, err = m.fetch(ctx, decl.Source, version, decl.Name)
+		if !useCache || errors.Is(err, fs.ErrNotExist) && !m.Offline && !o.Offline && !input.historical {
+			tr, err = m.fetch(ctx, decl.Source, decl.Version, decl.Name)
 		}
 		if err != nil {
 			return nil, err
@@ -114,15 +70,17 @@ func (m *Manager) resolveAll(ctx context.Context, o plugin.Options, refresh bool
 		if err != nil {
 			return nil, err
 		}
-		if meta.Name != decl.Name || !sameVersion(meta.Version, version) {
+		if meta.Name != decl.Name || !sameVersion(meta.Version, decl.Version) {
 			return nil, problem("resolve plugin", fmt.Errorf("metadata differs from declaration for %q", decl.Name))
 		}
 		hash := tr.hash()
 		if hash != expectedHash {
 			return nil, problem("resolve plugin", fmt.Errorf("plugin %q hash mismatch: got %s, approved %s", decl.Name, hash, expectedHash))
 		}
+		// Preserve the declared tag spelling in the lock without changing tree bytes.
+		meta.Version = decl.Version
 		loaded := plugin.Loaded{Meta: meta, Source: decl.Source, SHA256: hash, FS: tr.fs()}
-		if !m.Offline && !o.Offline && !historical {
+		if !m.Offline && !o.Offline && !input.historical {
 			if err := m.cache(tr, loaded); err != nil {
 				return nil, err
 			}
@@ -131,4 +89,140 @@ func (m *Manager) resolveAll(ctx context.Context, o plugin.Options, refresh bool
 	}
 	return result, nil
 }
+
+type resolveInput struct {
+	project.Plugin
+	hash       string
+	historical bool
+}
+
+// resolveInputs separates current approval from the inputs of a historical render.
+// Overrides select only the named plugins, including removed declarations retained in history.
+func (m *Manager) resolveInputs(cfg *project.Config, versions map[string]string) ([]resolveInput, error) {
+	declared := map[string]project.Plugin{}
+	for _, decl := range cfg.Plugins {
+		if _, duplicate := declared[decl.Name]; duplicate || !namePattern.MatchString(decl.Name) || !safeVersion(decl.Version) {
+			return nil, problem("resolve plugin", fmt.Errorf("invalid or duplicate declaration %q", decl.Name))
+		}
+		declared[decl.Name] = decl
+	}
+	if len(versions) == 0 {
+		if len(cfg.Plugins) == 0 {
+			return nil, nil
+		}
+		allow, err := readAllowlist(m.Root, false)
+		if err != nil {
+			return nil, err
+		}
+		var inputs []resolveInput
+		for _, decl := range cfg.Plugins {
+			approved, ok := allow[decl.Name]
+			if !ok || approved.Source != decl.Source {
+				return nil, problem("resolve plugin", fmt.Errorf("plugin %q differs from the allowlist", decl.Name))
+			}
+			inputs = append(inputs, resolveInput{Plugin: decl, hash: approved.SHA256})
+		}
+		return inputs, nil
+	}
+	lock, err := manifest.Load(m.Root + "/" + project.LockFile)
+	if err != nil {
+		return nil, err
+	}
+	locked := map[string]manifest.Plugin{}
+	for _, entry := range lock.Plugins {
+		if _, duplicate := locked[entry.Name]; duplicate || entry.API != plugin.API || !validHash(entry.SHA256) {
+			return nil, problem("resolve plugins", fmt.Errorf("invalid or duplicate lock entry %q", entry.Name))
+		}
+		locked[entry.Name] = entry
+	}
+	history, err := readHistory(m.Root)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(versions))
+	for name := range versions {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	var inputs []resolveInput
+	for _, name := range names {
+		version := versions[name]
+		if !namePattern.MatchString(name) || !safeVersion(version) {
+			return nil, problem("resolve historical plugin", fmt.Errorf("invalid identity %s@%s", name, version))
+		}
+		entry := locked[name]
+		decl := declared[name]
+		if sameVersion(entry.Version, version) {
+			input, err := lockedInput(entry, history)
+			if err != nil {
+				return nil, err
+			}
+			input.Version = version
+			inputs = append(inputs, input)
+			continue
+		}
+		source := decl.Source
+		hash, err := m.historyHash(name, version, source)
+		if err != nil {
+			return nil, err
+		}
+		if hash == "" {
+			return nil, problem("resolve historical plugin", fmt.Errorf("project history has no matching approved hash for %s@%s", name, version))
+		}
+		inputs = append(inputs, resolveInput{Plugin: project.Plugin{Name: name, Source: source, Version: version}, hash: hash, historical: true})
+	}
+	return inputs, nil
+}
+
+// ResolveLocked loads exactly the rendered plugins from a lock, using project history and cached bytes.
+// The supplied entries can come from an intermediate lock during a chained upgrade.
+func ResolveLocked(ctx context.Context, o plugin.Options, entries []manifest.Plugin) ([]plugin.Loaded, error) {
+	m := &Manager{Root: o.Root, Offline: true, Out: o.Out, CLIVersion: buildVersion()}
+	return m.resolveLocked(ctx, o, entries)
+}
+
+func (m *Manager) resolveLocked(ctx context.Context, o plugin.Options, entries []manifest.Plugin) ([]plugin.Loaded, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	history, err := readHistory(m.Root)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	inputs := make([]resolveInput, 0, len(entries))
+	for _, entry := range entries {
+		if seen[entry.Name] {
+			return nil, problem("resolve historical plugin", fmt.Errorf("duplicate locked plugin %q", entry.Name))
+		}
+		seen[entry.Name] = true
+		input, err := lockedInput(entry, history)
+		if err != nil {
+			return nil, err
+		}
+		inputs = append(inputs, input)
+	}
+	return m.loadInputs(ctx, o, inputs, false)
+}
+
+func lockedInput(entry manifest.Plugin, history []historyEntry) (resolveInput, error) {
+	if !namePattern.MatchString(entry.Name) || !safeVersion(entry.Version) || entry.API != plugin.API || !validHash(entry.SHA256) {
+		return resolveInput{}, problem("resolve historical plugin", fmt.Errorf("invalid lock entry for %q", entry.Name))
+	}
+	var source string
+	for _, h := range history {
+		if h.Name != entry.Name || !sameVersion(h.Version, entry.Version) || h.SHA256 != entry.SHA256 {
+			continue
+		}
+		if source != "" && source != h.Source {
+			return resolveInput{}, problem("resolve historical plugin", fmt.Errorf("project history has multiple sources for %s@%s", entry.Name, entry.Version))
+		}
+		source = h.Source
+	}
+	if source == "" {
+		return resolveInput{}, problem("resolve historical plugin", fmt.Errorf("project history has no matching approved hash for %s@%s", entry.Name, entry.Version))
+	}
+	return resolveInput{Plugin: project.Plugin{Name: entry.Name, Source: source, Version: entry.Version}, hash: entry.SHA256, historical: true}, nil
+}
+
 func sameVersion(a, b string) bool { return strings.TrimPrefix(a, "v") == strings.TrimPrefix(b, "v") }

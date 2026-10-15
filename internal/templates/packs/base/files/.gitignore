@@ -1,7 +1,9 @@
 .env
 .env.*
 !.env.example
-.spinup/
+.spinup/*
+!.spinup/plugins.allow
+!.spinup/plugins.history
 api/bin/
 node_modules/
 .DS_Store

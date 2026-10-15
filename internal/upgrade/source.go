@@ -2,9 +2,19 @@ package upgrade
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"text/template"
 
+	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/plugin"
+	"github.com/stopyellingatme/spinup/internal/plugin/pack"
+	pluginrender "github.com/stopyellingatme/spinup/internal/plugin/render"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/render"
 	"github.com/stopyellingatme/spinup/internal/templates"
 	"github.com/stopyellingatme/spinup/internal/vfs"
@@ -16,7 +26,11 @@ func Render(v *templates.Version, packs []string, answers map[string]any) (vfs.P
 	if err != nil {
 		return vfs.Plan{}, err
 	}
-	return render.Render(render.Input{Packs: loaded, Answers: completed, Stack: v.Stack, TemplateVersion: v.Version})
+	plan, err := render.Render(render.Input{Packs: loaded, Answers: completed, Stack: v.Stack, TemplateVersion: v.Version})
+	if err != nil {
+		return vfs.Plan{}, err
+	}
+	return pluginrender.Prefix(v.Packs, plan), nil
 }
 
 func loadPlanPacks(v *templates.Version, names []string, answers map[string]any) ([]*templates.Pack, map[string]any, error) {
@@ -90,4 +104,80 @@ func renderRenamePath(source string, answers map[string]any) (string, error) {
 		return "", fmt.Errorf("render rename path %q: path is not clean\nTry: use a clean relative path", name)
 	}
 	return name, nil
+}
+
+// pluginPacks loads OLD from the rendered lock and NEW from current approvals.
+// It uses the project's source paths, even when planning in a temporary directory.
+func (r *Runner) pluginPacks(ctx context.Context, lock *manifest.Lock, old, newer *templates.Version, target PackSet, offline bool) (PackSet, PackSet, error) {
+	loaded, err := r.declaredPlugins(ctx, lock, offline)
+	if err != nil {
+		return PackSet{}, PackSet{}, err
+	}
+	historical, err := pack.ResolveLocked(ctx, plugin.Options{Root: r.Root, Offline: true, Out: r.Out}, lock.Plugins)
+	if err != nil {
+		return PackSet{}, PackSet{}, err
+	}
+	oldSet := PackSet{}
+	if len(historical) > 0 {
+		if old == nil {
+			return PackSet{}, PackSet{}, fmt.Errorf("load OLD plugin packs: template version is unavailable\nTry: restore the old template version before upgrading")
+		}
+		v, names, err := pluginrender.Overlay(old, lock.Packs, historical)
+		if err != nil {
+			return PackSet{}, PackSet{}, err
+		}
+		oldSet = PackSet{FS: v.Packs, Names: names}
+	}
+	_, names := target.resolve(newer, lock.Packs)
+	names = slices.Clone(names)
+	// Rebuild plugin selections from NEW, preserving the order of core packs.
+	names = slices.DeleteFunc(names, func(name string) bool {
+		for _, p := range lock.Plugins {
+			if p.Name == name {
+				return true
+			}
+		}
+		for _, p := range loaded {
+			if p.Meta.Name == name {
+				return true
+			}
+		}
+		return false
+	})
+	v, names, err := pluginrender.Overlay(newer, names, loaded)
+	if err != nil {
+		return PackSet{}, PackSet{}, err
+	}
+	return oldSet, PackSet{FS: v.Packs, Names: names}, nil
+}
+
+func (r *Runner) pluginChain(ctx context.Context, lock *manifest.Lock, versions []string, offline bool) ([]string, error) {
+	if len(versions) > 0 {
+		return versions, nil
+	}
+	loaded, err := r.declaredPlugins(ctx, lock, offline)
+	if err != nil {
+		return nil, err
+	}
+	if len(lock.Plugins) != len(loaded) {
+		return []string{lock.TemplateVersion}, nil
+	}
+	locked := make(map[string]manifest.Plugin, len(lock.Plugins))
+	for _, p := range lock.Plugins {
+		locked[p.Name] = p
+	}
+	for _, p := range loaded {
+		entry, exists := locked[p.Meta.Name]
+		if !exists || strings.TrimPrefix(entry.Version, "v") != strings.TrimPrefix(p.Meta.Version, "v") || entry.SHA256 != p.SHA256 || entry.API != p.Meta.API {
+			return []string{lock.TemplateVersion}, nil
+		}
+	}
+	return versions, nil
+}
+
+func (r *Runner) declaredPlugins(ctx context.Context, lock *manifest.Lock, offline bool) ([]plugin.Loaded, error) {
+	if _, err := os.Stat(filepath.Join(r.Root, project.ConfigFile)); os.IsNotExist(err) && len(lock.Plugins) == 0 {
+		return nil, nil
+	}
+	return plugin.Resolve(ctx, plugin.Options{Root: r.Root, Offline: offline, Out: r.Out})
 }

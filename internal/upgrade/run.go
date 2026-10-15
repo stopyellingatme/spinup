@@ -138,6 +138,10 @@ func (r *Runner) Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
+	versions, err = r.pluginChain(ctx, lock, versions, o.Offline)
+	if err != nil {
+		return err
+	}
 	if len(versions) == 0 {
 		_, err = fmt.Fprintln(r.Out, "Already up to date.")
 		return err
@@ -334,7 +338,11 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			if err := callPhase(ctx, phases.Before, step); err != nil {
 				return err
 			}
-			step.Plan, err = BuildPlan(ctx, PlanInput{Root: step.Worktree, Lock: step.Lock, Old: step.From, New: step.To, OldAnswers: oldAnswers, NewAnswers: step.Answers, NewPacks: &targetPacks, Merger: r.Merger, ForceManaged: step.Options.ForceManaged})
+			oldPacks, newPacks, err := r.pluginPacks(ctx, step.Lock, step.From, step.To, targetPacks, step.Options.Offline)
+			if err != nil {
+				return err
+			}
+			step.Plan, err = BuildPlan(ctx, PlanInput{Root: step.Worktree, Lock: step.Lock, Old: step.From, New: step.To, OldAnswers: oldAnswers, NewAnswers: step.Answers, OldPacks: &oldPacks, NewPacks: &newPacks, Merger: r.Merger, ForceManaged: step.Options.ForceManaged})
 			if err != nil {
 				return err
 			}
@@ -346,7 +354,7 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			if err := step.Plan.Format(r.Out); err != nil {
 				return err
 			}
-			step.Lock, err = NextLock(step.Lock, step.Plan, step.To, step.Answers, targetPacks)
+			step.Lock, err = NextLock(step.Lock, step.Plan, step.To, step.Answers, newPacks)
 			if err != nil {
 				return err
 			}

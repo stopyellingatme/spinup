@@ -42,15 +42,21 @@ func (r *Runner) checkRepository(ctx context.Context) error {
 
 func (r *Runner) checkIgnored(ctx context.Context, dir string) error {
 	if _, err := r.git(ctx, dir, "check-ignore", "-q", "--no-index", ".spinup/upgrade.json"); err != nil {
-		return fmt.Errorf("check upgrade storage: .spinup/ must be ignored by Git\nTry: add .spinup/ to the app .gitignore and commit it")
+		return fmt.Errorf("check upgrade storage: local .spinup/ state must be ignored by Git\nTry: ignore .spinup/* except plugins.allow and plugins.history, then commit .gitignore")
 	}
 	tracked, err := r.git(ctx, dir, "ls-files", "--", ".spinup")
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(tracked) != "" {
-		return fmt.Errorf("check upgrade storage: .spinup/ contains tracked files\nTry: remove .spinup/ from the Git index and commit the change")
+	for _, name := range strings.Fields(tracked) {
+		if name != ".spinup/plugins.allow" && name != ".spinup/plugins.history" {
+			return fmt.Errorf("check upgrade storage: .spinup/ contains tracked state %q\nTry: remove local state from the Git index and commit the change", name)
+		}
 	}
+	if _, err := r.git(ctx, dir, "check-ignore", "-q", "--no-index", ".spinup/upgrade/probe"); err != nil {
+		return fmt.Errorf("check upgrade storage: .spinup/upgrade must be ignored by Git\nTry: ignore .spinup/* except plugins.allow and plugins.history, then commit .gitignore")
+	}
+
 	return nil
 }
 

@@ -67,6 +67,10 @@ func (r *Runner) Plan(ctx context.Context, o Options) (*PlanReport, error) {
 	if err != nil {
 		return nil, err
 	}
+	versions, err = r.pluginChain(ctx, lock, versions, o.Offline)
+	if err != nil {
+		return nil, err
+	}
 	report, err := r.preview(ctx, lock, versions, o)
 	if err != nil {
 		return nil, err
@@ -100,6 +104,15 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if loadErr != nil {
 			return nil, loadErr
 		}
+		from, loadErr := r.Source.Load(ctx, lock.TemplateVersion)
+		if loadErr != nil && !errors.Is(loadErr, templates.ErrVersionUnavailable) {
+			return nil, loadErr
+		}
+		_, selection, pluginErr := r.pluginPacks(ctx, lock, from, to, targetPacks, o.Offline)
+		if pluginErr != nil {
+			return nil, pluginErr
+		}
+		to, namesForRender = selection.resolve(to, namesForRender)
 		rendered, renderErr := Render(to, namesForRender, answers)
 		if renderErr != nil {
 			return nil, renderErr
@@ -131,7 +144,11 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err != nil && !errors.Is(err, templates.ErrVersionUnavailable) {
 			return nil, err
 		}
-		plan, err := BuildPlan(ctx, PlanInput{Root: temp, Lock: lock, Old: from, New: to, OldAnswers: lock.Answers, NewAnswers: answers, NewPacks: &targetPacks, Merger: r.Merger, ForceManaged: o.ForceManaged})
+		oldPacks, newPacks, err := r.pluginPacks(ctx, lock, from, to, targetPacks, o.Offline)
+		if err != nil {
+			return nil, err
+		}
+		plan, err := BuildPlan(ctx, PlanInput{Root: temp, Lock: lock, Old: from, New: to, OldAnswers: lock.Answers, NewAnswers: answers, OldPacks: &oldPacks, NewPacks: &newPacks, Merger: r.Merger, ForceManaged: o.ForceManaged})
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +167,7 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err := writePlan(temp, plan); err != nil {
 			return nil, err
 		}
-		lock, err = NextLock(lock, plan, to, answers, targetPacks)
+		lock, err = NextLock(lock, plan, to, answers, newPacks)
 		if err != nil {
 			return nil, err
 		}

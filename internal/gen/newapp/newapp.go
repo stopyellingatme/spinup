@@ -29,6 +29,12 @@ type Options struct {
 	Name, Dir, Version, KitReplace            string
 	APIOnly, NoGit, DryRun, JSON, Interactive bool
 	Answers                                   map[string]any
+	// Plugins lists sources with optional @version suffixes.
+	Plugins []string
+	// Trust approves plugin sources and hashes without a terminal.
+	Trust bool
+	// Offline requires cached plugins.
+	Offline bool
 }
 
 // Result contains the rendered plan, its validated lock, and output metadata.
@@ -81,7 +87,8 @@ func Questions(packs []*templates.Pack) ([]templates.Question, error) {
 	return result, nil
 }
 
-// Generate renders the selected packs without writing files or running commands.
+// Generate plans an application without writing to its target directory.
+// Requested plugins are resolved and cached before the deterministic render.
 func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error) {
 	packs, err := Catalog()
 	if err != nil {
@@ -198,7 +205,11 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	if err := lock.Validate(); err != nil {
 		return nil, err
 	}
-	return &Result{Dir: dir, Packs: names, Plan: plan, Lock: lock, Warnings: warnings, KitReplace: replace}, nil
+	result := &Result{Dir: dir, Packs: names, Plan: plan, Lock: lock, Warnings: warnings, KitReplace: replace}
+	if err := addPlugins(ctx, o, result, prompter); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) ([]*templates.Pack, error) {

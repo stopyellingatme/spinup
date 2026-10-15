@@ -204,24 +204,12 @@ func (m *Manager) writeRecords(cfg *project.Config, lock *manifest.Lock, decl pr
 	if err != nil {
 		return err
 	}
-	entries := make([]manifest.Plugin, 0, len(lock.Plugins)+1)
-	for _, entry := range lock.Plugins {
-		if entry.Name != decl.Name {
-			entries = append(entries, entry)
-		}
-	}
 	delete(allow, decl.Name)
 	if loaded != nil {
-		entries = append(entries, manifest.Plugin{Name: decl.Name, Version: decl.Version, API: loaded.Meta.API, SHA256: loaded.SHA256})
 		allow[decl.Name] = approval{Source: decl.Source, SHA256: loaded.SHA256}
 	}
-	lock.Plugins = entries
-	locked, err := lock.Marshal()
-	if err != nil {
-		return err
-	}
 	var plan vfs.Plan
-	for _, file := range []vfs.File{{Path: project.ConfigFile, Data: data, Mode: 0644}, {Path: project.LockFile, Data: locked, Mode: 0644}, {Path: plugin.AllowlistFile, Data: allowBytes(allow), Mode: 0644}, {Path: historyFile, Data: history, Mode: 0644}} {
+	for _, file := range []vfs.File{{Path: project.ConfigFile, Data: data, Mode: 0644}, {Path: plugin.AllowlistFile, Data: allowBytes(allow), Mode: 0644}, {Path: historyFile, Data: history, Mode: 0644}} {
 		if err := plan.Add(file); err != nil {
 			return err
 		}
