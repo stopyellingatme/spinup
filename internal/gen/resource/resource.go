@@ -86,8 +86,9 @@ func registeredParts() []Part {
 
 // The paths that the built-in parts write, relative to the project root.
 const (
-	serverPath    = "api/internal/handlers/server.go"
-	routesGenPath = "api/internal/routes/routes_gen.go"
+	serverPath         = "api/internal/handlers/server.go"
+	requiredFieldsPath = "api/internal/handlers/validation.go"
+	routesGenPath      = "api/internal/routes/routes_gen.go"
 )
 
 // QueriesPath returns the sqlc queries file of a resource.
@@ -292,14 +293,19 @@ func planAPI(spec Spec, tests bool) (vfs.Plan, error) {
 		}
 		files = append(files, vfs.File{Path: handlersTestPath(spec.Name), Data: test, Class: string(manifest.Scaffold)})
 	}
-	if _, err := os.Stat(filepath.Join(spec.Root, filepath.FromSlash(serverPath))); errors.Is(err, os.ErrNotExist) {
-		server, err := withModule(serverGo, module)
-		if err != nil {
-			return vfs.Plan{}, err
+	for _, shared := range []struct{ path, source string }{
+		{serverPath, serverGo},
+		{requiredFieldsPath, requiredFieldsGo},
+	} {
+		if _, err := os.Stat(filepath.Join(spec.Root, filepath.FromSlash(shared.path))); errors.Is(err, os.ErrNotExist) {
+			source, err := withModule(shared.source, module)
+			if err != nil {
+				return vfs.Plan{}, err
+			}
+			files = append(files, vfs.File{Path: shared.path, Data: source, Class: string(manifest.Scaffold)})
+		} else if err != nil {
+			return vfs.Plan{}, fmt.Errorf("check %s: %w\nTry: check the file permissions", shared.path, err)
 		}
-		files = append(files, vfs.File{Path: serverPath, Data: server, Class: string(manifest.Scaffold)})
-	} else if err != nil {
-		return vfs.Plan{}, fmt.Errorf("check %s: %w\nTry: check the file permissions", serverPath, err)
 	}
 	var plan vfs.Plan
 	for _, f := range files {

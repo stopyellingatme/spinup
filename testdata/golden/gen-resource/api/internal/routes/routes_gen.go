@@ -18,6 +18,7 @@ func registerGenerated(mux *http.ServeMux, d Deps) {
 	})
 	gen.HandlerWithOptions(strict, gen.StdHTTPServerOptions{
 		BaseRouter:       mux,
+		Middlewares:      []gen.MiddlewareFunc{handlers.RequireFields},
 		ErrorHandlerFunc: handlers.RequestError,
 	})
 }

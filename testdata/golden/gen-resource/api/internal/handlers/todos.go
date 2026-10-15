@@ -9,6 +9,16 @@ import (
 	"github.com/stopyellingatme/spinup/kit/httpx"
 )
 
+func init() {
+	required := []string{
+		"title",
+		"done",
+		"priority",
+	}
+	requiredFields["POST /api/todos"] = required
+	requiredFields["PUT /api/todos/{id}"] = required
+}
+
 // todoFromStore converts a store row to the API type.
 func todoFromStore(row store.Todo) gen.Todo {
 	item := gen.Todo{
