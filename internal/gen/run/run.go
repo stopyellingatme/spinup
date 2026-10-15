@@ -52,6 +52,8 @@ type Result struct {
 	PostSteps []gen.PostStep `json:"post_steps"`
 	// Next contains the generator's suggested commands.
 	Next []string `json:"next"`
+	// Commands lists the external commands, run after the write and before the post-steps.
+	Commands []gen.Command `json:"commands,omitempty"`
 }
 
 // Run validates and previews or applies g's plan in the supplied project root.
@@ -81,11 +83,15 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 	if err != nil {
 		return nil, err
 	}
+	commands, err := validateCommands(g.Name, output.Commands)
+	if err != nil {
+		return nil, err
+	}
 	changes, err := vfs.Diff(o.Root, plan)
 	if err != nil {
 		return nil, withHint("compare generator files", err, "check the project paths and permissions")
 	}
-	result := &Result{Files: make([]FileResult, 0, len(changes)), PostSteps: orderedSteps(output.PostSteps), Next: append([]string{}, output.Next...)}
+	result := &Result{Files: make([]FileResult, 0, len(changes)), PostSteps: orderedSteps(output.PostSteps), Next: append([]string{}, output.Next...), Commands: commands}
 	var writes vfs.Plan
 	var conflicts []string
 	for i, change := range changes {
@@ -121,7 +127,7 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 				return result, withHint("write generator preview", err, "check the output destination")
 			}
 		}
-		return result, nil
+		return result, previewCommands(o.Out, result.Commands)
 	}
 	if len(writes.Files) > 0 {
 		if _, err := vfs.Apply(o.Root, writes, vfs.ApplyOptions{}); err != nil {
@@ -139,6 +145,13 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 		if err := lock.Save(lockPath); err != nil {
 			return result, err
 		}
+	}
+	commandOut := o.Out
+	if o.JSON {
+		commandOut = os.Stderr
+	}
+	if err := runCommands(ctx, o.Root, result.Commands, o.Runner, commandOut); err != nil {
+		return result, err
 	}
 	runners, err := stepRunners(result.PostSteps)
 	if err != nil {

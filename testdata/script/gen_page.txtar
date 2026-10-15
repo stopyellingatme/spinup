@@ -1,0 +1,60 @@
+# g page and g component in a web app, then g resource with its SvelteKit pages: the pages
+# install offline, type-check against the regenerated client types, and build.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --module example.com/demo --no-git --non-interactive
+cd demo
+
+# g page writes a scaffold page. --server adds a load function.
+exec spinup g page about
+stdout '^Created 1, updated 0 files$'
+stdout '^Next: cd web && pnpm check$'
+grep '<title>About</title>' web/src/routes/about/+page.svelte
+! exists web/src/routes/about/+page.server.ts
+exec spinup g page settings/profile --server
+grep 'return \{ title: ''Profile'' \};' web/src/routes/settings/profile/+page.server.ts
+grep '"web/src/routes/settings/profile/\+page.svelte": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+! exec spinup g page Settings
+stderr 'invalid segment "Settings"'
+stderr 'Try: '
+! exec spinup g page api/users
+stderr 'goes to the Go API'
+
+# g component runs shadcn-svelte at the lock registry version. A dry run prints the command.
+exec spinup g component dialog --dry-run
+stdout '^run pnpm dlx shadcn-svelte@1\.7\.0 add dialog --yes --no-deps-install \(in web\)$'
+! exists web/src/lib/components/ui/dialog
+! grep 'dialog' spinup.lock
+
+# A resource dry run lists the pages.
+exec spinup g resource todo title:string done:bool 'due:date?' --dry-run
+stdout '^create web/src/routes/todos/\+page\.svelte \(scaffold\)$'
+stdout '^create web/src/routes/todos/\[id\]/\+page\.server\.ts \(scaffold\)$'
+stdout '^create web/src/routes/todos/new/\+page\.svelte \(scaffold\)$'
+! exists web/src/routes/todos
+
+# The client post-step needs pnpm and the installed packages.
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+
+exec spinup g resource todo title:string done:bool 'due:date?'
+stdout '^Created 16, updated 1 files$'
+exists web/src/routes/todos/+page.svelte web/src/routes/todos/+page.server.ts
+exists web/src/routes/todos/new/+page.svelte web/src/routes/todos/new/+page.server.ts
+exists web/src/routes/todos/[id]/+page.svelte web/src/routes/todos/[id]/+page.server.ts
+exists web/src/routes/todos/form.ts web/src/routes/todos/fields.svelte
+grep '"/api/todos/\{id\}": \{' web/src/lib/api/schema.d.ts
+grep '"web/src/routes/todos/form.ts": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+
+cd web
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.js
+
+-- pnpm.sh --
+# Scripts get their own HOME, but pnpm keeps the package metadata for offline installs under
+# the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"
