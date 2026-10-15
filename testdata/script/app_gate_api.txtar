@@ -31,7 +31,6 @@ grep '"status":\s*"ok"' health.json
 exec curl -sS -o ready.json -w '%{http_code}' http://127.0.0.1:38417/readyz
 stdout '^200$'
 kill server
-! wait server
 cd ..
 
 # Roll back the first migration.
