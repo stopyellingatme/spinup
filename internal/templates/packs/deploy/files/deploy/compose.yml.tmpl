@@ -39,9 +39,10 @@ services:
       SPINUP_ENV: production
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
-[[- if and $monitoring (ne $monitoring "none") ]]
+[[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: [[ .app_name ]]-api
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=${SPINUP_COLOR}
 [[- end ]]
     volumes:
       - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
@@ -80,9 +81,10 @@ services:
     environment:
       # The API of the same color. The build bakes PUBLIC_ORIGIN into the image (ADR 0002 rule 2).
       API_URL: http://api-${SPINUP_COLOR}:8080
-[[- if and $monitoring (ne $monitoring "none") ]]
+[[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: [[ .app_name ]]-web
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=${SPINUP_COLOR}
 [[- end ]]
     networks:
       app:

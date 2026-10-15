@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -164,7 +163,8 @@ func TestMonitoringResume(t *testing.T) {
 				for _, path := range []string{"compose.monitoring.yml", "grafana/entrypoint.sh", ".env"} {
 					x.vm.ExpectUpload(testRoot+"/monitoring.new/"+path).Return("", "", 0)
 				}
-				x.ok("sh", "-c", monitoringSwapScript, "spinup-monitoring", testRoot+"/monitoring")
+				x.ok("sh", "-c", monitoringSyncScript, "spinup-monitoring", testRoot+"/monitoring")
+				x.ok("sh", "-c", monitoringSecretsScript, "spinup-monitoring-secrets", testRoot+"/secrets", testRoot+"/monitoring-secrets")
 				up := x.vm.Expect("docker", "compose", "-p", "todo-monitoring", "--project-directory", testRoot+"/monitoring", "-f", testRoot+"/monitoring/compose.monitoring.yml", "up", "-d", "--wait", "--remove-orphans")
 				if tc.fail {
 					up.Return("", "unhealthy", 1)
@@ -276,37 +276,118 @@ func TestMonitoringPlan(t *testing.T) {
 	}
 }
 
-func TestMonitoringSwap(t *testing.T) {
+func TestMonitoringSyncPreservesMounts(t *testing.T) {
 	t.Parallel()
-	for _, previous := range []bool{false, true} {
-		t.Run(fmt.Sprint(previous), func(t *testing.T) {
+	vm := localVM{root: t.TempDir()}
+	writeTree(t, vm.root, map[string]string{
+		"monitoring/alloy/config.alloy":           "old",
+		"monitoring/prometheus/rules/current.yml": "old",
+		"monitoring/prometheus/rules/removed.yml": "obsolete",
+		"monitoring/.env":                         "old env",
+	})
+	var mounted []os.FileInfo
+	for _, name := range []string{"monitoring", "monitoring/prometheus/rules", "monitoring/alloy/config.alloy"} {
+		info, err := os.Stat(filepath.Join(vm.root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		mounted = append(mounted, info)
+	}
+	for _, content := range []string{"new", "new", "newer"} {
+		writeTree(t, vm.root, map[string]string{
+			"monitoring.new/alloy/config.alloy":                       content,
+			"monitoring.new/prometheus/rules/current.yml":             content,
+			"monitoring.new/grafana/dashboards/custom/dashboard.json": content,
+			"monitoring.new/.env":                                     "new env",
+		})
+		run(t, vm, "sh", "-c", monitoringSyncScript, "spinup-monitoring", "/opt/app/monitoring")
+		for i, name := range []string{"monitoring", "monitoring/prometheus/rules", "monitoring/alloy/config.alloy"} {
+			info, err := os.Stat(filepath.Join(vm.root, name))
+			if err != nil || !os.SameFile(mounted[i], info) {
+				t.Fatalf("mounted inode replaced: %s, %v", name, err)
+			}
+		}
+		for _, name := range []string{"alloy/config.alloy", "prometheus/rules/current.yml", "grafana/dashboards/custom/dashboard.json"} {
+			data, err := os.ReadFile(filepath.Join(vm.root, "monitoring", name))
+			if err != nil || string(data) != content {
+				t.Fatalf("%s = %s, %v", name, data, err)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(vm.root, "monitoring/prometheus/rules/removed.yml")); !os.IsNotExist(err) {
+			t.Fatalf("obsolete rule retained: %v", err)
+		}
+	}
+	if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"sh", "-c", monitoringSyncScript, "spinup-monitoring", "/opt/app/monitoring"}}); err == nil {
+		t.Fatal("missing upload succeeded")
+	}
+}
+
+func TestMonitoringConfigHashes(t *testing.T) {
+	t.Parallel()
+	files := []releaseFile{
+		{Path: "alloy/config.alloy", Data: []byte("alloy")},
+		{Path: "prometheus/prometheus.yml", Data: []byte("prometheus")},
+		{Path: "prometheus/rules/app.yml", Data: []byte("rules")},
+		{Path: "alerts/custom.yml", Data: []byte("alerts")},
+		{Path: "grafana/dashboards/custom/custom.json", Data: []byte("dashboard")},
+		{Path: "grafana/provisioning/alerting/rules.yml", Data: []byte("provisioning")},
+		{Path: "loki/loki.yml", Data: []byte("loki")},
+		{Path: "tempo/tempo.yml", Data: []byte("tempo")},
+		{Path: "blackbox/blackbox.yml", Data: []byte("blackbox")},
+	}
+	env := func(files []releaseFile) map[string]string {
+		t.Helper()
+		data, err := (monitoringStack{files: files}).env("1", "2", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		values := map[string]string{}
+		for _, line := range strings.Split(string(data), "\n") {
+			key, value, _ := strings.Cut(line, "=")
+			if strings.HasSuffix(key, "_CONFIG_HASH") {
+				values[key] = value
+			}
+		}
+		return values
+	}
+	original := env(files)
+	if len(original) != 6 {
+		t.Fatalf("config hashes = %v, want six services", original)
+	}
+	for i, file := range files {
+		t.Run(file.Path, func(t *testing.T) {
 			t.Parallel()
-			vm := localVM{root: t.TempDir()}
-			files := map[string]string{"monitoring.new/compose.monitoring.yml": "new", "monitoring.old/stale": "stale"}
-			if previous {
-				files["monitoring/compose.monitoring.yml"] = "old"
+			changed := append([]releaseFile(nil), files...)
+			changed[i].Data = []byte("changed")
+			want := strings.ToUpper(strings.Split(file.Path, "/")[0]) + "_CONFIG_HASH"
+			if strings.HasPrefix(file.Path, "alerts/") {
+				want = "PROMETHEUS_CONFIG_HASH"
 			}
-			writeTree(t, vm.root, files)
-			run(t, vm, "sh", "-c", monitoringSwapScript, "spinup-monitoring", "/opt/app/monitoring")
-			data, err := os.ReadFile(filepath.Join(vm.root, "monitoring/compose.monitoring.yml"))
-			if err != nil || string(data) != "new" {
-				t.Fatalf("installed tree = %s, %v", data, err)
+			if strings.HasPrefix(file.Path, "blackbox/") {
+				want = "BLACKBOX_CONFIG_HASH"
 			}
-			if previous {
-				data, err = os.ReadFile(filepath.Join(vm.root, "monitoring.old/compose.monitoring.yml"))
-				if err != nil || string(data) != "old" {
-					t.Fatalf("old tree = %s, %v", data, err)
+			for key, got := range env(changed) {
+				if (got != original[key]) != (key == want) {
+					t.Errorf("%s change affects %s incorrectly", file.Path, key)
 				}
 			}
-			// A repeat with no staged tree must fail and restore the current tree.
-			if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"sh", "-c", monitoringSwapScript, "spinup-monitoring", "/opt/app/monitoring"}}); err == nil {
-				t.Fatal("missing upload succeeded")
+			changed = append([]releaseFile(nil), files...)
+			changed[i].Path += ".renamed"
+			if env(changed)[want] == original[want] {
+				t.Error("rename does not change hash")
 			}
-			data, err = os.ReadFile(filepath.Join(vm.root, "monitoring/compose.monitoring.yml"))
-			if err != nil || string(data) != "new" {
-				t.Fatalf("restored tree = %s, %v", data, err)
+			changed = append(append([]releaseFile(nil), files[:i]...), files[i+1:]...)
+			if env(changed)[want] == original[want] {
+				t.Error("deletion does not change hash")
 			}
 		})
+	}
+	reversed := append([]releaseFile(nil), files...)
+	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
+		reversed[i], reversed[j] = reversed[j], reversed[i]
+	}
+	if !reflect.DeepEqual(env(reversed), original) {
+		t.Error("file order changes hashes")
 	}
 }
 
@@ -387,5 +468,99 @@ func TestMonitoringInvalidFilesAndValues(t *testing.T) {
 				t.Fatal("invalid monitoring input changed the VM")
 			}
 		})
+	}
+}
+
+func TestMonitoringSecretsCopy(t *testing.T) {
+	t.Parallel()
+	for _, optional := range []bool{false, true} {
+		name := "required only"
+		if optional {
+			name = "with optional secrets"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			vm := localVM{root: t.TempDir()}
+			files := map[string]string{
+				"secrets/GRAFANA_ADMIN_PASSWORD":   "grafana",
+				"secrets/DATABASE_URL":             "private database URL",
+				"secrets/SESSION_SECRET":           "private session secret",
+				"secrets/S3_SECRET_KEY":            "private backup key",
+				"monitoring-secrets/SMTP_PASSWORD": "obsolete",
+				"monitoring-secrets/DATABASE_URL":  "obsolete private secret",
+			}
+			want := []string{"GRAFANA_ADMIN_PASSWORD"}
+			if optional {
+				for _, key := range []string{"POSTGRES_PASSWORD", "SLACK_WEBHOOK_URL", "SMTP_PASSWORD"} {
+					files["secrets/"+key] = key + " value"
+					want = append(want, key)
+				}
+			}
+			writeTree(t, vm.root, files)
+			dir := filepath.Join(vm.root, "monitoring-secrets")
+			before, err := os.Stat(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				run(t, vm, "sh", "-c", monitoringSecretsScript, "spinup-monitoring-secrets", "/opt/app/secrets", "/opt/app/monitoring-secrets")
+				info, err := os.Stat(dir)
+				if err != nil || info.Mode().Perm() != 0700 || !os.SameFile(before, info) {
+					t.Fatalf("secrets directory changed inode or mode: %v, %v", info, err)
+				}
+				entries, err := os.ReadDir(dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []string
+				for _, entry := range entries {
+					got = append(got, entry.Name())
+					info, err := entry.Info()
+					if err != nil || info.Mode().Perm() != 0600 {
+						t.Fatalf("secret mode: %v, %v", info, err)
+					}
+					data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+					if err != nil || string(data) != files["secrets/"+entry.Name()] {
+						t.Fatalf("secret %s was not copied: %v", entry.Name(), err)
+					}
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("secrets = %v, want %v", got, want)
+				}
+			}
+			if optional {
+				if err := os.Remove(filepath.Join(vm.root, "secrets/SMTP_PASSWORD")); err != nil {
+					t.Fatal(err)
+				}
+				run(t, vm, "sh", "-c", monitoringSecretsScript, "spinup-monitoring-secrets", "/opt/app/secrets", "/opt/app/monitoring-secrets")
+				if _, err := os.Stat(filepath.Join(dir, "SMTP_PASSWORD")); !os.IsNotExist(err) {
+					t.Fatalf("removed optional secret retained: %v", err)
+				}
+			}
+			if err := os.Remove(filepath.Join(vm.root, "secrets/GRAFANA_ADMIN_PASSWORD")); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"sh", "-c", monitoringSecretsScript, "spinup-monitoring-secrets", "/opt/app/secrets", "/opt/app/monitoring-secrets"}}); err == nil {
+				t.Fatal("missing required secret succeeded")
+			}
+		})
+	}
+}
+
+func TestMonitoringSyncFirstInstall(t *testing.T) {
+	t.Parallel()
+	vm := localVM{root: t.TempDir()}
+	writeTree(t, vm.root, map[string]string{"monitoring.new/compose.monitoring.yml": "services: {}", "monitoring.new/.env": "DEPLOY_UID=1000"})
+	if err := os.Chmod(filepath.Join(vm.root, "monitoring.new/.env"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, vm, "sh", "-c", monitoringSyncScript, "spinup-monitoring", "/opt/app/monitoring")
+	data, err := os.ReadFile(filepath.Join(vm.root, "monitoring/compose.monitoring.yml"))
+	if err != nil || string(data) != "services: {}" {
+		t.Fatalf("installed compose = %s, %v", data, err)
+	}
+	info, err := os.Stat(filepath.Join(vm.root, "monitoring/.env"))
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("environment permissions = %v, %v", info, err)
 	}
 }

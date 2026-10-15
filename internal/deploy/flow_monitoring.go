@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -101,9 +102,41 @@ func loadMonitoring(root string, c *project.Config) (monitoringStack, error) {
 	return m, nil
 }
 
+// configHashes covers every config mount, including custom rules and dashboards.
+// Sort by path so traversal order cannot change a service's Compose definition.
+func (m monitoringStack) configHashes() [][2]string {
+	files := slices.Clone(m.files)
+	slices.SortFunc(files, func(a, b releaseFile) int { return strings.Compare(a.Path, b.Path) })
+	var pairs [][2]string
+	for _, service := range []struct {
+		key  string
+		dirs []string
+	}{
+		{"ALLOY", []string{"alloy/"}},
+		{"PROMETHEUS", []string{"prometheus/", "alerts/"}},
+		{"LOKI", []string{"loki/"}},
+		{"TEMPO", []string{"tempo/"}},
+		{"GRAFANA", []string{"grafana/"}},
+		{"BLACKBOX", []string{"blackbox/"}},
+	} {
+		h := sha256.New()
+		for _, file := range files {
+			if !slices.ContainsFunc(service.dirs, func(dir string) bool { return strings.HasPrefix(file.Path, dir) }) {
+				continue
+			}
+			// Lengths delimit paths and arbitrary file bytes without ambiguity.
+			fmt.Fprintf(h, "%d:%s:%o:%d:", len(file.Path), file.Path, file.Mode.Perm(), len(file.Data))
+			h.Write(file.Data)
+		}
+		pairs = append(pairs, [2]string{service.key + "_CONFIG_HASH", fmt.Sprintf("%x", h.Sum(nil))})
+	}
+	return pairs
+}
+
 // env renders literal Compose values. Dollar signs cannot trigger interpolation.
 func (m monitoringStack) env(uid, gid, publicURL string) ([]byte, error) {
 	pairs := append([][2]string{{"DEPLOY_UID", uid}, {"DEPLOY_GID", gid}, {"PUBLIC_URL", publicURL}}, m.pairs...)
+	pairs = append(pairs, m.configHashes()...)
 	quote := strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `$$`)
 	var b strings.Builder
 	b.WriteString("# Written by spinup deploy. It holds no secret.\n")
@@ -119,15 +152,36 @@ func (m monitoringStack) env(uid, gid, publicURL string) ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
-// monitoringSwapScript retains the previous tree and installs the complete upload.
-// A failed final rename restores the previous tree when one exists.
-const monitoringSwapScript = `set -e
-rm -rf -- "$1.old"
-if [ -e "$1" ]; then mv -- "$1" "$1.old"; fi
-if ! mv -- "$1.new" "$1"; then
-  if [ -e "$1.old" ]; then mv -- "$1.old" "$1"; fi
-  exit 1
-fi`
+// monitoringSyncScript preserves the inodes of files and directories with bind mounts.
+// Hash labels recreate only services whose config changed. Removed files cannot linger as rules.
+const monitoringSyncScript = `set -e
+[ -d "$1.new" ]
+mkdir -p -- "$1"
+cp -Rp "$1.new/." "$1/"
+find "$1" -type f -exec sh -ec '
+  live=$1
+  staged=$2
+  shift 2
+  for file do
+    relative=${file#"$live"/}
+    if [ ! -f "$staged/$relative" ]; then rm -f -- "$file"; fi
+  done
+' spinup-monitoring-prune "$1" "$1.new" {} +
+rm -rf -- "$1.new"`
+
+// monitoringSecretsScript copies only the secrets used by the monitoring services.
+// Keep the directory inode stable because running containers mount it.
+const monitoringSecretsScript = `set -e
+install -d -m 0700 -- "$2"
+find "$2" -mindepth 1 -maxdepth 1 ! -name GRAFANA_ADMIN_PASSWORD ! -name SLACK_WEBHOOK_URL ! -name SMTP_PASSWORD ! -name POSTGRES_PASSWORD -exec rm -rf -- {} +
+install -m 0600 -- "$1/GRAFANA_ADMIN_PASSWORD" "$2/GRAFANA_ADMIN_PASSWORD"
+for name in SLACK_WEBHOOK_URL SMTP_PASSWORD POSTGRES_PASSWORD; do
+  if [ -f "$1/$name" ]; then
+    install -m 0600 -- "$1/$name" "$2/$name"
+  else
+    rm -f -- "$2/$name"
+  fi
+done`
 
 // monitoring starts the independent monitoring project after the release is recorded.
 func (f *flow) monitoring(ctx context.Context) (detail string, err error) {
@@ -160,8 +214,11 @@ func (f *flow) monitoring(ctx context.Context) (detail string, err error) {
 	if err := f.vm.Upload(ctx, data, staging+"/.env", 0600); err != nil {
 		return "", fmt.Errorf("upload monitoring/.env: %w", err)
 	}
-	if _, err := f.cmd(ctx, false, "sh", "-c", monitoringSwapScript, "spinup-monitoring", dir); err != nil {
-		return "", fmt.Errorf("replace the monitoring directory: %w", err)
+	if _, err := f.cmd(ctx, false, "sh", "-c", monitoringSyncScript, "spinup-monitoring", dir); err != nil {
+		return "", fmt.Errorf("synchronize the monitoring directory: %w", err)
+	}
+	if _, err := f.cmd(ctx, false, "sh", "-c", monitoringSecretsScript, "spinup-monitoring-secrets", f.root()+"/secrets", f.root()+"/monitoring-secrets"); err != nil {
+		return "", fmt.Errorf("copy the monitoring secrets: %w", err)
 	}
 	argv := []string{"docker", "compose", "-p", f.l.app + "-monitoring", "--project-directory", dir, "-f", dir + "/compose.monitoring.yml", "up", "-d", "--wait", "--remove-orphans"}
 	if _, err := f.vm.Run(ctx, remote.Cmd{Argv: argv, Timeout: 5 * time.Minute, Stdout: f.out, Stderr: f.out, Redact: f.redact}); err != nil {
@@ -176,5 +233,6 @@ func (f *flow) planMonitoring() {
 		return
 	}
 	fmt.Fprintf(f.out, "Step monitoring (after record, before post): upload monitoring/ and .env to %s/monitoring.new.\n", f.root())
-	fmt.Fprintf(f.out, "  Replace %s/monitoring and start Compose project %s-monitoring with up -d --wait --remove-orphans (5 minute timeout).\n", f.root(), f.l.app)
+	fmt.Fprintf(f.out, "  Copy the monitoring secrets to %s/monitoring-secrets (0700), with file mode 0600.\n", f.root())
+	fmt.Fprintf(f.out, "  Synchronize %s/monitoring in place and start Compose project %s-monitoring with up -d --wait --remove-orphans (5 minute timeout).\n", f.root(), f.l.app)
 }

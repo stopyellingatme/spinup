@@ -9,6 +9,7 @@
 # `spinup monitor open` reaches it through an SSH tunnel. The app sends OTLP to
 # http://alloy:4318 on the todo-app network. No collector port is published.
 #
+# Config hashes in .env recreate only services whose mounted config changes.
 # spinup deploy sets these variables from spinup.toml and deploy/environments/<env>.toml:
 #   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM, who owns /opt/todo/secrets
 #   PUBLIC_URL               the public URL of the app
@@ -19,7 +20,8 @@
 #   PROMETHEUS_RETENTION     how long Prometheus keeps metrics (default 30d)
 #   PROMETHEUS_RETENTION_SIZE  the disk limit of Prometheus (default 5GB)
 #
-# Secrets are files in /opt/todo/secrets (spinup secrets push):
+# spinup deploy copies these secrets to /opt/todo/monitoring-secrets:
+# The directory has mode 0700. The files have mode 0600.
 #   GRAFANA_ADMIN_PASSWORD   required: the password of the Grafana admin user
 #   SLACK_WEBHOOK_URL        optional: Slack notifications
 #   SMTP_PASSWORD            optional: the SMTP relay password
@@ -41,6 +43,8 @@ x-hardening: &hardening
 services:
   alloy:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${ALLOY_CONFIG_HASH:-}
     image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
     user: "473:473"
     command:
@@ -80,6 +84,8 @@ services:
 
   prometheus:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${PROMETHEUS_CONFIG_HASH:-}
     image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     user: "65534:65534"
     command:
@@ -110,6 +116,8 @@ services:
 
   loki:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${LOKI_CONFIG_HASH:-}
     image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     user: "10001:10001"
     command: ["-config.file=/etc/loki/loki.yml"]
@@ -130,6 +138,8 @@ services:
 
   grafana:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${GRAFANA_CONFIG_HASH:-}
     image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
     # The deploy user owns the secret files (mode 0600). The Grafana image runs as any user.
     user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
@@ -163,7 +173,7 @@ services:
       - ./grafana/entrypoint.sh:/etc/spinup/entrypoint.sh:ro
       - ./grafana/provisioning:/etc/spinup/provisioning:ro
       - ./grafana/dashboards:/etc/spinup/dashboards:ro
-      - /opt/todo/secrets:/run/secrets:ro
+      - /opt/todo/monitoring-secrets:/run/secrets:ro
       - grafana_data:/var/lib/grafana
     tmpfs:
       - /tmp

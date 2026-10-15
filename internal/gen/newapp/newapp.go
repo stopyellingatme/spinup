@@ -109,7 +109,14 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 		return nil, err
 	}
 	more := o
-	more.Answers = answers
+	// Keep only the selected packs' questions and the positional application name.
+	// The first completion retains module flags until pack selection is known.
+	more.Answers = map[string]any{"app_name": o.Name}
+	for _, q := range questions {
+		if value, ok := answers[q.Key]; ok {
+			more.Answers[q.Key] = value
+		}
+	}
 	answers, extra, err := completeAnswers(ctx, more, questions, prompter)
 	if err != nil {
 		return nil, err
