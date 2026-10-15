@@ -29,6 +29,11 @@ type Cmd struct {
 	Stdout  io.Writer
 	Stderr  io.Writer
 
+	// ReplaceEnv uses only Env instead of extending the parent environment.
+	// A nil Env supplies an empty environment when ReplaceEnv is true.
+	// On Windows, os/exec also supplies SYSTEMROOT when it is absent.
+	ReplaceEnv bool
+
 	// Interactive preserves the parent's process group for terminal reads on Unix.
 	// Timeout or cancellation kills only the child. Descendants can survive.
 	// On Windows, cancellation always kills only the direct child.
@@ -81,7 +86,10 @@ func (OSRunner) Run(ctx context.Context, c Cmd) (Result, error) {
 
 	command := osexec.CommandContext(runCtx, path, c.Args...)
 	command.Dir = c.Dir
-	command.Env = append(os.Environ(), c.Env...)
+	command.Env = append([]string{}, c.Env...)
+	if !c.ReplaceEnv {
+		command.Env = append(os.Environ(), c.Env...)
+	}
 	command.Stdin = c.Stdin
 	command.WaitDelay = processWaitDelay
 	configureProcess(command, c.Interactive)
@@ -191,6 +199,9 @@ func lookPath(c Cmd) (string, error) {
 		return "", &NotFoundError{Name: c.Name}
 	}
 	searchPath := os.Getenv("PATH")
+	if c.ReplaceEnv {
+		searchPath = ""
+	}
 	pathSet := false
 	for _, entry := range c.Env {
 		key, value, ok := strings.Cut(entry, "=")
@@ -199,7 +210,7 @@ func lookPath(c Cmd) (string, error) {
 			pathSet = true
 		}
 	}
-	if c.Dir == "" && !pathSet {
+	if c.Dir == "" && !pathSet && !c.ReplaceEnv {
 		return LookPath(c.Name)
 	}
 	for _, entry := range filepath.SplitList(searchPath) {

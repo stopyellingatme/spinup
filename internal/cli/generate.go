@@ -9,6 +9,7 @@ import (
 	genregistry "github.com/stopyellingatme/spinup/internal/gen/registry"
 	genrun "github.com/stopyellingatme/spinup/internal/gen/run"
 	pluginrender "github.com/stopyellingatme/spinup/internal/plugin/render"
+	pluginrpc "github.com/stopyellingatme/spinup/internal/plugin/rpc"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -54,7 +55,7 @@ func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interac
 		add(g)
 	}
 	available := func(cmd *cobra.Command) ([]gen.Generator, error) {
-		return pluginrender.ProjectGenerators(cmd.Context(), app.Flags.Dir, app.Flags.Offline, kinds)
+		return pluginrpc.ProjectGenerators(cmd.Context(), app.Flags.Dir, app.Flags.Offline, kinds, cmd.ErrOrStderr())
 	}
 	// Project flags are parsed after Cobra chooses a child. Resolve a project-only
 	// generator here when Cobra selected the parent instead of a built-in child.

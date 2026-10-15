@@ -20,13 +20,18 @@ var versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 var argPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
 func validate(t tree, cliVersion string) (plugin.Meta, error) {
+	var decoded metadata
 	var meta plugin.Meta
 	data, err := fs.ReadFile(t.fs(), "plugin.toml")
 	if err != nil {
 		return meta, problem("read plugin metadata", err)
 	}
-	if err := toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields().Decode(&meta); err != nil {
+	if err := toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields().Decode(&decoded); err != nil {
 		return meta, problem("decode plugin metadata", err)
+	}
+	meta = decoded.Meta
+	if _, err := ReadExec(t.fs()); err != nil {
+		return meta, err
 	}
 	if !namePattern.MatchString(meta.Name) {
 		return meta, problem("validate plugin name", fmt.Errorf("invalid name %q", meta.Name))
@@ -54,8 +59,8 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 		}
 	}
 	for _, file := range p.Files {
-		if strings.Split(file.Source, "/")[0] == "@gen" {
-			return meta, problem("validate plugin source", fmt.Errorf("source %q uses the reserved @gen namespace", file.Source))
+		if namespace := strings.Split(file.Source, "/")[0]; namespace == "@gen" || namespace == "@exec" {
+			return meta, problem("validate plugin source", fmt.Errorf("source %q uses the reserved %s namespace", file.Source, namespace))
 		}
 		if err := CheckOutputPath(file.Path); err != nil {
 			return meta, err

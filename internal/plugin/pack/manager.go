@@ -32,6 +32,8 @@ type Manager struct {
 	Offline bool
 	// Trust supplies explicit approval instead of a terminal confirmation.
 	Trust bool
+	// TrustExec supplies the exact name of an approved executable plugin.
+	TrustExec string
 	// Interactive permits a terminal confirmation.
 	Interactive bool
 	// DryRun previews changes without writing records or caches.
@@ -56,7 +58,14 @@ func (m *Manager) state() (*project.Config, *manifest.Lock, error) {
 	lock, err := manifest.Load(filepath.Join(m.Root, project.LockFile))
 	return cfg, lock, err
 }
-func (m *Manager) confirm() error {
+func (m *Manager) confirm(loaded plugin.Loaded) error {
+	cfg, err := ReadExec(loaded.FS)
+	if err != nil {
+		return err
+	}
+	if cfg.Kind == "exec" {
+		return m.confirmExec(loaded.Meta.Name)
+	}
 	if m.Trust {
 		return nil
 	}
@@ -139,7 +148,7 @@ func (m *Manager) Add(ctx context.Context, source, version string) error {
 		return err
 	}
 	if !m.DryRun {
-		if err := m.confirm(); err != nil {
+		if err := m.confirm(loaded); err != nil {
 			return err
 		}
 		if err := m.cache(tr, loaded); err != nil {
@@ -191,7 +200,7 @@ func (m *Manager) Update(ctx context.Context, name, version string) error {
 			return err
 		}
 		if !m.DryRun {
-			if err := m.confirm(); err != nil {
+			if err := m.confirm(loaded); err != nil {
 				return err
 			}
 			if err := m.cache(tr, loaded); err != nil {
@@ -320,6 +329,26 @@ func (m *Manager) warnIgnoredRecords(ctx context.Context) error {
 	_, err := fmt.Fprintln(m.output(), "Warning: Git ignores plugin trust records.\nTry: replace .spinup/ in .gitignore with these lines:\n.spinup/*\n!.spinup/plugins.allow\n!.spinup/plugins.history")
 	if err != nil {
 		return problem("write ignored plugin records warning", err)
+	}
+	return nil
+}
+
+func (m *Manager) confirmExec(name string) error {
+	if m.TrustExec == name {
+		return nil
+	}
+	if !m.Interactive || m.In == nil {
+		return fmt.Errorf("cannot trust exec plugin %q without typed approval: it runs with your full privileges\nTry: inspect the plugin, then pass --trust-exec %s", name, name)
+	}
+	if _, err := fmt.Fprintf(m.output(), "Exec plugin %s runs with your full privileges. Type %s to trust it: ", name, name); err != nil {
+		return problem("write exec confirmation", err)
+	}
+	answer, err := bufio.NewReader(m.In).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return problem("read exec confirmation", err)
+	}
+	if strings.TrimSpace(answer) != name {
+		return fmt.Errorf("exec plugin trust was not confirmed: expected %q\nTry: inspect the plugin, then pass --trust-exec %s", name, name)
 	}
 	return nil
 }
