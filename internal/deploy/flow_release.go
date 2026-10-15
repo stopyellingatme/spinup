@@ -57,6 +57,10 @@ type Release struct {
 	User             string            `json:"user"`
 	CreatedAt        time.Time         `json:"created_at"`
 	Secrets          map[string]string `json:"secrets"`
+	// MigrationsSafe and PreDeployBackupTime come from the pre-deploy backup hook. Rollback
+	// uses them for its point-in-time restore guidance (--with-db-plan).
+	MigrationsSafe      *bool     `json:"migrations_safe,omitempty"`
+	PreDeployBackupTime time.Time `json:"pre_deploy_backup_time,omitzero"`
 }
 
 // ReleaseEntry is one entry of releases.json, the release history (newest first).

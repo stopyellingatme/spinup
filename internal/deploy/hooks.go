@@ -24,7 +24,16 @@ type HookContext struct {
 	App, Release string
 	Remote       remote.Runner
 	Out          io.Writer
+	// Results lets a hook report facts the deployer records in release.json. The backup hook
+	// sets ResultBackupTime and ResultMigrationsSafe (used by rollback --with-db-plan).
+	Results map[string]string
 }
+
+// Keys of HookContext.Results that the deployer records.
+const (
+	ResultBackupTime     = "pre_deploy_backup_time" // RFC 3339, UTC
+	ResultMigrationsSafe = "migrations_safe"        // "true" or "false"
+)
 
 type hookRegistry struct {
 	mu    sync.Mutex

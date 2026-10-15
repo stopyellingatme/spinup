@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stopyellingatme/spinup/internal/deploy"
 	"github.com/stopyellingatme/spinup/internal/project"
@@ -251,5 +252,44 @@ func TestUnsafePending(t *testing.T) {
 	}
 	if _, err := UnsafePending(filepath.Join(dir, "missing"), 0); err == nil {
 		t.Fatal("missing directory succeeded")
+	}
+}
+
+func TestHookRecordsResults(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name      string
+		migration string
+		wantSafe  string
+	}{
+		{"safe pending migration", "-- +goose Up\n-- spinup:safe adds a nullable column\nALTER TABLE todos ADD COLUMN note text;\n", "true"},
+		{"unsafe pending migration", "-- +goose Up\nALTER TABLE todos DROP COLUMN note;\n", "false"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := newProject(t, true, "", map[string]string{"00002_note.sql": tt.migration})
+			f := &remote.Fake{}
+			releaseHistory(f, "[{}]")
+			f.Expect(psRunning...).Return("4f2a\n", "", 0)
+			f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("0\n", "", 0)
+			f.Expect(append(append([]string(nil), psql...), gooseVersionQuery)...).Return("1\n", "", 0)
+			f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
+			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
+			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			results := map[string]string{}
+			ctx := WithDeployOptions(context.Background(), DeployOptions{Dir: dir})
+			var out strings.Builder
+			if err := Hook(ctx, &deploy.HookContext{App: "todo", Release: "r1", Remote: f, Out: &out, Results: results}); err != nil {
+				t.Fatal(err)
+			}
+			f.AssertDone(t)
+			if results[deploy.ResultMigrationsSafe] != tt.wantSafe {
+				t.Fatalf("migrations_safe = %q, want %q", results[deploy.ResultMigrationsSafe], tt.wantSafe)
+			}
+			if _, err := time.Parse(time.RFC3339, results[deploy.ResultBackupTime]); err != nil {
+				t.Fatalf("backup time %q: %v", results[deploy.ResultBackupTime], err)
+			}
+		})
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stopyellingatme/spinup/internal/deploy"
 	"github.com/stopyellingatme/spinup/internal/project"
@@ -133,11 +134,21 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 		_, _ = fmt.Fprintln(out, "backup: skipped (--skip-backup), every pending migration is marked safe")
 		return nil
 	}
+	// Record whether every pending migration is marked safe (rollback --with-db-plan uses it).
+	if unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir))); err == nil && c.Results != nil {
+		c.Results[deploy.ResultMigrationsSafe] = strconv.FormatBool(len(unsafe) == 0)
+	}
 	backend := &PGBackRest{App: app, Remote: c.Remote, Config: data, RetentionFull: retention, Progress: out}
 	_, _ = fmt.Fprintf(out, "backup: taking a %s backup before release %s\n", Diff, c.Release)
+	started := time.Now().UTC()
 	result, err := backend.Backup(ctx, Diff)
 	if err != nil {
 		return fmt.Errorf("pre-deploy backup: %w", err)
+	}
+	if c.Results != nil {
+		// A point-in-time restore to just before the backup started returns the database as
+		// it was before this deploy's migrations.
+		c.Results[deploy.ResultBackupTime] = started.Format(time.RFC3339)
 	}
 	_, _ = fmt.Fprintf(out, "backup: %s (%s), size %s, took %s\n", result.Label, result.Kind, HumanSize(result.Size), result.Duration)
 	return nil

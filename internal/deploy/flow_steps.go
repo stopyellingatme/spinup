@@ -43,12 +43,14 @@ func Deploy(ctx context.Context, o Options, d Deps) error {
 }
 
 type flow struct {
-	o      Options
-	d      Deps
-	l      *local
-	out    io.Writer
-	errOut io.Writer
-	redact []string
+	// hookResults holds what the pre-deploy hooks reported (HookContext.Results).
+	hookResults map[string]string
+	o           Options
+	d           Deps
+	l           *local
+	out         io.Writer
+	errOut      io.Writer
+	redact      []string
 
 	vm       remote.Runner
 	lock     *Lock
@@ -464,7 +466,8 @@ func (f *flow) hooks(ctx context.Context) (string, error) {
 		return "no hooks", nil
 	}
 	hctx := WithHookOptions(ctx, HookOptions{SkipBackup: f.o.SkipBackup, Root: f.l.root, PendingMigrations: pendingMigrations(f.l.migrations, deployed)})
-	if err := RunHooks(hctx, hooks, &HookContext{Env: f.l.env, App: f.l.app, Release: f.release, Remote: f.vm, Out: f.out}); err != nil {
+	f.hookResults = map[string]string{}
+	if err := RunHooks(hctx, hooks, &HookContext{Env: f.l.env, App: f.l.app, Release: f.release, Remote: f.vm, Out: f.out, Results: f.hookResults}); err != nil {
 		return "", err
 	}
 	names := make([]string, len(hooks))
@@ -492,11 +495,21 @@ func (f *flow) releaseSnapshot() Release {
 	if transport == "" {
 		transport = TransportSSH
 	}
-	return Release{
+	r := Release{
 		Release: f.release, App: f.l.app, Env: f.l.env.Name, GitSHA: f.l.sha, Color: f.color, Transport: transport,
 		Images: f.images, MigrationVersion: migrationVersion(f.l.migrations), User: f.d.User(),
 		CreatedAt: releaseTime(f.release), Secrets: SecretHashes(f.l.secrets),
 	}
+	if v, ok := f.hookResults[ResultMigrationsSafe]; ok {
+		safe := v == "true"
+		r.MigrationsSafe = &safe
+	}
+	if v, ok := f.hookResults[ResultBackupTime]; ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			r.PreDeployBackupTime = t.UTC()
+		}
+	}
+	return r
 }
 
 // releaseFiles returns the files of the release directory, without release.json.
