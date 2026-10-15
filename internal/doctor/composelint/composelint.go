@@ -3,7 +3,9 @@ package composelint
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -32,7 +34,7 @@ func Lint(file string, data []byte) ([]Finding, error) {
 	if err := yaml.Unmarshal(data, &document); err != nil {
 		return nil, err
 	}
-	root := documentNode(&document)
+	root := resolveNode(documentNode(&document), make(map[*yaml.Node]bool))
 	services := mappingValue(root, "services")
 	if services == nil || services.Kind != yaml.MappingNode {
 		return nil, nil
@@ -60,7 +62,7 @@ func Lint(file string, data []byte) ([]Finding, error) {
 }
 
 func lintService(file, name string, serviceKey, service *yaml.Node) []Finding {
-	comments := nodeComments(serviceKey)
+	comments := append(nodeComments(serviceKey), nodeComments(service)...)
 	for _, node := range service.Content {
 		comments = append(comments, nodeComments(node)...)
 	}
@@ -76,8 +78,12 @@ func lintService(file, name string, serviceKey, service *yaml.Node) []Finding {
 		findings = append(findings, finding(file, name, rule, message, try))
 	}
 
-	if node := mappingValue(service, "privileged"); node != nil && isTrue(node) {
-		add("privileged", "The service uses privileged mode.", "Remove privileged mode.", node)
+	if node := mappingValue(service, "privileged"); node != nil && (isTrue(node) || strings.Contains(node.Value, "$")) {
+		message := "The service uses privileged mode."
+		if strings.Contains(node.Value, "$") {
+			message = "The privileged value uses interpolation, so its safety cannot be determined."
+		}
+		add("privileged", message, "Remove privileged mode.", node)
 	}
 	if node := mappingValue(service, "volumes"); node != nil {
 		for _, volume := range sequenceValues(node) {
@@ -87,8 +93,12 @@ func lintService(file, name string, serviceKey, service *yaml.Node) []Finding {
 		}
 	}
 	for _, key := range []string{"network_mode", "pid", "ipc"} {
-		if node := mappingValue(service, key); node != nil && strings.EqualFold(strings.TrimSpace(node.Value), "host") {
-			add("host-namespace", "The service shares a host namespace.", "Use an isolated namespace.", node)
+		if node := mappingValue(service, key); node != nil && (strings.EqualFold(strings.TrimSpace(node.Value), "host") || strings.Contains(node.Value, "$")) {
+			message := "The service shares a host namespace."
+			if strings.Contains(node.Value, "$") {
+				message = "The namespace value uses interpolation, so its safety cannot be determined."
+			}
+			add("host-namespace", message, "Use an isolated namespace.", node)
 		}
 	}
 	if node := mappingValue(service, "cap_add"); node != nil {
@@ -119,7 +129,7 @@ func lintService(file, name string, serviceKey, service *yaml.Node) []Finding {
 	}
 	if environment := mappingValue(service, "environment"); environment != nil {
 		for _, entry := range environmentValues(environment) {
-			if secretName.MatchString(entry.key) && !strings.HasSuffix(strings.ToUpper(entry.key), "_FILE") && entry.value != "" && !interpolation.MatchString(entry.value) {
+			if literalSecret(file, entry.key, entry.value) {
 				add("literal-secret", "The service sets a literal secret value.", "Use an environment interpolation or a _FILE variable.", entry.node)
 			}
 		}
@@ -161,7 +171,7 @@ func sequenceValues(node *yaml.Node) []*yaml.Node {
 }
 
 func isTrue(node *yaml.Node) bool {
-	return node.Tag == "!!bool" && node.Value == "true"
+	return node.Tag == "!!bool" && strings.EqualFold(node.Value, "true")
 }
 
 func dockerSocket(node *yaml.Node) bool {
@@ -176,7 +186,16 @@ func dockerSocket(node *yaml.Node) bool {
 }
 
 func socketPath(value string) bool {
-	return value == "/var/run/docker.sock" || value == "/run/docker.sock"
+	source := path.Clean(value)
+	if !path.IsAbs(source) {
+		return false
+	}
+	for _, socket := range []string{"/var/run/docker.sock", "/run/docker.sock"} {
+		if source == socket || strings.HasPrefix(socket, strings.TrimSuffix(source, "/")+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func publicAllowed(service *yaml.Node) bool {
@@ -201,24 +220,52 @@ func publicPort(node *yaml.Node) bool {
 		hostIP := mappingValue(node, "host_ip")
 		return hostIP == nil || isPublicHost(hostIP.Value)
 	}
-	value := strings.TrimSpace(node.Value)
-	if !strings.Contains(value, ":") {
-		return true
-	}
-	if strings.HasPrefix(value, "[") {
-		end := strings.Index(value, "]")
-		return end < 0 || isPublicHost(value[1:end])
-	}
-	parts := strings.Split(value, ":")
-	if len(parts) == 2 {
+	// Split only outside interpolations and IPv6 brackets.
+	parts := portParts(strings.TrimSpace(node.Value))
+	if len(parts) != 3 {
 		return true
 	}
 	return isPublicHost(parts[0])
 }
 
+func portParts(value string) []string {
+	var parts []string
+	start, braces, brackets := 0, 0, 0
+	for i, char := range value {
+		switch char {
+		case '{':
+			braces++
+		case '}':
+			if braces > 0 {
+				braces--
+			}
+		case '[':
+			brackets++
+		case ']':
+			if brackets > 0 {
+				brackets--
+			}
+		case ':':
+			if braces == 0 && brackets == 0 {
+				parts = append(parts, value[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(parts, value[start:])
+}
+
 func isPublicHost(host string) bool {
 	host = strings.TrimSpace(host)
-	return host == "" || host == "0.0.0.0" || host == "::"
+	if strings.Contains(host, "$") {
+		return true
+	}
+	if host == "localhost" {
+		return false
+	}
+	host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	ip := net.ParseIP(host)
+	return ip == nil || !ip.IsLoopback()
 }
 
 type environmentValue struct {
