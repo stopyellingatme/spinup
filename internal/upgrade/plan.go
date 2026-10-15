@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/merge"
@@ -138,6 +139,11 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		switch {
 		case slices.Contains(in.Lock.Tombstones, name):
 			d.Action, d.Reason = ActionKeep, "tombstone"
+		case tracked && strings.HasPrefix(entry.Template, "gen/"):
+			// A generator wrote this file last (ADR 0007 §1). Templates never re-render or
+			// delete it; for a pack file such as routes_gen.go the generator's version wins.
+			d.Class, d.Template = entry.Class, entry.Template
+			d.Action, d.Reason = ActionKeep, "generator-owned"
 		case tracked && !disk.exists:
 			d.Action, d.Reason = ActionKeep, "missing on disk"
 		case (!rendered && entry.Class == manifest.Seed) || d.Class == manifest.Seed:

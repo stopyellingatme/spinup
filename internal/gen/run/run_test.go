@@ -128,10 +128,11 @@ func TestOverwrite(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name, class, template string
-		force, allow          bool
+		force, allow, edited  bool
 	}{
 		{name: "untracked", class: "managed"}, {name: "scaffold", class: "scaffold", template: "gen/example"},
-		{name: "pack-owned", class: "managed", template: "api/file.tmpl"}, {name: "generator-owned", class: "managed", template: "gen/other", allow: true},
+		{name: "pack-owned untouched", class: "managed", template: "api/file.tmpl", allow: true},
+		{name: "pack-owned edited", class: "managed", template: "api/file.tmpl", edited: true}, {name: "generator-owned", class: "managed", template: "gen/other", allow: true},
 		{name: "force", class: "scaffold", force: true, allow: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -140,7 +141,11 @@ func TestOverwrite(t *testing.T) {
 			put(t, root, "api/file.txt", "old")
 			if tc.template != "" {
 				lock, _ := manifest.Load(filepath.Join(root, "spinup.lock"))
-				if err := lock.SetFile("api/file.txt", manifest.FileEntry{Class: manifest.Managed, Template: tc.template, Hash: manifest.Hash([]byte("old")), Mode: "0644"}); err != nil {
+				locked := "old"
+				if tc.edited {
+					locked = "what the template wrote"
+				}
+				if err := lock.SetFile("api/file.txt", manifest.FileEntry{Class: manifest.Managed, Template: tc.template, Hash: manifest.Hash([]byte(locked)), Mode: "0644"}); err != nil {
 					t.Fatal(err)
 				}
 				if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {

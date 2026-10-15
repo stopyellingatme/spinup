@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -98,7 +99,7 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 		if action == "unchanged" {
 			continue
 		}
-		if change.Kind == vfs.Update && !o.Force && (file.Class != string(manifest.Managed) || !strings.HasPrefix(lock.Files[file.Path].Template, "gen/")) {
+		if change.Kind == vfs.Update && !o.Force && !generatorOwned(o.Root, file, lock) {
 			conflicts = append(conflicts, file.Path)
 		}
 		writes.Files = append(writes.Files, file)
@@ -200,4 +201,20 @@ func withHint(what string, err error, hint string) error {
 		return fmt.Errorf("%s: %w", what, err)
 	}
 	return fmt.Errorf("%s: %w\nTry: %s", what, err, hint)
+}
+
+// generatorOwned reports whether a generator may update an existing file without --force:
+// the plan marks it managed, and either a generator wrote it last (lock template "gen/...")
+// or it is a managed pack file that the user never edited (disk hash equals lock hash),
+// such as routes_gen.go on a fresh app (ADR 0007 §1).
+func generatorOwned(root string, file vfs.File, lock *manifest.Lock) bool {
+	entry, ok := lock.Files[file.Path]
+	if file.Class != string(manifest.Managed) || !ok || entry.Class != manifest.Managed {
+		return false
+	}
+	if strings.HasPrefix(entry.Template, "gen/") {
+		return true
+	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Path)))
+	return err == nil && manifest.Hash(data) == entry.Hash
 }

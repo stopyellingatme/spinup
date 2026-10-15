@@ -586,3 +586,33 @@ func TestPlanRenameEjectedClass(t *testing.T) {
 		t.Fatalf("renamed class: %s", next.Files["moved.txt"].Class)
 	}
 }
+
+func TestPlanKeepsGeneratorOwnedFiles(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writePlanFile(t, root, "file.txt", "generated routes", 0o644)
+	writePlanFile(t, root, "queries.sql", "generated queries", 0o644)
+	lock := planLock("generated routes", "managed")
+	lock.Files["file.txt"] = manifest.FileEntry{Class: manifest.Managed, Template: "gen/resource", Hash: manifest.Hash([]byte("generated routes")), Mode: "0644"}
+	lock.Files["queries.sql"] = manifest.FileEntry{Class: manifest.Scaffold, Template: "gen/resource", Hash: manifest.Hash([]byte("generated queries")), Mode: "0644"}
+	// The template renders an empty file.txt and knows nothing about queries.sql.
+	newer := planVersion("0.2.0", planSpec{path: "file.txt", data: "empty", class: "managed"})
+	p, err := BuildPlan(context.Background(), PlanInput{Root: root, Lock: lock, Old: planVersion("0.1.0", planSpec{path: "file.txt", data: "empty", class: "managed"}), New: newer, Merger: &planMerger{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range p.Files {
+		if d.Action != ActionKeep || d.Reason != "generator-owned" || d.Template != "gen/resource" {
+			t.Errorf("%s: %#v, want keep generator-owned", d.Path, d)
+		}
+	}
+	next, err := NextLock(lock, p, newer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"file.txt", "queries.sql"} {
+		if next.Files[name] != lock.Files[name] {
+			t.Errorf("%s lock entry changed: %#v", name, next.Files[name])
+		}
+	}
+}
