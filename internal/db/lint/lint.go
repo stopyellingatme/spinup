@@ -142,10 +142,17 @@ func createdTables(sql []byte) []string {
 func mustUp(sql []byte) []byte { up, _ := upSection(sql); return up }
 
 func createTable(tokens []string) (string, bool) {
-	if len(tokens) < 3 || tokens[0] != "CREATE" || tokens[1] != "TABLE" {
+	if len(tokens) < 3 || tokens[0] != "CREATE" {
 		return "", false
 	}
-	i := 2
+	i := 1
+	for i < len(tokens) && (tokens[i] == "UNLOGGED" || tokens[i] == "TEMP" || tokens[i] == "TEMPORARY" || tokens[i] == "GLOBAL" || tokens[i] == "LOCAL") {
+		i++
+	}
+	if i >= len(tokens) || tokens[i] != "TABLE" {
+		return "", false
+	}
+	i++
 	if len(tokens) > i+2 && tokens[i] == "IF" && tokens[i+1] == "NOT" && tokens[i+2] == "EXISTS" {
 		i += 3
 	}
@@ -162,23 +169,29 @@ func ruleFor(tokens []string, earlier, createdHere map[string]bool, noTransactio
 	if tokens[0] == "DROP" && len(tokens) > 1 && tokens[1] == "TABLE" {
 		return "drop-table", "dropping a table breaks old application versions", "remove the table in a later release after all old versions stop using it"
 	}
+	if tokens[0] == "DO" || tokens[0] == "EXECUTE" {
+		return "unchecked-dynamic-sql", "dynamic SQL can hide unsafe schema changes", "avoid dynamic DDL, or add -- spinup:allow-destructive with a reason"
+	}
 	if tokens[0] == "ALTER" && len(tokens) > 3 && tokens[1] == "TABLE" {
-		for i := 2; i+1 < len(tokens); i++ {
-			if tokens[i] == "DROP" && tokens[i+1] == "COLUMN" {
+		for _, clause := range alterTableClauses(tokens) {
+			if len(clause) == 0 {
+				continue
+			}
+			if clause[0] == "DROP" && dropColumn(clause) {
 				return "drop-column", "dropping a column breaks old application versions", "remove the column in a later release after all old versions stop using it"
 			}
-			if tokens[i] == "RENAME" {
+			if clause[0] == "RENAME" {
 				return "rename", "renaming database objects breaks old application versions", "add a compatible replacement and remove the old name in a later release"
 			}
-			if tokens[i] == "ALTER" && i+3 < len(tokens) && tokens[i+1] == "COLUMN" && (tokens[i+3] == "TYPE" || i+4 < len(tokens) && tokens[i+3] == "SET" && tokens[i+4] == "DATA") {
+			if clause[0] == "ALTER" && alterColumnType(clause) {
 				return "alter-type", "changing a column type can break old application versions", "add a new compatible column and migrate data in a later release"
 			}
-			if tokens[i] == "ALTER" && i+4 < len(tokens) && tokens[i+1] == "COLUMN" && tokens[i+3] == "SET" && tokens[i+4] == "NOT" {
+			if clause[0] == "ALTER" && alterColumnSetNotNull(clause) {
 				return "set-not-null", "adding NOT NULL can reject writes from old application versions", "backfill first, then add the constraint in a later release"
 			}
-		}
-		if containsSequence(tokens, "ADD", "COLUMN") && containsSequence(tokens, "NOT", "NULL") && !contains(tokens, "DEFAULT") {
-			return "set-not-null", "adding a required column without a default breaks old application versions", "add the column as nullable or with a default, then constrain it in a later release"
+			if clause[0] == "ADD" && addRequiredColumn(clause) {
+				return "set-not-null", "adding a required column without a default breaks old application versions", "add the column as nullable or with a default, then constrain it in a later release"
+			}
 		}
 	}
 	if tokens[0] == "CREATE" && indexStatement(tokens) {
@@ -188,7 +201,7 @@ func ruleFor(tokens []string, earlier, createdHere map[string]bool, noTransactio
 			}
 			return "", "", ""
 		}
-		if table, ok := indexTable(tokens); ok && earlier != nil && earlier[table] && !createdHere[table] {
+		if table, ok := indexTable(tokens); ok && !createdHere[table] && (earlier == nil || earlier[table]) {
 			return "index-not-concurrent", "creating an index on an existing table can block writes", "use CREATE INDEX CONCURRENTLY in a NO TRANSACTION migration"
 		}
 	}
@@ -202,7 +215,13 @@ func indexStatement(tokens []string) bool {
 func indexTable(tokens []string) (string, bool) {
 	for i := 0; i+1 < len(tokens); i++ {
 		if tokens[i] == "ON" {
-			return identifier(tokens[i+1]), true
+			i++
+			if i < len(tokens) && tokens[i] == "ONLY" {
+				i++
+			}
+			if i < len(tokens) {
+				return identifier(tokens[i]), true
+			}
 		}
 	}
 	return "", false
@@ -226,7 +245,89 @@ func containsSequence(tokens []string, first, second string) bool {
 	return false
 }
 
-func identifier(token string) string { return strings.ToLower(strings.Trim(token, `"`)) }
+func identifier(token string) string {
+	token = strings.Trim(token, `"`)
+	if index := strings.LastIndex(token, "."); index >= 0 {
+		token = token[index+1:]
+	}
+	return strings.ToLower(strings.Trim(token, `"`))
+}
+
+func alterClauses(tokens []string) [][]string {
+	var clauses [][]string
+	depth, start := 0, 0
+	for i, token := range tokens {
+		switch token {
+		case "(":
+			depth++
+		case ")":
+			if depth > 0 {
+				depth--
+			}
+		case ",":
+			if depth == 0 {
+				clauses = append(clauses, tokens[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(clauses, tokens[start:])
+}
+
+func alterTableClauses(tokens []string) [][]string {
+	i := 2
+	if i+2 < len(tokens) && tokens[i] == "IF" && tokens[i+1] == "EXISTS" {
+		i += 2
+	}
+	if i < len(tokens) && tokens[i] == "ONLY" {
+		i++
+	}
+	if i >= len(tokens) {
+		return nil
+	}
+	return alterClauses(tokens[i+1:])
+}
+
+func dropColumn(tokens []string) bool {
+	i := 1
+	if i < len(tokens) && tokens[i] == "COLUMN" {
+		i++
+	}
+	if i+1 < len(tokens) && tokens[i] == "IF" && tokens[i+1] == "EXISTS" {
+		i += 2
+	}
+	if i >= len(tokens) {
+		return false
+	}
+	return tokens[i] != "CONSTRAINT" && tokens[i] != "DEFAULT" && tokens[i] != "NOT"
+}
+
+func alterColumnType(tokens []string) bool {
+	i := 1
+	if i < len(tokens) && tokens[i] == "COLUMN" {
+		i++
+	}
+	return i+1 < len(tokens) && (tokens[i+1] == "TYPE" || i+2 < len(tokens) && tokens[i+1] == "SET" && tokens[i+2] == "DATA")
+}
+
+func alterColumnSetNotNull(tokens []string) bool {
+	i := 1
+	if i < len(tokens) && tokens[i] == "COLUMN" {
+		i++
+	}
+	return i+2 < len(tokens) && tokens[i+1] == "SET" && tokens[i+2] == "NOT"
+}
+
+func addRequiredColumn(tokens []string) bool {
+	i := 1
+	if i < len(tokens) && tokens[i] == "COLUMN" {
+		i++
+	}
+	if i >= len(tokens) || tokens[i] == "CONSTRAINT" || tokens[i] == "PRIMARY" || tokens[i] == "UNIQUE" || tokens[i] == "CHECK" || tokens[i] == "FOREIGN" {
+		return false
+	}
+	return containsSequence(tokens[i:], "NOT", "NULL") && !contains(tokens[i:], "DEFAULT") && !(contains(tokens[i:], "GENERATED") && contains(tokens[i:], "STORED"))
+}
 
 func tokenize(sql []byte) []statement {
 	var statements []statement
@@ -280,6 +381,11 @@ func tokenize(sql []byte) []statement {
 		}
 		if sql[i] == ';' {
 			flush()
+			i++
+			continue
+		}
+		if sql[i] == ',' || sql[i] == '(' || sql[i] == ')' {
+			tokens = append(tokens, string(sql[i]))
 			i++
 			continue
 		}
