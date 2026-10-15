@@ -23,7 +23,7 @@ func TestLocal(t *testing.T) {
 		wantErr      string
 	}{
 		{name: "api", target: "api"}, {name: "all", target: "all"}, {name: "web", target: "web", wantErr: "Try:"},
-		{name: "image", target: "api", image: true}, {name: "dry", target: "api", dry: true},
+		{name: "image", target: "api", image: true}, {name: "image dry", target: "api", image: true, dry: true}, {name: "dry", target: "api", dry: true},
 		{name: "replace", target: "api", image: true, replace: "replace github.com/stopyellingatme/spinup/kit => /tmp/kit", wantErr: "Try:"},
 		{name: "replace block", target: "api", image: true, replace: "replace (\n github.com/stopyellingatme/spinup/kit v0.1.0 => ../kit\n)", wantErr: "Try:"},
 	} {
@@ -42,10 +42,14 @@ func TestLocal(t *testing.T) {
 			want := run.Cmd{Name: "go", Args: []string{"build", "-trimpath", "-ldflags", "-X main.version=dev", "-o", "bin/api", "./cmd/api"}, Dir: filepath.Join(root, "api")}
 			if tc.image {
 				want.Name = "docker"
-				want.Args = []string{"build", "-f", "../deploy/Dockerfile.api", "-t", "todo-api:dev", "--build-arg", "VERSION=dev", "."}
+				want.Dir = root
+				want.Args = []string{"buildx", "build", "--platform", "linux/amd64", "-f", "deploy/Dockerfile.api", "-t", "todo-api:dev", "--build-arg", "VERSION=dev", "--load", "api"}
 			}
 			if !tc.dry && tc.wantErr == "" {
 				fake.Expect(want.Name, want.Args...)
+				if tc.image {
+					fake.Expect("docker", "buildx", "build", "--platform", "linux/amd64", "-f", "deploy/Dockerfile.web", "-t", "todo-web:dev", "--build-arg", "PUBLIC_ORIGIN=", "--load", "web")
+				}
 			}
 			var out bytes.Buffer
 			err := Local(context.Background(), Options{Dir: root, Target: tc.target, Image: tc.image, DryRun: tc.dry, Out: &out, ErrOut: &out}, fake)
@@ -63,7 +67,11 @@ func TestLocal(t *testing.T) {
 			}
 			fake.AssertDone(t)
 			if tc.dry {
-				if !strings.Contains(out.String(), "go build") {
+				wantCommand := "go build"
+				if tc.image {
+					wantCommand = "docker buildx build"
+				}
+				if !strings.Contains(out.String(), wantCommand) {
 					t.Fatal(out.String())
 				}
 				return

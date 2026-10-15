@@ -5,9 +5,12 @@ The default binary is `api/bin/api`.
 The command embeds the version from `--tag`, or `dev` when the flag is absent.
 
 ```console
-$ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+$ spinup new todo --api-only --module github.com/acme/todo --no-git --non-interactive
 ...
 $ cd todo
+$ cd api
+$ go mod edit -dropreplace github.com/stopyellingatme/spinup/kit
+$ cd ..
 $ spinup build --dry-run
 go build -trimpath -ldflags '-X main.version=dev' -o bin/api ./cmd/api
 $ spinup build --target all --tag v0.1.0 --dry-run
@@ -36,3 +39,30 @@ A missing Go or Docker executable produces an error with installation guidance.
 An image build fails when `api/go.mod` replaces the kit with a local directory.
 Remove the replacement and use a published kit version before an image build.
 If project discovery fails, pass `--dir` with the application directory.
+
+## Images and push
+
+`--image` builds both deploy images with Docker buildx.
+The default platform is `linux/amd64`.
+Without `--push`, buildx loads local images and does not create provenance or an SBOM.
+
+```console
+$ spinup build --image --tag v0.1.0 --platform linux/amd64 --dry-run
+...
+```
+
+Use `--push` to send images to GHCR or another registry.
+The module path supplies the GitHub owner for the default `ghcr.io` registry.
+Buildx creates provenance and an SBOM for pushed images.
+The command prints each image digest for the deployer.
+
+```console
+$ spinup build --image --push --tag v0.1.0 --dry-run
+...
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--push` | Push images and create provenance and an SBOM. |
+| `--platform <platform>` | Select the Docker target platform. |
+| `--registry <registry>` | Replace the default `ghcr.io` registry. |

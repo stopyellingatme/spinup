@@ -4,6 +4,7 @@ package build
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,9 +19,10 @@ import (
 
 // Options selects the application and local build output.
 type Options struct {
-	Dir, Target, Tag string
-	Image, DryRun    bool
-	Out, ErrOut      io.Writer
+	Dir, Target, Tag        string
+	Platform, Registry, Env string
+	Image, Push, DryRun     bool
+	Out, ErrOut             io.Writer
 }
 
 // Local builds the API or prints the command when DryRun is true.
@@ -43,19 +45,11 @@ func Local(ctx context.Context, o Options, runner run.Runner) error {
 	}
 	c := run.Cmd{Name: "go", Args: []string{"build", "-trimpath", "-ldflags", "-X main.version=" + o.Tag, "-o", "bin/api", "./cmd/api"}, Dir: filepath.Join(root, "api"), Stdout: o.Out, Stderr: o.ErrOut}
 	if o.Image {
-		data, err := os.ReadFile(filepath.Join(c.Dir, "go.mod"))
-		if err != nil {
-			return buildError(err)
+		_, err := Images(ctx, o, runner)
+		if err == nil && !o.Push && o.Out != nil {
+			_, err = fmt.Fprintln(o.Out, imageWarning(ImageOptions{}))
 		}
-		if localKitReplace(string(data)) {
-			return &ui.Error{What: "Cannot build the API image", Why: "a local kit replace is outside the Docker build context", Try: "remove the local kit replace from api/go.mod and use a published kit version"}
-		}
-		config, err := project.Load(root)
-		if err != nil {
-			return buildError(err)
-		}
-		c.Name = "docker"
-		c.Args = []string{"build", "-f", "../deploy/Dockerfile.api", "-t", config.App.Name + "-api:" + o.Tag, "--build-arg", "VERSION=" + o.Tag, "."}
+		return err
 	}
 	if o.Target == "all" {
 		if _, err := fmt.Fprintln(o.Out, "Building available targets: api"); err != nil {
@@ -71,6 +65,54 @@ func Local(ctx context.Context, o Options, runner run.Runner) error {
 		return buildError(err)
 	}
 	return nil
+}
+
+// Images builds application images and returns their deploy references.
+func Images(ctx context.Context, o Options, runner run.Runner) ([]Image, error) {
+	root, err := project.FindRoot(o.Dir)
+	if err != nil {
+		return nil, buildError(err)
+	}
+	config, err := project.Load(root)
+	if err != nil {
+		return nil, buildError(err)
+	}
+	publicOrigin := ""
+	if o.Env != "" || config.DefaultEnv != "" || len(config.Envs) == 1 {
+		env, err := config.ResolveEnv(o.Env)
+		if err != nil {
+			return nil, buildError(err)
+		}
+		publicOrigin = env.PublicURL
+	}
+	if o.DryRun {
+		runner = imageDryRunRunner{out: o.Out}
+	}
+	return BuildImages(ctx, runner, ImageOptions{
+		Root: root, App: config.App.Name, Tag: o.Tag, Platform: o.Platform,
+		Push: o.Push, Registry: o.Registry, PublicOrigin: publicOrigin,
+	})
+}
+
+type imageDryRunRunner struct{ out io.Writer }
+
+func (r imageDryRunRunner) Run(_ context.Context, c run.Cmd) (run.Result, error) {
+	if _, err := fmt.Fprintln(r.out, c.String()); err != nil {
+		return run.Result{}, err
+	}
+	for index, arg := range c.Args {
+		if arg != "--metadata-file" {
+			continue
+		}
+		data, err := json.Marshal(map[string]string{"containerimage.digest": "dry-run"})
+		if err != nil {
+			return run.Result{}, err
+		}
+		if err := os.WriteFile(c.Args[index+1], data, 0600); err != nil {
+			return run.Result{}, err
+		}
+	}
+	return run.Result{}, nil
 }
 
 func buildError(err error) error {

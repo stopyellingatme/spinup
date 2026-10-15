@@ -11,6 +11,9 @@ func init() { Register(GroupShip, newBuild) }
 func newBuild(app *App) *cobra.Command {
 	var o build.Options
 	c := &cobra.Command{Use: "build", Short: "Build the application API", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+		if o.Image {
+			return buildImagesCommand(c.Context(), app, c, o)
+		}
 		o.Dir = app.Flags.Dir
 		o.DryRun = app.Flags.DryRun
 		o.Out = c.OutOrStdout()
@@ -20,5 +23,6 @@ func newBuild(app *App) *cobra.Command {
 	c.Flags().StringVar(&o.Target, "target", "api", "target to build: api, web, or all")
 	c.Flags().StringVar(&o.Tag, "tag", "", "version tag (default dev)")
 	c.Flags().BoolVar(&o.Image, "image", false, "build the API container image")
+	registerBuildImageFlags(c, &o)
 	return c
 }
