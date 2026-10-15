@@ -1,4 +1,3 @@
-// Package model generates a migration, queries, and a schema.
-//
-// STUB from the M3 pre-seed commit. Unit M3.4 owns this file and replaces it.
+// Package model generates the data layer of a resource without its API
+// (`spinup g model`): a migration, the sqlc queries, and the OpenAPI schemas.
 package model
