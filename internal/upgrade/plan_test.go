@@ -91,7 +91,7 @@ func TestPlanDecisions(t *testing.T) {
 		{name: "large theirs", class: "scaffold", disk: "user", next: strings.Repeat("n", merge.MaxSize+1), action: ActionKeep},
 		{name: "large base", class: "scaffold", disk: "user", base: strings.Repeat("b", merge.MaxSize+1), action: ActionKeep},
 		{name: "forced managed", class: "managed", disk: "user", force: true, action: ActionOverwrite, reason: "forced"},
-		{name: "new managed policy", class: "scaffold", nextClass: "managed", disk: "user", force: true, action: ActionOverwrite, reason: "forced"},
+		{name: "ejected not forced", class: "scaffold", nextClass: "managed", disk: "user", force: true, action: ActionConflict, merges: 1},
 		{name: "scaffold not forced", class: "scaffold", disk: "user", force: true, action: ActionConflict, merges: 1},
 		{name: "managed conflict", class: "managed", disk: "user", action: ActionConflict, merges: 1},
 		{name: "scaffold clean", class: "scaffold", disk: "user", next: "old", action: ActionMerge, merges: 1},
@@ -176,7 +176,7 @@ func TestPlanRename(t *testing.T) {
 		action           Action
 	}{
 		{"unchanged", "old", "new", ActionRename},
-		{"occupied destination", "old", "new", ActionRename},
+		{"identical destination", "old", "new", ActionRename},
 		{"edited clean", "user", "old", ActionRename},
 		{"edited conflict", "user", "new", ActionConflict},
 	} {
@@ -184,8 +184,8 @@ func TestPlanRename(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
 			writePlanFile(t, root, "file.txt", tc.disk, 0o644)
-			if tc.name == "occupied destination" {
-				writePlanFile(t, root, "moved.txt", "unrelated", 0o644)
+			if tc.name == "identical destination" {
+				writePlanFile(t, root, "moved.txt", tc.next, 0o644)
 			}
 			lock := planLock("old", "scaffold")
 			newer := planVersion("0.2.0", planSpec{path: "moved.txt", data: tc.next, from: "file.txt", mode: 0o755})
@@ -443,5 +443,146 @@ func TestNextLockSnapshot(t *testing.T) {
 	next.Answers["nested"].(map[string]any)["items"].([]any)[0] = "changed"
 	if old.Packs[0] != "base" || old.AppliedMigrations[0] != "0001" || answers["nested"].(map[string]any)["items"].([]any)[0] != "original" {
 		t.Fatal("next lock aliases inputs")
+	}
+}
+
+func TestPlanRenameOccupiedDestination(t *testing.T) {
+	t.Parallel()
+	for _, destination := range []string{"aaa.txt", "moved.txt"} {
+		t.Run(destination, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writePlanFile(t, root, "file.txt", "old", 0o644)
+			writePlanFile(t, root, destination, "USER WORK", 0o600)
+			lock := planLock("old", "scaffold")
+			newer := planVersion("0.2.0", planSpec{path: destination, data: "new", from: "file.txt"})
+			merger := &planMerger{}
+			p, err := BuildPlan(context.Background(), PlanInput{Root: root, Lock: lock, New: newer, Merger: merger})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var conflict FileDecision
+			for _, d := range p.Files {
+				if d.Path == destination {
+					conflict = d
+				}
+			}
+			if conflict.Action != ActionConflict || conflict.Reason != "path exists" || conflict.From != "" {
+				t.Fatalf("destination: %#v", conflict)
+			}
+			if len(merger.inputs) != 1 || len(merger.inputs[0].Base) != 0 || string(merger.inputs[0].Ours) != "USER WORK\n" {
+				t.Fatalf("merge inputs: %#v", merger.inputs)
+			}
+			next, err := NextLock(lock, p, newer, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(next.Orphans, []string{"file.txt"}) || next.Files[destination].Hash != manifest.Hash([]byte("new")) {
+				t.Fatalf("next lock: %#v", next)
+			}
+			if err := writePlan(root, p); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(filepath.Join(root, "file.txt"))
+			if err != nil || string(data) != "old" {
+				t.Fatalf("rename source: %q, %v", data, err)
+			}
+			data, err = os.ReadFile(filepath.Join(root, destination))
+			if err != nil || !bytes.Contains(data, []byte("USER WORK")) || !bytes.Contains(data, []byte("<<<<<<<")) {
+				t.Fatalf("destination content: %q, %v", data, err)
+			}
+		})
+	}
+}
+
+func TestPlanEjectedClass(t *testing.T) {
+	t.Parallel()
+	for _, force := range []bool{false, true} {
+		name := "default"
+		if force {
+			name = "force managed"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writePlanFile(t, root, "file.txt", "user", 0o644)
+			lock := planLock("old", "scaffold")
+			newer := planVersion("0.2.0", planSpec{path: "file.txt", data: "new", class: "managed"})
+			p, err := BuildPlan(context.Background(), PlanInput{Root: root, Lock: lock, Old: planVersion("0.1.0", planSpec{path: "file.txt", data: "old", class: "managed"}), New: newer, Merger: &planMerger{}, ForceManaged: force})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.Files[0].Action != ActionConflict || p.Files[0].Class != manifest.Scaffold {
+				t.Errorf("ejected decision: %#v", p.Files[0])
+			}
+			next, err := NextLock(lock, p, newer, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if next.Files["file.txt"].Class != manifest.Scaffold {
+				t.Errorf("ejected class reset: %#v", next.Files["file.txt"])
+			}
+		})
+	}
+}
+
+func TestPlanClassTransitions(t *testing.T) {
+	t.Parallel()
+	for _, oldClass := range []manifest.Class{manifest.Managed, manifest.Scaffold, manifest.Seed} {
+		for _, newClass := range []manifest.Class{manifest.Managed, manifest.Scaffold, manifest.Seed} {
+			t.Run(string(oldClass)+" to "+string(newClass), func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				writePlanFile(t, root, "file.txt", "user", 0o644)
+				lock := planLock("old", string(oldClass))
+				newer := planVersion("0.2.0", planSpec{path: "file.txt", data: "new", class: string(newClass)})
+				p, err := BuildPlan(context.Background(), PlanInput{Root: root, Lock: lock, New: newer, Merger: &planMerger{}, ForceManaged: true})
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantClass, wantAction := newClass, ActionConflict
+				if oldClass == manifest.Scaffold && newClass == manifest.Managed {
+					wantClass = manifest.Scaffold
+				}
+				switch wantClass {
+				case manifest.Managed:
+					wantAction = ActionOverwrite
+				case manifest.Seed:
+					wantAction = ActionKeep
+				}
+				if p.Files[0].Class != wantClass || p.Files[0].Action != wantAction {
+					t.Fatalf("decision: %#v", p.Files[0])
+				}
+				next, err := NextLock(lock, p, newer, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if next.Files["file.txt"].Class != wantClass {
+					t.Fatalf("next class: %s, want %s", next.Files["file.txt"].Class, wantClass)
+				}
+			})
+		}
+	}
+}
+
+func TestPlanRenameEjectedClass(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writePlanFile(t, root, "file.txt", "old", 0o644)
+	lock := planLock("old", "scaffold")
+	newer := planVersion("0.2.0", planSpec{path: "moved.txt", data: "new", from: "file.txt", class: "managed"})
+	p, err := BuildPlan(context.Background(), PlanInput{Root: root, Lock: lock, New: newer, ForceManaged: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Files[0].Class != manifest.Scaffold || p.Files[0].Action != ActionRename {
+		t.Fatalf("rename: %#v", p.Files[0])
+	}
+	next, err := NextLock(lock, p, newer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Files["moved.txt"].Class != manifest.Scaffold {
+		t.Fatalf("renamed class: %s", next.Files["moved.txt"].Class)
 	}
 }

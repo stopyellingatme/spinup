@@ -108,7 +108,7 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		from := renames[file.Path]
 		entry, tracked := in.Lock.Files[from]
 		_, targetTracked := in.Lock.Files[file.Path]
-		if from == "" || !tracked || targetTracked || !disks[from].exists || entry.Class == manifest.Seed || manifest.Class(file.Class) == manifest.Seed || slices.Contains(in.Lock.Tombstones, file.Path) {
+		if from == "" || !tracked || targetTracked || !disks[from].exists || planClass(entry.Class, manifest.Class(file.Class)) == manifest.Seed || slices.Contains(in.Lock.Tombstones, file.Path) {
 			continue
 		}
 		if previous, used := sources[from]; used {
@@ -120,19 +120,27 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		sources[from] = file.Path
 	}
 	for _, name := range paths {
-		if _, consumed := sources[name]; consumed {
+		if target, consumed := sources[name]; consumed {
+			file, _ := newer.Get(target)
+			if disks[target].exists && !bytes.Equal(disks[target].data, file.Data) {
+				entry := in.Lock.Files[name]
+				p.Files = append(p.Files, FileDecision{Path: name, Class: entry.Class, Template: entry.Template, Action: ActionOrphan, Reason: "rename destination exists"})
+			}
 			continue
 		}
 		entry, tracked := in.Lock.Files[name]
 		file, rendered := newer.Get(name)
 		d := FileDecision{Path: name, Class: manifest.Class(file.Class), Template: file.Template, Mode: file.Mode, Data: file.Data}
+		if tracked {
+			d.Class = planClass(entry.Class, d.Class)
+		}
 		disk := disks[name]
 		switch {
 		case slices.Contains(in.Lock.Tombstones, name):
 			d.Action, d.Reason = ActionKeep, "tombstone"
 		case tracked && !disk.exists:
 			d.Action, d.Reason = ActionKeep, "missing on disk"
-		case entry.Class == manifest.Seed || d.Class == manifest.Seed:
+		case (!rendered && entry.Class == manifest.Seed) || d.Class == manifest.Seed:
 			d.Action, d.Reason = ActionKeep, "seed"
 			if !tracked && !disk.exists && rendered {
 				d.Action, d.Reason = ActionCreate, ""
@@ -140,7 +148,10 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		default:
 			from := renames[name]
 			switch {
+			case sources[from] == name && disk.exists && !bytes.Equal(disk.data, file.Data):
+				d, err = mergePlanFile(ctx, in.Merger, d, nil, disk.data, file.Data, "path exists")
 			case sources[from] == name:
+				d.Class = planClass(in.Lock.Files[from].Class, d.Class)
 				d.From = from
 				source := disks[from]
 
@@ -167,7 +178,7 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 			return nil, err
 		}
 		if d.Action == ActionKeep || d.Action == ActionDelete || d.Action == ActionOrphan {
-			if tracked {
+			if tracked && !rendered {
 				d.Class, d.Template = entry.Class, entry.Template
 			}
 			d.Data = nil
@@ -175,6 +186,14 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		p.Files = append(p.Files, d)
 	}
 	return p, nil
+}
+
+// planClass preserves an ejected file unless the template changes it to seed.
+func planClass(old, newer manifest.Class) manifest.Class {
+	if old == manifest.Scaffold && newer == manifest.Managed {
+		return manifest.Scaffold
+	}
+	return newer
 }
 
 func planContext(ctx context.Context) error {

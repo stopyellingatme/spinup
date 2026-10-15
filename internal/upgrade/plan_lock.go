@@ -68,7 +68,11 @@ func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[st
 			if !ok {
 				continue
 			}
-			entry := manifest.FileEntry{Class: manifest.Class(file.Class)}
+			previous := old.Files[d.Path]
+			if d.From != "" {
+				previous = old.Files[d.From]
+			}
+			entry := manifest.FileEntry{Class: planClass(previous.Class, manifest.Class(file.Class))}
 			if entry.Class != manifest.Seed {
 				entry.Template = file.Template
 				entry.Hash = manifest.Hash(file.Data)
