@@ -364,8 +364,8 @@ fi
 echo "    deploy unlock --force removed the lock"
 
 # ---------------------------------------------------------------------------------------------
-step "6. the deploy pushes secrets with mode 0600"
-# spinup has no separate secrets push command. The upload step of deploy pushes the secrets.
+step "6. the deploy and secrets push write secrets with mode 0600"
+# The upload step of deploy pushes the secrets; secrets push (below) does it without a deploy.
 token="dind-token-$run_id"
 printf '%s' "$token" >"$work/value"
 sp secrets-token secrets set --env staging DIND_TOKEN <"$work/value" || { show_log secrets-token; fail "secrets set failed"; }
@@ -389,5 +389,17 @@ fi
 leaks="$(docker exec "$vm" sh -c "grep -rlF '$token' /opt/$app/releases /opt/$app/deploy.state /opt/$app/releases.json 2>/dev/null || true")"
 [[ -z "$leaks" ]] || fail "the secret value is in files outside /opt/$app/secrets" "$leaks"
 echo "    the value is only in /opt/$app/secrets"
+
+# secrets push writes changed values without a deploy.
+token2="dind-token-2-$run_id"
+printf '%s' "$token2" >"$work/value"
+sp secrets-token2 secrets set --env staging DIND_TOKEN <"$work/value" || { show_log secrets-token2; fail "secrets set failed"; }
+rm -f "$work/value"
+sp secrets-push secrets push --env staging --yes || { show_log secrets-push; fail "secrets push failed"; }
+if [[ "$(ssh -F "$work/ssh_config" -o BatchMode=yes "$host_alias" cat "/opt/$app/secrets/DIND_TOKEN")" != "$token2" ]]; then
+  fail "secrets push did not write the new DIND_TOKEN value"
+fi
+[[ "$(docker exec "$vm" stat -c '%a' "/opt/$app/secrets/DIND_TOKEN")" == 600 ]] || fail "secrets push left DIND_TOKEN without mode 0600"
+echo "    secrets push wrote the new value with mode 0600"
 
 printf '\nrun.sh: PASS (releases %s, %s, %s)\n' "$rel1" "$rel2" "$rel3"

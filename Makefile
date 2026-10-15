@@ -47,8 +47,8 @@ e2e: ## Playwright smoke on a generated app with auth (needs DATABASE_URL and th
 	@if [[ -z "$${DATABASE_URL:-}" ]]; then echo "e2e: DATABASE_URL is empty"; echo "Try: export DATABASE_URL=postgres://... (an empty database server you own)"; exit 1; fi
 	@bash testdata/e2e/web/run.sh
 
-dind: ## Docker-in-Docker deploy suite (from M5)
-	@echo "dind: not implemented until M5"
+dind: ## Docker-in-Docker deploy suite: bootstrap, deploy, auto rollback, rollback, lock, secrets (DIND_WEB=1 adds the web app)
+	@bash testdata/dind/run.sh
 
 tools-check: ## Fail when a required tool is missing or has the wrong version
 	@scripts/tools-check.sh

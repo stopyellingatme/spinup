@@ -87,3 +87,19 @@ The full `doctor` command includes the `plaintext-secrets` check.
 It rejects tracked `.env` files, tracked `*.agekey` files, and tracked YAML files under `secrets/` without sops metadata.
 It also rejects a `.gitignore` that does not exclude `.env`.
 The quick doctor check skips this check.
+
+## Push secrets to the host
+
+`spinup deploy` writes the decrypted secrets to `/opt/<app>/secrets/` on every deploy.
+To change a value without a deploy, use `push`. It takes the deploy lock, writes one file per
+secret with mode 0600, and removes files for names that no longer exist. Running containers read
+the files when they start, so the next deploy or restart picks up the new values.
+
+<!-- doctest: skip -->
+```console
+$ spinup secrets push --env staging
+Pushed 3 secrets to staging: DATABASE_URL, DIND_TOKEN, POSTGRES_PASSWORD
+Next: spinup deploy --env staging (running containers read the files at start)
+```
+
+A protected environment asks you to type its name first (or needs `--yes` in CI).
