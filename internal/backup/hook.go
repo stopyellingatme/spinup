@@ -57,7 +57,7 @@ func DeployOptionsFrom(ctx context.Context) DeployOptions {
 // Hook is the pre-deploy hook: it takes a diff backup before every deploy.
 //
 //   - A project without the backups module skips it.
-//   - A VM without a running postgres container (the first deploy) skips it.
+//   - A VM without a recorded release and a running postgres container skips it.
 //   - --skip-backup skips it, unless a pending migration lacks the -- spinup:safe marker.
 func Hook(ctx context.Context, c *deploy.HookContext) error {
 	if c == nil {
@@ -96,13 +96,31 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 	if app == "" {
 		app = config.App.Name
 	}
+	releases, err := deploy.ReadReleases(ctx, c.Remote, app)
+	if err != nil {
+		return fmt.Errorf("pre-deploy backup: determine whether this is the first deploy: %w", err)
+	}
 	running, err := postgresRunning(ctx, c.Remote, app)
 	if err != nil {
 		return err
 	}
 	if !running {
-		_, _ = fmt.Fprintln(out, "backup: skipped, the database does not run yet (first deploy)")
-		return nil
+		if len(releases) == 0 {
+			_, _ = fmt.Fprintln(out, "backup: skipped, the database does not run yet (first deploy)")
+			return nil
+		}
+		if o.SkipBackup {
+			unsafe, err := unsafePendingAfter(filepath.Join(root, filepath.FromSlash(MigrationsDir)), releases[0].MigrationVersion)
+			if err != nil {
+				return fmt.Errorf("refuse --skip-backup: the pending migrations could not be checked: %w\nTry: start postgres, then deploy again", err)
+			}
+			if len(unsafe) > 0 {
+				return fmt.Errorf("refuse --skip-backup: pending migrations lack the %q marker: %s\nTry: start postgres, or add a %q line to every pending migration that keeps all data", SafeMarker, strings.Join(unsafe, ", "), SafeMarker)
+			}
+			_, _ = fmt.Fprintln(out, "backup: skipped (--skip-backup), every pending migration is marked safe")
+			return nil
+		}
+		return errors.New("pre-deploy backup: postgres is not running on an existing deployment\nTry: start postgres, or pass --skip-backup when every pending migration is marked safe")
 	}
 	if o.SkipBackup {
 		unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir)))
@@ -169,6 +187,14 @@ func unsafePending(ctx context.Context, r remote.Runner, app, dir string) ([]str
 	applied, err := AppliedVersion(ctx, r, app)
 	if err != nil {
 		return nil, err
+	}
+	return UnsafePending(dir, applied)
+}
+
+func unsafePendingAfter(dir, version string) ([]string, error) {
+	applied, err := strconv.ParseInt(version, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse the recorded migration version %q: %w", version, err)
 	}
 	return UnsafePending(dir, applied)
 }

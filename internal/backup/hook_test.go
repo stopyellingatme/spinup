@@ -47,6 +47,10 @@ var (
 	psql      = []string{"docker", "compose", "-p", "todo", "exec", "-T", "postgres", "psql", "-U", "app", "-d", "app", "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c"}
 )
 
+func releaseHistory(f *remote.Fake, data string) {
+	f.Expect("sh", "-c").Return(data, "", 0)
+}
+
 func TestHookRegistered(t *testing.T) {
 	t.Parallel()
 	for _, h := range deploy.PreDeployHooks() {
@@ -83,46 +87,67 @@ func TestHook(t *testing.T) {
 	}{
 		{name: "no backups module", out: "does not use the backups module", script: func(*remote.Fake) {}},
 		{name: "first deploy", backups: true, out: "first deploy", script: func(f *remote.Fake) {
+			releaseHistory(f, "")
 			f.Expect(psRunning...).Return("", "", 0)
 		}},
 		{name: "diff backup", backups: true, out: "backup: 20261015-082351F_20261015-082353D (diff)", script: func(f *remote.Fake) {
+			releaseHistory(f, "[{}]")
 			f.Expect(psRunning...).Return("4f2a\n", "", 0)
 			backupRun(f)
 		}},
 		{name: "retention from spinup.toml", backups: true, retention: "8", out: "backup: 20261015", upload: "repo1-retention-full=8\n", script: func(f *remote.Fake) {
+			releaseHistory(f, "[{}]")
 			f.Expect(psRunning...).Return("4f2a\n", "", 0)
 			backupRun(f)
 		}},
 		{name: "skip with safe migrations", backups: true, skip: true, out: "skipped (--skip-backup)",
 			migrations: map[string]string{"00001_init.sql": unsafe, "00002_note.sql": safe},
 			script: func(f *remote.Fake) {
+				releaseHistory(f, "[{}]")
 				f.Expect(psRunning...).Return("4f2a\n", "", 0)
 				gooseExists(f, "1")
 			}},
 		{name: "skip refused for unsafe migration", backups: true, skip: true, err: "00003_drop.sql",
 			migrations: map[string]string{"00001_init.sql": unsafe, "00002_note.sql": safe, "00003_drop.sql": unsafe},
 			script: func(f *remote.Fake) {
+				releaseHistory(f, "[{}]")
 				f.Expect(psRunning...).Return("4f2a\n", "", 0)
 				gooseExists(f, "1")
 			}},
 		{name: "skip refused on a database without goose", backups: true, skip: true, err: "00001_init.sql",
 			migrations: map[string]string{"00001_init.sql": unsafe},
 			script: func(f *remote.Fake) {
+				releaseHistory(f, "[{}]")
 				f.Expect(psRunning...).Return("4f2a\n", "", 0)
 				f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("-1\n", "", 0)
 			}},
 		{name: "skip refused when the check fails", backups: true, skip: true, err: "could not be checked",
 			script: func(f *remote.Fake) {
+				releaseHistory(f, "[{}]")
 				f.Expect(psRunning...).Return("4f2a\n", "", 0)
 				f.Expect(psql...).Return("", "psql: error\n", 2)
 			}},
 		{name: "backup failure stops the deploy", backups: true, err: "pre-deploy backup", script: func(f *remote.Fake) {
+			releaseHistory(f, "[{}]")
 			f.Expect(psRunning...).Return("4f2a\n", "", 0)
 			f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
 			f.Expect(Command("todo", "--output=json", "info")...).Return("", "P00 ERROR: [039]: HTTP request failed\n", 39)
 		}},
 		{name: "docker fails", backups: true, err: "list the running postgres container", script: func(f *remote.Fake) {
+			releaseHistory(f, "[{}]")
 			f.Expect(psRunning...).Return("", "Cannot connect to the Docker daemon\n", 1)
+		}},
+		{name: "stopped database after a release fails", backups: true, err: "start postgres", script: func(f *remote.Fake) {
+			releaseHistory(f, "[{}]")
+			f.Expect(psRunning...).Return("", "", 0)
+		}},
+		{name: "stopped database skips only safe migrations", backups: true, skip: true, out: "skipped (--skip-backup)", migrations: map[string]string{"00002_note.sql": safe}, script: func(f *remote.Fake) {
+			releaseHistory(f, `[{"migration_version":"1"}]`)
+			f.Expect(psRunning...).Return("", "", 0)
+		}},
+		{name: "stopped database refuses unsafe migrations", backups: true, skip: true, err: "00002_drop.sql", migrations: map[string]string{"00002_drop.sql": unsafe}, script: func(f *remote.Fake) {
+			releaseHistory(f, `[{"migration_version":"1"}]`)
+			f.Expect(psRunning...).Return("", "", 0)
 		}},
 		{name: "invalid retention", backups: true, retention: "weekly", err: "[backups] retention", script: func(*remote.Fake) {}},
 	} {
@@ -156,6 +181,7 @@ func TestHookThroughRunHooks(t *testing.T) {
 	t.Parallel()
 	dir := newProject(t, true, "", map[string]string{"00001_init.sql": "-- +goose Up\nDROP TABLE x;\n"})
 	f := &remote.Fake{}
+	releaseHistory(f, "[{}]")
 	f.Expect(psRunning...).Return("4f2a\n", "", 0)
 	f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("-1\n", "", 0)
 	ctx := WithDeployOptions(context.Background(), DeployOptions{Dir: dir, SkipBackup: true})
