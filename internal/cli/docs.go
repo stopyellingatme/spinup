@@ -19,7 +19,7 @@ func init() { Register(GroupMaintain, newDocs) }
 
 func newDocs(app *App) *cobra.Command {
 	command := &cobra.Command{Use: "docs", Short: "Print compatibility data and generate command references", Args: cobra.NoArgs}
-	command.AddCommand(newDocsCompat(app), newDocsReference(app))
+	command.AddCommand(newDocsCompat(app), newDocsReference())
 	return command
 }
 
@@ -48,7 +48,7 @@ func newDocsCompat(app *App) *cobra.Command {
 	return command
 }
 
-func newDocsReference(app *App) *cobra.Command {
+func newDocsReference() *cobra.Command {
 	var out string
 	command := &cobra.Command{
 		Use:   "reference",
