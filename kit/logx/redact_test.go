@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -40,5 +42,34 @@ func TestURLRedaction(t *testing.T) {
 				t.Fatal(out.String())
 			}
 		})
+	}
+}
+
+func TestStructuredValueRedaction(t *testing.T) {
+	defer SetRedactor(nil)
+	SetRedactor(nil)
+	values := url.Values{"token": {"query-secret"}, "page": {"1"}}
+	headers := http.Header{"Authorization": {"header-secret"}, "Accept": {"application/json"}}
+	fields := map[string]string{"password": "map-secret", "name": "visible"}
+	var out bytes.Buffer
+	New(&out, Options{}).InfoContext(context.Background(), "request",
+		slog.Any("fields", fields),
+		slog.Any("headers", headers),
+		slog.Any("query", values),
+	)
+
+	output := out.String()
+	for _, secret := range []string{"map-secret", "header-secret", "query-secret"} {
+		if strings.Contains(output, secret) {
+			t.Fatalf("secret %q was not redacted: %s", secret, output)
+		}
+	}
+	for _, visible := range []string{"visible", "application/json", "\"1\""} {
+		if !strings.Contains(output, visible) {
+			t.Fatalf("visible value %q was removed: %s", visible, output)
+		}
+	}
+	if strings.Count(output, "****") != 3 {
+		t.Fatal(output)
 	}
 }

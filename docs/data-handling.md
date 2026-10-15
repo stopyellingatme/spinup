@@ -41,6 +41,8 @@ A key matches when it contains `password`, `secret`, `token`, `authorization`, `
 Matching ignores letter case.
 The replacement value is `****`.
 The redactor also checks nested slog groups and attributes attached with `With`.
+It checks `map[string]T`, `http.Header`, and `url.Values` values one level deep.
+It masks values whose nested keys match a secret key.
 
 URL passwords are masked in string attributes, error values, and messages.
 For example, `postgres://user:password@db/app` becomes `postgres://user:****@db/app`.

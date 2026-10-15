@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -101,11 +104,8 @@ type defaultRedactor struct{}
 func init() { SetRedactor(defaultRedactor{}) }
 
 func (defaultRedactor) Redact(key string, value slog.Value) slog.Value {
-	lower := strings.ToLower(key)
-	for _, secret := range []string{"password", "secret", "token", "authorization", "cookie", "api_key", "dsn"} {
-		if strings.Contains(lower, secret) {
-			return slog.StringValue("****")
-		}
+	if isSecretKey(key) {
+		return slog.StringValue("****")
 	}
 	switch value.Kind() {
 	case slog.KindString:
@@ -117,9 +117,56 @@ func (defaultRedactor) Redact(key string, value slog.Value) slog.Value {
 			return slog.StringValue(maskURLs(v.Error()))
 		case fmt.Stringer:
 			return slog.StringValue(maskURLs(v.String()))
+		case http.Header:
+			return slog.AnyValue(redactStringSlices(v))
+		case url.Values:
+			return slog.AnyValue(redactStringSlices(v))
+		}
+		if redacted, ok := redactStringMap(value.Any()); ok {
+			return slog.AnyValue(redacted)
 		}
 	}
 	return value
+}
+
+func isSecretKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, secret := range []string{"password", "secret", "token", "authorization", "cookie", "api_key", "dsn"} {
+		if strings.Contains(lower, secret) {
+			return true
+		}
+	}
+	return false
+}
+
+func redactStringSlices(values map[string][]string) map[string][]string {
+	redacted := make(map[string][]string, len(values))
+	for key, value := range values {
+		if isSecretKey(key) {
+			redacted[key] = []string{"****"}
+			continue
+		}
+		redacted[key] = append([]string(nil), value...)
+	}
+	return redacted
+}
+
+func redactStringMap(value any) (map[string]any, bool) {
+	mapValue := reflect.ValueOf(value)
+	if mapValue.Kind() != reflect.Map || mapValue.Type().Key().Kind() != reflect.String {
+		return nil, false
+	}
+	redacted := make(map[string]any, mapValue.Len())
+	iter := mapValue.MapRange()
+	for iter.Next() {
+		key := iter.Key().String()
+		if isSecretKey(key) {
+			redacted[key] = "****"
+			continue
+		}
+		redacted[key] = iter.Value().Interface()
+	}
+	return redacted, true
 }
 
 var urlCredentials = regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://[^/@\s:]*:)[^\s]*@`)
