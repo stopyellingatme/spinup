@@ -1,4 +1,2 @@
-// Package tools installs checksum-verified tool binaries.
-//
-// STUB from the M5 pre-seed commit. Unit M5.10 owns this file and replaces it.
+// Package tools installs and locates checksum-verified host tools.
 package tools
