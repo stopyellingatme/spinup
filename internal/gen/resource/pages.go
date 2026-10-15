@@ -212,7 +212,7 @@ func (d *pageData) field(f fields.Field) pageField {
 			break
 		}
 		p.ValueType, p.Empty = "boolean", "false"
-		p.Read = fmt.Sprintf("form.has('%s')", col)
+		p.Read = fmt.Sprintf("form.get('%s') === 'on'", col)
 		p.ToValue = "item." + col
 		p.Cell = fmt.Sprintf("{item.%s ? 'Yes' : 'No'}", col)
 		p.Input = fmt.Sprintf(`<div class="grid gap-2">

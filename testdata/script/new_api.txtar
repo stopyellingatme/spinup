@@ -3,9 +3,7 @@ env SPINUP_KIT_REPLACE=
 exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 stdout 'Created todo \([0-9]+ files\) from packs base, api, ci'
 stdout 'Next:'
-stdout 'docker compose -f deploy/compose.dev.yml up -d'
-stdout 'spinup db migrate up'
-stdout 'cd api && go run ./cmd/api'
+stdout '  spinup dev'
 exists todo/spinup.lock todo/spinup.toml todo/api/go.mod
 exists todo/api/cmd/api/main.go todo/deploy/compose.dev.yml
 exists todo/.github/workflows/ci.yml todo/.env

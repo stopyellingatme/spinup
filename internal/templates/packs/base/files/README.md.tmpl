@@ -1,19 +1,24 @@
 # [[ .app_name ]]
 
-Stack: Go API, PostgreSQL, Docker Compose, and Mailpit.
+Made with spinup: a Go API, PostgreSQL, and (unless the app is API-only) a SvelteKit web app.
 
 ## Quick start
 
-Start the development services:
+Start everything in development: PostgreSQL and Mailpit in Docker, the migrations, the API
+with live reload, and the web dev server:
 
 ```sh
-docker compose -f deploy/compose.dev.yml up -d
-spinup db migrate up
-cd api && go run ./cmd/api
+spinup dev
 ```
 
-In another terminal, check the API:
+Open the app URL that `spinup dev` prints (http://localhost:5173 by default).
+Press Ctrl-C to stop. The Docker services keep running; `spinup dev --down` stops them too.
+
+## Everyday commands
 
 ```sh
-curl localhost:8080/healthz
+spinup g resource post title:string body:text   # a CRUD API and pages
+spinup db migrate up                             # apply migrations
+spinup test                                      # run the API tests
+spinup upgrade --plan                            # preview a template upgrade
 ```

@@ -46,7 +46,7 @@ export function parse(form: FormData): { values: Values; body: Input; errors: Er
 	const errors: Errors = {};
 	const values: Values = {
 		title: text(form, 'title'),
-		done: form.has('done'),
+		done: form.get('done') === 'on',
 		due: text(form, 'due'),
 		priority: text(form, 'priority')
 	};

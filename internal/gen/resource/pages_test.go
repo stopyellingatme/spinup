@@ -121,7 +121,7 @@ func TestPageInputs(t *testing.T) {
 	}{
 		{"title:string", []string{`<Input id="title" name="title" type="text" value={values.title} required`}, []string{"title: string;", "title: values.title", "title: text(form, 'title')"}, "{item.title}"},
 		{"body:text?", []string{`<textarea id="body" name="body" rows="4" value={values.body} class={control} aria-invalid`}, []string{"body: optional(values.body)", "body: item.body ?? ''"}, "{item.body ?? ''}"},
-		{"done:bool", []string{`<input id="done" name="done" type="checkbox" checked={values.done}`}, []string{"done: boolean;", "done: form.has('done')", "done: false"}, "{item.done ? 'Yes' : 'No'}"},
+		{"done:bool", []string{`<input id="done" name="done" type="checkbox" checked={values.done}`}, []string{"done: boolean;", "done: form.get('done') === 'on'", "done: false"}, "{item.done ? 'Yes' : 'No'}"},
 		{"flag:bool?", []string{`<select id="flag" name="flag" class={control}`, `<option value="" selected={values.flag === ''}>Unset</option>`, `<option value="true"`, `<option value="false"`}, []string{"flag: item.flag === null ? '' : String(item.flag)", "flag: values.flag === '' ? null : values.flag === 'true'"}, "{item.flag === null ? '' : item.flag ? 'Yes' : 'No'}"},
 		{"rank:int", []string{`type="number" value={values.rank} step="1" required`}, []string{"rank: integer(values.rank, 'rank', errors)", "rank: String(item.rank)"}, "{item.rank}"},
 		{"size:bigint?", []string{`type="number" value={values.size} step="1" aria-invalid`}, []string{"size: values.size.trim() === '' ? null : integer(values.size, 'size', errors)", "size: item.size === null ? '' : String(item.size)"}, "{item.size ?? ''}"},

@@ -63,7 +63,7 @@ func Apply(ctx context.Context, result *Result, o Options, runner run.Runner, pr
 		return nil
 	}
 	printer.Printf("Created %s (%d files) from packs %s\n", o.Name, len(result.Plan.Files), strings.Join(result.Packs, ", "))
-	printer.Printf("\nNext:\n  cd %s\n  docker compose -f deploy/compose.dev.yml up -d\n  spinup db migrate up\n  cd api && go run ./cmd/api\n", o.Name)
+	printer.Printf("\nNext:\n  cd %s\n  spinup dev\n", o.Name)
 	return nil
 }
 
