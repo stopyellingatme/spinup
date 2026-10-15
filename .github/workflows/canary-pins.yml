@@ -1,0 +1,119 @@
+name: Canary dependency minors
+
+on:
+  schedule:
+    - cron: '13 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Render every module outside the checkout
+        shell: bash
+        run: |
+          go build -o "$RUNNER_TEMP/spinup" ./cmd/spinup
+          modules=$(find internal/templates/packs -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | grep -vE '^(_.*|base|api|web)$' | paste -sd, -)
+          mkdir -p "$RUNNER_TEMP/canary"
+          cd "$RUNNER_TEMP/canary"
+          SPINUP_KIT_REPLACE="$GITHUB_WORKSPACE/kit" "$RUNNER_TEMP/spinup" new demo \
+            --modules "$modules" --module example.com/canary --no-git --non-interactive
+      - name: Select newest stable npm minors within each major
+        working-directory: ${{ runner.temp }}/canary/demo/web
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          function newest(name, current) {
+            const major = /^(\d+)\./.exec(current)?.[1];
+            if (!major) throw new Error(`Cannot determine major for ${name}: ${current}`);
+            const versions = JSON.parse(execFileSync('npm', ['view', name, 'versions', '--json'], {encoding: 'utf8'}));
+            const stable = versions.filter(v => /^\d+\.\d+\.\d+$/.test(v) && v.split('.')[0] === major);
+            stable.sort((a, b) => {
+              const x = a.split('.').map(Number), y = b.split('.').map(Number);
+              return x[0]-y[0] || x[1]-y[1] || x[2]-y[2];
+            });
+            if (!stable.length) throw new Error(`No stable version for ${name} major ${major}`);
+            const version = stable.at(-1);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `| ${name} | ${current} | ${version} |\n`);
+            return version;
+          }
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Canary dependency minors\n\n| Package | Pinned | Canary |\n|---|---|---|\n');
+          for (const section of ['dependencies', 'devDependencies']) {
+            for (const name of Object.keys(pkg[section] ?? {}).sort()) {
+              pkg[section][name] = newest(name, pkg[section][name]);
+            }
+          }
+          pkg.packageManager = `pnpm@${newest('pnpm', pkg.packageManager.slice('pnpm@'.length))}`;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          JS
+      - name: Select newest Go module minors and test the API
+        working-directory: ${{ runner.temp }}/canary/demo/api
+        env:
+          GOWORK: 'off'
+          GOFLAGS: '-mod=mod'
+          GOTOOLCHAIN: auto
+        shell: bash
+        run: |
+          go version >> "$GITHUB_STEP_SUMMARY"
+          go list -m -u -json all > "$RUNNER_TEMP/go-updates.json"
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'go-updates.json')) as stream:
+              data = stream.read()
+          decoder = json.JSONDecoder()
+          while data.strip():
+              module, end = decoder.raw_decode(data.lstrip())
+              data = data.lstrip()[end:]
+              if module.get('Main') or module.get('Replace') or not module.get('Update'):
+                  continue
+              path, version = module['Path'], module['Update']['Version']
+              current_major = module['Version'].split('.')[0]
+              if version.split('.')[0] != current_major:
+                  listed = subprocess.check_output(['go', 'list', '-m', '-versions', '-json', path], text=True)
+                  versions = json.loads(listed).get('Versions', [])
+                  stable = [v for v in versions if re.fullmatch(r'v\d+\.\d+\.\d+', v) and v.split('.')[0] == current_major]
+                  if not stable:
+                      continue
+                  version = max(stable, key=lambda v: tuple(map(int, v[1:].split('.'))))
+                  if version == module['Version']:
+                      continue
+              subprocess.run(['go', 'mod', 'edit', f'-require={path}@{version}'], check=True)
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                  summary.write(f"\n- Go `{path}`: `{module['Version']}` → `{version}`\n")
+          PY
+          go mod tidy
+          go build ./...
+          go test -race ./...
+      - name: Install and test the web app
+        working-directory: ${{ runner.temp }}/canary/demo/web
+        shell: bash
+        run: |
+          corepack pnpm install --no-frozen-lockfile
+          corepack pnpm check
+          corepack pnpm build
+          corepack pnpm test
+      - name: Report the result
+        if: always()
+        env:
+          CANARY_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          printf '\nCanary result: **%s**\n' "$CANARY_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          git diff --exit-code
