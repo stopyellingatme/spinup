@@ -169,3 +169,17 @@ func TestUploadFailureAndInvalidPaths(t *testing.T) {
 	}
 	f.AssertDone(t)
 }
+
+func TestSSHConfigOverride(t *testing.T) {
+	t.Setenv("SPINUP_SSH_CONFIG", "/tmp/spinup-test-ssh-config")
+	fake := &runexec.Fake{}
+	fake.Expect("ssh").Return("", "", 0)
+	r := New(Host{Name: "staging", Address: "vm.example.com", Port: 22}, fake, Options{})
+	if _, err := r.Run(context.Background(), Cmd{Argv: []string{"true"}}); err != nil {
+		t.Fatal(err)
+	}
+	calls := fake.Calls()
+	if len(calls) != 1 || len(calls[0].Args) < 2 || calls[0].Args[0] != "-F" || calls[0].Args[1] != "/tmp/spinup-test-ssh-config" {
+		t.Fatalf("ssh args = %v, want -F first", calls)
+	}
+}

@@ -6,7 +6,7 @@ The M5 units run in parallel. These decisions fix the contracts between them. AD
 
 ## 1. Remote access (`internal/remote`, unit M5.2)
 
-- spinup drives the system `ssh` binary through `internal/exec` with the user's SSH config, never a Go SSH library. Connection sharing: `-o ControlMaster=auto -o ControlPath=<user cache dir>/spinup/ssh/%C -o ControlPersist=60s`. Host key checking stays on (`StrictHostKeyChecking=accept-new` only with `--accept-new-host-key`).
+- spinup drives the system `ssh` binary through `internal/exec` with the user's SSH config, never a Go SSH library. Connection sharing: `-o ControlMaster=auto -o ControlPath=<user cache dir>/spinup/ssh/%C -o ControlPersist=60s`. Host key checking stays on (`StrictHostKeyChecking=accept-new` only with `--accept-new-host-key`). `SPINUP_SSH_CONFIG=<file>` adds `ssh -F <file>` (test VMs and CI).
 - `remote.Host` comes from an environment in `spinup.toml` (`[env.<name>]`: `host`, `user`, `port`, `public_url`, `protected`).
 - `remote.Runner` runs one remote command (argv quoted with POSIX shell rules), streams stdout and stderr, and uploads bytes to a path with a mode (`ssh ... 'umask 077 && cat > <tmp> && chmod <mode> <tmp> && mv <tmp> <path>'`). A fake implements it for tests.
 

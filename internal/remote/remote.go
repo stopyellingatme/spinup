@@ -111,6 +111,10 @@ func New(h Host, r runexec.Runner, o Options) Runner {
 	if o.AcceptNewHostKey {
 		s.args = append(s.args, "-o", "StrictHostKeyChecking=accept-new")
 	}
+	// SPINUP_SSH_CONFIG points ssh at another config file (ssh -F), for test VMs and CI.
+	if config := os.Getenv("SPINUP_SSH_CONFIG"); config != "" {
+		s.args = append([]string{"-F", config}, s.args...)
+	}
 	return s
 }
 
