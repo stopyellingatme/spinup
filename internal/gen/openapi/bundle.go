@@ -54,13 +54,13 @@ func bundle(apiDir string) ([]byte, error) {
 	}
 	for _, group := range []struct {
 		dir    string
-		target map[string]any
+		target *yaml.Node
 	}{
 		{"paths", paths}, {"schemas", schemas},
 	} {
 		owners := make(map[string]string)
-		for key := range group.target {
-			owners[key] = rootFile
+		for i := 0; i < len(group.target.Content); i += 2 {
+			owners[group.target.Content[i].Value] = rootFile
 		}
 		files, err := os.ReadDir(filepath.Join(apiDir, "openapi", group.dir))
 		if err != nil && !os.IsNotExist(err) {
@@ -79,11 +79,12 @@ func bundle(apiDir string) ([]byte, error) {
 			if err := references(fragment, rel, &refs); err != nil {
 				return nil, err
 			}
-			for _, key := range sortedKeys(fragment) {
+			for i := 0; i < len(fragment.Content); i += 2 {
+				key := fragment.Content[i].Value
 				if first, exists := owners[key]; exists {
 					return nil, fmt.Errorf("duplicate %s key %q in %s and %s", group.dir, key, first, rel)
 				}
-				group.target[key] = fragment[key]
+				group.target.Content = append(group.target.Content, fragment.Content[i], fragment.Content[i+1])
 				owners[key] = rel
 			}
 		}
@@ -97,12 +98,8 @@ func bundle(apiDir string) ([]byte, error) {
 	out.WriteString(bundleHeader)
 	encoder := yaml.NewEncoder(&out)
 	encoder.SetIndent(2)
-	var document yaml.Node
-	if err := document.Encode(root); err != nil {
-		return nil, fmt.Errorf("encode bundle: %w", err)
-	}
-	sortMappings(&document)
-	if err := encoder.Encode(&document); err != nil {
+	sortMappings(root)
+	if err := encoder.Encode(root); err != nil {
 		return nil, fmt.Errorf("encode bundle: %w", err)
 	}
 	if err := encoder.Close(); err != nil {
@@ -127,85 +124,168 @@ func sortMappings(node *yaml.Node) {
 	}
 }
 
-func readMap(apiDir, file string) (map[string]any, error) {
+func readMap(apiDir, file string) (*yaml.Node, error) {
 	data, err := os.ReadFile(filepath.Join(apiDir, filepath.FromSlash(file)))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", file, err)
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
-	var value any
+	var value yaml.Node
 	if err := decoder.Decode(&value); err != nil {
 		return nil, fmt.Errorf("read %s: %w", file, err)
 	}
-	var extra any
+	var extra yaml.Node
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", file, err)
 		}
 		return nil, fmt.Errorf("%s: expected one YAML document", file)
 	}
-	m, ok := value.(map[string]any)
-	if !ok {
+	if len(value.Content) != 1 || value.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("%s: expected a map with string keys", file)
 	}
-	return m, nil
+	root := value.Content[0]
+	if err := normalizeKeys(root, file); err != nil {
+		return nil, err
+	}
+	root, err = expandNodes(root, make(map[*yaml.Node]bool))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	sortMappings(root)
+	return root, nil
 }
 
-func object(parent map[string]any, key, file string) (map[string]any, error) {
-	value, exists := parent[key]
-	if !exists {
-		value = map[string]any{}
-		parent[key] = value
-	}
-	m, ok := value.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("%s: %s must be a map with string keys", file, key)
-	}
-	return m, nil
-}
-
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
-func references(value any, file string, refs *[]reference) error {
-	switch value := value.(type) {
-	case map[string]any:
-		for _, key := range sortedKeys(value) {
-			if key == "$ref" {
-				ref, ok := value[key].(string)
-				if !ok || !strings.HasPrefix(ref, "#/components/") {
-					return fmt.Errorf("%s: $ref %v must be local (#/components/...)", file, value[key])
-				}
-				*refs = append(*refs, reference{file, ref})
+// normalizeKeys treats scalar mapping keys as OpenAPI strings without decoding
+// scalar values into Go types. In particular, response code keys must be quoted.
+func normalizeKeys(node *yaml.Node, file string) error {
+	if node.Kind == yaml.MappingNode {
+		seen := make(map[string]bool)
+		for i := 0; i < len(node.Content); i += 2 {
+			key := node.Content[i]
+			if key.Kind != yaml.ScalarNode {
+				return fmt.Errorf("%s: map keys must be scalars", file)
 			}
-			if err := references(value[key], file, refs); err != nil {
-				return err
+			if seen[key.Value] {
+				return fmt.Errorf("%s: mapping key %q already defined", file, key.Value)
+			}
+			seen[key.Value] = true
+			if key.Tag != "!!str" && key.Tag != "!!merge" {
+				key.Tag = "!!str"
+				key.Style = yaml.DoubleQuotedStyle
 			}
 		}
-	case []any:
-		for _, item := range value {
-			if err := references(item, file, refs); err != nil {
-				return err
-			}
+	}
+	for _, child := range node.Content {
+		if err := normalizeKeys(child, file); err != nil {
+			return err
 		}
-	case map[any]any:
-		return fmt.Errorf("%s: map keys must be strings", file)
 	}
 	return nil
 }
 
-func resolves(root map[string]any, ref string) bool {
+// expandNodes removes aliases and merges before sorting and combining documents.
+// Copies retain scalar tags and text, and cannot refer to another file's anchors.
+func expandNodes(node *yaml.Node, active map[*yaml.Node]bool) (*yaml.Node, error) {
+	if active[node] {
+		return nil, fmt.Errorf("cyclic YAML alias")
+	}
+	active[node] = true
+	defer delete(active, node)
+	if node.Kind == yaml.AliasNode {
+		return expandNodes(node.Alias, active)
+	}
+	copy := *node
+	copy.Anchor = ""
+	copy.Content = make([]*yaml.Node, 0, len(node.Content))
+	for _, child := range node.Content {
+		expanded, err := expandNodes(child, active)
+		if err != nil {
+			return nil, err
+		}
+		copy.Content = append(copy.Content, expanded)
+	}
+	if copy.Kind != yaml.MappingNode {
+		return &copy, nil
+	}
+	var merges []*yaml.Node
+	content := copy.Content
+	copy.Content = nil
+	for i := 0; i < len(content); i += 2 {
+		if content[i].Tag == "!!merge" {
+			merge := content[i+1]
+			if merge.Kind == yaml.SequenceNode {
+				merges = append(merges, merge.Content...)
+			} else {
+				merges = append(merges, merge)
+			}
+		} else {
+			copy.Content = append(copy.Content, content[i], content[i+1])
+		}
+	}
+	for _, merge := range merges {
+		if merge.Kind != yaml.MappingNode {
+			return nil, fmt.Errorf("YAML merge must contain maps")
+		}
+		for i := 0; i < len(merge.Content); i += 2 {
+			if lookup(&copy, merge.Content[i].Value) == nil {
+				copy.Content = append(copy.Content, merge.Content[i], merge.Content[i+1])
+			}
+		}
+	}
+	return &copy, nil
+}
+
+func lookup(node *yaml.Node, key string) *yaml.Node {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func object(parent *yaml.Node, key, file string) (*yaml.Node, error) {
+	value := lookup(parent, key)
+	if value == nil {
+		value = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		parent.Content = append(parent.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
+	}
+	if value.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("%s: %s must be a map with string keys", file, key)
+	}
+	return value, nil
+}
+
+func references(node *yaml.Node, file string, refs *[]reference) error {
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Value == "$ref" {
+				value := node.Content[i+1]
+				if value.Kind != yaml.ScalarNode || value.Tag != "!!str" || !strings.HasPrefix(value.Value, "#/components/") {
+					return fmt.Errorf("%s: $ref %s must be local (#/components/...)", file, value.Value)
+				}
+				*refs = append(*refs, reference{file, value.Value})
+			}
+		}
+	}
+	for _, child := range node.Content {
+		if err := references(child, file, refs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func resolves(root *yaml.Node, ref string) bool {
 	pointer, err := url.PathUnescape(strings.TrimPrefix(ref, "#"))
 	if err != nil {
 		return false
 	}
-	var current any = root
+	current := root
 	for _, token := range strings.Split(strings.TrimPrefix(pointer, "/"), "/") {
 		for i := 0; i < len(token); i++ {
 			if token[i] == '~' {
@@ -217,19 +297,18 @@ func resolves(root map[string]any, ref string) bool {
 		}
 		// Decode JSON Pointer escapes in this order (RFC 6901).
 		token = strings.ReplaceAll(strings.ReplaceAll(token, "~1", "/"), "~0", "~")
-		switch value := current.(type) {
-		case map[string]any:
-			var exists bool
-			current, exists = value[token]
-			if !exists {
+		switch current.Kind {
+		case yaml.MappingNode:
+			current = lookup(current, token)
+			if current == nil {
 				return false
 			}
-		case []any:
+		case yaml.SequenceNode:
 			index, err := strconv.Atoi(token)
-			if err != nil || index < 0 || index >= len(value) || strconv.Itoa(index) != token {
+			if err != nil || index < 0 || index >= len(current.Content) || strconv.Itoa(index) != token {
 				return false
 			}
-			current = value[index]
+			current = current.Content[index]
 		default:
 			return false
 		}
