@@ -150,6 +150,15 @@ func Parse(data []byte) (*Config, error) {
 	return &config, nil
 }
 
+// EffectiveBehaviorVersion returns the behavior version that the running app receives.
+// A missing or invalid value means version 1, the same default as the kit.
+func (c *Config) EffectiveBehaviorVersion() int {
+	if c == nil || c.BehaviorVersion < 1 {
+		return 1
+	}
+	return c.BehaviorVersion
+}
+
 // Validate checks that a project configuration is complete and valid.
 func (c *Config) Validate() error {
 	if c == nil {

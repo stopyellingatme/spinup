@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
@@ -32,6 +33,7 @@ type local struct {
 	migrations []migration
 	origin     string // PUBLIC_ORIGIN
 	site       string // PUBLIC_HOST
+	behavior   int    // SPINUP_BEHAVIOR_VERSION
 }
 
 var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
@@ -65,7 +67,7 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	if env.Host == "" {
 		return nil, preflightError(fmt.Sprintf("environment %q has no host", env.Name), "set host in [env."+env.Name+"] of spinup.toml")
 	}
-	l := &local{root: root, app: config.App.Name, env: env}
+	l := &local{root: root, app: config.App.Name, env: env, behavior: config.EffectiveBehaviorVersion()}
 	if l.origin, l.site, err = publicOrigin(env.PublicURL, env.Host); err != nil {
 		return nil, preflightError(stripTry(err.Error()), "set public_url in [env."+env.Name+"] of spinup.toml")
 	}
@@ -193,6 +195,7 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 	pairs = append(pairs,
 		[2]string{"PUBLIC_ORIGIN", l.origin},
 		[2]string{"PUBLIC_HOST", l.site},
+		[2]string{"SPINUP_BEHAVIOR_VERSION", strconv.Itoa(max(l.behavior, 1))},
 		[2]string{"DEPLOY_UID", uid},
 		[2]string{"DEPLOY_GID", gid},
 	)

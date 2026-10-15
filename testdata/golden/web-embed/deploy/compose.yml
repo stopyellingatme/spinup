@@ -34,6 +34,7 @@ services:
       - /tmp
     environment:
       SPINUP_ENV: production
+      SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
     volumes:
@@ -76,6 +77,7 @@ services:
       - /tmp
     environment:
       SPINUP_ENV: production
+      SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
     volumes:

@@ -87,7 +87,7 @@ func (c *stackChild) Kill() error { c.once.Do(func() { close(c.done) }); return 
 func devProject(t *testing.T, web bool) string {
 	t.Helper()
 	root := t.TempDir()
-	writeInput(t, root, "spinup.toml", "[app]\nname = \"todo\"\nmodule = \"example.com/todo\"\n")
+	writeInput(t, root, "spinup.toml", "behavior_version = 3\n[app]\nname = \"todo\"\nmodule = \"example.com/todo\"\n")
 	writeInput(t, root, ".env", "PORT=8080\n")
 	lock := manifest.New()
 	lock.Packs = []string{"base", "api"}
@@ -141,6 +141,11 @@ func TestRunOrder(t *testing.T) {
 					t.Fatalf("commands: %v err=%v", fake.events, err)
 				}
 				return
+			}
+			for _, c := range fake.commands {
+				if c.Name == "go" && len(c.Env) > 0 && !slices.Contains(c.Env, "SPINUP_BEHAVIOR_VERSION=3") {
+					t.Errorf("go command %v misses SPINUP_BEHAVIOR_VERSION=3 in %v", c.Args, c.Env)
+				}
 			}
 			migrate, up, api, web, down := -1, -1, -1, -1, -1
 			for index, event := range fake.events {

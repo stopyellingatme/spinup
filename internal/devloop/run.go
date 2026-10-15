@@ -89,6 +89,10 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	if err != nil {
 		return err
 	}
+	behavior := 1
+	if cfg, err := project.Load(root); err == nil {
+		behavior = cfg.EffectiveBehaviorVersion()
+	}
 	lock, err := manifest.Load(filepath.Join(root, project.LockFile))
 	if err != nil {
 		return err
@@ -132,7 +136,7 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	}
 	// The API trusts PUBLIC_ORIGIN for form-action calls from SvelteKit (kit auth), so it must
 	// match the web dev server, even when the web port moved.
-	apiEnv := []string{"SPINUP_ENV=dev", "PORT=" + strconv.Itoa(ports.API.Port), "PUBLIC_ORIGIN=http://localhost:" + strconv.Itoa(ports.Web.Port)}
+	apiEnv := []string{"SPINUP_ENV=dev", "SPINUP_BEHAVIOR_VERSION=" + strconv.Itoa(behavior), "PORT=" + strconv.Itoa(ports.API.Port), "PUBLIC_ORIGIN=http://localhost:" + strconv.Itoa(ports.Web.Port)}
 	if o.LGTM {
 		apiEnv = append(apiEnv, "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318")
 	}
