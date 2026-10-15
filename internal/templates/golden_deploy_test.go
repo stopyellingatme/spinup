@@ -14,6 +14,7 @@ import (
 	spexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
 	"github.com/stopyellingatme/spinup/internal/testutil"
+	"go.yaml.in/yaml/v3"
 )
 
 // deployGoldenPath selects the files of the deploy pack. The api and web packs own the
@@ -126,6 +127,9 @@ func TestGoldenDeployMonitoring(t *testing.T) {
 			}
 			if got := strings.Count(compose, "OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318"); got != want {
 				t.Errorf("OTLP endpoints = %d, want %d", got, want)
+			}
+			if got := strings.Count(compose, "OTEL_RESOURCE_ATTRIBUTES: service.instance.id=${SPINUP_COLOR}"); got != want {
+				t.Errorf("color resource attributes = %d, want %d", got, want)
 			}
 			for _, service := range []string{"api", "web"} {
 				if got := strings.Contains(compose, "OTEL_SERVICE_NAME: todo-"+service); got != (profile != "none") {
@@ -327,5 +331,66 @@ func caddyAdapt(t *testing.T, dir string, web bool) {
 	}
 	if got := strings.Contains(config, `"name":"web-green"`); got != web {
 		t.Errorf("caddy adapt routes to web-green = %v, want %v", got, web)
+	}
+}
+
+func TestDeployIgnoresUnselectedMonitoring(t *testing.T) {
+	t.Parallel()
+	fsys, err := renderDeploy(t, []string{"base", "api", "web", "deploy"}, map[string]any{
+		"app_name": "todo", "module": "example.com/todo", "modules": "ci,deploy", "monitoring_profile": "full",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compose := readDeployFile(t, fsys, "deploy/compose.yml"); strings.Contains(compose, "OTEL_") {
+		t.Errorf("unselected monitoring sets the environment:\n%s", compose)
+	}
+}
+
+func TestMonitoringConfigLabelsAndSecrets(t *testing.T) {
+	t.Parallel()
+	for _, profile := range []string{"lite", "full"} {
+		t.Run(profile, func(t *testing.T) {
+			t.Parallel()
+			fsys := renderMonitoring(t, profile)
+			var compose struct {
+				Services map[string]struct {
+					Labels      map[string]string
+					Volumes     []string
+					Environment map[string]string
+				}
+			}
+			if err := yaml.Unmarshal([]byte(readDeployFile(t, fsys, "monitoring/compose.monitoring.yml")), &compose); err != nil {
+				t.Fatal(err)
+			}
+			for service, key := range map[string]string{
+				"alloy": "ALLOY", "prometheus": "PROMETHEUS", "loki": "LOKI", "tempo": "TEMPO", "grafana": "GRAFANA", "blackbox-exporter": "BLACKBOX",
+			} {
+				if cfg, ok := compose.Services[service]; ok && cfg.Labels["spinup.config-hash"] != "${"+key+"_CONFIG_HASH:-}" {
+					t.Errorf("%s config hash label = %v", service, cfg.Labels)
+				}
+			}
+			for service, cfg := range compose.Services {
+				for _, mount := range cfg.Volumes {
+					if strings.HasPrefix(mount, "/opt/todo/secrets:") {
+						t.Errorf("%s mounts all application secrets", service)
+					}
+				}
+				if service == "grafana" || service == "postgres-exporter" {
+					found := false
+					for _, mount := range cfg.Volumes {
+						if mount == "/opt/todo/monitoring-secrets:/run/secrets:ro" {
+							found = true
+						}
+					}
+					if !found {
+						t.Errorf("%s misses restricted secrets mount", service)
+					}
+				}
+			}
+			if profile == "full" && compose.Services["postgres-exporter"].Environment["DATA_SOURCE_PASS_FILE"] != "/run/secrets/POSTGRES_PASSWORD" {
+				t.Error("postgres-exporter uses the wrong secret")
+			}
+		})
 	}
 }

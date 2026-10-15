@@ -10,6 +10,7 @@
 # `spinup monitor open` reaches it through an SSH tunnel. The app sends OTLP to
 # http://alloy:4318 on the [[ .app_name ]]-app network. No collector port is published.
 #
+# Config hashes in .env recreate only services whose mounted config changes.
 # spinup deploy sets these variables from spinup.toml and deploy/environments/<env>.toml:
 #   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM, who owns /opt/[[ .app_name ]]/secrets
 #   PUBLIC_URL               the public URL of the app[[ if $full ]]: the blackbox exporter probes it[[ end ]]
@@ -23,7 +24,8 @@
 #   TEMPO_RETENTION          how long Tempo keeps traces (default 336h)
 [[- end ]]
 #
-# Secrets are files in /opt/[[ .app_name ]]/secrets (spinup secrets push):
+# spinup deploy copies these secrets to /opt/[[ .app_name ]]/monitoring-secrets:
+# The directory has mode 0700. The files have mode 0600.
 #   GRAFANA_ADMIN_PASSWORD   required: the password of the Grafana admin user
 #   SLACK_WEBHOOK_URL        optional: Slack notifications
 #   SMTP_PASSWORD            optional: the SMTP relay password
@@ -48,6 +50,8 @@ x-hardening: &hardening
 services:
   alloy:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${ALLOY_CONFIG_HASH:-}
     image: [[ image "alloy" ]]
     user: "473:473"
     command:
@@ -91,6 +95,8 @@ services:
 
   prometheus:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${PROMETHEUS_CONFIG_HASH:-}
     image: [[ image "prometheus" ]]
     user: "65534:65534"
     command:
@@ -121,6 +127,8 @@ services:
 
   loki:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${LOKI_CONFIG_HASH:-}
     image: [[ image "loki" ]]
     user: "10001:10001"
     command: ["-config.file=/etc/loki/loki.yml"]
@@ -142,6 +150,8 @@ services:
 
   tempo:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${TEMPO_CONFIG_HASH:-}
     image: [[ image "tempo" ]]
     user: "10001:10001"
     command:
@@ -170,6 +180,8 @@ services:
 
   grafana:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${GRAFANA_CONFIG_HASH:-}
     image: [[ image "grafana" ]]
     # The deploy user owns the secret files (mode 0600). The Grafana image runs as any user.
     user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
@@ -203,7 +215,7 @@ services:
       - ./grafana/entrypoint.sh:/etc/spinup/entrypoint.sh:ro
       - ./grafana/provisioning:/etc/spinup/provisioning:ro
       - ./grafana/dashboards:/etc/spinup/dashboards:ro
-      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+      - /opt/[[ .app_name ]]/monitoring-secrets:/run/secrets:ro
       - grafana_data:/var/lib/grafana
     tmpfs:
       - /tmp
@@ -291,7 +303,7 @@ services:
       DATA_SOURCE_USER: app
       DATA_SOURCE_PASS_FILE: /run/secrets/POSTGRES_PASSWORD
     volumes:
-      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+      - /opt/[[ .app_name ]]/monitoring-secrets:/run/secrets:ro
     networks:
       db: {}
       monitoring: {}
@@ -308,6 +320,8 @@ services:
 
   blackbox-exporter:
     <<: *hardening
+    labels:
+      spinup.config-hash: ${BLACKBOX_CONFIG_HASH:-}
     image: [[ image "blackbox-exporter" ]]
     user: "65534:65534"
     command: ["--config.file=/etc/blackbox/blackbox.yml"]

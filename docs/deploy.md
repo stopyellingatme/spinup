@@ -150,16 +150,34 @@ For this reason, `api`, `migrate`, `caddy`, and `postgres` run as `DEPLOY_UID:DE
 When the app selects the `monitoring` module, `spinup deploy` starts its rendered stack after `record` and before `post`.
 The `post` hooks can then annotate Grafana.
 The step uploads `monitoring/` to `/opt/<app>/monitoring.new/` and preserves file permissions.
-It replaces `/opt/<app>/monitoring/` and retains the previous tree as `monitoring.old/`.
+It updates `/opt/<app>/monitoring/` in place and preserves the inodes of mounted files and directories.
+It removes files absent from the upload.
+
+The deployer hashes each service's mounted configuration locally, including custom rules and dashboards.
+Each hash enters `.env` and a Compose label.
+A changed hash recreates that service.
+An unchanged hash does not cause a recreation.
 Docker keeps the data in named volumes.
 
 The step runs Compose as project `<app>-monitoring` with `up -d --wait --remove-orphans` and a five-minute timeout.
 The deployed API and web services send OTLP to `http://alloy:4318`.
 Their service names are `<app>-api` and `<app>-web`.
+Both services set `OTEL_RESOURCE_ATTRIBUTES=service.instance.id=${SPINUP_COLOR}`.
+This attribute separates the metric series of blue and green during a switch.
+
+The OTEL settings require the `monitoring` module and an active profile.
+`spinup new` discards answers for unselected packs.
 
 Preflight requires `GRAFANA_ADMIN_PASSWORD` in the decrypted secrets for the selected environment.
 Set it from standard input with `spinup secrets set --env staging GRAFANA_ADMIN_PASSWORD`.
 The upload step writes it to `/opt/<app>/secrets/GRAFANA_ADMIN_PASSWORD` with mode 0600.
+
+The monitoring step creates `/opt/<app>/monitoring-secrets/` with mode 0700.
+It copies only `GRAFANA_ADMIN_PASSWORD` and the available `SLACK_WEBHOOK_URL`, `SMTP_PASSWORD`, and `POSTGRES_PASSWORD` files.
+The VM copies use `install -m 0600`.
+Grafana and postgres-exporter mount this directory read-only at `/run/secrets`.
+The postgres-exporter uses `DATA_SOURCE_PASS_FILE=/run/secrets/POSTGRES_PASSWORD`.
+
 Secret values never enter the monitoring `.env` file.
 
 The deployer writes `/opt/<app>/monitoring/.env` with mode 0600:
@@ -175,6 +193,11 @@ The deployer writes `/opt/<app>/monitoring/.env` with mode 0600:
 | `PROMETHEUS_RETENTION` | `[monitoring] prometheus_retention` |
 | `PROMETHEUS_RETENTION_SIZE` | `[monitoring] prometheus_retention_size` |
 | `TEMPO_RETENTION` | `[monitoring] tempo_retention` |
+| `ALLOY_CONFIG_HASH` | The files under `monitoring/alloy/` |
+| `PROMETHEUS_CONFIG_HASH` | The files under `monitoring/prometheus/` and `monitoring/alerts/` |
+| `LOKI_CONFIG_HASH`, `TEMPO_CONFIG_HASH` | The files under `monitoring/loki/` and `monitoring/tempo/`, respectively |
+| `GRAFANA_CONFIG_HASH` | The files under `monitoring/grafana/` |
+| `BLACKBOX_CONFIG_HASH` | The files under `monitoring/blackbox/` |
 
 The deployer quotes values and omits unset values, so Compose defaults apply.
 
