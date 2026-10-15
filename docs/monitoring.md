@@ -228,6 +228,7 @@ Alloy scrapes the exporter every 30 seconds with `job="backups"`.
 It sends the samples to Prometheus through remote write.
 
 The CLI and the scheduled script update `backup.prom` with an atomic rename.
+Both writers hold `/opt/<app>/backups/metrics/.lock` through `flock` during each update.
 Each update preserves other metrics and their metadata.
 A failed metrics update prints a warning. It does not fail a successful backup.
 
@@ -243,6 +244,8 @@ The recording rule calculates `backup_last_age_seconds` from the newest success 
 `BackupStale` fires when this age exceeds 26 hours for 15 minutes.
 `BackupVerifyFailed` fires when the last verification failed.
 Before the first backup, the age metric has no sample.
+`BackupStale` also fires when no backup success metric exists for 15 minutes.
+This includes a missing metrics file and a VM that has never completed a backup.
 
 Scheduled verification checks the repository or the dump contents.
 Its duration measures that check. It does not measure a full restore.

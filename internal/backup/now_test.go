@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -41,9 +42,10 @@ func TestNow(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.AssertDone(t)
-			uploads := f.Uploads()
-			if len(uploads) != 2 || !strings.Contains(string(uploads[1].Data), `backup_last_success_timestamp_seconds{kind="diff"} 1792052634`) || !strings.Contains(string(uploads[1].Data), `backup_last_size_bytes{kind="diff"} 31403056`) {
-				t.Fatalf("backup metrics = %+v", uploads)
+			calls := f.Calls()
+			updates, err := io.ReadAll(calls[len(calls)-1].Stdin)
+			if err != nil || !strings.Contains(string(updates), `backup_last_success_timestamp_seconds{kind="diff"} 1792052634`) || !strings.Contains(string(updates), `backup_last_size_bytes{kind="diff"} 31403056`) {
+				t.Fatalf("backup metrics = %s, %v", updates, err)
 			}
 
 			if !strings.Contains(out.String(), tt.want) {

@@ -13,7 +13,7 @@ backend = "pgdump"
 retention = "7"
 ```
 
-The default retention is seven dumps.
+The default retention is seven dumps for the CLI and the scheduled jobs.
 Pruning keeps the newest dumps and never removes the newest dump.
 The `pgbackrest` backend remains the default when `backend` is empty.
 
@@ -27,6 +27,12 @@ $ test -f deploy/compose.edge.yml
 $ spinup backup --help
 ...
 ```
+
+The backups pack generates `deploy/compose.backups.yml` for pgBackRest.
+When `[backups] backend = "pgdump"`, the deployer excludes this file from the release.
+This keeps WAL archiving off because pgdump has no archive repository.
+The scheduled script also excludes this file when it selects pgdump.
+After changing the backend, deploy the app again to apply the PostgreSQL configuration.
 
 ## Storage
 

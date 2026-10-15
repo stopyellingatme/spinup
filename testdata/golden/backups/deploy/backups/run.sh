@@ -5,18 +5,24 @@ export LC_ALL=C
 app='todo'
 base="/opt/$app/backups"
 metrics="$base/metrics/backup.prom"
-retention='4'
+retention=''
 backend=pgbackrest
 if [ -f "$base/backend" ]; then backend=$(cat "$base/backend"); fi
 case "$backend" in pgbackrest|pgdump) ;; *) echo 'Unknown backup backend' >&2; exit 1 ;; esac
+if [ -z "$retention" ]; then
+    if [ "$backend" = pgdump ]; then retention=7; else retention=4; fi
+fi
 kind=${1-}
 case "$kind" in full|diff|verify) ;; *) echo 'Usage: run.sh full|diff|verify' >&2; exit 1 ;; esac
 umask 077
 mkdir -p "$base"
+# Serialize scheduled backups and verification for this app.
+exec 9>"$base/run.lock"
+flock 9
 # The current release contains the base project's Compose files and environment.
 cd "/opt/$app/current"
 COMPOSE_FILE=compose.edge.yml
-if [ -f compose.backups.yml ]; then COMPOSE_FILE="$COMPOSE_FILE:compose.backups.yml"; fi
+if [ "$backend" = pgbackrest ] && [ -f compose.backups.yml ]; then COMPOSE_FILE="$COMPOSE_FILE:compose.backups.yml"; fi
 export COMPOSE_FILE
 compose() { docker compose -p "$app" exec -T postgres "$@"; }
 pgbackrest() {
@@ -31,6 +37,8 @@ write_metrics() (
         sudo -n chown --reference="$base" "$base/metrics" || exit 1
         chmod 0755 "$base/metrics" || exit 1
     fi
+    exec 8>"$base/metrics/.lock" || exit 1
+    flock 8 || exit 1
     tmp=$(mktemp "$metrics.tmp.XXXXXX") || exit 1
     trap 'rm -f "$tmp" "$tmp.old" "$tmp.new"' 0
     trap 'exit 1' HUP INT TERM

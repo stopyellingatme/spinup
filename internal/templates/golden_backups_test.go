@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -188,4 +190,56 @@ func mergedEdge(t *testing.T, dir string) {
 	if pg.Env["PGBACKREST_CONFIG"] != "/var/lib/pgbackrest/pgbackrest.conf" || pg.Env["POSTGRES_PASSWORD_FILE"] == "" {
 		t.Errorf("postgres environment = %v", pg.Env)
 	}
+}
+
+func TestBackupStaleWithoutMetrics(t *testing.T) {
+	t.Parallel()
+	dir := writeMonitoringTree(t, renderMonitoring(t, "lite"))
+	tests := `rule_files:
+  - monitoring/prometheus/rules/app.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BackupStale",alertstate="firing"}'
+        eval_time: 14m
+        exp_samples: []
+      - expr: 'ALERTS{alertname="BackupStale",alertstate="firing"}'
+        eval_time: 15m
+        exp_samples:
+          - labels: 'ALERTS{alertname="BackupStale",alertstate="firing",job="backups",severity="critical"}'
+            value: 1
+  - interval: 1m
+    input_series:
+      - series: 'backup_last_success_timestamp_seconds{job="backups",kind="full"}'
+        values: '1+0x20'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BackupStale",alertstate="firing"}'
+        eval_time: 20m
+        exp_samples: []
+  - interval: 1m
+    input_series:
+      - series: 'backup_last_success_timestamp_seconds{job="backups",kind="full"}'
+        values: '1 1 stale _x20'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BackupStale",alertstate="firing"}'
+        eval_time: 18m
+        exp_samples:
+          - labels: 'ALERTS{alertname="BackupStale",alertstate="firing",job="backups",severity="critical"}'
+            value: 1
+  - interval: 1m
+    input_series:
+      - series: 'backup_last_success_timestamp_seconds{job="backups",kind="full"}'
+        values: '1+0x1640'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BackupStale",alertstate="firing"}'
+        eval_time: 27h
+        exp_samples:
+          - labels: 'ALERTS{alertname="BackupStale",alertstate="firing",job="backups",severity="critical"}'
+            value: 1
+`
+	if err := os.WriteFile(filepath.Join(dir, "backup-absence.yml"), []byte(tests), 0600); err != nil {
+		t.Fatal(err)
+	}
+	promtool(t, dir, "test", "rules", "backup-absence.yml")
 }

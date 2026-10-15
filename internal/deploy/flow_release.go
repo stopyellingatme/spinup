@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -162,9 +163,13 @@ var excludedDeployFiles = []string{"compose.dev.yml", "Dockerfile.api", "Dockerf
 // deployFiles reads deploy/ for the release directory, without environments/, cloud-init/,
 // local build files, and .gitkeep files. The order is sorted.
 func deployFiles(root string) ([]releaseFile, error) {
+	config, err := project.Load(root)
+	if err != nil {
+		return nil, err
+	}
 	base := filepath.Join(root, "deploy")
 	var files []releaseFile
-	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -177,6 +182,10 @@ func deployFiles(root string) ([]releaseFile, error) {
 			if rel == "environments" || rel == "cloud-init" {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		// pgdump has no WAL repository. Never enable the pgBackRest archive command.
+		if rel == "compose.backups.yml" && config.Backups.Backend == "pgdump" {
 			return nil
 		}
 		if d.Name() == ".gitkeep" || slices.Contains(excludedDeployFiles, rel) || strings.HasPrefix(d.Name(), ".") {

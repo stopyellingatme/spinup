@@ -2,9 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -124,5 +128,100 @@ func TestBootstrapRejectsUnknownConnectionPort(t *testing.T) {
 			}
 			f.AssertDone(t)
 		})
+	}
+}
+
+func TestBootstrapBackupSudoers(t *testing.T) {
+	t.Parallel()
+	for _, invalid := range []bool{false, true} {
+		t.Run(fmt.Sprint(invalid), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			bin := filepath.Join(dir, "bin")
+			if err := os.Mkdir(bin, 0755); err != nil {
+				t.Fatal(err)
+			}
+			// Rejecting validation must leave the active policy intact.
+			policy := filepath.Join(dir, "spinup-todo")
+			if err := os.WriteFile(policy, []byte("old policy\n"), 0440); err != nil {
+				t.Fatal(err)
+			}
+			validator := `#!/bin/sh
+set -eu
+[ "$1" = -cf ]
+[ "$(cat "$2")" != 'old policy' ]
+[ "$INVALID" = false ]
+`
+			if err := os.WriteFile(filepath.Join(bin, "visudo"), []byte(validator), 0755); err != nil {
+				t.Fatal(err)
+			}
+			var script string
+			for _, step := range bootstrapSteps("todo", "key") {
+				if step.name == "backup-sudo" {
+					script = step.apply
+				}
+			}
+			if script == "" {
+				t.Fatal("missing backup sudo step")
+			}
+			script = strings.ReplaceAll(script, "/etc/sudoers.d", dir)
+			_, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", script}, Env: []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "INVALID=" + fmt.Sprint(invalid)}})
+			if (err != nil) != invalid {
+				t.Fatalf("apply: %v", err)
+			}
+			data, err := os.ReadFile(policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := backupSudoers("todo")
+			if invalid {
+				want = "old policy\n"
+			}
+			if string(data) != want {
+				t.Fatalf("policy = %s", data)
+			}
+			info, err := os.Stat(policy)
+			if err != nil || info.Mode().Perm() != 0440 {
+				t.Fatalf("policy mode = %v, %v", info, err)
+			}
+			// Check the generated policy with the real parser when available.
+			if !invalid {
+				if visudo, err := runexec.LookPath("visudo"); err == nil {
+					if _, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: visudo, Args: []string{"-cf", policy}}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCloudInitBackupSudoers(t *testing.T) {
+	t.Parallel()
+	// Both bootstrap paths must grant exactly the same commands.
+	data, err := os.ReadFile("../templates/packs/deploy/files/deploy/cloud-init/user-data.yaml.tmpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(string(data), "[[ .app_name ]]", "todo")
+	if !strings.Contains(text, strings.TrimSpace(backupSudoers("todo"))) {
+		t.Fatal("cloud-init policy differs from bootstrap")
+	}
+	for _, want := range []string{"permissions: \"0440\"", "visudo -cf /run/spinup-todo-sudoers && mv -f /run/spinup-todo-sudoers /etc/sudoers.d/spinup-todo"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("cloud-init missing %q", want)
+		}
+	}
+	if strings.Contains(backupSudoers("todo"), "*") {
+		t.Fatal("backup sudo permissions use a wildcard")
+	}
+}
+
+func TestBackupSudoersPermitsScheduleRemove(t *testing.T) {
+	t.Parallel()
+	got := backupSudoers("todo")
+	want := "/usr/bin/rm -f /etc/systemd/system/spinup-todo-backup-full.timer /etc/systemd/system/spinup-todo-backup-full.service /etc/systemd/system/spinup-todo-backup-diff.timer /etc/systemd/system/spinup-todo-backup-diff.service /etc/systemd/system/spinup-todo-backup-verify.timer /etc/systemd/system/spinup-todo-backup-verify.service\n"
+	if !strings.HasSuffix(got, ", "+want) {
+		t.Fatalf("sudoers = %q, want the rm rule of backup schedule --remove last", got)
 	}
 }

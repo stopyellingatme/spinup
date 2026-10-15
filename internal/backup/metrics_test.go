@@ -3,10 +3,14 @@ package backup
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -23,26 +27,46 @@ func TestRecordMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := &remote.Fake{}
-			f.Expect("sh", "-ec").Return(tt.existing, "", 0)
 			f.Expect("mkdir", "-p", "/opt/todo/backups/metrics")
 			f.Expect("chmod", "0755", "/opt/todo/backups/metrics")
-			f.ExpectUpload(MetricsPath("todo"))
+			f.Expect("flock", "/opt/todo/backups/metrics/.lock", "sh", "-ec", metricsMergeScript)
 			if err := RecordMetrics(context.Background(), f, "todo", tt.sample); err != nil {
 				t.Fatal(err)
 			}
 			f.AssertDone(t)
-			uploads := f.Uploads()
-			if len(uploads) != 1 || string(uploads[0].Data) != tt.want || uploads[0].Mode != 0644 {
-				t.Fatalf("uploads = %+v", uploads)
+			command := f.Calls()[2]
+			dir := t.TempDir()
+			metrics := filepath.Join(dir, "backup.prom")
+			if err := os.WriteFile(metrics, []byte(tt.existing), 0644); err != nil {
+				t.Fatal(err)
 			}
+			bin := filepath.Join(dir, "bin")
+			testFlock(t, bin)
+			command.Argv[1] = filepath.Join(dir, ".lock")
+			command.Argv[len(command.Argv)-1] = metrics
+			if _, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: command.Argv[0], Args: command.Argv[1:], Stdin: command.Stdin, Env: []string{"PATH=" + bin + ":" + os.Getenv("PATH")}}); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(metrics)
+			if err != nil || string(data) != tt.want {
+				t.Fatalf("metrics = %s, %v", data, err)
+			}
+			info, err := os.Stat(metrics)
+			if err != nil || info.Mode().Perm() != 0644 {
+				t.Fatalf("metrics mode: %v, %v", info, err)
+			}
+			if len(f.Uploads()) != 0 {
+				t.Fatal("metrics used an unlocked upload")
+			}
+
 		})
 	}
 }
 
-func TestMetricsReadFailure(t *testing.T) {
+func TestMetricsDirectoryFailure(t *testing.T) {
 	t.Parallel()
 	f := &remote.Fake{}
-	f.Expect("sh", "-ec").Fail(errors.New("permission denied"))
+	f.Expect("mkdir", "-p").Fail(errors.New("permission denied"))
 	if err := RecordMetrics(context.Background(), f, "todo", Sample{Kind: Full, Success: time.Unix(1, 0)}); err == nil || !strings.Contains(err.Error(), "Try:") {
 		t.Fatalf("error = %v", err)
 	}
@@ -53,10 +77,9 @@ func TestMetricsReadFailure(t *testing.T) {
 }
 
 func expectMetrics(f *remote.Fake) {
-	f.Expect("sh", "-ec").Return("", "", 0)
 	f.Expect("mkdir", "-p", "/opt/todo/backups/metrics")
 	f.Expect("chmod", "0755", "/opt/todo/backups/metrics")
-	f.ExpectUpload(MetricsPath("todo"))
+	f.Expect("flock", "/opt/todo/backups/metrics/.lock", "sh", "-ec", metricsMergeScript)
 }
 
 func TestNowMetricsWarning(t *testing.T) {
@@ -67,7 +90,7 @@ func TestNowMetricsWarning(t *testing.T) {
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	f.Expect(Command("todo", "--type=diff", "backup")...)
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
-	f.Expect("sh", "-ec").Fail(errors.New("no disk space"))
+	f.Expect("mkdir", "-p").Fail(errors.New("no disk space"))
 	var warnings strings.Builder
 	if _, err := Now(context.Background(), Options{Dir: dir, Env: "staging", Remote: f, ErrOut: &warnings}); err != nil {
 		t.Fatal(err)
@@ -81,14 +104,27 @@ func TestNowMetricsWarning(t *testing.T) {
 func TestMetricsBindDirectoryOwnership(t *testing.T) {
 	t.Parallel()
 	f := &remote.Fake{}
-	f.Expect("sh", "-ec")
 	f.Expect("mkdir", "-p", "/opt/todo/backups/metrics")
 	f.Expect("chmod", "0755", "/opt/todo/backups/metrics").Return("", "operation not permitted", 1)
 	f.Expect("sudo", "-n", "chown", "--reference=/opt/todo/backups", "/opt/todo/backups/metrics")
 	f.Expect("chmod", "0755", "/opt/todo/backups/metrics")
-	f.ExpectUpload(MetricsPath("todo"))
+	f.Expect("flock", "/opt/todo/backups/metrics/.lock", "sh", "-ec", metricsMergeScript)
 	if err := RecordMetrics(context.Background(), f, "todo", Sample{Kind: Full, Success: time.Unix(1, 0)}); err != nil {
 		t.Fatal(err)
 	}
 	f.AssertDone(t)
+}
+
+func TestMetricsUpdateStdin(t *testing.T) {
+	t.Parallel()
+	f := &remote.Fake{}
+	expectMetrics(f)
+	if err := RecordMetrics(context.Background(), f, "todo", Sample{Kind: Full, Success: time.Unix(123, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	f.AssertDone(t)
+	data, err := io.ReadAll(f.Calls()[2].Stdin)
+	if err != nil || string(data) != "backup_last_success_timestamp_seconds{kind=\"full\"} 123\n" {
+		t.Fatalf("updates = %s, %v", data, err)
+	}
 }

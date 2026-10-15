@@ -172,7 +172,7 @@ func TestHook(t *testing.T) {
 				t.Fatalf("output %q does not contain %q", out.String(), tt.out)
 			}
 			f.AssertDone(t)
-			if uploads := f.Uploads(); tt.upload != "" && (len(uploads) != 2 || !strings.Contains(string(uploads[0].Data), tt.upload)) {
+			if uploads := f.Uploads(); tt.upload != "" && (len(uploads) != 1 || !strings.Contains(string(uploads[0].Data), tt.upload)) {
 				t.Fatalf("uploads = %+v, want %q", uploads, tt.upload)
 			}
 		})
