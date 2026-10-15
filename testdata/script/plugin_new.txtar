@@ -1,0 +1,52 @@
+# Both plugin kinds work without a network or a terminal.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup plugin new paper
+stdout 'Created pack plugin'
+exists paper/files/note.txt.tmpl
+exists paper/pack.toml
+! exists paper/main.go
+! exec spinup plugin new paper
+stderr 'not empty'
+! exec spinup plugin new ../escape
+stderr 'invalid plugin name'
+! exec spinup plugin new invalid --kind unknown
+stderr 'invalid kind'
+exec spinup plugin new preview --kind exec --dry-run
+stdout 'Would create exec plugin'
+! exists preview
+
+# An explicit empty destination works. The Go module uses the local SDK.
+mkdir executable
+exec spinup plugin new greetings --kind exec --out executable --sdk-path $SPINUP_REPO/plugin-sdk
+exists executable/main.go
+exists executable/main_test.go
+grep 'replace github.com/stopyellingatme/spinup/plugin-sdk' executable/go.mod
+cd executable
+exec make build
+exec make test
+cd ..
+
+exec spinup new demo --api-only --module example.com/demo --modules '' --no-git --non-interactive
+cd demo
+exec spinup plugin add path:../paper --trust
+exec spinup g paper-note sample
+cmp notes/sample.txt ../want-note
+
+! exec spinup plugin add path:../executable --trust
+stderr '--trust-exec greetings'
+exec spinup plugin add path:../executable --trust-exec greetings
+grep ' exec$' .spinup/plugins.allow
+exec spinup g greetings-hello sample
+cmp greetings/sample.txt ../want-greeting
+exec spinup g greetings-note sample
+exec spinup plugin verify
+
+# The executable rejects path arguments before it constructs a plan.
+! exec spinup g greetings-hello ../../escape
+stderr 'expected one name'
+! exists ../escape.txt
+
+-- want-note --
+Note: sample
+-- want-greeting --
+Hello, sample!
