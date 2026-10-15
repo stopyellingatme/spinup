@@ -184,3 +184,20 @@ func TestSvMigrateErrors(t *testing.T) {
 		}
 	})
 }
+
+func TestBunSvMigrate(t *testing.T) {
+	t.Parallel()
+	root := kit2Tree(t)
+	var fake exec.Fake
+	fake.Expect("bunx", "sv@1.1.1", "migrate", "sveltekit-3")
+	m := migrate.SvMigrateWith(stack("2.49.0"), stack("3.0.1"))
+	c := &migrate.Ctx{Root: root, Answers: map[string]any{"package_manager": "bun"}, Runner: &fake}
+	changes, err := m.Plan(c)
+	if err != nil || len(changes) != 1 || !strings.Contains(changes[0].Desc, "bunx sv@1.1.1") {
+		t.Fatalf("plan = %v, %v", changes, err)
+	}
+	if err := m.Apply(c); err != nil {
+		t.Fatal(err)
+	}
+	fake.AssertDone(t)
+}

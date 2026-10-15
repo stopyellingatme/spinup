@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/compat"
-	"github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func phaseDeps(ctx context.Context, s *Step) error {
@@ -21,7 +21,7 @@ func phaseDeps(ctx context.Context, s *Step) error {
 	return webDeps(ctx, s)
 }
 
-// webDeps refreshes web/pnpm-lock.yaml from the upgraded web/package.json. The lockfile is a
+// webDeps refreshes the package manager lockfile from the upgraded web/package.json. The lockfile is a
 // seed file that upgrades never merge, so the dependency step regenerates it (ADR 0008).
 func webDeps(ctx context.Context, s *Step) error {
 	_, err := os.Stat(filepath.Join(s.Worktree, "web", "package.json"))
@@ -31,13 +31,23 @@ func webDeps(ctx context.Context, s *Step) error {
 	if err != nil {
 		return fmt.Errorf("inspect web/package.json: %w\nTry: check the upgrade worktree permissions", err)
 	}
+	tool := webtool.FromLock(s.Lock)
+	if s.Answers != nil {
+		tool = webtool.For(s.Answers)
+	}
+	lockfile := "web/" + tool.Lockfile()
 	if s.Plan != nil && slices.Contains(s.Plan.Conflicts(), "web/package.json") {
-		_, _ = fmt.Fprintln(s.Out, "Skipped web/pnpm-lock.yaml: web/package.json has conflicts. Resolve them, then run pnpm install in web/.")
+		_, _ = fmt.Fprintf(s.Out, "Skipped %s: web/package.json has conflicts. Resolve them, then run %s install in web/.\n", lockfile, tool.Name())
 		return nil
 	}
-	command := exec.Cmd{Name: "pnpm", Args: []string{"install", "--lockfile-only", "--prefer-offline", "--ignore-scripts"}, Dir: filepath.Join(s.Worktree, "web")}
-	if result, err := s.Runner.Run(ctx, command); err != nil {
-		return fmt.Errorf("update web/pnpm-lock.yaml with %s: %w\n%s\nTry: rerun with network access, or run pnpm install in %s and then spinup upgrade --continue", command.String(), err, strings.TrimSpace(string(result.Stderr)), command.Dir)
+	command := tool.RefreshLock()
+	command.Dir = filepath.Join(s.Worktree, "web")
+	result, err := s.Runner.Run(ctx, command)
+	if err == nil && result.ExitCode != 0 {
+		err = fmt.Errorf("exit code %d", result.ExitCode)
+	}
+	if err != nil {
+		return fmt.Errorf("update %s with %s: %w\n%s\nTry: rerun with network access, or run %s install in %s and then spinup upgrade --continue", lockfile, command.String(), err, strings.TrimSpace(string(result.Stderr)), tool.Name(), command.Dir)
 	}
 	return nil
 }

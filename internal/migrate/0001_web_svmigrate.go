@@ -12,12 +12,13 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 // SvMigrateID is the ID of the codemod that runs `sv migrate` on a SvelteKit major bump.
 const SvMigrateID = "0001_web_svmigrate"
 
-// svMigrateTimeout bounds one `pnpm dlx sv migrate` run, which may download sv.
+// svMigrateTimeout bounds one sv migration, which may download the pinned CLI.
 const svMigrateTimeout = 10 * time.Minute
 
 func init() { Register(svMigrate(stepStacks)) }
@@ -38,9 +39,13 @@ type svStep struct {
 	svVersion string // the pinned sv CLI version
 }
 
-// args returns the command line in web/.
-func (s svStep) args() []string {
-	return []string{"dlx", "sv@" + s.svVersion, "migrate", "sveltekit-" + strconv.Itoa(s.major)}
+// command returns the selected package manager command.
+func (s svStep) command(c *Ctx) exec.Cmd {
+	tool := webtool.FromLock(c.Lock)
+	if c.Answers != nil {
+		tool = webtool.For(c.Answers)
+	}
+	return tool.Dlx("sv@"+s.svVersion, "migrate", "sveltekit-"+strconv.Itoa(s.major))
 }
 
 // svMigrate returns the After codemod. stacks gives the old and new stack versions of a step.
@@ -95,7 +100,7 @@ func svMigrate(stacks func(*Ctx) (old, next *stackversions.Stack)) Migration {
 			}
 			return []Change{{
 				Path: "web",
-				Desc: fmt.Sprintf("SvelteKit %s to %s: run pnpm %s", step.from, step.to, strings.Join(step.args(), " ")),
+				Desc: fmt.Sprintf("SvelteKit %s to %s: run %s", step.from, step.to, step.command(c).String()),
 			}}, nil
 		},
 		Apply: func(c *Ctx) error {
@@ -106,7 +111,9 @@ func svMigrate(stacks func(*Ctx) (old, next *stackversions.Stack)) Migration {
 			if c.Runner == nil {
 				return errors.New("run sv migrate: no command runner\nTry: run spinup upgrade --continue")
 			}
-			cmd := exec.Cmd{Name: "pnpm", Args: step.args(), Dir: filepath.Join(c.Root, "web"), Timeout: svMigrateTimeout}
+			cmd := step.command(c)
+			cmd.Dir = filepath.Join(c.Root, "web")
+			cmd.Timeout = svMigrateTimeout
 			if _, err := c.Runner.Run(context.Background(), cmd); err != nil {
 				return fmt.Errorf("run %s in web/: %w\nTry: run the command by hand, then run spinup upgrade --continue", cmd.String(), err)
 			}

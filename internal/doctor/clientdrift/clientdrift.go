@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	exec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/gen/client"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
@@ -59,22 +61,79 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 		return warning("cannot create temporary client directory: %v", err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	output := filepath.Join(dir, "schema.d.ts")
+	tool := webtool.FromLock(lock)
+	output := filepath.Join(dir, filepath.Base(tool.ClientOutput()))
 	if err := client.GenerateTypes(ctx, c.Root, output, runner); err != nil {
 		return warning("cannot generate TypeScript client: %v", err)
 	}
-	fresh, err := os.ReadFile(output)
+	fresh, err := outputs(output, tool.HeyAPI())
 	if err != nil {
 		return warning("cannot read generated TypeScript client: %v", err)
 	}
-	disk, err := os.ReadFile(filepath.Join(c.Root, "web/src/lib/api/schema.d.ts"))
+	disk, err := outputs(filepath.Join(c.Root, "web", tool.ClientOutput()), tool.HeyAPI())
 	if err != nil {
-		return warning("cannot read web/src/lib/api/schema.d.ts: %v", err)
+		return warning("cannot read web/%s: %v", tool.ClientOutput(), err)
 	}
-	if !bytes.Equal(normalize(fresh), normalize(disk)) {
-		return warning("web/src/lib/api/schema.d.ts is stale")
+	names := make([]string, 0, len(fresh)+len(disk))
+	for name := range fresh {
+		names = append(names, name)
+	}
+	for name := range disk {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range slices.Compact(names) {
+		a, aok := fresh[name]
+		b, bok := disk[name]
+		if !aok || !bok || !bytes.Equal(normalize(a), normalize(b)) {
+			return warning("web/src/lib/api/%s is stale", name)
+		}
 	}
 	return doctor.Result{Status: doctor.OK, Message: "TypeScript client matches the OpenAPI bundle"}
+}
+
+// outputs reads every generated file, including shared resource types for heyapi.
+func outputs(output string, heyapi bool) (map[string][]byte, error) {
+	files := map[string][]byte{}
+	if !heyapi {
+		data, err := os.ReadFile(output)
+		if err != nil {
+			return nil, err
+		}
+		files[filepath.Base(output)] = data
+		return files, nil
+	}
+	err := filepath.WalkDir(output, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return fmt.Errorf("generated file %s is not regular", path)
+		}
+		rel, err := filepath.Rel(filepath.Dir(output), path)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(rel)] = data
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	schema := filepath.Join(filepath.Dir(output), "schema.d.ts")
+	data, err := os.ReadFile(schema)
+	if err != nil {
+		return nil, err
+	}
+	files["schema.d.ts"] = data
+	return files, nil
 }
 
 func normalize(data []byte) []byte {

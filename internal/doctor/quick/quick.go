@@ -4,6 +4,7 @@ package quick
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -15,13 +16,14 @@ import (
 	"github.com/stopyellingatme/spinup/internal/doctor"
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
 	for _, check := range []doctor.Check{
 		{ID: "go-version", Title: "Go version", Run: goVersion},
 		{ID: "node-version", Title: "Node version", Run: nodeVersion},
-		{ID: "pnpm", Title: "pnpm executable", Run: pnpm},
+		{ID: "pnpm", Title: "Web package manager", Run: pnpm},
 		{ID: "docker", Title: "Docker daemon", Run: docker},
 		{ID: "ports", Title: "Development ports", Run: ports},
 		{ID: "env-file", Title: "Development environment", Run: envFile},
@@ -124,11 +126,20 @@ func pnpm(ctx context.Context, c *doctor.Context) doctor.Result {
 	if _, result := runner(c); result.Status == doctor.Fail {
 		return result
 	}
-	output, err := command(ctx, c, "pnpm", "--version")
-	if err != nil {
-		return fail("pnpm is not available on PATH", "enable pnpm through corepack and add it to PATH")
+	lock, err := manifest.Load(filepath.Join(c.Root, "spinup.lock"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fail("cannot read spinup.lock", "repair spinup.lock and repeat spinup doctor")
 	}
-	return doctor.Result{Status: doctor.OK, Message: "pnpm " + output}
+	name := webtool.FromLock(lock).Name()
+	output, err := command(ctx, c, name, "--version")
+	if err != nil {
+		hint := "enable pnpm through corepack and add it to PATH"
+		if name == "bun" {
+			hint = "install bun and add it to PATH"
+		}
+		return fail(name+" is not available on PATH", hint)
+	}
+	return doctor.Result{Status: doctor.OK, Message: name + " " + output}
 }
 func docker(ctx context.Context, c *doctor.Context) doctor.Result {
 	if enabled(c, "no-infra") {

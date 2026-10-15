@@ -251,3 +251,37 @@ func TestValidationAndWGOGuard(t *testing.T) {
 		})
 	}
 }
+
+func TestBunDev(t *testing.T) {
+	t.Parallel()
+	root := devProject(t, true)
+	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock.Answers["package_manager"] = "bun"
+	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	fake := &stackFake{cancel: cancel, stopAt: 2}
+	if err := Run(ctx, Options{Dir: root, NoInfra: true, Starter: fake, PortAllocator: func(port int) (int, error) { return port, nil }}, fake); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, c := range fake.commands {
+		if c.Name == "pnpm" {
+			t.Fatal("bun app ran pnpm")
+		}
+		if c.Name == "bun" && slices.Contains(c.Args, "dev") {
+			found = true
+			if c.Dir != filepath.Join(root, "web") || !reflect.DeepEqual(c.Args, []string{"run", "dev", "--port", "5173", "--strictPort"}) {
+				t.Fatalf("dev command = %+v", c)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("bun dev did not start")
+	}
+}

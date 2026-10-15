@@ -13,6 +13,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
@@ -35,9 +36,13 @@ var (
 
 // Command returns the shadcn-svelte command that adds names, run in web/.
 func Command(registryVersion string, names []string) gen.Command {
-	argv := []string{"pnpm", "dlx", "shadcn-svelte@" + registryVersion, "add"}
-	argv = append(argv, names...)
-	return gen.Command{Dir: "web", Argv: append(argv, "--yes", "--no-deps-install")}
+	return componentCommand(webtool.For(nil), registryVersion, names)
+}
+
+func componentCommand(tool webtool.Tool, registryVersion string, names []string) gen.Command {
+	args := append([]string{"add"}, names...)
+	cmd := tool.Dlx("shadcn-svelte@"+registryVersion, append(args, "--yes", "--no-deps-install")...)
+	return gen.Command{Dir: "web", Argv: append([]string{cmd.Name}, cmd.Args...)}
 }
 
 func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
@@ -60,8 +65,9 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		}
 		reg = s
 	}
+	tool := webtool.FromLock(in.Lock)
 	return &gen.Output{
-		Commands: []gen.Command{Command(reg, in.Args)},
-		Next:     []string{"cd web && pnpm install", "cd web && pnpm check"},
+		Commands: []gen.Command{componentCommand(tool, reg, in.Args)},
+		Next:     []string{"cd web && " + tool.Install(false, false).String(), "cd web && " + tool.Run("check").String()},
 	}, nil
 }

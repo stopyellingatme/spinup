@@ -16,6 +16,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/vfs"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
@@ -106,7 +107,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 			return nil, err
 		}
 	}
-	return &gen.Output{Plan: p, Next: []string{"cd web && pnpm check"}}, nil
+	return &gen.Output{Plan: p, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
 }
 
 func pageSvelte(dir, name string, server bool) []byte {
