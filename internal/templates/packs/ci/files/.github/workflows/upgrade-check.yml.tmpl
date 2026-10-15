@@ -1,0 +1,89 @@
+# Managed by spinup. Add extensions in a separate workflow file.
+name: Check for spinup upgrades
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spinup-upgrade-check
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: [[ uses "actions/checkout" ]]
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: [[ uses "actions/setup-go" ]]
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+[[- if index . "shadcn_registry" ]]
+      - uses: [[ uses "actions/setup-node" ]]
+        with:
+          node-version-file: web/package.json
+      - uses: [[ uses "pnpm/action-setup" ]]
+        with:
+          package_json_file: web/package.json
+[[- end ]]
+      - uses: ./.github/actions/setup-spinup
+        id: setup
+        with:
+          version: latest
+      - name: Apply the upgrade
+        id: upgrade
+        shell: bash
+        env:
+          SPINUP_RELEASE: ${{ steps.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          unset SPINUP_KIT_REPLACE
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          status=0
+          spinup upgrade --yes --non-interactive || status=$?
+          if [ "$status" != 0 ] && [ "$status" != 3 ]; then
+            exit "$status"
+          fi
+          work="$GITHUB_WORKSPACE/.spinup/upgrade/$SPINUP_RELEASE"
+          body="$RUNNER_TEMP/spinup-upgrade-body.md"
+          printf '%s\n' 'This pull request applies the newest published spinup release.' > "$body"
+          if [ "$status" = 3 ]; then
+            # The engine keeps conflicts and its partial commits in this worktree.
+            work="$(jq -er '.worktree' .spinup/upgrade.json)"
+            {
+              printf '\n%s\n' 'Resolve the conflict markers (<<<<<<<, |||||||, =======, >>>>>>>) in these files:'
+              jq -r '.conflicts[] | "- `" + . + "`"' .spinup/upgrade.json
+              printf '\n%s\n' 'The upgrade stopped before completion. Review the files and run spinup upgrade after resolving the markers.'
+            } >> "$body"
+          fi
+          if [ -d "$work" ]; then
+            printf 'path=%s\n' "$work" >> "$GITHUB_OUTPUT"
+          elif [ "$status" = 3 ]; then
+            printf '%s\n' 'Cannot propose the upgrade: the conflict worktree is missing.' >&2
+            printf '%s\n' 'Try: reproduce spinup upgrade locally.' >&2
+            exit 1
+          else
+            printf 'path=.\n' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: [[ uses "peter-evans/create-pull-request" ]]
+        with:
+          token: ${{ github.token }}
+          path: ${{ steps.upgrade.outputs.path }}
+          base: main
+          branch: spinup/upgrade-check
+          title: 'chore: upgrade spinup'
+          commit-message: 'chore: upgrade spinup'
+          body-path: ${{ runner.temp }}/spinup-upgrade-body.md

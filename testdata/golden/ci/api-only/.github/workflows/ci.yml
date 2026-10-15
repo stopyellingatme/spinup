@@ -45,7 +45,28 @@ jobs:
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
-      - run: go mod verify
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test -race ./...
+      - run: |
+          set -euo pipefail
+          go mod verify
+          go build ./...
+          go vet ./...
+          go test -race ./...
+
+  spinup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - uses: ./.github/actions/setup-spinup
+      - run: |
+          set -euo pipefail
+          cp .env.example .env
+          chmod 0600 .env
+          spinup check --allow-behind
+          spinup doctor
