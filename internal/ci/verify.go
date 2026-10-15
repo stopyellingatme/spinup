@@ -188,7 +188,7 @@ func verifyYAML(name string, data []byte, workflow bool) []Finding {
 				if !strings.HasPrefix(uses, "./") && (!ok || !actionSHA.MatchString(ref)) {
 					add(v, "uses must be pinned by a 40-character SHA (local ./ actions are exempt)")
 				}
-				if target && strings.HasPrefix(uses, "actions/checkout@") {
+				if target && strings.HasPrefix(strings.ToLower(uses), "actions/checkout@") {
 					with := yamlField(n, "with")
 					for _, key := range []string{"ref", "repository"} {
 						if input := yamlField(with, key); input != nil && headCheckout(input.Value) {
@@ -251,7 +251,14 @@ var bracketAccess = regexp.MustCompile(`\[['"]([a-zA-Z_][a-zA-Z_0-9]*)['"]\]`)
 func headCheckout(value string) bool {
 	value = strings.Join(strings.Fields(value), "")
 	value = bracketAccess.ReplaceAllString(value, ".$1")
-	return strings.Contains(value, "pull_request.head") || strings.Contains(value, "head_ref") || strings.Contains(value, "refs/pull/")
+	value = strings.ToLower(value)
+	// The merge commit and the PR number refs hold the untrusted PR code too.
+	for _, marker := range []string{"pull_request.head", "head_ref", "refs/pull/", "merge_commit_sha", "pull_request.number", "event.number"} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasEvent(n *yaml.Node, event string) bool {

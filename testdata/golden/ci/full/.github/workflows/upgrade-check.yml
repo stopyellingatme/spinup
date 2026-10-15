@@ -60,7 +60,7 @@ jobs:
           work="$GITHUB_WORKSPACE/.spinup/upgrade/$SPINUP_RELEASE"
           body="$RUNNER_TEMP/spinup-upgrade-body.md"
           printf '%s\n' 'This pull request applies the newest published spinup release.' > "$body"
-          if [ -z "$SPINUP_UPGRADE_TOKEN" ]; then
+          if [ -z "${SPINUP_UPGRADE_TOKEN:-}" ]; then
             printf '\n%s\n' 'This run uses the fallback GITHUB_TOKEN. It cannot push workflow changes, and its PR does not trigger pull_request workflows. Configure SPINUP_UPGRADE_TOKEN before upgrading workflows.' >> "$body"
           fi
           if [ "$status" = 3 ]; then
