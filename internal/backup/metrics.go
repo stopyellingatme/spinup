@@ -29,21 +29,32 @@ func writeMetrics(ctx context.Context, r remote.Runner, app string, s Sample) er
 		return nil
 	}
 	filename := MetricsPath(app)
-	current, err := r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-ec", "if [ -e " + remote.Quote(filename) + " ]; then cat " + remote.Quote(filename) + "; fi"}})
-	if err != nil {
-		return fmt.Errorf("read backup metrics: %w\nTry: check permissions of %s", err, filename)
-	}
-	dir := path.Dir(filename)
-	if err = ensureMetricsDir(ctx, r, app); err != nil {
+	if err := ensureMetricsDir(ctx, r, app); err != nil {
 		return err
 	}
-	// Runner.Upload reserves a temporary file beside the destination, sets its mode,
-	// and renames it atomically. Readers never see a partial metrics file.
-	if err = r.Upload(ctx, mergeMetrics(current.Stdout, updates), filename, 0644); err != nil {
-		return fmt.Errorf("upload backup metrics: %w\nTry: check permissions and disk space at %s", err, dir)
+	// Keep the read, merge, and rename under the same lock as run.sh.
+	_, err := r.Run(ctx, remote.Cmd{
+		Argv:  []string{"flock", path.Dir(filename) + "/.lock", "sh", "-ec", metricsMergeScript, "spinup-metrics", filename},
+		Stdin: strings.NewReader(metricLines(updates)),
+	})
+	if err != nil {
+		return fmt.Errorf("write backup metrics: %w\nTry: check flock, permissions, and disk space at %s", err, filename)
 	}
 	return nil
 }
+
+const metricsMergeScript = `metrics=$1
+umask 077
+tmp=$(mktemp "$metrics.tmp.XXXXXX")
+trap 'rm -f "$tmp" "$tmp.old" "$tmp.updates" "$tmp.new"' 0
+trap 'exit 1' HUP INT TERM
+cat > "$tmp.updates"
+if [ -e "$metrics" ]; then cat "$metrics" > "$tmp.old"; else : > "$tmp.old"; fi
+awk 'NR == FNR {replace[$1]=1; next} /^#/ || !($1 in replace)' "$tmp.updates" "$tmp.old" > "$tmp.new"
+cat "$tmp.updates" >> "$tmp.new"
+LC_ALL=C sort "$tmp.new" > "$tmp"
+chmod 0644 "$tmp"
+mv -f "$tmp" "$metrics"`
 
 func metricUpdates(s Sample) map[string]string {
 	updates := map[string]string{}
@@ -67,25 +78,13 @@ func metricUpdates(s Sample) map[string]string {
 	return updates
 }
 
-func mergeMetrics(current []byte, updates map[string]string) []byte {
-	lines := []string{}
-	for line := range strings.SplitSeq(string(current), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if !strings.HasPrefix(strings.TrimSpace(line), "#") && len(fields) > 0 {
-			if _, replace := updates[fields[0]]; replace {
-				continue
-			}
-		}
-		lines = append(lines, line)
-	}
+func metricLines(updates map[string]string) string {
+	lines := make([]string, 0, len(updates))
 	for name, value := range updates {
 		lines = append(lines, name+" "+value)
 	}
 	sort.Strings(lines)
-	return []byte(strings.Join(lines, "\n") + "\n")
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func backupMetrics(ctx context.Context, r remote.Runner, app string, result Result, warnings io.Writer) {

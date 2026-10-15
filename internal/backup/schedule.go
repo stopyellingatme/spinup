@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -106,6 +107,36 @@ func Schedule(ctx context.Context, o ScheduleOptions) error {
 	if _, err = r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-ec", systemdProbe}}); err != nil {
 		return fmt.Errorf("install backup schedule: the VM needs systemctl and systemd as PID 1: %w\nTry: use a VM that boots systemd, or run deploy/backups/run.sh with another scheduler", err)
 	}
+	if !o.Remove {
+		for _, file := range files {
+			if !strings.HasSuffix(file.Path, ".timer") {
+				continue
+			}
+			for line := range bytes.SplitSeq(file.Data, []byte("\n")) {
+				if calendar, ok := strings.CutPrefix(string(line), "OnCalendar="); ok {
+					if _, err := r.Run(ctx, remote.Cmd{Argv: []string{"systemd-analyze", "calendar", "--", calendar}, Stderr: errOut}); err != nil {
+						return fmt.Errorf("validate backup calendar %q: %w\nTry: correct [backups] schedule_full, schedule_diff, or schedule_verify in spinup.toml", calendar, err)
+					}
+				}
+			}
+		}
+	}
+	for _, argv := range schedulePrivileges(config.App.Name, o.Remove) {
+		// A plain sudo -l can list a password-protected command. Inspect the
+		// matching rule's authentication option instead of accepting exit 0.
+		result, err := r.Run(ctx, remote.Cmd{Argv: append([]string{"sudo", "-n", "-ll", "--"}, argv...), Stderr: errOut})
+		if err == nil && env.User != "root" && !sudoWithoutPassword(string(result.Stdout)) {
+			err = fmt.Errorf("the matching sudo rule requires authentication")
+		}
+		if err != nil {
+			hint := "re-run spinup server bootstrap for this environment"
+			if o.Remove && argv[0] == "rm" {
+				hint = "re-run spinup server bootstrap for this environment, which permits rm -f of these six unit files"
+			}
+			return fmt.Errorf("check backup schedule sudo access (%s): %w\nTry: %s", strings.Join(argv, " "), err, hint)
+		}
+	}
+
 	run := func(argv ...string) error {
 		_, err := r.Run(ctx, remote.Cmd{Argv: argv, Stderr: errOut})
 		if err != nil {
@@ -114,17 +145,7 @@ func Schedule(ctx context.Context, o ScheduleOptions) error {
 		return nil
 	}
 	if o.Remove {
-		if err = run(append([]string{"sudo", "-n", "systemctl", "disable", "--now"}, timers...)...); err != nil {
-			return err
-		}
-		args := []string{"sudo", "-n", "rm", "-f"}
-		for _, timer := range timers {
-			args = append(args, "/etc/systemd/system/"+timer, "/etc/systemd/system/"+strings.TrimSuffix(timer, ".timer")+".service")
-		}
-		if err = run(args...); err != nil {
-			return err
-		}
-		return run("sudo", "-n", "systemctl", "daemon-reload")
+		return run(append([]string{"sh", "-ec", scheduleRemoveScript, "spinup-remove", "/etc/systemd/system"}, timers...)...)
 	}
 	base := "/opt/" + config.App.Name + "/backups"
 	if err = ensureMetricsDir(ctx, r, config.App.Name); err != nil {
@@ -171,8 +192,10 @@ func Schedule(ctx context.Context, o ScheduleOptions) error {
 	if err = run("sudo", "-n", "systemctl", "daemon-reload"); err != nil {
 		return err
 	}
-	if err = run(append([]string{"sudo", "-n", "systemctl", "enable", "--now"}, timers...)...); err != nil {
-		return err
+	for _, timer := range timers {
+		if err = run("sudo", "-n", "systemctl", "enable", "--now", timer); err != nil {
+			return err
+		}
 	}
 	_, err = r.Run(ctx, remote.Cmd{Argv: append([]string{"systemctl", "list-timers", "--all", "--no-pager"}, timers...), Stdout: out, Stderr: errOut})
 	if err != nil {
@@ -198,7 +221,7 @@ func scheduleFiles(c *project.Config, env project.Env) ([]vfs.File, error) {
 		return nil, fmt.Errorf("render backup services: invalid deploy user %q\nTry: set a Unix user name in the environment configuration", user)
 	}
 	for _, value := range []string{c.Backups.ScheduleFull, c.Backups.ScheduleDiff, c.Backups.ScheduleVerify} {
-		if strings.ContainsAny(value, "\r\n\x00\\%") {
+		if (value != "" && strings.TrimSpace(value) == "") || strings.ContainsAny(value, "\r\n\x00\\%") {
 			return nil, fmt.Errorf("render backup timer: invalid calendar value\nTry: use a single systemd OnCalendar expression without escapes")
 		}
 	}
@@ -211,6 +234,9 @@ func scheduleFiles(c *project.Config, env project.Env) ([]vfs.File, error) {
 	}
 	if retention == 0 {
 		retention = 4
+		if c.Backups.Backend == "pgdump" {
+			retention = 7
+		}
 	}
 	pack, err := templates.Load(templates.Embedded(), "backups")
 	if err != nil {
@@ -228,4 +254,58 @@ func scheduleFiles(c *project.Config, env project.Env) ([]vfs.File, error) {
 		return nil, err
 	}
 	return plan.Files, nil
+}
+
+// Queries use sudo -l so the permission check has no systemd side effects.
+func schedulePrivileges(app string, remove bool) [][]string {
+	commands := [][]string{{"systemctl", "daemon-reload"}}
+	timers := scheduleTimers(app)
+	if remove {
+		for _, timer := range timers {
+			commands = append(commands, []string{"systemctl", "disable", "--now", timer})
+		}
+		args := []string{"rm", "-f"}
+		for _, timer := range timers {
+			args = append(args, "/etc/systemd/system/"+timer, "/etc/systemd/system/"+strings.TrimSuffix(timer, ".timer")+".service")
+		}
+		return append(commands, args)
+	}
+	for _, timer := range timers {
+		commands = append(commands, []string{"systemctl", "enable", "--now", timer})
+		for _, name := range []string{strings.TrimSuffix(timer, ".timer") + ".service", timer} {
+			commands = append(commands, []string{"install", "-m", "0644", "/opt/" + app + "/backups/" + name, "/etc/systemd/system/" + name})
+		}
+	}
+	return commands
+}
+
+// Missing timers are harmless. Cleanup and reload still run after a disable error.
+const scheduleRemoveScript = `dir=$1
+shift
+failed=0
+for timer do
+    if ! sudo -n systemctl disable --now "$timer"; then
+        state=$(systemctl show --property=LoadState --value "$timer") || :
+        [ "$state" = not-found ] || failed=1
+    fi
+done
+for timer do
+    set -- "$@" "$dir/$timer" "$dir/${timer%.timer}.service"
+    shift
+done
+sudo -n rm -f "$@" || failed=1
+sudo -n systemctl daemon-reload || failed=1
+exit "$failed"`
+
+func sudoWithoutPassword(listing string) bool {
+	allowed := false
+	for _, field := range strings.FieldsFunc(listing, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == ',' }) {
+		switch field {
+		case "!authenticate":
+			allowed = true
+		case "authenticate":
+			allowed = false
+		}
+	}
+	return allowed
 }

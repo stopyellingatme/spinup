@@ -47,6 +47,11 @@ swap:
   maxsize: 2G
 
 write_files:
+  # Validate this staged policy before it becomes active.
+  - path: /run/spinup-todo-sudoers
+    permissions: "0440"
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl enable --now spinup-todo-backup-full.timer, /usr/bin/systemctl disable --now spinup-todo-backup-full.timer, /usr/bin/systemctl start --now spinup-todo-backup-full.timer, /usr/bin/systemctl stop --now spinup-todo-backup-full.timer, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-full.service /etc/systemd/system/spinup-todo-backup-full.service, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-full.timer /etc/systemd/system/spinup-todo-backup-full.timer, /usr/bin/systemctl enable --now spinup-todo-backup-diff.timer, /usr/bin/systemctl disable --now spinup-todo-backup-diff.timer, /usr/bin/systemctl start --now spinup-todo-backup-diff.timer, /usr/bin/systemctl stop --now spinup-todo-backup-diff.timer, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-diff.service /etc/systemd/system/spinup-todo-backup-diff.service, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-diff.timer /etc/systemd/system/spinup-todo-backup-diff.timer, /usr/bin/systemctl enable --now spinup-todo-backup-verify.timer, /usr/bin/systemctl disable --now spinup-todo-backup-verify.timer, /usr/bin/systemctl start --now spinup-todo-backup-verify.timer, /usr/bin/systemctl stop --now spinup-todo-backup-verify.timer, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-verify.service /etc/systemd/system/spinup-todo-backup-verify.service, /usr/bin/install -m 0644 /opt/todo/backups/spinup-todo-backup-verify.timer /etc/systemd/system/spinup-todo-backup-verify.timer, /usr/bin/rm -f /etc/systemd/system/spinup-todo-backup-full.timer /etc/systemd/system/spinup-todo-backup-full.service /etc/systemd/system/spinup-todo-backup-diff.timer /etc/systemd/system/spinup-todo-backup-diff.service /etc/systemd/system/spinup-todo-backup-verify.timer /etc/systemd/system/spinup-todo-backup-verify.service
   # Log rotation for every container (the Compose files set the same values).
   - path: /etc/docker/daemon.json
     permissions: "0644"
@@ -87,6 +92,7 @@ write_files:
       net.core.somaxconn = 4096
 
 runcmd:
+  - [sh, -ec, "visudo -cf /run/spinup-todo-sudoers && mv -f /run/spinup-todo-sudoers /etc/sudoers.d/spinup-todo"]
   - [usermod, -aG, docker, deploy]
   - [install, -d, -o, deploy, -g, deploy, -m, "0750", /opt/todo, /opt/todo/releases, /opt/todo/backups, /opt/todo/data, /opt/todo/data/caddy, /opt/todo/data/caddy/data, /opt/todo/data/caddy/config, /opt/todo/caddy, /opt/todo/postgres]
   - [install, -d, -o, deploy, -g, deploy, -m, "0700", /opt/todo/secrets]

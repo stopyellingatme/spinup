@@ -2,6 +2,8 @@ package backup
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,6 +24,14 @@ func TestSchedule(t *testing.T) {
 				if mode == "no-systemd" {
 					probe.Return("", "", 1)
 				}
+				if mode == "install" || mode == "remove" {
+					if mode == "install" {
+						expectCalendars(f)
+					}
+					for _, argv := range schedulePrivileges("todo", mode == "remove") {
+						f.Expect(append([]string{"sudo", "-n", "-ll", "--"}, argv...)...).Return("Sudoers entry:\n    RunAsUsers: root\n    Options: !authenticate\n", "", 0)
+					}
+				}
 				if mode == "install" {
 					f.Expect("mkdir", "-p")
 					f.Expect("chmod", "0755")
@@ -37,13 +47,13 @@ func TestSchedule(t *testing.T) {
 						}
 					}
 					f.Expect("sudo", "-n", "systemctl", "daemon-reload")
-					f.Expect("sudo", "-n", "systemctl", "enable", "--now", "spinup-todo-backup-full.timer", "spinup-todo-backup-diff.timer", "spinup-todo-backup-verify.timer")
+					for _, timer := range scheduleTimers("todo") {
+						f.Expect("sudo", "-n", "systemctl", "enable", "--now", timer)
+					}
 					f.Expect("systemctl", "list-timers", "--all", "--no-pager").Return("timers installed\n", "", 0)
 				}
 				if mode == "remove" {
-					f.Expect("sudo", "-n", "systemctl", "disable", "--now")
-					f.Expect("sudo", "-n", "rm", "-f")
-					f.Expect("sudo", "-n", "systemctl", "daemon-reload")
+					f.Expect("sh", "-ec", scheduleRemoveScript)
 				}
 			}
 			err := Schedule(context.Background(), ScheduleOptions{Options: Options{Dir: dir, Env: "staging", Remote: f, Out: &out}, Plan: mode == "plan", Remove: mode == "remove"})
@@ -130,4 +140,135 @@ func TestScheduleStatus(t *testing.T) {
 			t.Errorf("probe missing %q", want)
 		}
 	}
+}
+
+func TestScheduleDefaults(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct{ backend, retention string }{{"pgdump", "7"}, {"pgbackrest", "4"}} {
+		t.Run(tt.backend, func(t *testing.T) {
+			t.Parallel()
+			c := &project.Config{}
+			c.App.Name = "todo"
+			c.Backups.Backend = tt.backend
+			files, err := scheduleFiles(c, project.Env{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range files {
+				if file.Path == "deploy/backups/run.sh" && !strings.Contains(string(file.Data), "retention='"+tt.retention+"'") {
+					t.Fatalf("wrong retention for %s", tt.backend)
+				}
+				if strings.HasSuffix(file.Path, "-diff.timer") && !strings.Contains(string(file.Data), "OnCalendar=Mon..Sat *-*-* 03:00:00") {
+					t.Fatal("default diff includes Sunday")
+				}
+			}
+		})
+	}
+}
+
+func TestScheduleWhitespaceCalendar(t *testing.T) {
+	t.Parallel()
+	c := &project.Config{}
+	c.App.Name = "todo"
+	c.Backups.ScheduleFull = " \t "
+	if _, err := scheduleFiles(c, project.Env{}); err == nil {
+		t.Fatal("accepted whitespace calendar")
+	}
+}
+
+func expectCalendars(f *remote.Fake) {
+	for _, calendar := range []string{"Sun *-*-* 03:00:00", "Mon..Sat *-*-* 03:00:00", "Sat *-*-* 04:00:00"} {
+		f.Expect("systemd-analyze", "calendar", "--", calendar)
+	}
+}
+
+func TestSchedulePreflight(t *testing.T) {
+	t.Parallel()
+	for _, remove := range []bool{false, true} {
+		for denied, command := range schedulePrivileges("todo", remove) {
+			t.Run(strings.Join(command, " "), func(t *testing.T) {
+				t.Parallel()
+				dir := newProject(t, true, "", nil)
+				f := &remote.Fake{}
+				f.Expect("sh", "-ec", systemdProbe)
+				if !remove {
+					expectCalendars(f)
+				}
+				for i, argv := range schedulePrivileges("todo", remove) {
+					expectation := f.Expect(append([]string{"sudo", "-n", "-ll", "--"}, argv...)...).Return("Sudoers entry:\n    RunAsUsers: root\n    Options: !authenticate\n", "", 0)
+					if i == denied {
+						expectation.Return("", "password required", 1)
+						break
+					}
+				}
+				err := Schedule(context.Background(), ScheduleOptions{Options: Options{Dir: dir, Env: "staging", Remote: f}, Remove: remove})
+				hint := "Try: re-run spinup server bootstrap"
+				if remove && command[0] == "rm" {
+					hint = "Try: re-run spinup server bootstrap for this environment, which permits rm -f"
+				}
+				if err == nil || !strings.Contains(err.Error(), hint) {
+					t.Fatalf("error = %v", err)
+				}
+				if len(f.Uploads()) != 0 {
+					t.Fatal("uploaded files before sudo check")
+				}
+				f.AssertDone(t)
+			})
+		}
+	}
+}
+
+func TestScheduleInvalidCalendarBeforeUpload(t *testing.T) {
+	t.Parallel()
+	for _, key := range []string{"schedule_full", "schedule_diff", "schedule_verify"} {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			dir := newProject(t, true, "", nil)
+			file, err := os.OpenFile(filepath.Join(dir, "spinup.toml"), os.O_APPEND|os.O_WRONLY, 0600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = file.WriteString("\n[backups]\n" + key + " = \"garbage\"\n")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := file.Close(); err != nil {
+				t.Fatal(err)
+			}
+			f := &remote.Fake{}
+			f.Expect("sh", "-ec", systemdProbe)
+			for _, item := range []struct{ key, value string }{{"schedule_full", "Sun *-*-* 03:00:00"}, {"schedule_diff", "Mon..Sat *-*-* 03:00:00"}, {"schedule_verify", "Sat *-*-* 04:00:00"}} {
+				if item.key == key {
+					f.Expect("systemd-analyze", "calendar", "--", "garbage").Return("", "Invalid calendar specification", 1)
+					break
+				}
+				f.Expect("systemd-analyze", "calendar", "--", item.value)
+			}
+			err = Schedule(context.Background(), ScheduleOptions{Options: Options{Dir: dir, Env: "staging", Remote: f}})
+			if err == nil || !strings.Contains(err.Error(), "Try: correct [backups]") {
+				t.Fatalf("error = %v", err)
+			}
+			if len(f.Uploads()) != 0 {
+				t.Fatal("uploaded invalid calendar")
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+
+func TestScheduleRejectsPasswordRule(t *testing.T) {
+	t.Parallel()
+	dir := newProject(t, true, "", nil)
+	f := &remote.Fake{}
+	f.Expect("sh", "-ec", systemdProbe)
+	expectCalendars(f)
+	f.Expect("sudo", "-n", "-ll", "--", "systemctl", "daemon-reload").Return("Sudoers entry:\n    Options: authenticate\n    Commands:\n        /usr/bin/systemctl daemon-reload\n", "", 0)
+	err := Schedule(context.Background(), ScheduleOptions{Options: Options{Dir: dir, Env: "staging", Remote: f}})
+	if err == nil || !strings.Contains(err.Error(), "Try: re-run spinup server bootstrap") {
+		t.Fatalf("error = %v", err)
+	}
+	if len(f.Uploads()) != 0 {
+		t.Fatal("uploaded before passwordless sudo check")
+	}
+	f.AssertDone(t)
 }
