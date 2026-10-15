@@ -105,3 +105,92 @@ func TestSSHDValidationBeforeReload(t *testing.T) {
 		})
 	}
 }
+
+func TestBootstrapFirewallSSHPorts(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, ports, connected, want string
+		sshdFails, fails             bool
+	}{
+		{name: "custom port", ports: "port 2222\n", want: "2222"},
+		{name: "multiple ports", ports: "port 2222\nport 2200\n", want: "2222 2200"},
+		{name: "connection port", ports: "port 22\n", connected: "2222", want: "22 2222"},
+		{name: "connection only", connected: "2222", want: "2222"},
+		{name: "empty ports", fails: true},
+		{name: "sshd failure", connected: "2222", sshdFails: true, fails: true},
+		{name: "invalid port", ports: "port invalid\n", fails: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			for name, script := range map[string]string{
+				"sshd": "#!/bin/sh\n[ \"$SSHD_FAILS\" != true ] || exit 1\nprintf '%s' \"$PORTS\"\n",
+				"ufw": `#!/bin/sh
+if [ "$1" = status ]; then
+ printf '%s\n' 'Status: active' 'Default: deny (incoming), allow (outgoing)'
+ while read -r action port; do
+  if [ "$action" = allow ]; then printf '%s ALLOW IN Anywhere\n' "$port"; fi
+ done < "$EVENTS"
+else
+ printf '%s\n' "$*" >> "$EVENTS"
+fi
+`,
+			} {
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			events := filepath.Join(dir, "events")
+			if err := os.WriteFile(events, nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+			env := []string{"PATH=" + dir + ":" + os.Getenv("PATH"), "PORTS=" + tc.ports, "connection_port=" + tc.connected, "EVENTS=" + events, "SSHD_FAILS=" + map[bool]string{true: "true", false: "false"}[tc.sshdFails]}
+			var firewall bootstrapStep
+			for _, step := range bootstrapSteps("todo", "key") {
+				if step.name == "firewall" {
+					firewall = step
+				}
+			}
+			run := func(script string) error {
+				_, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", strings.ReplaceAll(script, "/usr/sbin/sshd", filepath.Join(dir, "sshd"))}, Env: env})
+				return err
+			}
+			if err := run(firewall.check); err == nil {
+				t.Fatal("probe accepted missing rules")
+			}
+			if err := run(firewall.apply); (err != nil) != tc.fails {
+				t.Fatalf("apply error = %v, want failure %v", err, tc.fails)
+			}
+			data, err := os.ReadFile(events)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.fails {
+				if len(data) != 0 {
+					t.Fatalf("unsafe discovery changed firewall: %s", data)
+				}
+				return
+			}
+			for _, port := range strings.Fields(tc.want) {
+				allow := "allow " + port + "/tcp\n"
+				if i := strings.Index(string(data), allow); i < 0 || i > strings.Index(string(data), "--force enable") {
+					t.Fatalf("port %s not allowed before enable: %s", port, data)
+				}
+				// Keep the standard rules but remove each required SSH rule in turn.
+				without := strings.ReplaceAll(string(data), allow, "")
+				if err := os.WriteFile(events, []byte(without), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := run(firewall.check); err == nil {
+					t.Fatalf("probe accepted missing SSH port %s", port)
+				}
+			}
+			if err := os.WriteFile(events, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := run(firewall.check); err != nil {
+				t.Fatalf("probe rejected complete rules: %v", err)
+			}
+		})
+	}
+}

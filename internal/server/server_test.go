@@ -118,6 +118,7 @@ func TestBootstrapStopsOnFailure(t *testing.T) {
 				f.Expect("sudo", "-n", "true").Return("", "not permitted", 1)
 			} else {
 				f.Expect("sudo", "-n", "true").Return("", "", 0)
+				f.Expect("sh", "-ec").Return("192.0.2.1 54321 192.0.2.2 22\n", "", 0)
 				if failure == "transport" {
 					f.Expect("sudo", "-n", "sh").Fail(errors.New("connection lost"))
 				} else {
@@ -224,6 +225,7 @@ func TestBootstrapPlanCommand(t *testing.T) {
 	f := &runexec.Fake{}
 	f.Expect("ssh").Return("ID=ubuntu\n", "", 0)
 	f.Expect("ssh").Return("", "", 0)
+	f.Expect("ssh").Return("192.0.2.1 54321 192.0.2.2 22\n", "", 0)
 	for range bootstrapSteps("todo", operatorKey) {
 		f.Expect("ssh").Return("", "", 1)
 	}
