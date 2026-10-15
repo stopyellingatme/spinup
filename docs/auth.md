@@ -183,3 +183,95 @@ Run the tests of the helper in `web/`:
 ```console
 $ pnpm test
 ```
+
+## OpenID Connect
+
+Enable OIDC with `--auth-oidc` when you create an app:
+
+```console
+$ spinup new oidcapp --module example.com/oidcapp --modules auth --auth-oidc --no-git --non-interactive
+...
+$ cd oidcapp
+$ ls api/db/migrations
+00001_init.sql
+00002_create_auth.sql
+00004_oidc_identities.sql
+embed.go
+$ grep OidcButtons web/src/routes/login/+page.svelte
+	import OidcButtons from '#lib/components/OidcButtons.svelte';
+		<OidcButtons />
+```
+
+The question `auth_oidc` defaults to false.
+The migration follows `00003_password_resets.sql`, which exists only when the mail module is enabled.
+The migration permits a NULL password hash and creates `user_identities`.
+Existing migrations remain unchanged.
+
+Configure each provider in the API environment:
+
+```sh
+PUBLIC_ORIGIN=https://app.example.com
+AUTH_OIDC_PROVIDERS=google,acme
+AUTH_OIDC_GOOGLE_ISSUER=https://accounts.google.com
+AUTH_OIDC_GOOGLE_CLIENT_ID=your-client-id
+AUTH_OIDC_GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google-client-secret
+AUTH_OIDC_GOOGLE_LABEL=Google
+AUTH_OIDC_ACME_ISSUER=https://identity.example.com/realms/acme
+AUTH_OIDC_ACME_CLIENT_ID=your-client-id
+AUTH_OIDC_ACME_CLIENT_SECRET_FILE=/run/secrets/acme-client-secret
+AUTH_OIDC_ACME_LABEL=Acme
+AUTH_OIDC_ACME_SCOPES=groups,offline_access
+```
+
+Register this callback URL with each provider:
+`https://app.example.com/api/auth/oidc/<provider>/callback`.
+Use the name from `AUTH_OIDC_PROVIDERS` for `<provider>`.
+Use lower-case names with letters, digits, or underscores.
+Start each name with a letter.
+The API reads provider settings when it registers the routes.
+Restart the API after you change these settings.
+
+Use `_CLIENT_SECRET` or `_CLIENT_SECRET_FILE` for the secret.
+Do not set both forms.
+The scopes always include `openid`, `email`, and `profile`.
+The optional `_SCOPES` adds scopes separated by commas or spaces.
+The optional `_LABEL` controls the button text.
+The provider name supplies the default label.
+
+The login component reads names and labels from `GET /api/auth/oidc/providers`.
+This route never returns secrets.
+A button opens `GET /api/auth/oidc/<provider>/start`.
+Discovery runs on the first attempt and caches successful results.
+A failed attempt returns a 503 problem with a `Try:` instruction.
+An unavailable provider does not prevent API startup or password login.
+
+The flow uses PKCE with S256, state, and a nonce.
+An encrypted cookie expires after ten minutes.
+The cookie uses HttpOnly and SameSite=Lax.
+The cookie uses Secure when the session cookie uses Secure.
+The callback verifies the signature, issuer, audience, expiry, and nonce of the ID token.
+
+The API requires a verified email claim.
+An existing identity keeps its account even when the provider changes its email.
+A new identity links to an account with the same normalized email.
+If no account matches, the API creates an account with no password.
+Password login rejects an account with no password with the usual generic error.
+The callback uses the existing session method, which rotates the token.
+
+Use `?next=/account` to select a destination after login.
+The destination must start with one slash and remain a relative path within the same origin.
+The API rejects absolute URLs, protocol-relative URLs, and backslashes.
+The default destination is `/account`.
+The callback origin comes from `PUBLIC_ORIGIN`, never from request headers.
+Production requires an HTTPS origin.
+
+For multiple API instances, configure `AUTH_OIDC_COOKIE_KEY` with the same key on each instance.
+Use 32 random bytes encoded as unpadded base64url.
+The `_FILE` form is also supported.
+Without this setting, each process creates a key at startup.
+A restart then invalidates pending flows.
+A key change also invalidates pending flows.
+
+Before you revert the OIDC migration, set a password for each account that has no password.
+The reverse migration refuses to require passwords while these accounts exist.
+It never deletes these accounts.

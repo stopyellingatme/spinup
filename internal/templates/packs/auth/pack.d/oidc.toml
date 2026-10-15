@@ -1,0 +1,17 @@
+[[questions]]
+key = "auth_oidc"
+prompt = "Enable OpenID Connect sign-in?"
+type = "bool"
+default = false
+
+[[files]]
+path = "api/db/migrations/00004_oidc_identities.sql"
+source = "files/api/db/migrations/00004_oidc_identities.sql"
+class = "seed"
+when = "auth_oidc"
+
+[[files]]
+path = "web/src/lib/components/OidcButtons.svelte"
+source = "files/web/src/lib/components/OidcButtons.svelte"
+class = "scaffold"
+when = "auth_oidc"
