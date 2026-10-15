@@ -118,6 +118,8 @@ go run ./cmd/api migrate to 1
 
 ## The development database
 
+The commands are `spinup db psql`, `spinup db dump`, `spinup db restore`, `spinup db seed`, `spinup db reset`, and `spinup db doctor`.
+
 `db psql`, `db dump`, `db restore`, `db seed`, `db reset`, and `db doctor` use the `postgres` service in `deploy/compose.dev.yml`.
 They run `docker compose -f deploy/compose.dev.yml exec postgres ...` as user `app` on database `app`.
 Start the service first with `docker compose -f deploy/compose.dev.yml up -d`.

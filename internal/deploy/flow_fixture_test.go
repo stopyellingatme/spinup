@@ -83,7 +83,7 @@ type fx struct {
 func newFx(t *testing.T, web bool, transport string) *fx {
 	t.Helper()
 	x := &fx{t: t, root: t.TempDir(), web: web, transport: transport, exec: &runexec.Fake{}, vm: &remote.Fake{}, http: map[string][]httpCall{}, decrypted: testSecrets}
-	toml := "[app]\nname = \"todo\"\nmodule = \"github.com/acme/todo\"\n\n[env.staging]\nhost = \"vm.example.com\"\nuser = \"deploy\"\npublic_url = \"https://todo.example.com\"\n"
+	toml := "behavior_version = 3\n\n[app]\nname = \"todo\"\nmodule = \"github.com/acme/todo\"\n\n[env.staging]\nhost = \"vm.example.com\"\nuser = \"deploy\"\npublic_url = \"https://todo.example.com\"\n"
 	if transport != "" {
 		toml += "transport = \"" + transport + "\"\n"
 	}

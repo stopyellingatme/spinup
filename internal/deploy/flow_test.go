@@ -91,7 +91,7 @@ func TestFlowSSHFirstDeploy(t *testing.T) {
 		t.Fatalf("hook = %#v %#v", x.hookOpts, x.hookCtx)
 	}
 	env := string(x.upload(testRelDir + "/.env"))
-	for _, want := range []string{"SPINUP_COLOR=blue\n", "API_IMAGE=todo-api:" + testRelease + "\n", "PUBLIC_ORIGIN=https://todo.example.com\n", "PUBLIC_HOST=todo.example.com\n", "DEPLOY_UID=1000\n", "DEPLOY_GID=1001\n", "API_REPLICAS=2\n", "API_CPUS=0.5\n", "API_MEMORY=256m\n", "POSTGRES_MEMORY=1g\n"} {
+	for _, want := range []string{"SPINUP_COLOR=blue\n", "API_IMAGE=todo-api:" + testRelease + "\n", "PUBLIC_ORIGIN=https://todo.example.com\n", "PUBLIC_HOST=todo.example.com\n", "SPINUP_BEHAVIOR_VERSION=3\n", "DEPLOY_UID=1000\n", "DEPLOY_GID=1001\n", "API_REPLICAS=2\n", "API_CPUS=0.5\n", "API_MEMORY=256m\n", "POSTGRES_MEMORY=1g\n"} {
 		if !strings.Contains(env, want) {
 			t.Errorf(".env misses %q:\n%s", want, env)
 		}

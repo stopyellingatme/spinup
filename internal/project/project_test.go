@@ -238,3 +238,23 @@ tempo_retention = "72h"
 		}
 	}
 }
+
+func TestEffectiveBehaviorVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		toml string
+		want int
+	}{
+		{"[app]\nname = \"a\"\n", 1},
+		{"behavior_version = 0\n", 1},
+		{"behavior_version = 3\n", 3},
+	} {
+		c, err := Parse([]byte(tc.toml))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.EffectiveBehaviorVersion(); got != tc.want {
+			t.Errorf("%q: got %d, want %d", tc.toml, got, tc.want)
+		}
+	}
+}
