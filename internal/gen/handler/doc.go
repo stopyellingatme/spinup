@@ -1,4 +1,4 @@
-// Package handler generates a handler stub.
-//
-// STUB from the M3 pre-seed commit. Unit M3.4 owns this file and replaces it.
+// Package handler generates a plain net/http handler and its test
+// (`spinup g handler`). Generators never edit routes.go, so the generator
+// prints the line that registers the handler.
 package handler
