@@ -36,11 +36,11 @@ func Migrate(ctx context.Context, o Options, runner run.Runner) error {
 	if err != nil {
 		return migrateError(err)
 	}
-	if o.Env != "" {
-		config, err := project.Load(root)
-		if err != nil {
-			return migrateError(err)
-		}
+	config, err := project.Load(root)
+	if err != nil {
+		return migrateError(err)
+	}
+	if len(config.Envs) > 0 || o.Env != "" {
 		env, err := config.ResolveEnv(o.Env)
 		if err != nil {
 			return migrateError(err)
@@ -65,9 +65,11 @@ func Migrate(ctx context.Context, o Options, runner run.Runner) error {
 
 func migrateError(err error) error {
 	code := ui.ExitError
+	why := err.Error()
 	var exit *run.ExitError
 	if errors.As(err, &exit) {
 		code = exit.Code
+		why = fmt.Sprintf("%s exited with status %d", exit.Cmd, exit.Code)
 	}
-	return &ui.Error{What: "Cannot run migration", Why: err.Error(), Try: "check the command output and environment, then retry", Code: code, Err: err}
+	return &ui.Error{What: "Cannot run migration", Why: why, Try: "check the command output and environment, then retry", Code: code, Err: err}
 }

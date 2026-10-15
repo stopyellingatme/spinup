@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: [[ image "postgres" ]]
+        image: [[ if eq .db_version "18" ]][[ image "postgres" ]][[ else if eq .db_version "17" ]][[ image "postgres-17" ]][[ else ]][[ image "postgres-16" ]][[ end ]]
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: app

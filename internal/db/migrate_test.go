@@ -84,3 +84,93 @@ func errorText(err error) string {
 	}
 	return err.Error()
 }
+
+func TestMigrateEnvironmentGuards(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, config, env, sub string
+		dry, yes, ci           bool
+		wantErr                string
+	}{
+		{name: "protected default", config: "default_env='prod'\n[env.prod]\nprotected=true\n", wantErr: "protected environment"},
+		{name: "protected default dry run", config: "default_env='prod'\n[env.prod]\nprotected=true\n", dry: true, wantErr: "protected environment"},
+		{name: "protected only environment", config: "[env.prod]\nprotected=true\n", dry: true, wantErr: "protected environment"},
+		{name: "yes needs CI", config: "[env.prod]\nprotected=true\n", dry: true, yes: true, wantErr: "protected environment"},
+		{name: "CI confirmation", config: "[env.prod]\nprotected=true\n", dry: true, yes: true, ci: true},
+		{name: "unprotected default", config: "default_env='dev'\n[env.dev]\nprotected=false\n", dry: true},
+		{name: "ambiguous environments", config: "[env.dev]\n[env.prod]\n", dry: true, wantErr: "could not resolve environment"},
+		{name: "ambiguous up", config: "[env.dev]\n[env.prod]\n", sub: "up", dry: true, wantErr: "could not resolve environment"},
+		{name: "local database", dry: true},
+		{name: "unknown local environment", env: "prod", dry: true, wantErr: "could not resolve environment"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "spinup.toml"), []byte(tc.config+"\n[app]\nname='todo'\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			sub := tc.sub
+			if sub == "" {
+				sub = "down"
+			}
+			fake := &run.Fake{}
+			var out bytes.Buffer
+			err := Migrate(context.Background(), Options{Dir: root, Sub: sub, Env: tc.env, IKnow: true, DryRun: tc.dry, Yes: tc.yes, CI: tc.ci, Out: &out}, fake)
+			switch {
+			case tc.wantErr != "":
+				if err == nil || !strings.Contains(errorText(err), tc.wantErr) || !strings.Contains(errorText(err), "Try:") {
+					t.Fatalf("error=%v, want %q with Try line", err, tc.wantErr)
+				}
+				if out.Len() != 0 {
+					t.Fatalf("refused migration printed a command: %s", out.String())
+				}
+			case err != nil:
+				t.Fatal(err)
+			case !strings.Contains(out.String(), "go run ./cmd/api migrate "+sub):
+				t.Fatalf("missing dry-run command: %s", out.String())
+			}
+			if len(fake.Calls()) != 0 {
+				t.Fatal("ran guarded or dry-run command")
+			}
+		})
+	}
+}
+
+func TestMigrateProcessErrors(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		startErr error
+		wantWhy  string
+	}{
+		{name: "nonzero exit", wantWhy: "go run ./cmd/api migrate up exited with status 1"},
+		{name: "cannot start", startErr: &run.NotFoundError{Name: "go"}, wantWhy: (&run.NotFoundError{Name: "go"}).Error()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "spinup.toml"), []byte("[app]\nname='todo'\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			fake := &run.Fake{}
+			expect := fake.Expect("go", "run", "./cmd/api", "migrate", "up")
+			if tc.startErr != nil {
+				expect.Fail(tc.startErr)
+			} else {
+				expect.Return("", "migration failed: unique diagnostic\n", 1)
+			}
+			var out, stderr bytes.Buffer
+			err := Migrate(context.Background(), Options{Dir: root, Out: &out, ErrOut: &stderr}, fake)
+			var ue *ui.Error
+			if !errors.As(err, &ue) || ue.Why != tc.wantWhy {
+				t.Fatalf("error=%v, want Why=%q", err, tc.wantWhy)
+			}
+			if tc.startErr == nil {
+				if strings.Count(stderr.String()+errorText(err), "unique diagnostic") != 1 || strings.Count(errorText(err), "Try:") != 1 {
+					t.Fatalf("duplicate output or guidance: %s\n%s", stderr.String(), errorText(err))
+				}
+			}
+			fake.AssertDone(t)
+		})
+	}
+}
