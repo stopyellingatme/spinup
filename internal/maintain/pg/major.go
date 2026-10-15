@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/deploy"
 )
 
@@ -25,6 +26,10 @@ done`
 
 func (u *upgrade) major(ctx context.Context) error {
 	image, err := targetImage(u.current.major, u.o.To)
+	if err != nil {
+		return err
+	}
+	backupConfig, err := u.majorBackupConfig()
 	if err != nil {
 		return err
 	}
@@ -131,8 +136,20 @@ exec docker volume create "$1"`
 	if _, err = u.run(ctx, u.base("build", "postgres")...); err != nil {
 		return err
 	}
+	if backupConfig != nil {
+		if err = u.vm.Upload(ctx, backupConfig, backup.RemoteConfigPath(u.cfg.App.Name), 0600); err != nil {
+			return failure("write pgBackRest configuration for the new major", err)
+		}
+	}
 	if _, err = u.run(ctx, u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...); err != nil {
 		return err
+	}
+	if backupConfig != nil {
+		fmt.Fprintln(u.o.Out, "Upgrade the pgBackRest stanza for the new PostgreSQL cluster")
+		if _, err = u.run(ctx, u.base(backup.Command(u.cfg.App.Name, "stanza-upgrade")[4:]...)...); err != nil {
+			return failure("upgrade pgBackRest stanza (WAL archiving requires repair)", err)
+		}
+		fmt.Fprintf(u.o.ErrOut, "WARNING: Take a new full backup after the repository changes below: spinup backup now --env %s --type full\n", u.env.Name)
 	}
 	fmt.Fprintln(u.o.Out, "Run migrate with the live release")
 	if _, err = u.run(ctx, u.color("--profile", "migrate", "run", "--rm", "-T", "migrate")...); err != nil {

@@ -14,7 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/deploy"
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 	"github.com/stopyellingatme/spinup/internal/ui"
@@ -95,10 +98,9 @@ func fixture(t *testing.T, major bool) (*upgrade, *remote.Fake, *bytes.Buffer) {
 }
 func expectBackup(f *remote.Fake) {
 	f.Expect("sh", "-eu", "-c").Return("512\n", "", 0)
-	f.Expect("sh", "-ec").Return("", "", 0)
 	f.Expect("mkdir", "-p", "/opt/demo/backups/metrics")
 	f.Expect("chmod", "0755", "/opt/demo/backups/metrics")
-	f.ExpectUpload("/opt/demo/backups/metrics/backup.prom")
+	f.Expect("flock", "/opt/demo/backups/metrics/.lock", "sh", "-ec")
 }
 func expectRecovery(u *upgrade, f *remote.Fake) {
 	if u.o.Major {
@@ -106,10 +108,17 @@ func expectRecovery(u *upgrade, f *remote.Fake) {
 	} else {
 		f.Expect("mkdir", "-m", "0700", "-p", u.operationDir())
 	}
-	for _, file := range append(append([]string{}, u.files...), u.dir+"/Dockerfile.postgres", u.dir+"/.env") {
+	files := append(append([]string{}, u.files...), u.dir+"/Dockerfile.postgres", u.dir+"/.env")
+	if u.o.Major && u.usesPGBackRest() {
+		files = append(files, backup.RemoteConfigPath(u.cfg.App.Name))
+	}
+	for _, file := range files {
 		f.Expect("cp", "--", file, u.operationDir()+"/"+filepath.Base(file))
 	}
 	f.ExpectUpload(u.operationDir() + "/rollback.sh")
+	if !u.o.Major {
+		f.Expect("sh", "-ec")
+	}
 	f.Expect("docker", "create", "--name", "demo-pg-recovery-17-10")
 	if u.o.Major {
 		f.ExpectUpload(u.operationDir() + "/state.json")
@@ -183,35 +192,61 @@ func expectMajorUntilVerify(u *upgrade, f *remote.Fake, restored string) {
 }
 func TestMajorOrderAndMismatch(t *testing.T) {
 	t.Parallel()
-	for _, mismatch := range []bool{false, true} {
-		t.Run(strconv.FormatBool(mismatch), func(t *testing.T) {
+	for _, tt := range []struct {
+		name, backend                   string
+		mismatch, stanzaFail, noBackups bool
+	}{
+		{name: "pgbackrest", backend: "pgbackrest"},
+		{name: "default backend"},
+		{name: "pgdump", backend: "pgdump"},
+		{name: "no backups module", noBackups: true},
+		{name: "stanza failure", stanzaFail: true},
+		{name: "counts mismatch", mismatch: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			u, f, out := fixture(t, true)
-			// Major upgrades must use pgdump even when the configured backend is pgBackRest.
-			u.cfg.Backups.Backend = "pgbackrest"
+			// Major upgrades must dump even when the configured backend is pgBackRest.
+			u.cfg.Backups.Backend = tt.backend
+			if tt.noBackups {
+				u.cfg.Modules = []string{"api", "deploy"}
+			}
+			writePGFile(t, u.root, backup.ConfigPath, "[global]\nrepo1-retention-full=4\n[demo]\npg1-path=/var/lib/postgresql/data/pgdata\n")
 			report := counts
-			if mismatch {
+			if tt.mismatch {
 				report = strings.Replace(counts, "42", "41", 1)
 			}
 			expectMajorUntilVerify(u, f, report)
 			var urls []string
-			if !mismatch {
+			if !tt.mismatch {
 				f.Expect("docker", "stop", "demo-pg-upgrade-18")
 				f.Expect(u.base("stop", "postgres")...)
 				expectUpdate(u, f)
 				f.Expect(u.base("build", "postgres")...)
-				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...)
-				f.Expect(u.color("--profile", "migrate", "run", "--rm", "-T", "migrate")...)
-				f.Expect(u.color("up", "-d", "--no-deps", "--wait", "api")...)
-				u.d.HTTPGet = func(_ context.Context, url string) (int, []byte, error) {
-					urls = append(urls, url)
-					return 200, []byte(`{"version":"abcdef123456"}`), nil
+				if u.usesPGBackRest() {
+					f.ExpectUpload(backup.RemoteConfigPath("demo"))
 				}
-				f.ExpectUpload(u.operationDir() + "/state.json")
+				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...)
+				if u.usesPGBackRest() {
+					e := f.Expect(u.base(backup.Command("demo", "stanza-upgrade")[4:]...)...)
+					if tt.stanzaFail {
+						e.Return("", "stanza mismatch", 1)
+					}
+				}
+				if !tt.stanzaFail {
+					f.Expect(u.color("--profile", "migrate", "run", "--rm", "-T", "migrate")...)
+					f.Expect(u.color("up", "-d", "--no-deps", "--wait", "api")...)
+					u.d.HTTPGet = func(_ context.Context, url string) (int, []byte, error) {
+						urls = append(urls, url)
+						return 200, []byte(`{"version":"abcdef123456"}`), nil
+					}
+					f.ExpectUpload(u.operationDir() + "/state.json")
+				}
 			}
 			f.Expect("docker", "rm", "-f", "demo-pg-upgrade-18")
 			err := u.major(context.Background())
-			if mismatch {
+			switch {
+			case tt.mismatch:
 				if err == nil || !strings.Contains(err.Error(), "counts differ") {
 					t.Fatalf("got %v", err)
 				}
@@ -220,7 +255,19 @@ func TestMajorOrderAndMismatch(t *testing.T) {
 						t.Fatal("swap started on mismatch")
 					}
 				}
-			} else {
+			case tt.stanzaFail:
+				if err == nil || !strings.Contains(err.Error(), "WAL archiving requires repair") || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("got %v", err)
+				}
+				if strings.Contains(out.String(), "PostgreSQL now runs") || len(urls) > 0 {
+					t.Fatal(out.String())
+				}
+				for _, upload := range f.Uploads() {
+					if strings.HasSuffix(upload.Path, "/state.json") && bytes.Contains(upload.Data, []byte(`"complete":true`)) {
+						t.Fatal("marked a broken stanza complete")
+					}
+				}
+			default:
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -228,13 +275,77 @@ func TestMajorOrderAndMismatch(t *testing.T) {
 					t.Fatal(urls)
 				}
 				assertCompose(t, u, f, true)
+				if u.usesPGBackRest() && !strings.Contains(out.String(), "WARNING: Take a new full backup") {
+					t.Fatal(out.String())
+				}
 				if !strings.Contains(out.String(), "answers.db_version") || !strings.Contains(out.String(), "only after these repository changes") {
 					t.Fatal(out.String())
 				}
 			}
 			assertRecovery(t, u, f)
 			f.AssertDone(t)
+			if !tt.mismatch && u.usesPGBackRest() {
+				for _, upload := range f.Uploads() {
+					if upload.Path == backup.RemoteConfigPath("demo") {
+						if !bytes.Contains(upload.Data, []byte("pg1-path=/var/lib/postgresql/18/docker")) || upload.Mode != 0600 {
+							t.Fatalf("config: %+v", upload)
+						}
+					}
+				}
+				for _, c := range f.Calls() {
+					if slices.Contains(c.Argv, "stanza-upgrade") {
+						assertStanzaShell(t, c.Argv, tt.stanzaFail)
+					}
+				}
+			}
 		})
+	}
+}
+
+// assertStanzaShell executes the VM shell with fake container tools and secrets.
+func assertStanzaShell(t *testing.T, argv []string, fail bool) {
+	t.Helper()
+	dir := t.TempDir()
+	secret := "test key with ' quotes and $dollars"
+	writePGFile(t, dir, "secrets/PGBACKREST_REPO1_S3_KEY_SECRET", secret)
+	writePGFile(t, dir, "docker", `#!/bin/sh
+set -eu
+while [ "$1" != exec ]; do shift; done
+shift
+[ "$1" = -T ]; shift
+[ "$1" = postgres ]; shift
+exec "$@"
+`)
+	writePGFile(t, dir, "pgbackrest", `#!/bin/sh
+set -eu
+[ "$#" = 2 ]
+[ "$1" = --stanza=demo ]
+[ "$2" = stanza-upgrade ]
+[ "$PGBACKREST_REPO1_S3_KEY_SECRET" = "$EXPECTED_SECRET" ]
+exit "$BACKREST_EXIT"
+`)
+	for _, name := range []string{"docker", "pgbackrest"} {
+		if err := os.Chmod(filepath.Join(dir, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	args := slices.Clone(argv[1:])
+	for i := range args {
+		args[i] = strings.ReplaceAll(args[i], "/run/secrets/", filepath.Join(dir, "secrets")+"/")
+	}
+	exit := "0"
+	if fail {
+		exit = "23"
+	}
+	_, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: argv[0], Args: args, Env: []string{"PATH=" + dir + ":" + os.Getenv("PATH"), "EXPECTED_SECRET=" + secret, "BACKREST_EXIT=" + exit}})
+	if (err != nil) != fail {
+		t.Fatalf("stanza shell: %v", err)
+	}
+	if fail {
+		var e *runexec.ExitError
+		if !errors.As(err, &e) || e.Code != 23 {
+			t.Fatalf("lost pgbackrest failure: %v", err)
+		}
 	}
 }
 func assertRecovery(t *testing.T, u *upgrade, f *remote.Fake) {
@@ -371,6 +482,7 @@ func TestCleanup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			u, f, _ := fixture(t, true)
+			writeCleanupRepo(t, u, "18", "demo_pgdata_18", true)
 			u.o.Cleanup = true
 			u.o.To = 0
 			state := upgradeState{OldVolume: "demo_postgres_data", NewVolume: "demo_pgdata_18", Anchor: "demo-pg-recovery-17-10", Complete: tt.complete}
@@ -539,6 +651,142 @@ func TestSmokeNormalizesPublicOrigin(t *testing.T) {
 	}
 	if err := u.smoke(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+	f.AssertDone(t)
+}
+
+func writePGFile(t *testing.T, root, name, text string) {
+	t.Helper()
+	path := filepath.Join(root, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(text), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+func writeCleanupRepo(t *testing.T, u *upgrade, major, volume string, external bool) {
+	t.Helper()
+	lock := manifest.New()
+	lock.Answers["db_version"] = major
+	if err := lock.Save(filepath.Join(u.root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	writePGFile(t, u.root, "deploy/compose.edge.yml", "volumes:\n  postgres_data:\n    external: "+strconv.FormatBool(external)+"\n    name: "+volume+"\n")
+}
+func TestCleanupRequiresRepositorySwap(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, major, volume string
+		external            bool
+		missing             string
+	}{
+		{"old answer", "17", "demo_pgdata_18", true, "answers.db_version"},
+		{"old volume", "18", "demo_postgres_data", true, "volumes.postgres_data"},
+		{"internal volume", "18", "demo_pgdata_18", false, "volumes.postgres_data"},
+		{"missing files", "", "", false, "spinup.lock"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			u, f, _ := fixture(t, true)
+			if tt.major != "" {
+				writeCleanupRepo(t, u, tt.major, tt.volume, tt.external)
+			}
+			state := upgradeState{OldVolume: "demo_postgres_data", NewVolume: "demo_pgdata_18", Anchor: "demo-pg-recovery-17-10", Complete: true}
+			data, _ := json.Marshal(state)
+			f.Expect("cat", u.operationDir()+"/state.json").Return(string(data), "", 0)
+			u.live.Mounts[0].Name = state.NewVolume
+			expectInspect(u, f, "18.6\n")
+			err := u.cleanup(context.Background())
+			if err == nil || !strings.Contains(err.Error(), tt.missing) || !strings.Contains(err.Error(), "Try:") {
+				t.Fatalf("got %v", err)
+			}
+			for _, c := range f.Calls() {
+				if slices.Contains(c.Argv, "rm") {
+					t.Fatalf("cleanup removed data: %v", c.Argv)
+				}
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+func TestMinorRecoveryCanRetry(t *testing.T) {
+	t.Parallel()
+	u, f, _ := fixture(t, false)
+	expectRecovery(u, f)
+	if err := u.saveRecovery(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	f.AssertDone(t)
+	dir := t.TempDir()
+	writePGFile(t, dir, "docker", `#!/bin/sh
+set -eu
+case "$1" in
+ container) test -f "$ANCHOR" ;;
+ rm) test "$2" = -f; test "$#" = 3; rm "$ANCHOR" ;;
+ create) test ! -f "$ANCHOR"; printf '%s\n' "$*" > "$ANCHOR" ;;
+ *) exit 1 ;;
+esac
+`)
+	if err := os.Chmod(filepath.Join(dir, "docker"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{"PATH=" + dir + ":" + os.Getenv("PATH"), "ANCHOR=" + filepath.Join(dir, "anchor")}
+	for range 2 {
+		for _, c := range f.Calls() {
+			if c.Argv[0] != "sh" && c.Argv[0] != "docker" {
+				continue
+			}
+			_, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: c.Argv[0], Args: c.Argv[1:], Env: env})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "anchor"))
+	if err != nil || !strings.Contains(string(data), u.live.Image) {
+		t.Fatalf("anchor %s, %v", data, err)
+	}
+}
+
+func TestMajorBackupConfig(t *testing.T) {
+	t.Parallel()
+	for _, major := range []int{16, 17, 18} {
+		t.Run(strconv.Itoa(major), func(t *testing.T) {
+			t.Parallel()
+			u, _, _ := fixture(t, true)
+			u.o.To = major
+			u.cfg.Backups.Backend = ""
+			u.cfg.Backups.Retention = "7"
+			config := "[global]\nrepo1-path=/demo\nrepo1-retention-full=4\n[demo]\npg1-path=/old/path\npg1-user=app\n[other]\npg1-path=/other/path\n"
+			writePGFile(t, u.root, backup.ConfigPath, config)
+			data, err := u.majorBackupConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := "/var/lib/postgresql/data/pgdata"
+			if major == 18 {
+				path = "/var/lib/postgresql/18/docker"
+			}
+			want := strings.Replace(strings.Replace(config, "/old/path", path, 1), "full=4", "full=7", 1)
+			if string(data) != want {
+				t.Fatalf("got %s, want %s", data, want)
+			}
+			local, err := os.ReadFile(filepath.Join(u.root, backup.ConfigPath))
+			if err != nil || string(local) != config {
+				t.Fatalf("repository changed: %s, %v", local, err)
+			}
+		})
+	}
+}
+func TestMajorRefusesMissingBackupPathBeforeDowntime(t *testing.T) {
+	t.Parallel()
+	u, f, _ := fixture(t, true)
+	u.cfg.Backups.Backend = "pgbackrest"
+	writePGFile(t, u.root, backup.ConfigPath, "[other]\npg1-path=/other/path\n")
+	err := u.major(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "pg1-path") || len(f.Calls()) != 0 {
+		t.Fatalf("got %v, calls %v", err, f.Calls())
 	}
 	f.AssertDone(t)
 }

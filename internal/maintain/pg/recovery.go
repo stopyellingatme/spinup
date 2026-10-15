@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -63,6 +64,9 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	}
 	script.WriteString(shell(u.base("stop", "postgres")...) + "\n")
 	files := append(append([]string{}, u.files...), u.dir+"/Dockerfile.postgres", u.dir+"/.env")
+	if u.o.Major && u.usesPGBackRest() {
+		files = append(files, backup.RemoteConfigPath(u.cfg.App.Name))
+	}
 	for _, file := range files {
 		saved := dir + "/" + filepath.Base(file)
 		if _, err := u.run(ctx, "cp", "--", file, saved); err != nil {
@@ -81,6 +85,13 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	u.recovery = u.recoveryCommand()
 	fmt.Fprintf(u.o.Out, "Recovery command: %s\n", u.recovery)
 	anchor := fmt.Sprintf("%s-pg-recovery-%d-%d", u.cfg.App.Name, u.current.major, u.current.minor)
+	if !u.o.Major {
+		// Without -v: a retry must retain every data volume.
+		const removeAnchor = `if docker container inspect "$1" >/dev/null 2>&1; then docker rm -f "$1"; fi`
+		if _, err := u.run(ctx, "sh", "-ec", removeAnchor, "pg-recovery", anchor); err != nil {
+			return err
+		}
+	}
 	args = []string{"docker", "create", "--name", anchor, "--entrypoint", "/bin/true"}
 	if oldVolume != "" {
 		args = append(args, "--mount", "type=volume,src="+oldVolume+",dst=/old,readonly")
@@ -123,6 +134,9 @@ func (u *upgrade) cleanup(ctx context.Context) error {
 	}
 	if u.volume() != s.NewVolume {
 		return failure("remove old volume", errors.New("the active PostgreSQL volume does not match the completed upgrade"))
+	}
+	if err = u.checkRepositorySwap(s.NewVolume); err != nil {
+		return err
 	}
 	fmt.Fprintf(u.o.Out, "Remove the retained old volume %s\n", s.OldVolume)
 	// Without -v: removing the anchor must never remove a data volume.

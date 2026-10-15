@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
 )
 
@@ -106,4 +110,44 @@ func (u *upgrade) repositoryChange() {
 spinup.toml has no db_version setting. No command changes this answer directly. These are manual steps.
 The VM swap survives the next spinup deploy only after these repository changes.
 `, fmt.Sprint(u.o.To), u.cfg.App.Name, u.o.To)
+	if u.usesPGBackRest() {
+		fmt.Fprintln(u.o.Out, "For pgBackRest, render and commit its configuration before the full backup:")
+		fmt.Fprintln(u.o.Out, "   spinup restore deploy/pgbackrest/pgbackrest.conf --force")
+	}
+}
+
+func (u *upgrade) checkRepositorySwap(volume string) error {
+	lock, err := manifest.Load(filepath.Join(u.root, "spinup.lock"))
+	if err != nil {
+		return failure("check repository before cleanup", err)
+	}
+	major := strconv.Itoa(u.current.major)
+	var missing []string
+	if lock.Answers["db_version"] != major {
+		missing = append(missing, fmt.Sprintf("spinup.lock answers.db_version must be %q", major))
+	}
+	if volume != u.cfg.App.Name+"_pgdata_"+major {
+		missing = append(missing, "the active PostgreSQL major must match the completed swap volume")
+	}
+	data, err := os.ReadFile(filepath.Join(u.root, "deploy/compose.edge.yml"))
+	if err != nil {
+		return failure("check deploy/compose.edge.yml before cleanup", err)
+	}
+	var doc struct {
+		Volumes map[string]struct {
+			External bool   `yaml:"external"`
+			Name     string `yaml:"name"`
+		} `yaml:"volumes"`
+	}
+	if err = yaml.Unmarshal(data, &doc); err != nil {
+		return failure("parse deploy/compose.edge.yml before cleanup", err)
+	}
+	pg := doc.Volumes["postgres_data"]
+	if !pg.External || pg.Name != volume {
+		missing = append(missing, fmt.Sprintf("deploy/compose.edge.yml volumes.postgres_data must have external: true and name: %s", volume))
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("cleanup refused: %s\nTry: complete and commit the repository changes from pg-major-upgrade before --cleanup", strings.Join(missing, "\n"))
+	}
+	return nil
 }

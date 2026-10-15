@@ -2,8 +2,11 @@ package pg
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 
+	"github.com/stopyellingatme/spinup/internal/backup"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
@@ -27,4 +30,44 @@ func (r releaseRunner) Run(ctx context.Context, c remote.Cmd) (runexec.Result, e
 		c.Argv = append(args, c.Argv[4:]...)
 	}
 	return r.Runner.Run(ctx, c)
+}
+
+func (u *upgrade) usesPGBackRest() bool {
+	return slices.Contains(u.cfg.Modules, "backups") && (u.cfg.Backups.Backend == "" || u.cfg.Backups.Backend == "pgbackrest")
+}
+
+// majorBackupConfig preserves repository options and updates the app's data path.
+func (u *upgrade) majorBackupConfig() ([]byte, error) {
+	if !u.usesPGBackRest() {
+		return nil, nil
+	}
+	data, err := backup.ReadConfig(u.root)
+	if err != nil {
+		return nil, err
+	}
+	retention, err := backup.Retention(u.cfg)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	stanza, found := "", false
+	for i, line := range lines {
+		text := strings.TrimSpace(line)
+		if strings.HasPrefix(text, "[") && strings.HasSuffix(text, "]") {
+			stanza = text
+		}
+		key, _, ok := strings.Cut(text, "=")
+		if stanza == "["+u.cfg.App.Name+"]" && ok && strings.TrimSpace(key) == "pg1-path" {
+			path := "/var/lib/postgresql/data/pgdata"
+			if u.o.To == 18 {
+				path = "/var/lib/postgresql/18/docker"
+			}
+			lines[i] = "pg1-path=" + path
+			found = true
+		}
+	}
+	if !found {
+		return nil, failure("prepare pgBackRest configuration", errors.New("the app stanza has no pg1-path in "+backup.ConfigPath))
+	}
+	return backup.WithRetention([]byte(strings.Join(lines, "\n")), retention), nil
 }
