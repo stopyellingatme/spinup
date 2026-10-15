@@ -8,6 +8,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/backup"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -33,7 +34,7 @@ func (r releaseRunner) Run(ctx context.Context, c remote.Cmd) (runexec.Result, e
 }
 
 func (u *upgrade) usesPGBackRest() bool {
-	return slices.Contains(u.cfg.Modules, "backups") && (u.cfg.Backups.Backend == "" || u.cfg.Backups.Backend == "pgbackrest")
+	return modules.Enabled(u.cfg, "backups") && (u.cfg.Backups.Backend == "" || u.cfg.Backups.Backend == "pgbackrest")
 }
 
 // majorBackupConfig preserves repository options and updates the app's data path.

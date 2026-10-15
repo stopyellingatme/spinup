@@ -1,0 +1,84 @@
+# Keep this command test offline. Tool shims record the phase commands.
+# Package tests exercise the planner, Git worktrees, lock, conflicts, and recovery.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+env MODULE_TOOL_LOG=$WORK/tool-calls.txt
+mkversion 0.0.1
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+
+exec spinup new demo --modules ci,deploy --module example.com/demo --non-interactive
+cd demo
+exec spinup module list
+stdout 'monitoring +off +deploy'
+exec spinup module list --json
+stdout '"name":"monitoring"'
+stdout '"enabled":false'
+
+# Unknown modules and invalid answers fail before a branch or state exists.
+! exec spinup module add bogus --yes --non-interactive
+stderr 'unknown module'
+stderr 'Try: spinup module list'
+! exists .spinup/upgrade.json
+! exec spinup module add monitoring --monitoring-profile invalid --yes --non-interactive
+stderr 'Try: supply a valid --monitoring-profile value'
+! exists .spinup/upgrade.json
+
+# The main checkout stays unchanged. A newer template version remains unused.
+exec spinup module add monitoring --monitoring-profile lite --yes --non-interactive
+stdout 'monitoring/compose.monitoring.yml'
+stdout 'git merge spinup/module-monitoring'
+exists .spinup/upgrade/0.0.0-dev/monitoring/compose.monitoring.yml
+! exists monitoring/compose.monitoring.yml
+! exists .spinup/upgrade.json
+grep '^modules = .*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
+! grep '^modules = .*monitoring' spinup.toml
+grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep '"template_version": "0.0.0-dev"' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep 'monitoring/files/monitoring/compose.monitoring.yml.tmpl' .spinup/upgrade/0.0.0-dev/spinup.lock
+exec git status --porcelain
+! stdout .
+exec git show spinup/module-monitoring:monitoring/compose.monitoring.yml
+stdout 'services:'
+exec git show spinup/module-monitoring:spinup.toml
+stdout '^modules = .*monitoring'
+grep '^go mod edit -json$' $MODULE_TOOL_LOG
+grep '^go build ./...' $MODULE_TOOL_LOG
+grep '^go vet ./...' $MODULE_TOOL_LOG
+grep '^go test ./...' $MODULE_TOOL_LOG
+grep '^pnpm install --lockfile-only' $MODULE_TOOL_LOG
+
+# Merge the reviewed result. Repeating an enabled module creates no new worktree.
+exec git merge spinup/module-monitoring
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add monitoring --yes --non-interactive
+stdout 'Modules are already enabled.'
+exec spinup module list
+stdout 'monitoring +on +deploy'
+
+# Requirements are added automatically. Web modules refuse an API-only app.
+cd $WORK
+exec spinup new apionly --api-only --modules ci --module example.com/apionly --non-interactive
+cd apionly
+! exec spinup module add auth --yes --non-interactive
+stderr 'API-only'
+stderr 'Try:'
+exec spinup module add monitoring --yes --non-interactive
+stdout 'Adding required modules: deploy'
+stdout 'git merge spinup/module-monitoring'
+grep '^modules = .*deploy.*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
+
+-- tools/go --
+#!/bin/sh
+printf 'go %s\n' "$*" >> "$MODULE_TOOL_LOG"
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+printf 'pnpm %s\n' "$*" >> "$MODULE_TOOL_LOG"
+exit 0

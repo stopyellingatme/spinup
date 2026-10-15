@@ -28,6 +28,7 @@ type runState struct {
 	Lock               *manifest.Lock `json:"lock"`
 	Plan               *Plan          `json:"plan,omitempty"`
 	Options            Options        `json:"options"`
+	Module             *moduleChange  `json:"module,omitempty"`
 	UI                 bool           `json:"ui,omitempty"`
 }
 
@@ -62,7 +63,14 @@ func (s *runState) validate(root string) error {
 		}
 	}
 	to := s.Chain[len(s.Chain)-1]
-	if s.Worktree != filepath.Join(root, ".spinup", "upgrade", to) || s.Branch != "spinup/upgrade-"+to {
+	branch := "spinup/upgrade-" + to
+	if s.Module != nil {
+		if !s.Module.valid() || len(s.Chain) != 1 {
+			return invalid()
+		}
+		branch = s.Module.branch()
+	}
+	if s.Worktree != filepath.Join(root, ".spinup", "upgrade", to) || s.Branch != branch {
 		return invalid()
 	}
 	switch s.Status {

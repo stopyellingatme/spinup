@@ -17,6 +17,36 @@ import (
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
+// PackSet selects the packs for one side of a render.
+// Nil Names uses the locked selection. Nil FS uses the version's pack filesystem.
+// FS can supply a combined filesystem of built-in and plugin packs.
+type PackSet struct {
+	// Names lists the packs in render order.
+	Names []string
+	// FS replaces the version's pack filesystem when supplied.
+	FS fs.FS
+}
+
+func (p PackSet) resolve(v *templates.Version, fallback []string) (*templates.Version, []string) {
+	names := p.Names
+	if names == nil {
+		names = fallback
+	}
+	if p.FS != nil && v != nil {
+		copy := *v
+		copy.Packs = p.FS
+		v = &copy
+	}
+	return v, names
+}
+
+func planPacks(p *PackSet, v *templates.Version, fallback []string) (*templates.Version, []string) {
+	if p == nil {
+		return v, fallback
+	}
+	return p.resolve(v, fallback)
+}
+
 // PlanInput contains the disk, lock, template versions, and policy for one step.
 type PlanInput struct {
 	// Root is the project directory whose files are read.
@@ -27,6 +57,8 @@ type PlanInput struct {
 	Old, New *templates.Version
 	// OldAnswers and NewAnswers are the render inputs for each version.
 	OldAnswers, NewAnswers map[string]any
+	// OldPacks and NewPacks select each side independently. Nil uses Lock.Packs.
+	OldPacks, NewPacks *PackSet
 	// Merger combines changed text without writing files.
 	Merger merge.Merger
 	// ForceManaged permits replacement of changed managed text.
@@ -47,18 +79,20 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 	if err := planContext(ctx); err != nil {
 		return nil, err
 	}
-	newer, err := Render(in.New, in.Lock.Packs, in.NewAnswers)
+	newVersion, newPacks := planPacks(in.NewPacks, in.New, in.Lock.Packs)
+	oldVersion, oldPacks := planPacks(in.OldPacks, in.Old, in.Lock.Packs)
+	newer, err := Render(newVersion, newPacks, in.NewAnswers)
 	if err != nil {
 		return nil, err
 	}
 	var older vfs.Plan
 	if in.Old != nil {
-		older, err = Render(in.Old, in.Lock.Packs, in.OldAnswers)
+		older, err = Render(oldVersion, oldPacks, in.OldAnswers)
 		if err != nil {
 			return nil, err
 		}
 	}
-	renames, err := RenamedFrom(in.New, in.Lock.Packs, in.NewAnswers)
+	renames, err := RenamedFrom(newVersion, newPacks, in.NewAnswers)
 	if err != nil {
 		return nil, err
 	}

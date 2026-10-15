@@ -12,14 +12,23 @@ import (
 
 // NextLock records NEW template content, preserving user edits for later upgrades.
 // It returns an independent lock and never modifies the old lock or the plan.
-func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[string]any) (*manifest.Lock, error) {
+// The optional target selects NEW packs and their filesystem. Omission keeps old.Packs.
+func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[string]any, target ...PackSet) (*manifest.Lock, error) {
 	if err := old.Validate(); err != nil {
 		return nil, err
 	}
 	if p == nil {
 		return nil, fmt.Errorf("build next lock: plan is nil\nTry: build an upgrade plan first")
 	}
-	rendered, err := Render(to, old.Packs, answers)
+	if len(target) > 1 {
+		return nil, fmt.Errorf("build next lock: multiple target pack sets\nTry: supply one target pack set")
+	}
+	selection := PackSet{}
+	if len(target) == 1 {
+		selection = target[0]
+	}
+	version, packs := selection.resolve(to, old.Packs)
+	rendered, err := Render(version, packs, answers)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +36,7 @@ func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[st
 	next.TemplateVersion = to.Version
 	next.FormatterGo = runtime.Version()
 	next.Answers = clonePlanAnswers(answers)
-	next.Packs = slices.Clone(old.Packs)
+	next.Packs = slices.Clone(packs)
 	next.Plugins = slices.Clone(old.Plugins)
 	next.AppliedMigrations = slices.Clone(old.AppliedMigrations)
 	next.Tombstones = slices.Clone(old.Tombstones)
