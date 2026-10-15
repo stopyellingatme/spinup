@@ -1,7 +1,11 @@
 package cli
 
 import (
+	"context"
+	"os"
+	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -24,5 +28,20 @@ func TestDevRejectsInvalidOptions(t *testing.T) {
 		if code == 0 || !strings.Contains(errOut, "Try:") {
 			t.Fatalf("%v: %d %s", args, code, errOut)
 		}
+	}
+}
+
+func TestDevContextHandlesSIGHUP(t *testing.T) {
+	original := notifyContext
+	t.Cleanup(func() { notifyContext = original })
+	var got []os.Signal
+	notifyContext = func(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		got = signals
+		return context.WithCancel(parent)
+	}
+	_, stop := devContext(context.Background())
+	stop()
+	if !reflect.DeepEqual(got, []os.Signal{syscall.SIGHUP}) {
+		t.Fatalf("signals = %v, want SIGHUP", got)
 	}
 }
