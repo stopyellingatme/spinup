@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
@@ -41,8 +42,27 @@ func BootstrapHost(ctx context.Context, r remote.Runner, app, key string, plan b
 	if _, err := r.Run(ctx, remote.Cmd{Argv: []string{"sudo", "-n", "true"}}); err != nil {
 		return nil, fmt.Errorf("bootstrap requires passwordless sudo: %w\nTry: connect as a user with passwordless sudo", err)
 	}
+	// Read the server-side connection port before sudo removes SSH_CONNECTION.
+	// This also covers ports selected through the user's SSH configuration.
+	connection, err := r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-ec", `printf '%s\n' "${SSH_CONNECTION-}"`}})
+	if err != nil {
+		return nil, fmt.Errorf("read SSH connection port: %w\nTry: check the remote SSH_CONNECTION environment", err)
+	}
+	fields := strings.Fields(string(connection.Stdout))
+	if len(fields) != 4 {
+		return nil, fmt.Errorf("read SSH connection port: SSH_CONNECTION must contain four fields\nTry: connect through SSH with SSH_CONNECTION available")
+	}
+	port, err := strconv.Atoi(fields[3])
+	if err != nil || port < 1 || port > 65535 {
+		return nil, fmt.Errorf("read SSH connection port: invalid server port\nTry: check the remote SSH_CONNECTION environment")
+	}
 	reports := make([]StepResult, 0)
 	for _, step := range bootstrapSteps(app, key) {
+		if step.name == "firewall" {
+			prefix := "connection_port=" + remote.Quote(strconv.Itoa(port)) + "\n"
+			step.check = prefix + step.check
+			step.apply = prefix + step.apply
+		}
 		// Tools such as systemctl use several exit codes for unmet conditions.
 		// Normalize probe failures while preserving SSH and sudo failures.
 		probe := "(\n" + step.check + "\n) || exit 1"
@@ -90,11 +110,14 @@ trap 'if [ "$ok" != true ]; then cp -p "$backup/main" /etc/ssh/sshd_config; if [
 fi
 /usr/sbin/sshd -t
 ` + sshEffective + "\nsystemctl reload ssh\nok=true\n"
-	firewallCheck := `command -v ufw >/dev/null || exit 1
+	firewallCheck := firewallSSHPorts + `command -v ufw >/dev/null || exit 1
 status=$(ufw status verbose)
 printf '%s\n' "$status" | grep -q '^Status: active$' || exit 1
 printf '%s\n' "$status" | grep -Fq 'Default: deny (incoming), allow (outgoing)' || exit 1
-for port in 22/tcp 80/tcp 443/tcp 443/udp; do
+for p in $ssh_ports; do
+ printf '%s\n' "$status" | grep -Eq "^$p/tcp[[:space:]]+ALLOW IN[[:space:]]+Anywhere" || exit 1
+done
+for port in 80/tcp 443/tcp 443/udp; do
  printf '%s\n' "$status" | grep -Eq "^$port[[:space:]]+ALLOW IN[[:space:]]+Anywhere" || exit 1
 done`
 	jail := "[sshd]\nenabled = true\nbackend = systemd\nmaxretry = 5\nbantime = 1h\n"
@@ -120,7 +143,7 @@ install -d -o deploy -g deploy -m 0700 /home/deploy/.ssh
 touch /home/deploy/.ssh/authorized_keys
 ` + "if ! grep -Fqx -- " + remote.Quote(key) + " /home/deploy/.ssh/authorized_keys; then printf '\\n%s\\n' " + remote.Quote(key) + " >> /home/deploy/.ssh/authorized_keys; fi\nchown deploy:deploy /home/deploy/.ssh/authorized_keys\nchmod 0600 /home/deploy/.ssh/authorized_keys"},
 		{"sshd", sshEffective, sshApply},
-		{"firewall", firewallCheck, "ufw default deny incoming\nufw default allow outgoing\nufw allow 22/tcp\nufw allow 80/tcp\nufw allow 443/tcp\nufw allow 443/udp\nufw --force enable"},
+		{"firewall", firewallCheck, firewallSSHPorts + "ufw default deny incoming\nufw default allow outgoing\nfor p in $ssh_ports; do ufw allow \"$p/tcp\" || exit 1; done\nufw allow 80/tcp\nufw allow 443/tcp\nufw allow 443/udp\nufw --force enable"},
 		{"fail2ban", fileCheck("/etc/fail2ban/jail.d/sshd.local", jail) + " && systemctl is-enabled --quiet fail2ban && systemctl is-active --quiet fail2ban", "mkdir -p /etc/fail2ban/jail.d\n" + writeFile("/etc/fail2ban/jail.d/sshd.local", jail) + "systemctl enable --now fail2ban\nsystemctl restart fail2ban"},
 		{"unattended-upgrades", fileCheck("/etc/apt/apt.conf.d/20auto-upgrades", upgrades) + " && systemctl is-enabled --quiet unattended-upgrades && systemctl is-active --quiet unattended-upgrades", writeFile("/etc/apt/apt.conf.d/20auto-upgrades", upgrades) + "systemctl enable --now unattended-upgrades\nsystemctl enable --now apt-daily-upgrade.timer"},
 		{"docker-repository", dockerRepositoryCheck, dockerRepositoryApply},
@@ -178,3 +201,15 @@ chmod 0644 "$config"
 dockerd --validate --config-file="$config"
 mv "$config" /etc/docker/daemon.json
 systemctl restart docker`
+
+// firewallSSHPorts discovers and validates every port before changing UFW.
+// Capture sshd output separately so a failed sshd cannot be hidden by awk.
+const firewallSSHPorts = `sshd_config=$(/usr/sbin/sshd -T) || exit 1
+ssh_ports=$(printf '%s\n' "$sshd_config" | awk '$1=="port"{print $2}')
+if [ -n "${connection_port:-}" ]; then ssh_ports="$ssh_ports $connection_port"; fi
+[ -n "$ssh_ports" ] || exit 1
+for p in $ssh_ports; do
+ case "$p" in ''|*[!0-9]*) exit 1 ;; esac
+ [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || exit 1
+done
+`

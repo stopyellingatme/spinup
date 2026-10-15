@@ -43,7 +43,11 @@ Plan mode requires SSH and sudo access but changes no host settings.
 Bootstrap installs the deploy user, the operator key, and the SSH settings.
 It disables root login, password authentication, and keyboard-interactive authentication.
 It validates the SSH configuration before reload and restores the previous files if validation fails.
-It permits ports 22, 80, and 443 through UFW, including UDP on port 443.
+
+Bootstrap permits every SSH port reported by `sshd -T` and the current SSH connection port through UFW.
+This includes the connection port selected by `spinup.toml`, `~/.ssh/config`, or `SPINUP_SSH_CONFIG`.
+It also permits TCP ports 80 and 443, and UDP port 443.
+Bootstrap stops before enabling UFW if it cannot determine valid SSH ports.
 It enables fail2ban and automatic security upgrades.
 
 Bootstrap installs Docker from its official apt repository with a verified signing key.
