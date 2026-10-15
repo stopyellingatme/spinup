@@ -71,6 +71,7 @@ func TestSelect(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name                    string
+		frontendMode            string
 		modules                 []string
 		names                   []string
 		flags                   map[string]any
@@ -85,6 +86,9 @@ func TestSelect(t *testing.T) {
 		{name: "unknown", names: []string{"bogus"}, wantError: "Try: spinup module list"},
 		{name: "core", names: []string{"web"}, wantError: "unknown module"},
 		{name: "web required", names: []string{"auth"}, wantError: "API-only"},
+		{name: "embed auth refused", frontendMode: "embed", names: []string{"auth"}, web: true, wantError: "cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules"},
+		{name: "embed jobs allowed", frontendMode: "embed", names: []string{"jobs"}, web: true, wantAdded: []string{"jobs"}},
+		{name: "node auth allowed", frontendMode: "node", names: []string{"auth"}, web: true, wantAdded: []string{"auth"}},
 		{name: "web available", names: []string{"auth"}, web: true, wantAdded: []string{"auth"}},
 		{name: "invalid profile", names: []string{"monitoring"}, flags: map[string]any{"monitoring_profile": "wrong"}, wantError: "--monitoring-profile"},
 		{name: "unselected flag", names: []string{"jobs"}, flags: map[string]any{"monitoring_profile": "full"}, wantError: "does not belong"},
@@ -99,6 +103,9 @@ func TestSelect(t *testing.T) {
 				lock.Packs = append(lock.Packs, "web")
 			}
 			lock.Answers = map[string]any{"app_name": "demo", "module": "example.com/demo", "modules": slices.Clone(tc.modules), "db_version": "18"}
+			if tc.frontendMode != "" {
+				lock.Answers["frontend_mode"] = tc.frontendMode
+			}
 			original := slices.Clone(lock.Packs)
 			prompt := &questionPrompt{}
 			got, err := Select(context.Background(), SelectOptions{Config: cfg, Lock: lock, FS: templates.Embedded(), Names: tc.names, Answers: tc.flags, Interactive: tc.interactive, Prompter: prompt})

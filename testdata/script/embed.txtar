@@ -1,5 +1,17 @@
 # Embed mode builds offline and serves the static build through kit app.
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+# Bun apps use Bun in the embedded image and the upgrade workflow.
+exec spinup new embeddedbun --module example.com/embeddedbun --frontend-mode embed --package-manager bun --modules ci --no-git --non-interactive
+grep 'RUN npm install --global bun@[0-9]' embeddedbun/deploy/Dockerfile.api
+grep 'COPY --from=web package.json bun.lock ./' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bun install --frozen-lockfile --ignore-scripts' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bunx --no-install svelte-kit sync && bun run build' embeddedbun/deploy/Dockerfile.api
+! grep 'pnpm|corepack' embeddedbun/deploy/Dockerfile.api
+grep 'npm install --global bun@[0-9]' embeddedbun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' embeddedbun/.github/workflows/upgrade-check.yml
+exec spinup new nodebun --module example.com/nodebun --package-manager bun --modules ci --no-git --non-interactive
+grep 'npm install --global bun@[0-9]' nodebun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' nodebun/.github/workflows/upgrade-check.yml
 exec spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
 cd embedded
 ! exists deploy/Dockerfile.web web/src/hooks.server.ts web/src/routes/+layout.server.ts

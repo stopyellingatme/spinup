@@ -69,6 +69,23 @@ stdout 'git merge spinup/module-monitoring'
 grep '^modules = .*deploy.*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
 grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
 
+# Embed mode refuses auth before creating a branch, worktree, or upgrade state.
+cd $WORK
+exec spinup new embedded --frontend-mode embed --modules ci --module example.com/embedded --non-interactive
+cd embedded
+cp spinup.lock $WORK/embed.lock
+cp spinup.toml $WORK/embed.toml
+! exec spinup module add auth --yes --non-interactive
+stderr 'cannot use auth in embed mode: its pages require SvelteKit form actions'
+stderr 'Try: use --frontend-mode node, or remove auth from --modules'
+! exists .spinup/upgrade.json .spinup/upgrade/0.0.0-dev
+exec git branch --list spinup/module-auth
+! stdout .
+exec git status --porcelain
+! stdout .
+cmp spinup.lock $WORK/embed.lock
+cmp spinup.toml $WORK/embed.toml
+
 -- tools/go --
 #!/bin/sh
 printf 'go %s\n' "$*" >> "$MODULE_TOOL_LOG"

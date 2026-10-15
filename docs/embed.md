@@ -44,7 +44,8 @@ Development continues to use Vite and its API proxy through `spinup dev`.
 
 Run `spinup build --image` to build only the API image.
 The command supplies `--build-context web=web` to Docker buildx.
-The Docker template builds the static app and embeds it in the API image.
+The Docker template builds the static app with the selected package manager.
+It embeds the static app in the API image.
 Deploy uses the same API image build.
 A local kit replace must be removed before an image build.
 
@@ -67,9 +68,11 @@ The handler permits inline bootstrap scripts in the CSP for the index.
 
 The API prefix, health endpoints, metrics, version, and internal endpoints never use the SPA fallback.
 The health endpoint is `/healthz`.
+Unknown reserved paths return 404 for every HTTP method.
 Missing assets under `/_app/` return 404.
 
 Embed mode refuses the auth module because its pages require SvelteKit form actions.
+This restriction applies to `spinup new` and `spinup module add auth`.
 It also refuses `g page --server` and the pages from `g resource`.
 Use `--api-only` with the resource generator to generate its API files.
 Use node mode when the app needs server pages or auth.
