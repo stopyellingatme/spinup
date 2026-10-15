@@ -43,10 +43,13 @@ Error: generator "alert" failed: alert "HighErrors" already exists
 ```
 
 The generator adds a rule to `monitoring/alerts/custom.yml`.
-When `promtool` is on `PATH`, the generator checks the file with `promtool check rules` and prints its output first.
 It keeps comments and existing rules.
 Use `--severity warning` or `--severity critical`.
 The default duration is `5m`.
+The generator always validates `--for` as a Prometheus duration.
+Use integer units in descending order, such as `1h30m`.
 
-When `promtool` is available, the generator runs `promtool check rules` after it writes the rule.
-When it is unavailable, the generator skips validation and prints a note.
+When `promtool` is on `PATH`, the generator validates a temporary copy before it returns the plan.
+If validation fails, the generator leaves the alert file unchanged.
+After writing, the generator repeats `promtool check rules` and prints its output.
+When `promtool` is unavailable, the generator skips the PromQL check and prints a note.

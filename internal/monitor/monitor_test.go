@@ -12,20 +12,16 @@ import (
 
 func TestReadCommands(t *testing.T) {
 	t.Parallel()
-	for _, tt := range []struct{ action, service, body, want string }{
-		{"logs", "loki", `{"status":"success","data":{"resultType":"streams","result":[{"values":[["1000000000","hello"]]}]}}`, "1970-01-01T00:00:01Z hello"},
-		{"alerts", "grafana", `[{"labels":{"alertname":"Down"},"status":{"state":"active"}}]`, "Down"},
-		{"trace", "tempo", `{"batches":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"api"}}]},"scopeSpans":[{"spans":[{"spanId":"a","name":"GET /","startTimeUnixNano":"0","endTimeUnixNano":"1000000"}]}]}]}`, "api GET / 1ms"},
+	for _, tt := range []struct{ action, body, want string }{
+		{"logs", `{"status":"success","data":{"resultType":"streams","result":[{"values":[["1000000000","hello"]]}]}}`, "1970-01-01T00:00:01Z hello"},
+		{"alerts", `[{"labels":{"alertname":"Down"},"status":{"state":"active"}}]`, "Down"},
+		{"trace", `{"batches":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"api"}}]},"scopeSpans":[{"spans":[{"spanId":"a","name":"GET /","startTimeUnixNano":"0","endTimeUnixNano":"1000000"}]}]}]}`, "api GET / 1ms"},
 	} {
 		t.Run(tt.action, func(t *testing.T) {
 			t.Parallel()
 			f := &remote.Fake{}
 			f.Expect("docker", "ps").Return("abc123\n", "", 0)
-			if tt.service == "grafana" {
-				f.Expect("sh", "-c").Return(tt.body, "", 0)
-			} else {
-				f.Expect("docker", "exec").Return(tt.body, "", 0)
-			}
+			f.Expect("sh", "-c").Return(tt.body, "", 0)
 			if tt.action == "alerts" {
 				f.Expect("docker", "ps").Return("abc123", "", 0)
 				f.Expect("sh", "-c").Return(`{"status":"success","data":{"groups":[{"rules":[{"name":"Slow","state":"pending"}]}]}}`, "", 0)

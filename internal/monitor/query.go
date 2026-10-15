@@ -30,7 +30,7 @@ func (c *client) logs(ctx context.Context, o Options) error {
 		}
 	}
 	now := c.now()
-	values := url.Values{"query": {query}, "start": {strconv.FormatInt(now.Add(-duration).UnixNano(), 10)}, "end": {strconv.FormatInt(now.UnixNano(), 10)}, "direction": {"forward"}, "limit": {"1000"}}
+	values := url.Values{"query": {query}, "start": {strconv.FormatInt(now.Add(-duration).UnixNano(), 10)}, "end": {strconv.FormatInt(now.UnixNano(), 10)}, "direction": {"backward"}, "limit": {"1000"}}
 	data, err := c.api(ctx, "loki", "GET", "/loki/api/v1/query_range?"+values.Encode(), nil)
 	if err != nil {
 		return err

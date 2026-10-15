@@ -174,14 +174,16 @@ printf '%s\n' 'The container needs curl or wget.' >&2
 exit 1`
 
 func (c *client) api(ctx context.Context, service, method, path string, body any) ([]byte, error) {
-	id, err := c.container(ctx, service)
+	if service == "loki" || service == "tempo" {
+		path = "/api/datasources/proxy/uid/" + service + path
+	}
+	id, err := c.container(ctx, "grafana")
 	if err != nil {
 		return nil, err
 	}
 	if id == "" {
 		return nil, failure("query "+service, fmt.Errorf("the container is not running"))
 	}
-	port := map[string]string{"grafana": "3000", "loki": "3100", "tempo": "3200"}[service]
 	payload := ""
 	if body != nil {
 		data, e := json.Marshal(body)
@@ -190,19 +192,13 @@ func (c *client) api(ctx context.Context, service, method, path string, body any
 		}
 		payload = string(data)
 	}
-	args := []string{"docker", "exec", id, "sh", "-c", httpScript, "spinup-http", "http://127.0.0.1:" + port + path, method, payload, "no"}
-	if service == "grafana" {
-		// Positional arguments preserve shell quoting for all user input.
-		script := `set -eu; { cat "$1"; printf '\n'; } | docker exec -i "$2" sh -c "$3" spinup-http "$4" "$5" "$6" yes`
-		args = []string{"sh", "-c", script, "spinup-grafana", "/opt/" + c.app + "/secrets/GRAFANA_ADMIN_PASSWORD", id, httpScript, "http://127.0.0.1:" + port + path, method, payload}
-	}
+	// Positional arguments preserve shell quoting for all user input.
+	script := `set -eu; { cat "$1"; printf '\n'; } | docker exec -i "$2" sh -c "$3" spinup-http "$4" "$5" "$6" yes`
+	args := []string{"sh", "-c", script, "spinup-grafana", "/opt/" + c.app + "/secrets/GRAFANA_ADMIN_PASSWORD", id, httpScript, "http://127.0.0.1:3000" + path, method, payload}
 	res, err := c.vm.Run(ctx, remote.Cmd{Argv: args, Timeout: 40 * time.Second})
 	if err != nil {
 		// Authenticated failures must not expose arbitrary server diagnostics.
-		if service == "grafana" {
-			return nil, failure("query Grafana", fmt.Errorf("the authenticated request failed"))
-		}
-		return nil, failure("query "+service, err)
+		return nil, failure("query "+service, fmt.Errorf("the authenticated request failed"))
 	}
 	return res.Stdout, nil
 }
