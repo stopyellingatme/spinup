@@ -1,0 +1,139 @@
+# The plan leaves the main checkout clean.
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+exec git status --porcelain
+! stdout .
+exec spinup upgrade --plan
+stdout 'Upgrade 0.0.0-dev -> 0.0.1'
+stdout 'upgrade-added.txt'
+stdout 'deploy/compose.dev.yml'
+exists .spinup/plan.json
+grep '"to": "0.0.1"' .spinup/plan.json
+! grep '"Data"' .spinup/plan.json
+exec git status --porcelain
+! stdout .
+
+# Competing edits stop only the upgrade worktree.
+exec sed 's/Package routes registers the application routes./Package routes registers my application routes./' api/internal/routes/routes.go
+cp stdout api/internal/routes/routes.go
+cp api/internal/routes/routes.go $WORK/resolved-routes.go
+exec git add api/internal/routes/routes.go
+exec git commit -m 'Edit route comment'
+exec sh -c 'spinup upgrade --yes --no-verify; test $? -eq 3'
+stderr 'api/internal/routes/routes.go'
+grep '^<<<<<<<' .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+exists .spinup/upgrade.json
+exec git status --porcelain
+! stdout .
+grep 'registers my application' api/internal/routes/routes.go
+! exec spinup upgrade --yes --no-verify
+stderr '--continue'
+exec sh -c 'spinup upgrade --continue; test $? -eq 3'
+stderr 'api/internal/routes/routes.go'
+cp $WORK/resolved-routes.go .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+exec spinup upgrade --continue --yes --no-verify
+stdout 'git merge spinup/upgrade-0.0.1'
+! exists .spinup/upgrade.json
+grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
+exec git log spinup/upgrade-0.0.1 --format=%s
+stdout 'spinup upgrade 0.0.0-dev -> 0.0.1'
+stdout 'spinup upgrade: lock 0.0.1'
+exists .spinup/upgrade/0.0.1/upgrade-added.txt
+grep '^# Updated development compose file.' .spinup/upgrade/0.0.1/deploy/compose.dev.yml
+! grep '^# Updated development compose file.' deploy/compose.dev.yml
+exec git status --porcelain
+! stdout .
+
+# An app without user edits upgrades without conflicts.
+cd $WORK
+exec spinup new clean --api-only --module example.com/clean --non-interactive
+cd clean
+exec spinup upgrade --yes --no-verify
+stdout 'git merge spinup/upgrade-0.0.1'
+! exists .spinup/upgrade.json
+exists .spinup/upgrade/0.0.1/upgrade-added.txt
+grep '^# Updated development compose file.' .spinup/upgrade/0.0.1/deploy/compose.dev.yml
+! grep '^# Updated development compose file.' deploy/compose.dev.yml
+exec git status --porcelain
+! stdout .
+
+# Abort removes both the upgrade worktree and its branch.
+cd $WORK
+exec spinup new aborted --api-only --module example.com/aborted --non-interactive
+cd aborted
+cp $WORK/resolved-routes.go api/internal/routes/routes.go
+exec git add api/internal/routes/routes.go
+exec git commit -m 'Edit route comment'
+exec sh -c 'spinup upgrade --yes --no-verify; test $? -eq 3'
+stderr 'api/internal/routes/routes.go'
+! exec spinup upgrade --abort
+stderr '--yes'
+exec spinup upgrade --abort --yes
+! exists .spinup/upgrade/0.0.1
+! exists .spinup/upgrade.json
+exec git branch --list spinup/upgrade-0.0.1
+! stdout .
+exec git status --porcelain
+! stdout .
+
+-- overlay/packs/api/files/api/internal/routes/routes.go.tmpl --
+// Package routes registers the upgraded application routes.
+package routes
+
+import (
+ "net/http"
+
+ "github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Deps contains the dependencies for route handlers.
+type Deps struct {
+ DB *pgxpool.Pool
+}
+
+// Register adds generated routes and application routes to mux.
+func Register(mux *http.ServeMux, d Deps) {
+ registerGenerated(mux, d)
+
+ // Add your application routes here. Generators never edit this file.
+}
+
+-- overlay/packs/api/files/deploy/compose.dev.yml.tmpl --
+# Updated development compose file.
+name: [[ .app_name ]]-dev
+
+services:
+  postgres:
+    image: [[ if eq .db_version "18" ]][[ image "postgres" ]][[ else if eq .db_version "17" ]][[ image "postgres-17" ]][[ else ]][[ image "postgres-16" ]][[ end ]]
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql[[ if ne .db_version "18" ]]/data[[ end ]]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  mailpit:
+    image: [[ image "mailpit" ]]
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  postgres_data:
+
+-- overlay/packs/base/files/upgrade-added.txt --
+Added by upgrade.
+
+-- overlay/packs/base/pack.d/upgrade.toml --
+[[files]]
+path = "upgrade-added.txt"
+source = "files/upgrade-added.txt"
+class = "managed"
