@@ -1,0 +1,25 @@
+# spinup plugin update
+
+Inspect and trust a plugin version
+
+## Use
+
+```text
+spinup plugin update <name> [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `-C, --dir` | `` | run in this project directory |
+| `--dry-run` | `false` | show changes without writing |
+| `--env` | `` | target environment |
+| `--json` | `false` | write JSON output |
+| `--no-color` | `false` | turn off color |
+| `--non-interactive` | `false` | never prompt |
+| `--offline` | `false` | never download template versions |
+| `--trust` | `false` | trust the displayed plugin source and hash |
+| `--verbose` | `false` | write extra detail |
+| `--version` | `` | new fixed git tag or path plugin version |
+| `-y, --yes` | `false` | answer yes to prompts |
