@@ -1,0 +1,2 @@
+name = "<%.Name%>"
+description = "Templates for <%.Name%>."

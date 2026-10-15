@@ -1,0 +1,13 @@
+GOOS ?= <%.GOOS%>
+GOARCH ?= <%.GOARCH%>
+export GOTOOLCHAIN := local
+export GOWORK := off
+
+.PHONY: build test
+
+build:
+	@mkdir -p bin
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -trimpath -ldflags='-s -w' -o bin/<%.Name%>_$(GOOS)_$(GOARCH) .
+
+test:
+	go test -race ./...

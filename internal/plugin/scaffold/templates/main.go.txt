@@ -1,0 +1,50 @@
+package main
+
+import (
+ "context"
+ "fmt"
+ "os"
+ "regexp"
+
+ "github.com/stopyellingatme/spinup/plugin-sdk/sdk"
+)
+
+var safeName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]{0,62}$`)
+
+type plugin struct{}
+
+// Handshake identifies the plugin and its capabilities.
+func (plugin) Handshake(context.Context) (sdk.HandshakeResult, error) {
+ return sdk.HandshakeResult{Name: "<%.Name%>", Version: "0.1.0", API: sdk.API, Capabilities: []string{sdk.CapabilityGenerator, sdk.CapabilityCheck}}, nil
+}
+
+// Describe lists the executable generators and checks.
+func (plugin) Describe(context.Context) (sdk.DescribeResult, error) {
+ return sdk.DescribeResult{
+  Generators: []sdk.Generator{{Name: "<%.Name%>-hello", Short: "Create a greeting", Usage: "<%.Name%>-hello <Name>", Args: []string{"Name"}}},
+  Checks: []sdk.Check{{Name: "<%.Name%>-ready", Title: "Check plugin readiness"}},
+ }, nil
+}
+
+// Plan returns proposed files without applying them.
+func (plugin) Plan(_ context.Context, p sdk.PlanParams) (sdk.PlanResult, error) {
+ if p.Generator != "<%.Name%>-hello" || len(p.Args) != 1 || !safeName.MatchString(p.Args[0]) {
+  return sdk.PlanResult{}, &sdk.Error{Code: sdk.InvalidParams, Message: "generate greeting: expected one name with letters, digits, underscores, or hyphens\nTry: spinup g <%.Name%>-hello sample"}
+ }
+ return sdk.PlanResult{Files: []sdk.File{{Path: "greetings/" + p.Args[0] + ".txt", Data: []byte("Hello, " + p.Args[0] + "!\n"), Class: "scaffold", Mode: 0644}}}, nil
+}
+
+// Check reports findings for the selected check.
+func (plugin) Check(_ context.Context, p sdk.CheckParams) (sdk.CheckResult, error) {
+ if p.Check != "<%.Name%>-ready" {
+  return sdk.CheckResult{}, &sdk.Error{Code: sdk.InvalidParams, Message: "unknown check\nTry: use <%.Name%>-ready"}
+ }
+ return sdk.CheckResult{Findings: []sdk.Finding{{Status: "ok", Message: "Plugin is ready"}}}, nil
+}
+
+func main() {
+ if err := sdk.Serve(plugin{}); err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+}

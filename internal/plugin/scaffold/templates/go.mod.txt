@@ -1,0 +1,8 @@
+module example.com/<%.Name%>
+
+go 1.26.0
+
+require github.com/stopyellingatme/spinup/plugin-sdk v0.0.0
+<%if .SDKPath%>
+replace github.com/stopyellingatme/spinup/plugin-sdk => <%quote .SDKPath%>
+<%end%>
