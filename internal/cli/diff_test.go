@@ -79,7 +79,7 @@ func TestMaintenanceCommands(t *testing.T) {
 	if len(lock.Tombstones) != 0 || lock.Files[managed].Hash == "" {
 		t.Fatal("restore did not update lock")
 	}
-	if err := os.WriteFile(filepath.Join(app, "api/cmd/api/main.go"), []byte("=======\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(app, "api/cmd/api/main.go"), []byte("<<<<<<< yours\nx\n=======\ny\n>>>>>>> template\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if got := runIn(4, "check", "--json"); !json.Valid([]byte(got)) || !strings.Contains(got, "conflict") {

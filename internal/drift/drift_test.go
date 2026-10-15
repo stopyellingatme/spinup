@@ -26,8 +26,10 @@ func TestConflictMarkers(t *testing.T) {
 		data string
 		want bool
 	}{
-		{"<<<<<<< ours\n", true}, {"=======\n", true}, {">>>>>>> theirs\n", true},
-		{" =======\n", false}, {"========\n", false}, {"normal\n", false}, {"=======\r\n", true},
+		{"<<<<<<< ours\nours\n=======\ntheirs\n>>>>>>> theirs\n", true},
+		{"<<<<<<< ours\nours\n||||||| base\nbase\n=======\ntheirs\n>>>>>>> theirs\n", true},
+		{"<<<<<<< ours\n", false}, {"=======\n", false}, {">>>>>>> theirs\n", false},
+		{"Title\n=======\n", false}, {" =======\n", false}, {"========\n", false}, {"normal\n", false},
 	} {
 		t.Run(tc.data, func(t *testing.T) {
 			t.Parallel()
@@ -86,6 +88,52 @@ func TestBehindAndUnavailable(t *testing.T) {
 	o.Source = testSource{err: fmt.Errorf("%w\nTry: spinup cache warm", templates.ErrVersionUnavailable)}
 	if err := Diff(context.Background(), o, nil, p); !errors.Is(err, templates.ErrVersionUnavailable) || !strings.HasSuffix(err.Error(), "Try: spinup cache warm") {
 		t.Fatalf("error=%v", err)
+	}
+}
+
+func TestCheckReportsUnavailableTemplateWithDrift(t *testing.T) {
+	t.Parallel()
+	o, _ := fixture(t)
+	if err := os.WriteFile(filepath.Join(o.Dir, "file.txt"), []byte("edited\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	o.JSON = true
+	o.Source = testSource{err: fmt.Errorf("%w\nTry: spinup cache warm", templates.ErrVersionUnavailable)}
+	var output bytes.Buffer
+	err := Check(context.Background(), o, false, ui.New(nil, &output, &output, ui.Options{}))
+	if ui.ExitCode(err) != ui.ExitDrift {
+		t.Fatalf("check=%v, output=%s", err, &output)
+	}
+	if !json.Valid(output.Bytes()) || !strings.Contains(output.String(), `"state": "template-unavailable"`) || !strings.Contains(output.String(), `"state": "drift"`) {
+		t.Fatalf("output=%s", &output)
+	}
+	output.Reset()
+	err = Check(context.Background(), o, true, ui.New(nil, &output, &output, ui.Options{}))
+	if ui.ExitCode(err) != ui.ExitDrift || !json.Valid(output.Bytes()) || strings.Contains(output.String(), "template-unavailable") || !strings.Contains(output.String(), `"state": "drift"`) {
+		t.Fatalf("allow-behind check=%v, output=%s", err, &output)
+	}
+}
+
+func TestCheckReportsNonRegularPathWithOtherDrift(t *testing.T) {
+	t.Parallel()
+	o, lock := fixture(t)
+	lock.Files["other.txt"] = manifest.FileEntry{Class: manifest.Managed, Template: "base/other.txt", Hash: manifest.Hash([]byte("original\n")), Mode: "0644"}
+	if err := lock.Save(filepath.Join(o.Dir, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(o.Dir, "other.txt"), []byte("edited\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(o.Dir, "file.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(o.Dir, "other.txt"), filepath.Join(o.Dir, "file.txt")); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	err := Check(context.Background(), o, true, ui.New(nil, &output, &output, ui.Options{}))
+	if ui.ExitCode(err) != ui.ExitDrift || !strings.Contains(output.String(), "not-regular") || !strings.Contains(output.String(), "managed file differs") {
+		t.Fatalf("check=%v, output=%s", err, &output)
 	}
 }
 

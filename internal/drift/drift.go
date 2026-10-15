@@ -202,35 +202,22 @@ func Check(ctx context.Context, o Options, allowBehind bool, out *ui.Printer) er
 	if err != nil {
 		problems = append(problems, Problem{Path: project.LockFile, State: "invalid-lock", Message: err.Error(), Try: "repair spinup.lock"})
 	} else {
-		app, err := renderApp(ctx, o, root, lock)
-		if err != nil {
-			return err
-		}
 		problems, err = inspect(root, lock)
 		if err != nil {
 			return err
 		}
 		if !allowBehind {
-			versions, err := app.source.Versions(ctx)
-			if err != nil {
-				return err
-			}
-			current, err := compat.ParseVersion(lock.TemplateVersion)
-			if err != nil {
-				return fmt.Errorf("cannot compare template version: %w\nTry: repair spinup.lock", err)
-			}
-			for i := len(versions) - 1; i >= 0; i-- {
-				v, err := compat.ParseVersion(versions[i])
+			source := o.Source
+			if source == nil {
+				source, err = store.Default(o.Version, o.Offline)
 				if err != nil {
 					return err
 				}
-				if v.Compare(current) > 0 {
-					if _, err := app.source.Load(ctx, versions[i]); err != nil {
-						return err
-					}
-					problems = append(problems, Problem{Path: project.LockFile, State: "behind", Message: "newer template available: " + versions[i], Try: "spinup upgrade"})
-					break
-				}
+			}
+			if _, err := source.Load(ctx, lock.TemplateVersion); err != nil {
+				problems = append(problems, Problem{Path: project.LockFile, State: "template-unavailable", Message: "locked template cannot load: " + err.Error(), Try: "spinup cache warm"})
+			} else if err := checkBehind(ctx, source, lock, &problems); err != nil {
+				return err
 			}
 		}
 	}
@@ -247,6 +234,31 @@ func Check(ctx context.Context, o Options, allowBehind bool, out *ui.Printer) er
 	}
 	if len(problems) > 0 {
 		return &ui.Error{What: "Application check failed", Why: "the project has drift", Try: "correct the reported problems and run spinup check", Code: ui.ExitDrift}
+	}
+	return nil
+}
+
+func checkBehind(ctx context.Context, source templates.Source, lock *manifest.Lock, problems *[]Problem) error {
+	versions, err := source.Versions(ctx)
+	if err != nil {
+		return err
+	}
+	current, err := compat.ParseVersion(lock.TemplateVersion)
+	if err != nil {
+		return fmt.Errorf("cannot compare template version: %w\nTry: repair spinup.lock", err)
+	}
+	for i := len(versions) - 1; i >= 0; i-- {
+		v, err := compat.ParseVersion(versions[i])
+		if err != nil {
+			return err
+		}
+		if v.Compare(current) > 0 {
+			if _, err := source.Load(ctx, versions[i]); err != nil {
+				return err
+			}
+			*problems = append(*problems, Problem{Path: project.LockFile, State: "behind", Message: "newer template available: " + versions[i], Try: "spinup upgrade"})
+			break
+		}
 	}
 	return nil
 }
@@ -272,6 +284,10 @@ func inspect(dir string, lock *manifest.Lock) ([]Problem, error) {
 			}
 			continue
 		}
+		if errors.Is(err, errNotRegular) {
+			problems = append(problems, Problem{name, "not-regular", "tracked path is not a regular file", "replace " + name + " with a regular file"})
+			continue
+		}
 		if err != nil {
 			return nil, diskError(err)
 		}
@@ -286,14 +302,21 @@ func inspect(dir string, lock *manifest.Lock) ([]Problem, error) {
 }
 
 func conflictMarkers(data []byte) bool {
+	started := false
 	for _, line := range bytes.Split(data, []byte("\n")) {
 		line = bytes.TrimSuffix(line, []byte("\r"))
-		if bytes.HasPrefix(line, []byte("<<<<<<<")) || bytes.Equal(line, []byte("=======")) || bytes.HasPrefix(line, []byte(">>>>>>>")) {
+		if bytes.HasPrefix(line, []byte("<<<<<<<")) {
+			started = true
+			continue
+		}
+		if started && bytes.HasPrefix(line, []byte(">>>>>>>")) {
 			return true
 		}
 	}
 	return false
 }
+
+var errNotRegular = errors.New("not regular")
 
 func read(root *os.Root, name string) ([]byte, error) {
 	info, err := root.Lstat(name)
@@ -301,7 +324,7 @@ func read(root *os.Root, name string) ([]byte, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%q is not a regular file", name)
+		return nil, fmt.Errorf("%q: %w", name, errNotRegular)
 	}
 	return root.ReadFile(name)
 }
