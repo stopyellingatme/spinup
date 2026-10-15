@@ -41,7 +41,7 @@ func TestInstall(t *testing.T) {
 
 	t.Run("installs verified binaries", func(t *testing.T) {
 		dir := t.TempDir()
-		got, err := Install(context.Background(), Options{Dir: dir, GOOS: "linux", GOARCH: "amd64", BaseURL: baseURL, HTTPClient: client})
+		got, err := Install(context.Background(), Options{Names: []string{"sops", "age"}, Dir: dir, GOOS: "linux", GOARCH: "amd64", BaseURL: baseURL, HTTPClient: client})
 		if err != nil || len(got) != 2 {
 			t.Fatalf("Install() = %#v, %v", got, err)
 		}

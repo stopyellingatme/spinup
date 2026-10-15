@@ -110,9 +110,12 @@ func Install(ctx context.Context, o Options) ([]Installed, error) {
 		if err != nil {
 			return nil, fmt.Errorf("install %s: %w", name, err)
 		}
-		if name == "age" {
+		switch name {
+		case "age":
 			err = installAge(temporary, dir, o.GOOS)
-		} else {
+		case "tofu":
+			err = installTofu(temporary, path, o.GOOS)
+		default:
 			err = installBinary(temporary, path)
 		}
 		_ = os.Remove(temporary)
@@ -185,13 +188,13 @@ func targetDir(dir string) (string, error) {
 
 func selectedNames(names []string, binaries map[string]stackversions.Binary) ([]string, error) {
 	if len(names) == 0 {
-		names = []string{"sops", "age"}
+		names = []string{"sops", "age", "tofu"}
 	}
 	seen := make(map[string]bool, len(names))
 	selected := make([]string, 0, len(names))
 	for _, name := range names {
 		if _, ok := binaries[name]; !ok {
-			return nil, fmt.Errorf("unknown tool %q\nTry: use sops or age", name)
+			return nil, fmt.Errorf("unknown tool %q\nTry: use sops, age, or tofu", name)
 		}
 		if !seen[name] {
 			seen[name] = true
