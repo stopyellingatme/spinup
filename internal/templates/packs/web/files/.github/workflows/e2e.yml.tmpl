@@ -45,7 +45,7 @@ jobs:
           cache-dependency-path: api/go.sum
       - uses: [[ uses "actions/setup-node" ]]
         with:
-          node-version-file: web/package.json
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json

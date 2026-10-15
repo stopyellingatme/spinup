@@ -66,7 +66,7 @@ jobs:
           persist-credentials: false
       - uses: [[ uses "actions/setup-node" ]]
         with:
-          node-version-file: web/package.json
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
@@ -75,7 +75,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm check
           # A new app has no unit tests. Playwright runs in its own workflow.
-          pnpm test --passWithNoTests --exclude 'e2e/**'
+          pnpm test --passWithNoTests
 [[- end ]]
 
   spinup:
@@ -92,7 +92,7 @@ jobs:
 [[- if index . "shadcn_registry" ]]
       - uses: [[ uses "actions/setup-node" ]]
         with:
-          node-version-file: web/package.json
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json

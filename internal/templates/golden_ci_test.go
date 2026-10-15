@@ -213,3 +213,118 @@ func TestCIPackOwnership(t *testing.T) {
 		t.Errorf("manifest = %v, helper = %v", names, ci.ManagedFiles())
 	}
 }
+
+func TestCIWorkflowRegressions(t *testing.T) {
+	t.Parallel()
+	tree := renderCI(t, true, map[string]any{"modules": "ci,deploy,backups", "app_name": "todo", "ci_deploy_on_push": true})
+	nodeMajor, _, _ := strings.Cut(stackversions.MustLoad().Images["node"].Tag, "-")
+	for _, name := range []string{"ci", "e2e", "upgrade-check"} {
+		t.Run(name+"-node", func(t *testing.T) {
+			t.Parallel()
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Uses string            `yaml:"uses"`
+						With map[string]string `yaml:"with"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			if err := yaml.Unmarshal([]byte(readCIFile(t, tree, ".github/workflows/"+name+".yml")), &workflow); err != nil {
+				t.Fatal(err)
+			}
+			count := 0
+			for _, job := range workflow.Jobs {
+				for _, step := range job.Steps {
+					if strings.HasPrefix(step.Uses, "actions/setup-node@") {
+						count++
+						if step.With["node-version"] != nodeMajor || step.With["node-version-file"] != "" {
+							t.Errorf("setup-node options = %v, want Node %s", step.With, nodeMajor)
+						}
+					}
+				}
+			}
+			if count == 0 {
+				t.Fatal("no setup-node step checked")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name, expression string
+	}{
+		{"backup-verify", "${{ vars.SPINUP_ENVIRONMENT || 'staging' }}"},
+		{"deploy", "${{ inputs.environment || vars.SPINUP_ENVIRONMENT || 'staging' }}"},
+	} {
+		t.Run(tc.name+"-environment", func(t *testing.T) {
+			t.Parallel()
+			data := readCIFile(t, tree, ".github/workflows/"+tc.name+".yml")
+			for _, prefix := range []string{"environment: ", "SPINUP_ENVIRONMENT: ", "group: spinup-remote-"} {
+				if !strings.Contains(data, prefix+tc.expression) {
+					t.Errorf("missing %s%s", prefix, tc.expression)
+				}
+			}
+		})
+	}
+	upgrade := readCIFile(t, tree, ".github/workflows/upgrade-check.yml")
+	if got := strings.Count(upgrade, "token: ${{ secrets.SPINUP_UPGRADE_TOKEN || github.token }}"); got != 2 {
+		t.Errorf("upgrade token used %d times, want checkout and create-pull-request", got)
+	}
+	for _, want := range []string{"SPINUP_UPGRADE_TOKEN: ${{ secrets.SPINUP_UPGRADE_TOKEN }}", `if [ -z "$SPINUP_UPGRADE_TOKEN" ]; then`, "cannot push workflow changes", "does not trigger pull_request workflows"} {
+		if !strings.Contains(upgrade, want) {
+			t.Errorf("upgrade PR body lacks fallback guidance: %s", want)
+		}
+	}
+	if data := readCIFile(t, tree, ".github/workflows/ci.yml"); strings.Contains(data, "--exclude") {
+		t.Error("CI must use the shared Vitest exclusion")
+	}
+}
+
+func TestGoldenCIWebScaffold(t *testing.T) {
+	t.Parallel()
+	testutil.GoldenSelected(t, "ci")
+	for _, auth := range []bool{false, true} {
+		name := "no-auth"
+		if auth {
+			name = "auth"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			packs := []string{"base", "api", "web"}
+			modules := "ci"
+			if auth {
+				packs = append(packs, "auth")
+				modules += ",auth"
+			}
+			tree := testutil.RenderPack(t, packs, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": modules})
+			selected := fstest.MapFS{}
+			for _, path := range []string{"web/e2e/smoke.spec.ts", "web/vite.config.js"} {
+				selected[path] = &fstest.MapFile{Data: []byte(readCIFile(t, tree, path)), Mode: 0644}
+			}
+			testutil.Golden(t, "ci/web-scaffold/"+name, selected)
+			config := readCIFile(t, tree, "web/vite.config.js")
+			for _, want := range []string{"import { configDefaults } from 'vitest/config'", "exclude: ['e2e/**', ...configDefaults.exclude]"} {
+				if !strings.Contains(config, want) {
+					t.Errorf("Vitest config lacks %s", want)
+				}
+			}
+			if auth {
+				smoke := readCIFile(t, tree, "web/e2e/smoke.spec.ts")
+				for _, tc := range []struct {
+					locator string
+					count   int
+				}{
+					{"banner.getByRole('link', { name: 'Sign in', exact: true })", 2},
+					{"banner.getByRole('button', { name: 'Sign out', exact: true })", 2},
+					{"banner.getByTestId('user-email')", 3},
+					{"main.getByLabel('Email', { exact: true })", 2},
+					{"main.getByLabel('Password', { exact: true })", 2},
+					{"main.getByRole('button', { name: 'Create account', exact: true })", 1},
+					{"main.getByRole('button', { name: 'Sign in', exact: true })", 1},
+				} {
+					if got := strings.Count(smoke, tc.locator); got != tc.count {
+						t.Errorf("%s occurs %d times, want %d", tc.locator, got, tc.count)
+					}
+				}
+			}
+		})
+	}
+}
