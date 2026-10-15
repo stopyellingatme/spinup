@@ -43,8 +43,9 @@ app-gate: ## Generate apps and build/test them (Docker + network; gate check)
 doctest: ## Run the code blocks in docs/
 	@if [[ -d internal/doctest ]]; then go test ./internal/doctest/... -run 'TestDocs' -count=1; else echo "doctest: not implemented until M1.8"; fi
 
-e2e: ## Compose + Playwright end-to-end suite (from M4)
-	@echo "e2e: not implemented until M4"
+e2e: ## Playwright smoke on a generated app with auth (needs DATABASE_URL and the Chromium browser)
+	@if [[ -z "$${DATABASE_URL:-}" ]]; then echo "e2e: DATABASE_URL is empty"; echo "Try: export DATABASE_URL=postgres://... (an empty database server you own)"; exit 1; fi
+	@bash testdata/e2e/web/run.sh
 
 dind: ## Docker-in-Docker deploy suite (from M5)
 	@echo "dind: not implemented until M5"
