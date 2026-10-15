@@ -41,24 +41,39 @@ The loader requires a text part and rejects line breaks in subjects.
 
 With the `jobs` module enabled, mailers insert `mail.send` jobs into the River `mail` queue.
 River retries delivery failures with up to ten attempts.
+
 Run the migrations before the worker.
-Run the API binary with `mail-worker` to process this queue:
+The standard worker registers mail delivery and consumes the `default` and `mail` queues.
+Each queue permits ten concurrent jobs.
+When the standard worker runs, it also delivers queued mail.
+
+The current `spinup dev` command and deployment templates do not start this worker.
+Start it alongside `spinup dev`, or configure it as a separate service for deployment:
 
 ```sh
 cd api
 go run ./cmd/api migrate up
-go run ./cmd/api mail-worker
+go run ./cmd/worker
 ```
 
-The mail worker consumes only the `mail` queue.
-The application worker continues to consume its configured queues.
+For independent mail capacity, run the API binary with `mail-worker`.
+This optional worker consumes only the `mail` queue.
+River distributes mail jobs between active workers.
 Protect River storage because rendered messages can contain reset links.
 
 With `auth` and `mail`, the application includes password reset routes and pages.
 `POST /api/auth/reset/request` accepts an email address and returns 202.
-The request remains identical for unknown accounts, invalid emails, and throttled requests.
-The server limits requests by email and the direct peer IP through PostgreSQL.
-It ignores untrusted forwarding headers.
+The response remains identical for unknown accounts, invalid emails, and throttled requests.
+
+PostgreSQL limits requests to five per email and 100 globally per 15 minutes.
+The email limit uses the normalized address.
+Requests above either limit still return the same empty 202 response.
+The email limit applies first, so repeated requests for one address cannot exhaust the global limit.
+
+`auth.WithLockout` changes the email limit and the window for both limits.
+The global limit remains 100 per window.
+Peer addresses and forwarding headers do not affect these limits.
+
 Account lookup and email delivery run in a bounded background queue.
 
 `POST /api/auth/reset/confirm` accepts a token and a new password.

@@ -217,34 +217,65 @@ func (m *blockedResetMailer) Send(ctx context.Context, _ mail.Message) error {
 	}
 }
 
-func TestResetRateLimitsEmailAndIP(t *testing.T) {
+func TestResetRequestLimits(t *testing.T) {
 	t.Parallel()
-	f := resetFixture(t, &mail.Capture{})
-	send := func(email, ip string) {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "http://api.test/api/auth/reset/request", strings.NewReader(`{"email":"`+email+`"}`))
-		r.Header.Set("Content-Type", "application/json")
-		r.Header.Set("X-Forwarded-For", "198.51.100.99")
-		r.RemoteAddr = ip + ":12345"
-		rec := httptest.NewRecorder()
-		f.handler.ServeHTTP(rec, r)
-		if rec.Code != http.StatusAccepted {
-			t.Fatalf("status %d", rec.Code)
-		}
-	}
-	for i := range 10 {
-		send("unknown@example.com", fmt.Sprintf("192.0.2.%d", i+1))
-	}
-	var count int
-	if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts WHERE email = 'reset-email:unknown@example.com'`).Scan(&count); err != nil || count != DefaultLockoutThreshold {
-		t.Fatalf("email reservations: %d, %v", count, err)
-	}
-	for i := range 10 {
-		send(fmt.Sprintf("unknown%d@example.com", i), "203.0.113.1")
-	}
-	if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts WHERE email = 'reset-ip:203.0.113.1'`).Scan(&count); err != nil || count != DefaultLockoutThreshold {
-		t.Fatalf("IP reservations: %d, %v", count, err)
-	}
-	if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts WHERE email = 'reset-ip:198.51.100.99'`).Scan(&count); err != nil || count != 0 {
-		t.Fatalf("untrusted forwarded address: %d, %v", count, err)
+	for _, tc := range []struct {
+		name       string
+		requests   int
+		sameEmail  bool
+		concurrent bool
+		want       int
+	}{
+		{name: "shared web peer", requests: 10, want: 10},
+		{name: "per email", requests: 10, sameEmail: true, want: 5},
+		{name: "global", requests: 110, want: 100},
+		{name: "concurrent global", requests: 120, concurrent: true, want: 100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := resetFixture(t, &mail.Capture{})
+			// Inspect the admission queue without asynchronous account lookup or delivery.
+			h := &resetHandler{auth: f.auth, requests: make(chan string, tc.requests+1)}
+			send := func(i int) {
+				email := fmt.Sprintf("unknown%d@example.com", i)
+				if tc.sameEmail {
+					email = " UNKNOWN@example.com "
+				}
+				r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/auth/reset/request", strings.NewReader(`{"email":"`+email+`"}`))
+				r.Header.Set("Content-Type", "application/json")
+				r.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i))
+				r.RemoteAddr = "203.0.113.1:12345"
+				rec := httptest.NewRecorder()
+				h.request(rec, r)
+				if rec.Code != http.StatusAccepted || rec.Body.Len() != 0 {
+					t.Errorf("request %d: %d %s", i, rec.Code, rec.Body)
+				}
+			}
+			var wg sync.WaitGroup
+			for i := range tc.requests {
+				if tc.concurrent {
+					wg.Go(func() { send(i) })
+				} else {
+					send(i)
+				}
+			}
+			wg.Wait()
+			if got := len(h.requests); got != tc.want {
+				t.Fatalf("admitted %d requests, want %d", got, tc.want)
+			}
+			var reserved int
+			if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts WHERE email = 'reset-global'`).Scan(&reserved); err != nil {
+				t.Fatal(err)
+			}
+			if reserved != tc.want {
+				t.Fatalf("global reservations: %d, want %d", reserved, tc.want)
+			}
+			// Both buckets admit requests again at the window boundary.
+			f.clock.Add(DefaultLockoutWindow)
+			send(0)
+			if got := len(h.requests); got != tc.want+1 {
+				t.Fatalf("admitted after window: %d, want %d", got, tc.want+1)
+			}
+		})
 	}
 }

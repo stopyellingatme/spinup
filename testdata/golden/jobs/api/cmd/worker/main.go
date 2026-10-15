@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	jobsapp "example.com/todo/api/internal/jobs"
 	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/db"
@@ -43,11 +45,10 @@ func run() error {
 	}
 	defer pool.Close()
 
-	w, err := jobs.NewWorker(pool, jobs.WithLogger(logger))
+	w, err := newWorker(pool, logger)
 	if err != nil {
 		return err
 	}
-	jobsapp.Register(w, jobsapp.Deps{DB: pool})
 	if err := w.Start(ctx); err != nil {
 		return err
 	}
@@ -57,4 +58,13 @@ func run() error {
 	stopCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	return w.Stop(stopCtx)
+}
+
+func newWorker(pool *pgxpool.Pool, logger *slog.Logger) (*jobs.Worker, error) {
+	w, err := jobs.NewWorker(pool, jobs.WithLogger(logger))
+	if err != nil {
+		return nil, err
+	}
+	jobsapp.Register(w, jobsapp.Deps{DB: pool})
+	return w, nil
 }
