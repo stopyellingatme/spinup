@@ -162,12 +162,17 @@ func TestHelpHidesEmptyGroups(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0", code)
 	}
-	if !strings.Contains(out, "\nMaintain\n") {
-		t.Errorf("help has no Maintain group:\n%s", out)
+	var entered bool
+	app := &App{Flags: &GlobalFlags{}, UI: ui.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, ui.Options{})}
+	root := newRoot(app, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, &entered)
+	used := map[string]bool{}
+	for _, command := range root.Commands() {
+		used[command.GroupID] = true
 	}
-	for _, empty := range []string{"\nDevelop\n", "\nData\n", "\nShip\n", "\nOperate\n"} {
-		if strings.Contains(out, empty) {
-			t.Errorf("help shows the empty group %q:\n%s", strings.TrimSpace(empty), out)
+	for _, group := range groupOrder {
+		heading := "\n" + groupTitles[group] + "\n"
+		if got := strings.Contains(out, heading); got != used[string(group)] {
+			t.Errorf("group %q visibility = %v, want %v:\n%s", group, got, used[string(group)], out)
 		}
 	}
 }
