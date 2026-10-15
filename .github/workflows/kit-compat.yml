@@ -1,0 +1,69 @@
+name: Frozen app kit compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'kit/**'
+      - '.github/workflows/kit-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+      - name: Select the newest frozen default app
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re, shutil
+          corpus = pathlib.Path('testdata/corpus')
+          versions = []
+          synthetic = corpus / '0.0.0-dev' / 'api' / 'tree'
+          for directory in corpus.iterdir():
+              match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?', directory.name)
+              if match and directory.name != '0.0.0-dev':
+                  major, minor, patch, prerelease = match.groups()
+                  identifiers = tuple((0, int(p)) if p.isdigit() else (1, p) for p in (prerelease or '').split('.'))
+                  order = (int(major), int(minor), int(patch), prerelease is None, identifiers)
+                  versions.append((order, directory))
+          if versions:
+              version = max(versions, key=lambda item: item[0])[1]
+              trees = sorted(p.parent for p in version.glob('*/tree/spinup.lock'))
+              if not trees:
+                  raise SystemExit(f'No frozen app in {version}')
+              defaults = [p for p in trees if p.parent.name == 'default']
+              source = defaults[0] if defaults else trees[0]
+          elif (synthetic / 'spinup.lock').is_file():
+              source = synthetic
+          else:
+              raise SystemExit('No frozen corpus app. Try: freeze the newest released default app.')
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'kit-compat'
+          shutil.copytree(source, dest)
+          with open(dest / 'spinup.lock') as stream:
+              lock = json.load(stream)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f"Frozen corpus: `{source}`\n\nTemplate: `{lock['template_version']}`\n")
+          PY
+      - name: Build and test the frozen API against this kit
+        working-directory: ${{ runner.temp }}/kit-compat/api
+        env:
+          GOWORK: 'off'
+          GOFLAGS: '-mod=readonly'
+          GOTOOLCHAIN: local
+        shell: bash
+        run: |
+          go mod edit -replace="github.com/stopyellingatme/spinup/kit=$GITHUB_WORKSPACE/kit"
+          # Resolve the PR kit's module graph in the disposable corpus copy.
+          go mod tidy
+          go build ./...
+          go test -race ./...
