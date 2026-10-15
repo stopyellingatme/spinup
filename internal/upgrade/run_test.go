@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/stopyellingatme/spinup/internal/exec"
-	"github.com/stopyellingatme/spinup/internal/merge"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/merge"
 )
 
 func TestRunPlanChain(t *testing.T) {
