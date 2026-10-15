@@ -1,0 +1,4 @@
+# STUB from the M4 pre-seed commit. Unit M4.1 owns this file and replaces it.
+name = "web"
+description = "SvelteKit web app (stub)"
+requires = ["api"]

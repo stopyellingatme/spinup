@@ -24,6 +24,7 @@ Read these before you change anything:
 - The M1 contracts (`db migrate` through the app binary, the API lockfiles, the doc-test format) are in `docs/adr/0005-m1-contracts.md`.
 - The M2 contracts (upgrade engine types, lock schema 2, template versions and archives, the upgrade worktree) are in `docs/adr/0006-m2-contracts.md`.
 - The M3 contracts (generators, post-steps, the OpenAPI and sqlc layout, migrations, jobs) are in `docs/adr/0007-m3-contracts.md`.
+- The M4 contracts (pnpm through corepack, the web layout, session and auth API, client generation, the dev loop) are in `docs/adr/0008-m4-contracts.md`.
 
 ## Commands
 
@@ -60,6 +61,7 @@ Test contracts:
 |---|---|---|
 | Go | 1.27.2 | `/opt/homebrew/bin/go`. `GOTOOLCHAIN=local` always. Modules declare `go 1.26.0`. |
 | Node | 24.x | `/opt/homebrew/opt/node@24/bin`. The Makefile puts it on `PATH`. Do not call a bare `node` in an interactive shell. It is a broken nvm function. |
+| pnpm | 12.11.2 | `scripts/bin/pnpm` runs it through corepack (no global install). The Makefile puts `scripts/bin` on `PATH`. Use `$REPO/scripts/bin/pnpm` outside make. Offline installs: `pnpm install --frozen-lockfile --offline`. |
 | golangci-lint | 2.14.0 | config: `.golangci.yml` |
 | goreleaser, actionlint, syft, cosign, promtool, sops, age, docker | see `scripts/tools-check.sh` | |
 
@@ -81,6 +83,7 @@ Only the main loop writes these files. A unit never edits them:
 - `CLAUDE.md`, `docs/design/plan.md`
 - the M2 contract files: `internal/templates/source.go`, `internal/merge/contract.go`, `internal/upgrade/contract.go`, `internal/migrate/contract.go` (see `docs/adr/0006-m2-contracts.md`)
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
+- the web pack fragments `pack.d/deps.toml` and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
 

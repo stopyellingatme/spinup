@@ -7,7 +7,8 @@ SHELL := /bin/bash
 # Pinned toolchain: never download a Go toolchain during a build.
 export GOTOOLCHAIN := local
 # Node 24 from Homebrew. The interactive shell "node" is an nvm function that does not work here.
-export PATH := /opt/homebrew/opt/node@24/bin:$(PATH)
+# scripts/bin holds pnpm (through corepack, pinned in stackversions.yaml).
+export PATH := $(CURDIR)/scripts/bin:/opt/homebrew/opt/node@24/bin:$(PATH)
 
 MODULES := . ./kit
 PKGS ?= ./...

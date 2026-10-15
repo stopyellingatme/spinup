@@ -16,8 +16,9 @@ stdout '"api/cmd/api/main.go": \{\n[[:space:]]+"class": "scaffold"'
 # Occupied targets and unavailable packs give actionable errors.
 ! exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 stderr 'Try:'
-! exec spinup new frontend --no-git --non-interactive
-stderr 'Try: pass --api-only'
+# Without --api-only the app also gets the web pack.
+exec spinup new frontend --module example.com/frontend --no-git --non-interactive
+exists frontend/web/package.json
 ! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
 stderr 'available modules: ci'
 

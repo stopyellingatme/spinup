@@ -1,8 +1,8 @@
 # Create an application
 
 `spinup new <name>` composes template packs and creates an application directory.
-The default packs are `base`, `api`, and `ci`.
-M1 requires `--api-only` because the web pack is not available.
+The default packs are `base`, `api`, `web`, and `ci`.
+Pass `--api-only` to create the Go API without the web frontend.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive

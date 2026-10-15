@@ -47,7 +47,7 @@ func orderedSteps(requested []gen.PostStep) []gen.PostStep {
 		seen[step] = true
 	}
 	ordered := make([]gen.PostStep, 0, len(seen))
-	for _, step := range []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostGofmt} {
+	for _, step := range []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostClient, gen.PostGofmt} {
 		if seen[step] {
 			ordered = append(ordered, step)
 			delete(seen, step)

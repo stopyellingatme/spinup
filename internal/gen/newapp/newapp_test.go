@@ -97,7 +97,7 @@ func TestGenerateErrors(t *testing.T) {
 		modules string
 		want    string
 	}{
-		{"web", false, "ci", "Try: pass --api-only"}, {"unknown", true, "nope", "ci"}, {"base module", true, "base", "available modules"}, {"unsafe name", true, "ci", "app_name"},
+		{"unknown", true, "nope", "ci"}, {"base module", true, "base", "available modules"}, {"unsafe name", true, "ci", "app_name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

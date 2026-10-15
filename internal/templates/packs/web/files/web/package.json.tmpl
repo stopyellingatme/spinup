@@ -1,0 +1,47 @@
+{
+  "name": "[[ .app_name ]]-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@[[ npm "pnpm" ]]",
+  "engines": {
+    "node": ">=24"
+  },
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "gen:client": "openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "[[ npm "openapi-fetch" ]]"
+  },
+  "devDependencies": {
+    "@internationalized/date": "[[ npm "@internationalized/date" ]]",
+    "@lucide/svelte": "[[ npm "@lucide/svelte" ]]",
+    "@playwright/test": "[[ npm "@playwright/test" ]]",
+    "@sveltejs/adapter-node": "[[ npm "@sveltejs/adapter-node" ]]",
+    "@sveltejs/kit": "[[ npm "@sveltejs/kit" ]]",
+    "@sveltejs/vite-plugin-svelte": "[[ npm "@sveltejs/vite-plugin-svelte" ]]",
+    "@tailwindcss/vite": "[[ npm "@tailwindcss/vite" ]]",
+    "bits-ui": "[[ npm "bits-ui" ]]",
+    "clsx": "[[ npm "clsx" ]]",
+    "openapi-typescript": "[[ npm "openapi-typescript" ]]",
+    "svelte": "[[ npm "svelte" ]]",
+    "svelte-check": "[[ npm "svelte-check" ]]",
+    "tailwind-merge": "[[ npm "tailwind-merge" ]]",
+    "tailwind-variants": "[[ npm "tailwind-variants" ]]",
+    "tailwindcss": "[[ npm "tailwindcss" ]]",
+    "tw-animate-css": "[[ npm "tw-animate-css" ]]",
+    "typescript": "[[ npm "typescript" ]]",
+    "vite": "[[ npm "vite" ]]",
+    "vitest": "[[ npm "vitest" ]]"
+  }
+}

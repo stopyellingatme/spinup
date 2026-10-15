@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# pnpm through corepack at the version pinned in stackversions.yaml, with no global install.
+# The Makefile puts scripts/bin on PATH. Main loop only (see CLAUDE.md).
+set -euo pipefail
+here=$(cd "$(dirname "$0")/../.." && pwd)
+version=$(awk '/^npm:/{s=1;next} /^[^ #]/{s=0} s && $1=="pnpm:"{print $2; exit}' "$here/internal/stackversions/stackversions.yaml")
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_ENABLE_STRICT=0
+exec corepack "pnpm@${version}" "$@"

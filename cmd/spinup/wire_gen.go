@@ -21,4 +21,11 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/gen/model"
 	_ "github.com/stopyellingatme/spinup/internal/gen/openapi"
 	_ "github.com/stopyellingatme/spinup/internal/gen/resource"
+
+	// M4
+	_ "github.com/stopyellingatme/spinup/internal/doctor/clientdrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/quick"
+	_ "github.com/stopyellingatme/spinup/internal/gen/client"
+	_ "github.com/stopyellingatme/spinup/internal/gen/component"
+	_ "github.com/stopyellingatme/spinup/internal/gen/page"
 )

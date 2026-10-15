@@ -1,0 +1,73 @@
+# shadcn-svelte 1.7.0 components (button, card, input, label), output of `shadcn-svelte add`.
+# Main loop only: regenerate with the shadcn-svelte CLI at the pinned version. They are seed files
+# (critic resolution 6): upgrades never touch them, and `spinup upgrade --ui` (M4.8) offers updates.
+
+[[files]]
+path = "web/src/lib/components/ui/button/button.svelte"
+source = "files/web/src/lib/components/ui/button/button.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/button/index.ts"
+source = "files/web/src/lib/components/ui/button/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-action.svelte"
+source = "files/web/src/lib/components/ui/card/card-action.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-content.svelte"
+source = "files/web/src/lib/components/ui/card/card-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-description.svelte"
+source = "files/web/src/lib/components/ui/card/card-description.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-footer.svelte"
+source = "files/web/src/lib/components/ui/card/card-footer.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-header.svelte"
+source = "files/web/src/lib/components/ui/card/card-header.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card-title.svelte"
+source = "files/web/src/lib/components/ui/card/card-title.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/card.svelte"
+source = "files/web/src/lib/components/ui/card/card.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/card/index.ts"
+source = "files/web/src/lib/components/ui/card/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/input/index.ts"
+source = "files/web/src/lib/components/ui/input/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/input/input.svelte"
+source = "files/web/src/lib/components/ui/input/input.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/label/index.ts"
+source = "files/web/src/lib/components/ui/label/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/label/label.svelte"
+source = "files/web/src/lib/components/ui/label/label.svelte"
+class = "seed"

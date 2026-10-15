@@ -1,0 +1,19 @@
+# npm inputs and lockfile for the generated web app.
+# Main loop only: scripts/bump-stack.sh regenerates pnpm-lock.yaml from package.json.tmpl.
+# Units never edit this fragment or its sources.
+
+[[files]]
+path = "web/package.json"
+source = "files/web/package.json.tmpl"
+class = "scaffold"
+
+# pnpm owns the lockfile: upgrades never merge it, the dependency step reinstalls instead.
+[[files]]
+path = "web/pnpm-lock.yaml"
+source = "files/web/pnpm-lock.yaml"
+class = "seed"
+
+[[files]]
+path = "web/pnpm-workspace.yaml"
+source = "files/web/pnpm-workspace.yaml"
+class = "managed"

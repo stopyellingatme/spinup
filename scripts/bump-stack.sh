@@ -81,7 +81,8 @@ echo "bump-stack: wrote tools.mod.tmpl and tools.sum"
 # Packages, not modules: a package in a pinned module gets the module's pin, and google/uuid
 # (used by runtime/types for format: uuid) comes in at the version the runtime requires.
 app_extra=(github.com/oapi-codegen/runtime github.com/oapi-codegen/runtime/types github.com/google/uuid
-  github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5)
+  github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5
+  github.com/alexedwards/scs/v2 github.com/alexedwards/scs/pgxstore golang.org/x/crypto/argon2)
 
 # add_app_extra <api dir> requires and imports every app_extra module, so tidy keeps them.
 add_app_extra() {
@@ -141,3 +142,22 @@ case "$mode" in
 esac
 finish "$app" "$out/go.mod.tmpl" "$out/go.sum"
 echo "bump-stack: wrote go.mod.tmpl and go.sum ($mode mode, kit $kit_version)"
+
+# --- web: pnpm-lock.yaml ---------------------------------------------------------------------------
+# Render the web package.json with the CLI, lock it with pnpm (through scripts/bin/pnpm), and
+# install once so the pnpm store holds every package for offline lanes.
+export PATH="$root/scripts/bin:/opt/homebrew/opt/node@24/bin:$PATH"
+web_out="$root/internal/templates/packs/web/files/web"
+if [[ -f "$web_out/package.json.tmpl" ]]; then
+  (
+    cd "$root" && go build -o "$work/spinup-web" ./cmd/spinup
+    mkdir -p "$work/webapp" && cd "$work/webapp"
+    "$work/spinup-web" new demo --module "${placeholder%/api}" --modules "$all_modules" --non-interactive --no-git >/dev/null
+    cd demo/web
+    rm -f pnpm-lock.yaml
+    pnpm install --lockfile-only
+    cp pnpm-lock.yaml "$web_out/pnpm-lock.yaml"
+    pnpm install --frozen-lockfile
+  )
+  echo "bump-stack: wrote web/pnpm-lock.yaml and filled the pnpm store"
+fi
