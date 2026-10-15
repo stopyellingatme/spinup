@@ -146,3 +146,38 @@ func TestAbortMissingWorktree(t *testing.T) {
 		})
 	}
 }
+
+func TestUpgradeStorageTrustFiles(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, tracked string
+		allowUpgrade  bool
+		want          bool
+	}{
+		{name: "trust-files", want: true},
+		{name: "tracked-state", tracked: ".spinup/upgrade.json"},
+		{name: "visible-worktree", allowUpgrade: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r, root := runFixture(t, false)
+			ignored := ".spinup/*\n!.spinup/plugins.allow\n!.spinup/plugins.history\n"
+			if tc.allowUpgrade {
+				ignored += "!.spinup/upgrade/\n"
+			}
+			writePlanFile(t, root, ".gitignore", ignored, 0644)
+			for _, name := range []string{".spinup/plugins.allow", ".spinup/plugins.history"} {
+				writePlanFile(t, root, name, "trust\n", 0644)
+				testGit(t, root, "add", name)
+			}
+			if tc.tracked != "" {
+				writePlanFile(t, root, tc.tracked, "state\n", 0644)
+				testGit(t, root, "add", "-f", tc.tracked)
+			}
+			err := r.checkIgnored(t.Context(), root)
+			if (err == nil) != tc.want {
+				t.Fatalf("checkIgnored=%v", err)
+			}
+		})
+	}
+}

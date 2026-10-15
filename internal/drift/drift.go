@@ -74,7 +74,13 @@ func renderApp(ctx context.Context, o Options, root string, lock *manifest.Lock)
 	if err != nil {
 		return nil, err
 	}
-	plan, err := upgrade.Render(version, lock.Packs, lock.Answers)
+	selection, err := upgrade.LockedPacks(ctx, root, lock, version)
+	if err != nil {
+		return nil, err
+	}
+	copy := *version
+	copy.Packs = selection.FS
+	plan, err := upgrade.Render(&copy, selection.Names, lock.Answers)
 	if err != nil {
 		return nil, err
 	}

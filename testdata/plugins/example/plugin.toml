@@ -1,0 +1,16 @@
+name = "example"
+version = "1.0.0"
+api = 1
+spinup = ">=0.0.0"
+description = "A small declarative plugin for tests."
+
+[[generators]]
+name = "greeting"
+short = "Create a greeting"
+usage = "greeting <Name>"
+args = ["Name"]
+
+[[generators.files]]
+path = "greetings/{{.Name}}.txt"
+source = "files/greeting.txt.tmpl"
+class = "scaffold"

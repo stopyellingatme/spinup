@@ -8,6 +8,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	genregistry "github.com/stopyellingatme/spinup/internal/gen/registry"
 	genrun "github.com/stopyellingatme/spinup/internal/gen/run"
+	pluginrender "github.com/stopyellingatme/spinup/internal/plugin/render"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -20,19 +21,23 @@ func newGenerate(app *App) *cobra.Command {
 
 func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interactive func() bool) *cobra.Command {
 	var diff, force bool
-	c := &cobra.Command{
-		Use: "generate <kind> [args...]", Aliases: []string{"g"}, Short: "Generate application files",
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return &ui.Error{What: "Cannot generate files", Why: fmt.Sprintf("generator %q is not registered", args[0]), Try: "spinup g <kind> --help", Code: ui.ExitUsage}
-			}
-			return nil
-		},
-	}
+	var selected *gen.Generator
+	c := &cobra.Command{Use: "generate <kind> [args...]", Aliases: []string{"g"}, Short: "Generate application files"}
 	c.PersistentFlags().BoolVar(&diff, "diff", false, "show unified diffs without writing")
 	c.PersistentFlags().BoolVar(&force, "force", false, "overwrite files with different content")
+	run := func(cmd *cobra.Command, g gen.Generator, args []string) error {
+		root, err := project.FindRoot(app.Flags.Dir)
+		if err != nil {
+			return &ui.Error{What: "Cannot find the project", Why: err.Error(), Try: "run inside a spinup project, or pass --dir", Err: err}
+		}
+		_, err = pluginrender.RunGenerator(cmd.Context(), g, args, cmd.Flags(), genrun.Options{Root: root, DryRun: app.Flags.DryRun, Diff: diff, Force: force, JSON: app.Flags.JSON, Out: cmd.OutOrStdout(), Runner: exec.OSRunner{}})
+		return err
+	}
 	children := make(map[string]*cobra.Command, len(kinds))
-	for _, g := range kinds {
+	add := func(g gen.Generator) *cobra.Command {
+		if child := children[g.Name]; child != nil {
+			return child
+		}
 		child := &cobra.Command{Use: g.Name, Aliases: g.Aliases, Short: g.Short}
 		if g.Usage != "" {
 			child.Use += " " + g.Usage
@@ -40,24 +45,50 @@ func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interac
 		if g.Flags != nil {
 			g.Flags(child.Flags())
 		}
-		child.RunE = func(cmd *cobra.Command, args []string) error {
-			root, err := project.FindRoot(app.Flags.Dir)
-			if err != nil {
-				return &ui.Error{What: "Cannot find the project", Why: err.Error(), Try: "run inside a spinup project, or pass --dir", Err: err}
-			}
-			_, err = genrun.Run(cmd.Context(), g, args, cmd.Flags(), genrun.Options{Root: root, DryRun: app.Flags.DryRun, Diff: diff, Force: force, JSON: app.Flags.JSON, Out: cmd.OutOrStdout(), Runner: exec.OSRunner{}})
-			return err
-		}
+		child.RunE = func(cmd *cobra.Command, args []string) error { return run(cmd, g, args) }
 		children[g.Name] = child
 		c.AddCommand(child)
+		return child
 	}
-	c.RunE = func(cmd *cobra.Command, _ []string) error {
+	for _, g := range kinds {
+		add(g)
+	}
+	available := func(cmd *cobra.Command) ([]gen.Generator, error) {
+		return pluginrender.ProjectGenerators(cmd.Context(), app.Flags.Dir, app.Flags.Offline, kinds)
+	}
+	// Project flags are parsed after Cobra chooses a child. Resolve a project-only
+	// generator here when Cobra selected the parent instead of a built-in child.
+	c.Args = func(cmd *cobra.Command, args []string) error {
+		selected = nil
+		if len(args) == 0 {
+			return nil
+		}
+		all, err := available(cmd)
+		if err != nil {
+			return err
+		}
+		for _, g := range all {
+			if g.Name == args[0] {
+				selected = &g
+				return nil
+			}
+		}
+		return &ui.Error{What: "Cannot generate files", Why: fmt.Sprintf("generator %q is not registered", args[0]), Try: "spinup g <kind> --help", Code: ui.ExitUsage}
+	}
+	c.RunE = func(cmd *cobra.Command, args []string) error {
+		if selected != nil {
+			return run(cmd, *selected, args[1:])
+		}
+		all, err := available(cmd)
+		if err != nil {
+			return err
+		}
 		if !interactive() {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Available generators:")
-			for _, g := range kinds {
+			for _, g := range all {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s\t%s\n", g.Name, g.Short)
 			}
-			if len(kinds) == 0 {
+			if len(all) == 0 {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  (none registered)")
 			}
 			return &ui.Error{What: "Cannot select a generator", Why: "a terminal is required for the picker", Try: "spinup g <kind> --help", Code: ui.ExitUsage}
@@ -66,11 +97,11 @@ func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interac
 		if prompter == nil {
 			prompter = genrun.HuhPrompter{In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()}
 		}
-		g, args, err := genrun.Pick(cmd.Context(), kinds, prompter)
+		g, args, err := genrun.Pick(cmd.Context(), all, prompter)
 		if err != nil {
 			return err
 		}
-		child := children[g.Name]
+		child := add(g)
 		child.SetContext(cmd.Context())
 		child.InitDefaultHelpFlag()
 		if err := child.ParseFlags(args); err != nil {
@@ -82,5 +113,29 @@ func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interac
 		}
 		return child.RunE(child, child.Flags().Args())
 	}
+	defaultHelp := c.HelpFunc()
+	c.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd != c {
+			defaultHelp(cmd, args)
+			return
+		}
+		all, err := available(cmd)
+		if err != nil {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err)
+			defaultHelp(cmd, args)
+			return
+		}
+		for _, g := range all {
+			add(g)
+		}
+		positional := cmd.Flags().Args()
+		if len(positional) > 0 {
+			if child := children[positional[0]]; child != nil {
+				defaultHelp(child, args)
+				return
+			}
+		}
+		defaultHelp(cmd, args)
+	})
 	return c
 }

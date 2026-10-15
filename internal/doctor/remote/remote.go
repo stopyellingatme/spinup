@@ -15,6 +15,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/doctor"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 	sshremote "github.com/stopyellingatme/spinup/internal/remote"
 	"github.com/stopyellingatme/spinup/internal/ui"
@@ -296,7 +297,7 @@ func backupAge(ctx context.Context, c *doctor.Context) doctor.Result {
 	if !ok {
 		return skip
 	}
-	if !contains(config.Modules, "backups") {
+	if !modules.Enabled(config, "backups") {
 		return doctor.Result{Status: doctor.OK, Message: "The backups module is not enabled."}
 	}
 	out, err := run(ctx, r, "cat", backup.MetricsPath(config.App.Name))
@@ -363,7 +364,7 @@ func monitoring(ctx context.Context, c *doctor.Context) doctor.Result {
 	if !ok {
 		return skip
 	}
-	if !contains(config.Modules, "monitoring") || config.Monitoring.Profile == "none" {
+	if !modules.Enabled(config, "monitoring") || config.Monitoring.Profile == "none" {
 		return doctor.Result{Status: doctor.Skip, Message: "Monitoring is not enabled."}
 	}
 	out, err := run(ctx, r, "docker", "compose", "--project-name", config.App.Name+"-monitoring", "ps", "--status", "running", "--services")
@@ -371,13 +372,4 @@ func monitoring(ctx context.Context, c *doctor.Context) doctor.Result {
 		return doctor.Result{Status: doctor.Fail, Message: "The monitoring stack is not running.", Try: "Run spinup deploy monitoring --env " + c.Env + "."}
 	}
 	return doctor.Result{Status: doctor.OK, Message: "The monitoring stack is running."}
-}
-
-func contains(values []string, needle string) bool {
-	for _, value := range values {
-		if value == needle {
-			return true
-		}
-	}
-	return false
 }

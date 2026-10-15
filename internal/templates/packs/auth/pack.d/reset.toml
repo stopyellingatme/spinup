@@ -1,0 +1,54 @@
+[[files]]
+path = "api/db/migrations/00003_password_resets.sql"
+source = "files/api/db/migrations/00003_password_resets.sql"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/cmd/api/reset.go"
+source = "files/api/cmd/api/reset.go.tmpl"
+class = "managed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/+page.server.ts"
+source = "files/web/src/routes/reset/+page.server.ts"
+class = "scaffold"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/+page.svelte"
+source = "files/web/src/routes/reset/+page.svelte"
+class = "scaffold"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/[token]/+page.server.ts"
+source = "files/web/src/routes/reset/[token]/+page.server.ts"
+class = "scaffold"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/[token]/+page.svelte"
+source = "files/web/src/routes/reset/[token]/+page.svelte"
+class = "scaffold"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/internal/mail/templates/password_reset.subject.tmpl"
+source = "files/api/internal/mail/templates/password_reset.subject.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/internal/mail/templates/password_reset.txt.tmpl"
+source = "files/api/internal/mail/templates/password_reset.txt.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/internal/mail/templates/password_reset.html.tmpl"
+source = "files/api/internal/mail/templates/password_reset.html.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+

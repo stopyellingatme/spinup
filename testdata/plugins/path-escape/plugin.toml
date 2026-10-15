@@ -1,0 +1,4 @@
+name = "example"
+version = "1.0.0"
+api = 1
+spinup = ">=0.0.0"

@@ -17,9 +17,10 @@ func (a *Auth) userByID(ctx context.Context, id int64) (user User, found bool, e
 	return user, err == nil, err
 }
 
-// credentialsByEmail returns the user and the password hash for email.
+// credentialsByEmail returns the user and the password hash for email. An account without a
+// password (OIDC only) is not found, so the password login gives the same generic error.
 func (a *Auth) credentialsByEmail(ctx context.Context, email string) (user User, hash string, found bool, err error) {
-	err = a.pool.QueryRow(ctx, `SELECT id, email, password_hash FROM users WHERE email = $1`, email).Scan(&user.ID, &user.Email, &hash)
+	err = a.pool.QueryRow(ctx, `SELECT id, email, password_hash FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&user.ID, &user.Email, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", false, nil
 	}

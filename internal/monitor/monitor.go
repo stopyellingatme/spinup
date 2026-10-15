@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
@@ -52,7 +52,7 @@ func Run(ctx context.Context, o Options, d Deps) error {
 	if err = cfg.Validate(); err != nil {
 		return failure("validate monitoring configuration", err)
 	}
-	if !slices.Contains(cfg.Modules, "monitoring") || cfg.Monitoring.Profile == "none" {
+	if !modules.Enabled(cfg, "monitoring") || cfg.Monitoring.Profile == "none" {
 		return failure("operate monitoring", fmt.Errorf("the monitoring pack is disabled"))
 	}
 	env, err := cfg.ResolveEnv(o.Env)

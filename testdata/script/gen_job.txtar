@@ -68,7 +68,7 @@ exec spinup new plain --api-only --module example.com/plain --no-git --non-inter
 cd plain
 ! exec spinup g job send_digest
 stderr 'no jobs module'
-stderr 'Try: add the jobs module: create the app with --modules ci,jobs'
+stderr 'Try: spinup module add jobs'
 ! exists api/internal/jobs
 
 -- want/edited.go --

@@ -1,4 +1,2 @@
-// Package mailer is the g mailer generator (ADR 0013 §2).
-//
-// Stub from the M9 pre-seed. Unit M9.2 replaces it.
+// Package mailer plans typed mailers and seed email templates (ADR 0013 §2).
 package mailer

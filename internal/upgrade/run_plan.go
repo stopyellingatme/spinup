@@ -67,6 +67,10 @@ func (r *Runner) Plan(ctx context.Context, o Options) (*PlanReport, error) {
 	if err != nil {
 		return nil, err
 	}
+	versions, err = r.pluginChain(ctx, lock, versions, o.Offline)
+	if err != nil {
+		return nil, err
+	}
 	report, err := r.preview(ctx, lock, versions, o)
 	if err != nil {
 		return nil, err
@@ -77,7 +81,15 @@ func (r *Runner) Plan(ctx context.Context, o Options) (*PlanReport, error) {
 	return report, nil
 }
 
-func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []string, o Options) (*PlanReport, error) {
+func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []string, o Options, changes ...*moduleChange) (*PlanReport, error) {
+	var change *moduleChange
+	targetPacks := PackSet{}
+	answers := lock.Answers
+	if len(changes) > 0 && changes[0] != nil {
+		change = changes[0]
+		targetPacks.Names, answers = change.Packs, change.Answers
+	}
+	_, namesForRender := targetPacks.resolve(nil, lock.Packs)
 	temp, err := os.MkdirTemp("", "spinup-plan-")
 	if err != nil {
 		return nil, fmt.Errorf("create plan directory: %w\nTry: check temporary directory permissions", err)
@@ -92,7 +104,16 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if loadErr != nil {
 			return nil, loadErr
 		}
-		rendered, renderErr := Render(to, lock.Packs, lock.Answers)
+		from, loadErr := r.Source.Load(ctx, lock.TemplateVersion)
+		if loadErr != nil && !errors.Is(loadErr, templates.ErrVersionUnavailable) {
+			return nil, loadErr
+		}
+		_, selection, pluginErr := r.pluginPacks(ctx, lock, from, to, targetPacks, o.Offline)
+		if pluginErr != nil {
+			return nil, pluginErr
+		}
+		to, namesForRender = selection.resolve(to, namesForRender)
+		rendered, renderErr := Render(to, namesForRender, answers)
 		if renderErr != nil {
 			return nil, renderErr
 		}
@@ -123,9 +144,18 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err != nil && !errors.Is(err, templates.ErrVersionUnavailable) {
 			return nil, err
 		}
-		plan, err := BuildPlan(ctx, PlanInput{Root: temp, Lock: lock, Old: from, New: to, OldAnswers: lock.Answers, NewAnswers: lock.Answers, Merger: r.Merger, ForceManaged: o.ForceManaged})
+		oldPacks, newPacks, err := r.pluginPacks(ctx, lock, from, to, targetPacks, o.Offline)
 		if err != nil {
 			return nil, err
+		}
+		plan, err := BuildPlan(ctx, PlanInput{Root: temp, Lock: lock, Old: from, New: to, OldAnswers: lock.Answers, NewAnswers: answers, OldPacks: &oldPacks, NewPacks: &newPacks, Merger: r.Merger, ForceManaged: o.ForceManaged})
+		if err != nil {
+			return nil, err
+		}
+		if change != nil {
+			if err := change.editPlan(temp, plan); err != nil {
+				return nil, err
+			}
 		}
 		if err := plan.Format(r.Out); err != nil {
 			return nil, err
@@ -137,7 +167,7 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err := writePlan(temp, plan); err != nil {
 			return nil, err
 		}
-		lock, err = NextLock(lock, plan, to, lock.Answers)
+		lock, err = NextLock(lock, plan, to, answers, newPacks)
 		if err != nil {
 			return nil, err
 		}

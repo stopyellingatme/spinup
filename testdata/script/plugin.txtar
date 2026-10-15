@@ -1,0 +1,72 @@
+# A plugin changes trust records only. The source stays inside this script's tree.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --api-only --module example.com/demo --modules '' --no-git --non-interactive
+exec cp -R $SPINUP_REPO/testdata/plugins/example plugin
+cd demo
+! exec spinup plugin add path:../plugin --non-interactive
+stderr '--trust'
+! exists .spinup/plugins.allow
+! exec spinup plugin add path:$SPINUP_REPO/testdata/plugins/bad-api --trust
+stderr 'API 99'
+! exec spinup plugin add path:$SPINUP_REPO/testdata/plugins/path-escape --trust
+stderr 'path'
+exec spinup plugin add path:../plugin --trust
+stdout 'Name: example'
+stdout 'SHA256: [a-f0-9]{64}'
+stdout 'example.txt'
+stdout 'greetings/{{.Name}}.txt'
+stdout 'Next: spinup upgrade'
+! exists example.txt
+grep 'example path:../plugin [a-f0-9]{64}' .spinup/plugins.allow
+grep 'name = .example.' spinup.toml
+exec spinup plugin list --json
+stdout '"name": "example"'
+exec spinup plugin info example
+stdout 'Generator: greeting'
+stdout 'API: 1'
+stdout 'Spinup: >=0.0.0'
+stdout 'Usage: greeting <Name>'
+exec spinup plugin verify
+stdout 'Verified example'
+exec spinup plugin verify --offline
+stdout 'Verified example'
+
+# Changed bytes require a new approval.
+cp ../changed ../plugin/files/example.txt.tmpl
+! exec spinup plugin verify
+stderr 'hash mismatch'
+exec spinup plugin update example --trust
+stdout 'Hash: [a-f0-9]{64} -> [a-f0-9]{64}'
+stdout 'Next: spinup upgrade --plan'
+exec spinup plugin verify
+stdout 'Verified example'
+
+# A new version updates only the selected table.
+cp ../version2 ../plugin/plugin.toml
+exec spinup plugin update example --version 2.0.0 --trust
+exec spinup plugin list --json
+stdout '"version": "2.0.0"'
+exec spinup plugin verify --offline
+
+# A local bare repository must not bypass the file transport restriction.
+exec git init --bare ../bare.git
+! exec spinup plugin add git:file://$WORK/bare.git --version v1.0.0 --trust
+stderr 'git source must be'
+! exec spinup plugin add git:https://example.invalid/repo --trust
+stderr 'fixed tag'
+
+exec spinup plugin remove example
+stdout 'Retained files'
+exec spinup plugin list --json
+stdout '^\[\]'
+exec spinup plugin verify
+! grep 'name = .example.' spinup.toml
+! grep 'example' .spinup/plugins.allow
+
+-- changed --
+Changed plugin content.
+-- version2 --
+name = "example"
+version = "2.0.0"
+api = 1
+spinup = ">=0.0.0"

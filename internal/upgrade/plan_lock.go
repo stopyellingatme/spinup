@@ -7,28 +7,42 @@ import (
 	"slices"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	pluginrender "github.com/stopyellingatme/spinup/internal/plugin/render"
 	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
 // NextLock records NEW template content, preserving user edits for later upgrades.
 // It returns an independent lock and never modifies the old lock or the plan.
-func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[string]any) (*manifest.Lock, error) {
+// The optional target selects NEW packs and their filesystem. Omission keeps old.Packs.
+func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[string]any, target ...PackSet) (*manifest.Lock, error) {
 	if err := old.Validate(); err != nil {
 		return nil, err
 	}
 	if p == nil {
 		return nil, fmt.Errorf("build next lock: plan is nil\nTry: build an upgrade plan first")
 	}
-	rendered, err := Render(to, old.Packs, answers)
+	if len(target) > 1 {
+		return nil, fmt.Errorf("build next lock: multiple target pack sets\nTry: supply one target pack set")
+	}
+	selection := PackSet{}
+	if len(target) == 1 {
+		selection = target[0]
+	}
+	version, packs := selection.resolve(to, old.Packs)
+	_, completed, err := loadPlanPacks(version, packs, answers)
+	if err != nil {
+		return nil, err
+	}
+	rendered, err := Render(version, packs, completed)
 	if err != nil {
 		return nil, err
 	}
 	next := *old
 	next.TemplateVersion = to.Version
 	next.FormatterGo = runtime.Version()
-	next.Answers = clonePlanAnswers(answers)
-	next.Packs = slices.Clone(old.Packs)
-	next.Plugins = slices.Clone(old.Plugins)
+	next.Answers = clonePlanAnswers(completed)
+	next.Packs = slices.Clone(packs)
+	next.Plugins = pluginrender.Plugins(version.Packs)
 	next.AppliedMigrations = slices.Clone(old.AppliedMigrations)
 	next.Tombstones = slices.Clone(old.Tombstones)
 	next.Orphans = slices.Clone(old.Orphans)

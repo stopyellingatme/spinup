@@ -49,6 +49,9 @@ func TestGoldenAuth(t *testing.T) {
 			selected[path] = &fstest.MapFile{Data: data, Mode: info.Mode()}
 			return nil
 		})
+		if err == nil {
+			err = oidcGoldenFiles(t, selected)
+		}
 		return selected, err
 	}
 	fsys, err := render()
@@ -89,9 +92,9 @@ func TestAuthPackClasses(t *testing.T) {
 	for _, f := range p.Files {
 		want := "scaffold"
 		switch {
-		case strings.HasPrefix(f.Path, "api/db/migrations/"):
+		case strings.HasPrefix(f.Path, "api/db/migrations/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
 			want = "seed"
-		case strings.HasPrefix(f.Path, "web/src/lib/server/"):
+		case strings.HasPrefix(f.Path, "web/src/lib/server/"), f.Path == "api/cmd/api/reset.go":
 			want = "managed"
 		}
 		if f.Class != want {

@@ -5,6 +5,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import type { PageProps } from './$types';
+	import OidcButtons from '#lib/components/OidcButtons.svelte';
 
 	let { form }: PageProps = $props();
 	let pending = $state(false);
@@ -68,6 +69,7 @@
 			</div>
 			<Button type="submit" disabled={pending}>Sign in</Button>
 		</form>
+		<OidcButtons />
 	</Card.Content>
 	<Card.Footer class="text-sm">
 		<span class="text-muted-foreground">No account?</span>

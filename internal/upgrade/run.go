@@ -138,6 +138,10 @@ func (r *Runner) Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
+	versions, err = r.pluginChain(ctx, lock, versions, o.Offline)
+	if err != nil {
+		return err
+	}
 	if len(versions) == 0 {
 		_, err = fmt.Fprintln(r.Out, "Already up to date.")
 		return err
@@ -309,7 +313,11 @@ func (r *Runner) step(ctx context.Context, state *runState) (*Step, error) {
 	if err != nil && !errors.Is(err, templates.ErrVersionUnavailable) {
 		return nil, err
 	}
-	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: clonePlanAnswers(state.Lock.Answers), Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out, Merger: r.Merger}, nil
+	answers := clonePlanAnswers(state.Lock.Answers)
+	if state.Module != nil && state.Status == "step" {
+		answers = clonePlanAnswers(state.Module.Answers)
+	}
+	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: answers, Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out, Merger: r.Merger}, nil
 }
 
 func (r *Runner) resume(ctx context.Context, state *runState) error {
@@ -322,18 +330,31 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			return err
 		}
 		if state.Status == "step" {
-			oldAnswers := clonePlanAnswers(step.Answers)
+			oldAnswers := clonePlanAnswers(state.Lock.Answers)
+			targetPacks := PackSet{}
+			if state.Module != nil {
+				targetPacks.Names = state.Module.Packs
+			}
 			if err := callPhase(ctx, phases.Before, step); err != nil {
 				return err
 			}
-			step.Plan, err = BuildPlan(ctx, PlanInput{Root: step.Worktree, Lock: step.Lock, Old: step.From, New: step.To, OldAnswers: oldAnswers, NewAnswers: step.Answers, Merger: r.Merger, ForceManaged: step.Options.ForceManaged})
+			oldPacks, newPacks, err := r.pluginPacks(ctx, step.Lock, step.From, step.To, targetPacks, step.Options.Offline)
 			if err != nil {
 				return err
+			}
+			step.Plan, err = BuildPlan(ctx, PlanInput{Root: step.Worktree, Lock: step.Lock, Old: step.From, New: step.To, OldAnswers: oldAnswers, NewAnswers: step.Answers, OldPacks: &oldPacks, NewPacks: &newPacks, Merger: r.Merger, ForceManaged: step.Options.ForceManaged})
+			if err != nil {
+				return err
+			}
+			if state.Module != nil {
+				if err := state.Module.editPlan(step.Worktree, step.Plan); err != nil {
+					return err
+				}
 			}
 			if err := step.Plan.Format(r.Out); err != nil {
 				return err
 			}
-			step.Lock, err = NextLock(step.Lock, step.Plan, step.To, step.Answers)
+			step.Lock, err = NextLock(step.Lock, step.Plan, step.To, step.Answers, newPacks)
 			if err != nil {
 				return err
 			}
