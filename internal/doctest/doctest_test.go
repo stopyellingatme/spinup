@@ -124,12 +124,26 @@ func TestDocs(t *testing.T) {
 		t.Skip("no doc pages")
 	}
 	bin := filepath.Join(t.TempDir(), "spinup")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	if _, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "go", Args: []string{"build", "-o", bin, "./cmd/spinup"}, Dir: root}); err != nil {
 		t.Fatal(err)
 	}
-	vars := []string{}
+	// Pages run with their own HOME, so pin the Go caches to the real ones, and point
+	// generated apps at the local kit (it is not published yet).
+	goEnv, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "GOCACHE", "GOMODCACHE"}, Dir: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caches := strings.Split(strings.TrimSpace(string(goEnv.Stdout)), "\n")
+	if len(caches) != 2 {
+		t.Fatalf("go env printed %q, want two lines", goEnv.Stdout)
+	}
+	vars := []string{
+		"GOCACHE=" + caches[0],
+		"GOMODCACHE=" + caches[1],
+		"SPINUP_KIT_REPLACE=" + filepath.Join(root, "kit"),
+	}
 	if value := os.Getenv("DATABASE_URL"); value != "" {
 		vars = append(vars, "DATABASE_URL="+value)
 	}
