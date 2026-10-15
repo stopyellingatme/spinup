@@ -20,6 +20,7 @@ On Windows, run the command in WSL2.
 
 The command selects free ports when the preferred ports are busy. It records the ports in `.spinup/dev.json`.
 The URL table shows the application, API, and Mailpit addresses. With `--lgtm`, the table also shows Grafana.
+With `--no-infra`, the command does not record or show a Mailpit address.
 
 | Flag | Effect |
 | --- | --- |
@@ -39,4 +40,5 @@ The watcher ignores `bundle.gen.yaml`. If a generation step fails, the command r
 
 Each process has a prefix on its output lines. Failed processes restart with an increasing delay, up to five seconds.
 Press Ctrl-C to stop all child groups. Children receive SIGTERM, then SIGKILL after five seconds if necessary.
+Closing the terminal also stops all child groups.
 Docker services continue to run unless you specify `--down`. The `NO_COLOR` environment variable also disables prefix colors.

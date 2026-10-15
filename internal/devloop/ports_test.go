@@ -1,6 +1,7 @@
 package devloop
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"reflect"
@@ -76,5 +77,24 @@ func TestAllocateUniquePorts(t *testing.T) {
 	}
 	if ports.API.Port != 8080 || ports.Web.Port != 32000 || ports.Mailpit.Port != 8025 || ports.Grafana.Port != 3000 {
 		t.Fatalf("ports: %+v", ports)
+	}
+}
+
+func TestNoInfraOmitsMailpit(t *testing.T) {
+	t.Parallel()
+	ports, err := allocate(Options{NoInfra: true, PortAllocator: func(port int) (int, error) {
+		return port, nil
+	}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ports.Mailpit.Port != 0 {
+		t.Fatalf("Mailpit port = %d, want 0", ports.Mailpit.Port)
+	}
+
+	var out bytes.Buffer
+	printURLs(&out, ports, false, false)
+	if strings.Contains(out.String(), "Mailpit") {
+		t.Fatalf("printed unavailable Mailpit URL: %s", out.String())
 	}
 }

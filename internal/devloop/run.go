@@ -231,7 +231,10 @@ func allocate(o Options, web bool) (Ports, error) {
 	if front == 0 {
 		front = 5173
 	}
-	ports := Ports{API: Endpoint{api}, Mailpit: Endpoint{8025}}
+	ports := Ports{API: Endpoint{api}}
+	if !o.NoInfra {
+		ports.Mailpit.Port = 8025
+	}
 	if web {
 		ports.Web.Port = front
 	}
@@ -334,7 +337,10 @@ func printURLs(out io.Writer, ports Ports, web, lgtm bool) {
 	if web {
 		_, _ = fmt.Fprintf(out, "App      http://localhost:%d\n", ports.Web.Port)
 	}
-	_, _ = fmt.Fprintf(out, "API      http://localhost:%d\nMailpit  http://localhost:%d\n", ports.API.Port, ports.Mailpit.Port)
+	_, _ = fmt.Fprintf(out, "API      http://localhost:%d\n", ports.API.Port)
+	if ports.Mailpit.Port != 0 {
+		_, _ = fmt.Fprintf(out, "Mailpit  http://localhost:%d\n", ports.Mailpit.Port)
+	}
 	if lgtm {
 		_, _ = fmt.Fprintf(out, "Grafana  http://localhost:%d\n", ports.Grafana.Port)
 	}
