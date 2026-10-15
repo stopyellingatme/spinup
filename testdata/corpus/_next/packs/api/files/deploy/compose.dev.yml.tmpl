@@ -1,0 +1,26 @@
+name: [[ .app_name ]]-dev
+
+services:
+  postgres:
+    image: [[ if eq .db_version "18" ]][[ image "postgres" ]][[ else if eq .db_version "17" ]][[ image "postgres-17" ]][[ else ]][[ image "postgres-16" ]][[ end ]]
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql[[ if ne .db_version "18" ]]/data[[ end ]]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  mailpit:
+    image: [[ image "mailpit" ]]
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  postgres_data:
