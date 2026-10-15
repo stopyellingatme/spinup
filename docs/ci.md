@@ -28,16 +28,19 @@ $ spinup new preview --api-only --modules ci --module example.com/preview --no-g
 
 The web job runs `pnpm check` and `pnpm test`.
 An app without unit tests can pass the web job.
-The web job excludes `e2e/` because Playwright runs those tests separately.
+The Vite configuration excludes `e2e/` from Vitest and keeps the default exclusions.
+Local `pnpm test` uses the same configuration.
 A failed Playwright run uploads `web/playwright-report/` for seven days.
-Go and Node versions come from `api/go.mod` and `web/package.json`.
+The Go version comes from `api/go.mod`.
+Every workflow pins the Node major from the spinup stack manifest.
+This major matches the Node image.
 The `packageManager` field selects pnpm.
 
-The deploy pack lists `staging` first.
-The deploy and backup workflows use `staging` as their default environment.
-Select another environment through the manual deploy input.
-The deploy workflow serializes remote operations for each environment.
-The backup workflow shares this concurrency group for `staging`.
+Set the repository variable `SPINUP_ENVIRONMENT` to the default environment from `spinup.toml`.
+Backup verification and deployment on pushes use `${{ vars.SPINUP_ENVIRONMENT || 'staging' }}`.
+Without this variable, both workflows use `staging`.
+The manual deploy input takes precedence over this variable.
+The workflows share a concurrency group for each environment.
 
 Enable deployment on pushes to `main` during generation:
 
@@ -49,7 +52,7 @@ $ spinup new preview --api-only --modules ci,deploy --module example.com/preview
 ```
 
 The `--ci-deploy-on-push` flag defaults to false.
-A push deploys to `staging`.
+A push deploys to the environment selected by `SPINUP_ENVIRONMENT`, with `staging` as the fallback.
 Configure the target host and public URL in `spinup.toml` before deployment.
 Configure the matching GitHub environment with these secrets:
 
@@ -62,7 +65,7 @@ Configure the matching GitHub environment with these secrets:
 Encrypt the environment secrets to the CI recipient before deployment.
 The workflows install the age key with mode `0600` at `~/.config/spinup/keys/<app>-<env>.agekey`.
 They require strict SSH host verification and remove the keys after the operation.
-Only the deploy and backup workflows read these secrets.
+Only the deploy and backup workflows read these three secrets.
 Both workflows read them within their GitHub environment.
 
 The local `setup-spinup` action reads `cli_version` from `spinup.lock` by default.
@@ -78,6 +81,14 @@ The upgrade workflow removes `SPINUP_KIT_REPLACE` before it runs spinup.
 It opens the PR from the separate worktree created by the upgrade engine.
 If the upgrade returns exit code 3, the PR contains the conflicts and lists their paths.
 Resolve the markers and complete the upgrade before merging that PR.
-The repository must allow GitHub Actions to create pull requests.
-Only the upgrade job receives write permissions for contents and pull requests.
+
+Enable the repository setting "Allow GitHub Actions to create and approve pull requests".
+Create the repository secret `SPINUP_UPGRADE_TOKEN` for upgrades that change workflows and for PRs that must trigger CI.
+Use a fine-grained token or a GitHub App token with contents, pull-requests, and workflows write permissions.
+Both checkout and PR creation use `${{ secrets.SPINUP_UPGRADE_TOKEN || github.token }}`.
+
+Without the secret, the workflow uses `GITHUB_TOKEN`.
+This fallback cannot push changes under `.github/workflows/`, and its PRs do not trigger CI.
+The PR body explains these limits when the workflow uses the fallback.
+Only the upgrade job grants `GITHUB_TOKEN` write permissions for contents and pull requests.
 All workflows declare read access to contents at the top level.

@@ -86,6 +86,11 @@ $ PORT=3000 API_URL=http://localhost:8080 node build
 
 The web pack includes Playwright with a home-page smoke test.
 The `auth` module also tests registration, login, session reload, and logout.
+The smoke test scopes session controls to the header banner.
+It scopes registration and login controls to the main region.
+These scopes prevent duplicate links and buttons from causing strict locator errors.
+The Vite configuration excludes `e2e/**` from Vitest and keeps the default exclusions.
+Run `pnpm test` for unit tests and `pnpm test:e2e` for browser tests.
 CI starts the API and web services before it runs the tests.
 For local tests, start `spinup dev` in another terminal.
 

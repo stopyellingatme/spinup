@@ -4,6 +4,7 @@ import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv } from 'vite';
+import { configDefaults } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
 	// The process environment wins over web/.env files.
@@ -31,6 +32,9 @@ export default defineConfig(({ mode }) => {
 				tracing: { server: true }
 			})
 		],
+		test: {
+			exclude: ['e2e/**', ...configDefaults.exclude]
+		},
 		define: {
 			__PUBLIC_ORIGIN__: JSON.stringify(origin)
 		},

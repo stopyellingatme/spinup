@@ -18,16 +18,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: spinup-remote-${{ inputs.environment || 'staging' }}
+  group: spinup-remote-${{ inputs.environment || vars.SPINUP_ENVIRONMENT || 'staging' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ inputs.environment || vars.SPINUP_ENVIRONMENT || 'staging' }}
     env:
-      SPINUP_ENVIRONMENT: ${{ inputs.environment || 'staging' }}
+      SPINUP_ENVIRONMENT: ${{ inputs.environment || vars.SPINUP_ENVIRONMENT || 'staging' }}
       SPINUP_APP: [[ quote .app_name ]]
     steps:
       - uses: [[ uses "actions/checkout" ]]
