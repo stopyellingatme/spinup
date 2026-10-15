@@ -55,14 +55,30 @@ func TestScripts(t *testing.T) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build spinup: %v\n%s\nTry: correct the build failure", err, output)
 	}
+	// Scripts get their own HOME, so pin the Go caches to the real ones. Otherwise an
+	// app-gate build would start with an empty module cache and fail offline.
+	goEnv := exec.CommandContext(t.Context(), "go", "env", "GOCACHE", "GOMODCACHE")
+	goEnv.Dir = root
+	out, err := goEnv.Output()
+	if err != nil {
+		t.Fatalf("go env: %v\nTry: check the Go installation", err)
+	}
+	caches := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(caches) != 2 {
+		t.Fatalf("go env printed %q, want two lines", out)
+	}
 	testscript.Run(t, testscript.Params{
 		Files: files,
 		Setup: func(env *testscript.Env) error {
-			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "GOCACHE", "GOMODCACHE", "PATH"} {
+			env.Setenv("GOCACHE", caches[0])
+			env.Setenv("GOMODCACHE", caches[1])
+			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
 				if value, ok := os.LookupEnv(key); ok {
 					env.Setenv(key, value)
 				}
 			}
+			// SPINUP_REPO lets app-gate scripts point SPINUP_KIT_REPLACE at $SPINUP_REPO/kit.
+			env.Setenv("SPINUP_REPO", root)
 			env.Setenv("PATH", binDir+string(os.PathListSeparator)+env.Getenv("PATH"))
 			env.Setenv("HOME", env.WorkDir)
 			env.Setenv("SPINUP_NO_UPDATE_CHECK", "1")
