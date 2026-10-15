@@ -16,6 +16,10 @@ import (
 )
 
 func (u *upgrade) updateCompose(ctx context.Context, image stackversions.Image, volume string) error {
+	return u.updateComposeAt(ctx, image, volume, "")
+}
+
+func (u *upgrade) updateComposeAt(ctx context.Context, image stackversions.Image, volume, dataPath string) error {
 	edge := u.dir + "/compose.edge.yml"
 	data, err := u.run(ctx, "cat", edge)
 	if err != nil {
@@ -58,6 +62,9 @@ func (u *upgrade) updateCompose(ctx context.Context, image stackversions.Image, 
 		if !ok {
 			return failure("update Compose file", errors.New("postgres environment must use mapping syntax"))
 		}
+		if dataPath != "" {
+			pgdata = dataPath
+		}
 		env["PGDATA"] = pgdata
 		volumes, _ := doc["volumes"].(map[string]any)
 		if volumes == nil {
@@ -96,6 +103,9 @@ func (u *upgrade) updateCompose(ctx context.Context, image stackversions.Image, 
 	return nil
 }
 func (u *upgrade) repositoryChange() {
+	u.repositoryChangeAt(fmt.Sprintf("%s_pgdata_%d", u.cfg.App.Name, u.o.To))
+}
+func (u *upgrade) repositoryChangeAt(volume string) {
 	fmt.Fprintf(u.o.Out, `Before the next deploy, commit these repository changes:
 1. Set answers.db_version to %q (a JSON string) in spinup.lock.
 2. Render the new answer with these commands (review local changes first):
@@ -105,11 +115,11 @@ func (u *upgrade) repositoryChange() {
 3. In deploy/compose.edge.yml, set volumes.postgres_data to:
    postgres_data:
      external: true
-     name: %s_pgdata_%d
+     name: %s
 4. Commit spinup.lock and the rendered deploy files, including Dockerfile.postgres and compose.edge.yml.
 spinup.toml has no db_version setting. No command changes this answer directly. These are manual steps.
 The VM swap survives the next spinup deploy only after these repository changes.
-`, fmt.Sprint(u.o.To), u.cfg.App.Name, u.o.To)
+`, fmt.Sprint(u.o.To), volume)
 	if u.usesPGBackRest() {
 		fmt.Fprintln(u.o.Out, "For pgBackRest, render and commit its configuration before the full backup:")
 		fmt.Fprintln(u.o.Out, "   spinup restore deploy/pgbackrest/pgbackrest.conf --force")
