@@ -1,16 +1,117 @@
 #!/usr/bin/env bash
-# Regenerate the lockfiles (go.sum, tools.sum, pnpm-lock.yaml) that template packs embed.
-# Only the main loop runs this, during a pre-seed commit. Lanes never run it.
+# Regenerate the Go lockfiles that the api template pack embeds, from stackversions.yaml.
+# Only the main loop runs this, during a pre-seed commit or a milestone gate. It needs network
+# access (proxy.golang.org). Lanes never run it.
 #
-# The full procedure needs `spinup new` (M1.4): render the default app into a temp dir,
-# run `go mod tidy` and `pnpm install --lockfile-only` there, and copy the lockfiles back
-# into each pack. Until a pack declares a go.mod or package.json input, there is nothing to do.
+# Outputs, in internal/templates/packs/api/files/api/:
+#   tools.mod.tmpl, tools.sum   dev tools for `go tool -modfile=tools.mod` (sqlc, oapi-codegen, goose, air)
+#   go.mod.tmpl, go.sum         the generated API module: the kit, plus every module the kit and the scaffold need
+#
+# Modes:
+#   seed (default)  The app module imports every kit package plus the third-party packages in
+#                   kit/internal/deps. Use it before the api scaffold exists.
+#   app             BUMP_STACK_MODE=app. Render a real app with `spinup new` (SPINUP_KIT_REPLACE pointing at
+#                   kit/) and run `go mod tidy` in its api/ directory. Use it at a milestone gate, once
+#                   `new` works, so go.mod lists exactly what the scaffold imports.
 set -euo pipefail
 
-packs=internal/templates/packs
-if ! find "$packs" \( -name 'go.mod*' -o -name 'tools.mod*' -o -name 'package.json*' \) -print -quit 2>/dev/null | grep -q .; then
-  echo "bump-stack: no pack declares Go or npm dependencies yet; nothing to do"
-  exit 0
-fi
-echo "bump-stack: packs declare dependencies, but the render-and-lock procedure is not written yet (M1 pre-seed)" >&2
-exit 1
+export GOTOOLCHAIN=local GOFLAGS=
+export GOPROXY="${BUMP_STACK_GOPROXY:-https://proxy.golang.org,direct}"
+
+root=$(git rev-parse --show-toplevel)
+sv="$root/internal/stackversions/stackversions.yaml"
+out="$root/internal/templates/packs/api/files/api"
+mode="${BUMP_STACK_MODE:-seed}"
+# The kit version that generated apps require. Minors move in lockstep with the CLI.
+kit_version="${BUMP_STACK_KIT_VERSION:-v0.1.0}"
+kit_module=github.com/stopyellingatme/spinup/kit
+placeholder=spinup.invalid/app/api
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+mkdir -p "$out"
+
+# pin <section> <key> prints the version pinned for <key> in a top-level <section> of stackversions.yaml.
+pin() {
+  awk -v sec="$1:" -v key="$2:" '
+    /^[^ #]/ { insec = ($1 == sec) }
+    insec && $1 == key { print $2; found = 1; exit }
+    END { if (!found) exit 1 }' "$sv" || {
+    echo "bump-stack: no pin for $2 in section $1 of $sv" >&2
+    echo "Try: add it to internal/stackversions/stackversions.yaml" >&2
+    exit 1
+  }
+}
+
+# finish <dir> <go.mod target> <go.sum target> writes the module files as pack sources.
+# The module line becomes a template, and the local kit replace directive is dropped.
+finish() {
+  (cd "$1" && go mod edit -dropreplace="$kit_module" 2>/dev/null || true)
+  sed "s#^module .*#module [[ .module ]]/api#" "$1/go.mod" > "$2"
+  cp "$1/go.sum" "$3"
+  if grep -q '^toolchain ' "$2"; then
+    echo "bump-stack: $2 has a toolchain line; a pinned module needs a newer Go than 1.26.0" >&2
+    exit 1
+  fi
+}
+
+# --- tools.mod ---------------------------------------------------------------------------------
+tools=(
+  github.com/sqlc-dev/sqlc/cmd/sqlc
+  github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+  github.com/pressly/goose/v3/cmd/goose
+  github.com/air-verse/air
+)
+mkdir "$work/tools"
+(
+  cd "$work/tools"
+  go mod init "$placeholder" >/dev/null 2>&1
+  go mod edit -go=1.26.0
+  for t in "${tools[@]}"; do
+    go get -tool "$t@$(pin go_tools "$t")"
+  done
+  go mod tidy
+)
+finish "$work/tools" "$out/tools.mod.tmpl" "$out/tools.sum"
+echo "bump-stack: wrote tools.mod.tmpl and tools.sum"
+
+# --- go.mod (the API module) ---------------------------------------------------------------------
+case "$mode" in
+  seed)
+    app="$work/app"
+    mkdir -p "$app/internal/deps"
+    (
+      cd "$app"
+      go mod init "$placeholder" >/dev/null 2>&1
+      go mod edit -go=1.26.0 -require="$kit_module@$kit_version" -replace="$kit_module=$root/kit"
+      {
+        echo "package deps"
+        echo
+        echo "import ("
+        (cd "$root/kit" && go list ./... | grep -v '/internal/') | sed 's/.*/\t_ "&"/'
+        grep -h '^\s*_ "' "$root"/kit/internal/deps/deps_m*.go | grep -v "$kit_module"
+        echo ")"
+      } > internal/deps/deps.go
+      go mod tidy
+    )
+    ;;
+  app)
+    app="$work/new/demo/api"
+    (
+      cd "$root"
+      go build -o "$work/spinup" ./cmd/spinup
+      cd "$work" && mkdir new && cd new
+      SPINUP_KIT_REPLACE="$root/kit" "$work/spinup" new demo --api-only --module "${placeholder%/api}" \
+        --non-interactive --no-git
+      cd "$app"
+      go mod tidy
+    )
+    ;;
+  *)
+    echo "bump-stack: unknown BUMP_STACK_MODE=$mode" >&2
+    echo "Try: BUMP_STACK_MODE=seed or BUMP_STACK_MODE=app" >&2
+    exit 2
+    ;;
+esac
+finish "$app" "$out/go.mod.tmpl" "$out/go.sum"
+echo "bump-stack: wrote go.mod.tmpl and go.sum ($mode mode, kit $kit_version)"

@@ -1,0 +1,3 @@
+# STUB from the M1 pre-seed commit. Unit M1.3 owns this file and replaces it.
+name = "api"
+description = "Go API (stub)"

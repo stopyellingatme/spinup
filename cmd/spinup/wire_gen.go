@@ -5,3 +5,8 @@
 // milestone adds the packages that the milestone creates.
 
 package main
+
+import (
+	// M1
+	_ "github.com/stopyellingatme/spinup/internal/doctor/composelint"
+)

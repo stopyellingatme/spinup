@@ -21,6 +21,7 @@ Read these before you change anything:
 - MinIO is archived. Tests use SeaweedFS for S3.
 - cAdvisor is `ghcr.io/google/cadvisor`.
 - The SvelteKit rules are in `docs/adr/0002-sveltekit-version.md`. The backup backend decision is in `docs/adr/0004-backup-backend.md`.
+- The M1 contracts (`db migrate` through the app binary, the API lockfiles, the doc-test format) are in `docs/adr/0005-m1-contracts.md`.
 
 ## Commands
 
@@ -70,7 +71,7 @@ Test contracts:
 
 Only the main loop writes these files. A unit never edits them:
 - `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `kit/go.mod`, `kit/go.sum`, and every `deps_m*.go` file
-- template-pack lockfiles (`go.sum`, `tools.sum`, `pnpm-lock.yaml` under `internal/templates/packs/`)
+- template-pack lockfiles (`go.sum`, `tools.sum`, `pnpm-lock.yaml` under `internal/templates/packs/`), plus `go.mod.tmpl`, `tools.mod.tmpl`, and `pack.d/deps.toml` in the `api` pack
 - `internal/stackversions/stackversions.yaml`
 - `Makefile`, `scripts/tools-check.sh`, `scripts/bump-stack.sh`
 - `cmd/spinup/wire_gen.go`
