@@ -10,7 +10,7 @@ export GOTOOLCHAIN := local
 # scripts/bin holds pnpm (through corepack, pinned in stackversions.yaml).
 export PATH := $(CURDIR)/scripts/bin:/opt/homebrew/opt/node@24/bin:$(PATH)
 
-MODULES := . ./kit
+MODULES := . ./kit ./plugin-sdk
 PKGS ?= ./...
 
 .PHONY: help build test lint vuln golden script app-gate doctest e2e dind tools-check bump-stack install
@@ -24,6 +24,7 @@ build: ## Build every module
 test: ## Unit tests with the race detector (PKGS=./internal/x/... to narrow the root module)
 	@go test -race $(PKGS)
 	@cd kit && go test -race ./...
+	@cd plugin-sdk && go test -race ./...
 
 lint: ## golangci-lint on every module (offline)
 	@for m in $(MODULES); do (cd $$m && golangci-lint run ./...) || exit 1; done

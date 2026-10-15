@@ -57,6 +57,7 @@ go_tools:   # generated apps install these through api/tools.mod (go tool -modfi
   golang.org/x/vuln/cmd/govulncheck: v1.9.0
 
 npm:
+  bun: 1.4.2   # the packageManager pin of web apps created with --package-manager bun
   "@sveltejs/kit": 3.0.1                  # stable since 2026-10-01; ADR 0002
   svelte: 5.57.2
   vite: 8.3.4
@@ -139,6 +140,21 @@ binaries:   # `spinup tools install` verifies these sha256 values; they are comp
       linux-arm64:   { name: age-v1.3.2-linux-arm64.tar.gz,   sha256: 6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4 }
       windows-amd64: { name: age-v1.3.2-windows-amd64.zip,    sha256: f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7 }
 
+  tofu:
+    version: "1.13.1"
+    repo: opentofu/opentofu
+    assets:   # from tofu_1.13.1_SHA256SUMS
+      darwin-arm64:  { name: tofu_1.13.1_darwin_arm64.zip, sha256: 81aebe6453223bcb3ce3c28424b36d009ebfddd3ad65ad1ec3eed0d0d574a77b }
+      darwin-amd64:  { name: tofu_1.13.1_darwin_amd64.zip, sha256: d44ab59ec53fb18e900f4ae3fc8b72e042c9e03ca957860edbaac04e4427218d }
+      linux-amd64:   { name: tofu_1.13.1_linux_amd64.zip,  sha256: 8ccbc6f8ee21d2827715f3c6e08a9b3e0209b1e62057c05067ef117e047c1a80 }
+      linux-arm64:   { name: tofu_1.13.1_linux_arm64.zip,  sha256: b9614df40575cc3fc10a8a25025b7245d961da279f715ea3efff4ddae8e6938a }
+  wal-g:
+    version: "3.0.9"
+    repo: wal-g/wal-g
+    assets:   # installed into the postgres image (Debian trixie); the Ubuntu 24.04 build runs on its glibc
+      linux-amd64:   { name: wal-g-pg-24.04-amd64.tar.gz,   sha256: 444ce216230c254edef803e098a59a1746806da3e0d55671d7b0f0082db14ef4 }
+      linux-arm64:   { name: wal-g-pg-24.04-aarch64.tar.gz, sha256: cb37c5f8391bd8ef2efceeb9c6995059c0abf2fa74b9b717b42a16a7c93cfde1 }
+
 actions:   # GitHub Actions pinned by commit SHA (annotated tags dereferenced)
   actions/checkout:                { tag: v7.0.1,  sha: 3d3c42e5aac5ba805825da76410c181273ba90b1 }
   actions/setup-go:                { tag: v7.0.0,  sha: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e }
@@ -159,6 +175,10 @@ actions:   # GitHub Actions pinned by commit SHA (annotated tags dereferenced)
   actions/attest-build-provenance: { tag: v4.2.2,  sha: 4d101475d8b20a2381f78447822ac1eab6504dd8 }
   peter-evans/create-pull-request: { tag: v8.1.1,  sha: 5f6978faf089d4d20b00c7766989d076bb2fc7f1 }
   renovatebot/github-action:       { tag: v46.3.8, sha: f0f41e5f2e706165f6814b1d0f0d0e319de7d1d9 }
+  actions/configure-pages:         { tag: v6.0.0,  sha: 45bfe0192ca1faeb007ade9deae92b16b8254a0d }
+  actions/upload-pages-artifact:   { tag: v5.0.0,  sha: fc324d3547104276b827a68afc52ff2a11cc49c9 }
+  actions/deploy-pages:            { tag: v5.0.1,  sha: 368f82528645a54fb793d4d04e342629a3f51346 }
+  actions/jekyll-build-pages:      { tag: v1.0.13, sha: 44a6e6beabd48582f863aeeb6cb2151cc1716697 }
   # actionlint has no action.yml: install the binary (rhysd/actionlint v1.7.12) in workflows.
 
 tools:   # host tools that `make tools-check` and CI install
@@ -168,3 +188,4 @@ tools:   # host tools that `make tools-check` and CI install
   syft: 1.54.1
   cosign: 3.1.3
   promtool: 3.15.0
+  hcloud-provider: 1.70.0   # hetznercloud/hcloud for the tofu pack (generated apps, not a host tool)

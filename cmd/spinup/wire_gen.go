@@ -49,4 +49,8 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/gen/mailer"
 	_ "github.com/stopyellingatme/spinup/internal/plugin/pack"
 	_ "github.com/stopyellingatme/spinup/internal/plugin/render"
+
+	// M10
+	_ "github.com/stopyellingatme/spinup/internal/backup/walg"
+	_ "github.com/stopyellingatme/spinup/internal/plugin/rpc"
 )

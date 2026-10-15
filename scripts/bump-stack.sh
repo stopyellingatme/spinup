@@ -161,10 +161,29 @@ if [[ -f "$web_out/package.json.tmpl" ]]; then
     mkdir -p "$work/webapp" && cd "$work/webapp"
     "$work/spinup-web" new demo --module "${placeholder%/api}" --modules "$all_modules" --non-interactive --no-git >/dev/null
     cd demo/web
-    rm -f pnpm-lock.yaml
+    # Start from the current lockfile, so new packages do not re-resolve the others.
+    # BUMP_STACK_FRESH=1 re-resolves every package (a deliberate bump).
+    if [[ "${BUMP_STACK_FRESH:-0}" == 1 ]]; then rm -f pnpm-lock.yaml; fi
     pnpm install --lockfile-only
     cp pnpm-lock.yaml "$web_out/pnpm-lock.yaml"
     pnpm install --frozen-lockfile
   )
   echo "bump-stack: wrote web/pnpm-lock.yaml and filled the pnpm store"
+
+  # --- web: bun.lock (ADR 0014 §3) ---------------------------------------------------------------
+  bun_bin="${BUN:-bun}"
+  if command -v "$bun_bin" >/dev/null 2>&1; then
+    (
+      mkdir -p "$work/bunapp" && cd "$work/bunapp"
+      "$work/spinup-web" new demo --module "${placeholder%/api}" --modules "$all_modules" --package-manager bun --non-interactive --no-git >/dev/null
+      cd demo/web
+      if [[ "${BUMP_STACK_FRESH:-0}" == 1 || ! -s bun.lock || "$(head -c 2 bun.lock)" == "{}" ]]; then rm -f bun.lock; fi
+      "$bun_bin" install --lockfile-only
+      cp bun.lock "$web_out/bun.lock"
+      "$bun_bin" install --frozen-lockfile >/dev/null
+    )
+    echo "bump-stack: wrote web/bun.lock and filled the bun cache"
+  else
+    echo "bump-stack: bun is not on PATH; web/bun.lock is unchanged" >&2
+  fi
 fi

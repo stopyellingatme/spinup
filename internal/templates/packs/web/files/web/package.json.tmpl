@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@[[ npm "pnpm" ]]",
+  "packageManager": "[[ .package_manager ]]@[[ npm .package_manager ]]",
   "engines": {
     "node": ">=24"
   },
@@ -18,7 +18,11 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
+[[- if eq .api_client "heyapi" ]]
+    "gen:client": "openapi-ts --input ../api/openapi/bundle.gen.yaml --output src/lib/api/client"
+[[- else ]]
     "gen:client": "openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts"
+[[- end ]]
   },
   "dependencies": {
     "@opentelemetry/api": "[[ npm "@opentelemetry/api" ]]",
@@ -29,10 +33,12 @@
     "openapi-fetch": "[[ npm "openapi-fetch" ]]"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "[[ npm "@hey-api/openapi-ts" ]]",
     "@internationalized/date": "[[ npm "@internationalized/date" ]]",
     "@lucide/svelte": "[[ npm "@lucide/svelte" ]]",
     "@playwright/test": "[[ npm "@playwright/test" ]]",
     "@sveltejs/adapter-node": "[[ npm "@sveltejs/adapter-node" ]]",
+    "@sveltejs/adapter-static": "[[ npm "@sveltejs/adapter-static" ]]",
     "@sveltejs/kit": "[[ npm "@sveltejs/kit" ]]",
     "@sveltejs/vite-plugin-svelte": "[[ npm "@sveltejs/vite-plugin-svelte" ]]",
     "@tailwindcss/vite": "[[ npm "@tailwindcss/vite" ]]",

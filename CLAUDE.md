@@ -4,7 +4,8 @@ spinup is a Buffalo-style CLI. It creates and operates a full stack: a Go API, a
 
 - CLI module: `github.com/stopyellingatme/spinup` (repository root)
 - Runtime library ("kit"): `github.com/stopyellingatme/spinup/kit` (directory `kit/`, its own `go.mod`)
-- `go.work` is committed. It joins the root module and `kit/`.
+- Plugin SDK: `github.com/stopyellingatme/spinup/plugin-sdk` (directory `plugin-sdk/`, its own `go.mod`, ADR 0014 §1)
+- `go.work` is committed. It joins the root module, `kit/`, and `plugin-sdk/`.
 
 Read these before you change anything:
 - `docs/design/plan.md`: the approved plan, the milestone unit graphs, and the critic resolutions. The critic resolutions override `architecture.md`.
@@ -30,6 +31,7 @@ Read these before you change anything:
 - The M7 contracts (backup configuration, backends, in-place restore, backup metrics, the schedule, maintenance, the remote doctor, test storage) are in `docs/adr/0011-m7-contracts.md`.
 - The M8 contracts (release assets, versions and signing, installing spinup, generated workflows, `spinup ci`) are in `docs/adr/0012-m8-contracts.md`.
 - The M9 contracts (modules, mail and password reset, OIDC, pack plugins) are in `docs/adr/0013-m9-contracts.md`.
+- The M10 contracts (tier-2 plugins and the plugin SDK, embed mode, bun and heyapi, OpenTofu, self-update, WAL-G, in-place pg_upgrade, the docs site) are in `docs/adr/0014-m10-contracts.md`.
 
 ## Commands
 
@@ -80,7 +82,7 @@ Test contracts:
 ## Shared files (main loop only)
 
 Only the main loop writes these files. A unit never edits them:
-- `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `kit/go.mod`, `kit/go.sum`, and every `deps_m*.go` file
+- `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `kit/go.mod`, `kit/go.sum`, `plugin-sdk/go.mod`, and every `deps_m*.go` file
 - template-pack lockfiles (`go.sum`, `tools.sum`, `pnpm-lock.yaml` under `internal/templates/packs/`), plus `go.mod.tmpl`, `tools.mod.tmpl`, and `pack.d/deps.toml` in the `api` pack
 - `internal/stackversions/stackversions.yaml`
 - `Makefile`, `scripts/tools-check.sh`, `scripts/bump-stack.sh`
@@ -90,7 +92,7 @@ Only the main loop writes these files. A unit never edits them:
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
 - the M7 contract files `internal/backup/registry.go` and `internal/maintain/window.go` (see `docs/adr/0011-m7-contracts.md`)
 - the M9 contract file `internal/plugin/contract.go` (see `docs/adr/0013-m9-contracts.md`)
-- the web pack fragments `pack.d/deps.toml` and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
+- the web pack fragments `pack.d/deps.toml`, `pack.d/modes.toml`, and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/bun.lock`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
 

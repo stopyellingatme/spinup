@@ -289,17 +289,21 @@ The M9 pre-seed adds ADR 0013, the plugin contract `internal/plugin/contract.go`
 
 #### M10 — Deferred full-depth items (last, and the core does not depend on them)
 
+ADR 0014 fixes the contracts. Every unit also writes its `docs/` page and, when it changes a pack, `internal/templates/packs.digest`.
+
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| M10.1 | JSON-RPC host for tier-2 plugins, and the `plugin-sdk` module (the pre-seed writes its `go.mod`) | `T ./internal/plugin/rpc/...`, then `cd plugin-sdk && go test ./...` | `internal/plugin/rpc/`, `plugin-sdk/` (not `go.mod` or `go.sum`) | – |
-| M10.2 | Conformance suite with malicious cases, an example plugin, `plugin new`, and `g plugin` | `T ./plugin-sdk/conformance/...`, then `S plugin_new` | `plugin-sdk/conformance/`, `examples/plugin/`, `internal/cli/plugin_new.go`, `internal/gen/plugin/`, `testdata/script/plugin_new.txtar` | M10.1 |
-| M10.3 | `--frontend-mode=embed` (questions in `pack.toml`) | `G web-embed` | `packs/web-embed/`, `testdata/golden/web-embed/` | – |
-| M10.4 | `--pm bun` and `--client heyapi` | `G web-variants` | `packs/web/variants/`, `packs/web/pack.d/variants.toml`, `testdata/golden/web-variants/` | – |
-| M10.5 | OpenTofu pack for hcloud | `G tofu` | `packs/tofu/`, `testdata/golden/tofu/` | – |
-| M10.6 | `self-update` with cosign verification and Homebrew detection | `T ./internal/selfupdate/...` | `internal/selfupdate/`, `internal/cli/selfupdate.go` | – |
-| M10.7 | WAL-G backend | `T ./internal/backup/walg/...` | `internal/backup/walg/` | – |
-| M10.8 | In-place `pg_upgrade` | `T ./internal/maintain/pgupgrade/...` | `internal/maintain/pgupgrade/`, `internal/cli/maintenance_pgupgrade.go` | – |
-| M10.9 | Docs site from `compat/` and `stackversions`, and `docs compat` | `make doctest` | `docs/site/`, `internal/cli/docs.go` | – |
+| M10.1 | Tier-2 plugins: the JSON-RPC host, `kind = "exec"` validation and typed trust, and the `plugin-sdk` protocol package | `T ./internal/plugin/...`, then `cd plugin-sdk && go test ./...` | `internal/plugin/rpc/`, `internal/plugin/pack/` (exec kind), `plugin-sdk/sdk/` (not `go.mod`) | – |
+| M10.2 | Conformance kit with malicious cases, an example tier-2 plugin, and `plugin new` | `cd plugin-sdk && go test ./...`, then `S plugin_new` | `plugin-sdk/sdk/conformance/`, `examples/plugin/`, `internal/cli/plugin_new.go`, `testdata/script/plugin_new.txtar` | M10.1 |
+| M10.3 | `--frontend-mode=embed`: adapter-static SPA embedded in the API binary, kit `app.WithSPA`, deploy without a web service | `G web`, `T ./kit/app/...`, then `S embed` | web pack files and `pack.toml` conditions, `kit/app/spa*.go`, api pack embed files, deploy pack conditions, the page generators' refusal, `testdata/golden/web-embed/` | – |
+| M10.4 | `--package-manager bun` and `--api-client heyapi` through `internal/webtool` | `T ./internal/webtool/...`, then `S web_variants` | `internal/webtool/`, every caller that runs `pnpm`, `internal/gen/client/`, the client drift check, `testdata/golden/web-variants/` | M10.3 |
+| M10.5 | OpenTofu pack for hcloud and `spinup infra` | `G tofu`, `T ./internal/infra/...` | `packs/tofu/`, `internal/infra/`, `internal/cli/infra.go`, `internal/tools/` (tofu), `testdata/golden/tofu/` | – |
+| M10.6 | `self-update` and `version --check` with checksum and cosign verification and Homebrew detection | `T ./internal/selfupdate/...` | `internal/selfupdate/`, `internal/cli/selfupdate.go`, `internal/cli/version.go`, the root notice hook | – |
+| M10.7 | WAL-G backend | `T ./internal/backup/walg/...`, then `G backups` | `internal/backup/walg/`, the backups pack walg files, `Dockerfile.postgres` (wal-g), the deployer's backup override choice, `project` validation | – |
+| M10.8 | In-place `pg_upgrade --link` | `T ./internal/maintain/pgupgrade/...` | `internal/maintain/pgupgrade/`, `internal/cli/maintenance_pgupgrade.go` | – |
+| M10.9 | Docs site pages, `docs compat`, `docs reference`, and the Pages workflow | `T ./internal/docsite/...`, then `make doctest` | `internal/docsite/`, `internal/cli/docs.go`, `docs/site/`, `.github/workflows/docs.yml` | – |
+
+The M10 pre-seed adds ADR 0014, the `plugin-sdk` module, the web questions `frontend_mode`, `package_manager`, and `api_client` (main-loop fragment `web/pack.d/modes.toml`), adapter-static and hey-api in the web `package.json`, `bun.lock`, the OpenTofu, WAL-G, bun, hcloud, and Pages pins, `registerPlugin`, and stub packages.
 
 Note: `packs/` means `internal/templates/packs/`.
 

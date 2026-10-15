@@ -5,4 +5,5 @@ toolchain go1.27.2
 use (
 	.
 	./kit
+	./plugin-sdk
 )

@@ -12,6 +12,19 @@ func init() {
 	Register(GroupMaintain, newPlugin)
 }
 
+// pluginSubcommands holds the builders of the plugin subcommands that register with registerPlugin.
+var pluginSubcommands []func(app *App) *cobra.Command
+
+// registerPlugin adds a subcommand to `spinup plugin`. Call it from init().
+func registerPlugin(build func(app *App) *cobra.Command) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	pluginSubcommands = append(pluginSubcommands, build)
+}
+
+// The M10 units register their plugin subcommands; this keeps the pre-seed lint-clean.
+var _ = registerPlugin
+
 func newPlugin(app *App) *cobra.Command {
 	command := &cobra.Command{Use: "plugin", Short: "Manage trusted template pack plugins"}
 	manager := func(c *cobra.Command, trust bool) (*pack.Manager, error) {
@@ -80,5 +93,8 @@ func newPlugin(app *App) *cobra.Command {
 		return m.Info(c.Context(), args[0])
 	}}
 	command.AddCommand(add, remove, list, verify, info, update)
+	for _, build := range pluginSubcommands {
+		command.AddCommand(build(app))
+	}
 	return command
 }
