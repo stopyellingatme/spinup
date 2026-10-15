@@ -1,0 +1,50 @@
+# Compose the default public packs and write a validated lock.
+env SPINUP_KIT_REPLACE=
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+stdout 'Created todo \([0-9]+ files\) from packs base, api, ci'
+stdout 'Next:'
+stdout 'docker compose -f deploy/compose.dev.yml up -d'
+stdout 'spinup db migrate up'
+stdout 'cd api && go run ./cmd/api'
+exists todo/spinup.lock todo/spinup.toml todo/api/go.mod
+exists todo/api/cmd/api/main.go todo/deploy/compose.dev.yml
+exists todo/.github/workflows/ci.yml todo/.env
+exec cat todo/spinup.lock
+stdout '"api/cmd/api/main.go": \{\n[[:space:]]+"class": "scaffold"'
+! stdout '"\.env":'
+
+# Occupied targets and unavailable packs give actionable errors.
+! exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+stderr 'Try:'
+! exec spinup new frontend --no-git --non-interactive
+stderr 'Try: pass --api-only'
+! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
+stderr 'available modules: ci'
+
+# Preview creates no directory. JSON has the machine-readable result fields.
+exec spinup new preview --api-only --module example.com/preview --no-git --non-interactive --dry-run
+stdout 'api/cmd/api/main.go \(scaffold\)'
+! exists preview
+exec spinup new jsonapp --api-only --module example.com/jsonapp --no-git --non-interactive --json
+stdout '"dir": '
+stdout '"packs": \['
+stdout '"files": [0-9]+'
+
+# Local kit overrides reach the module and its recorded content hash.
+mkdir kit
+mkdir 'kit/path with spaces'
+# A path containing spaces requires Go module quoting.
+env 'SPINUP_KIT_REPLACE=kit/path with spaces'
+exec spinup new local --api-only --module example.com/local --no-git --non-interactive
+exec cat local/api/go.mod
+stdout 'replace github.com/stopyellingatme/spinup/kit => '
+env SPINUP_KIT_REPLACE=
+
+# App operations use the API directory and protect destructive migrations.
+cd todo
+! exec spinup db migrate down
+stderr 'Try: spinup db migrate down --i-know'
+exec spinup db migrate up --dry-run
+stdout '^go run ./cmd/api migrate up'
+exec spinup build --dry-run
+stdout '^go build -trimpath -ldflags .*-X main.version=dev.* -o bin/api ./cmd/api'
