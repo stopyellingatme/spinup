@@ -92,6 +92,10 @@ func TestBundleErrors(t *testing.T) {
 		{name: "bad yaml", root: rootSpec, files: map[string]string{"paths/broken.yaml": "/todos: ["}, want: []string{"paths/broken.yaml"}},
 		{name: "sequence fragment", root: rootSpec, files: map[string]string{"paths/broken.yaml": "- /todos"}, want: []string{"paths/broken.yaml", "map"}},
 		{name: "duplicate yaml key", root: rootSpec, files: map[string]string{"schemas/a.yaml": "Todo: {}\nTodo: {}"}, want: []string{"schemas/a.yaml", "already defined"}},
+		{name: "cyclic alias", root: rootSpec, files: map[string]string{"schemas/a.yaml": "Todo: &todo {child: *todo}"}, want: []string{"schemas/a.yaml", "cyclic"}},
+		{name: "invalid merge", root: rootSpec, files: map[string]string{"schemas/a.yaml": "Todo: {<<: 4}"}, want: []string{"schemas/a.yaml", "merge"}},
+		{name: "complex key", root: rootSpec, files: map[string]string{"schemas/a.yaml": "? [a, b]\n: {}"}, want: []string{"schemas/a.yaml", "keys"}},
+		{name: "normalized duplicate key", root: rootSpec, files: map[string]string{"paths/a.yaml": "/todos: {get: {responses: {200: {}, '200': {}}}}"}, want: []string{"paths/a.yaml", "already defined"}},
 		{name: "extra document", root: rootSpec + "---\npaths: {}\n", want: []string{"openapi.yaml", "document"}},
 		{name: "invalid paths", root: strings.Replace(rootSpec, "paths: {}", "paths: []", 1), want: []string{"openapi.yaml", "paths", "map"}},
 		{name: "invalid components", root: strings.Replace(rootSpec, "components:\n  schemas:\n    Problem: {type: object}", "components: []", 1), want: []string{"openapi.yaml", "components", "map"}},
@@ -143,5 +147,129 @@ func TestBundleEmptyAndComponentRefs(t *testing.T) {
 				t.Fatalf("empty paths: %s", got)
 			}
 		})
+	}
+}
+
+func TestBundleNumericResponseKeys(t *testing.T) {
+	t.Parallel()
+	for _, location := range []string{"root", "fragment"} {
+		t.Run(location, func(t *testing.T) {
+			t.Parallel()
+			api := t.TempDir()
+			path := "/things:\n  get:\n    responses:\n      200:\n        description: OK\n        content:\n          application/json:\n            schema: {$ref: '#/components/schemas/Problem'}\n      404: {description: Missing}\n"
+			root := rootSpec
+			if location == "root" {
+				root = strings.Replace(root, "paths: {}", "paths:\n"+indentYAML(path, "  "), 1)
+			} else {
+				put(t, api, "openapi/paths/things.yaml", path)
+			}
+			put(t, api, "openapi/openapi.yaml", root)
+			got, err := Bundle(api)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, code := range []string{"200", "404"} {
+				if !bytes.Contains(got, []byte(`"`+code+`":`)) {
+					t.Errorf("response key %s must be quoted:\n%s", code, got)
+				}
+			}
+			again, err := Bundle(api)
+			if err != nil || !bytes.Equal(got, again) {
+				t.Fatalf("bundle is not deterministic: %v", err)
+			}
+		})
+	}
+}
+
+func TestBundlePreservesScalarTextAndTags(t *testing.T) {
+	t.Parallel()
+	for _, location := range []string{"root", "fragment"} {
+		for _, tc := range []struct{ value, tag string }{
+			{"2001-01-01", "!!timestamp"},
+			{"0123", "!!int"},
+			{"1e3", "!!float"},
+		} {
+			t.Run(location+"/"+tc.value, func(t *testing.T) {
+				t.Parallel()
+				api := t.TempDir()
+				schema := "Sample:\n  type: string\n  format: date\n  example: " + tc.value + "\n  default: " + tc.value + "\n  enum: [" + tc.value + "]\n"
+				root := rootSpec
+				if location == "root" {
+					root += indentYAML(schema, "    ")
+				} else {
+					put(t, api, "openapi/schemas/sample.yaml", schema)
+				}
+				put(t, api, "openapi/openapi.yaml", root)
+				got, err := Bundle(api)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var doc yaml.Node
+				if err := yaml.Unmarshal(got, &doc); err != nil {
+					t.Fatal(err)
+				}
+				sample := yamlAt(t, doc.Content[0], "components", "schemas", "Sample")
+				for _, field := range []string{"example", "default", "enum"} {
+					node := yamlAt(t, sample, field)
+					if field == "enum" {
+						node = node.Content[0]
+					}
+					if node.Value != tc.value || node.Tag != tc.tag {
+						t.Errorf("%s: got (%q, %q), want (%q, %q)", field, node.Value, node.Tag, tc.value, tc.tag)
+					}
+				}
+			})
+		}
+	}
+}
+
+func indentYAML(text, indent string) string {
+	return indent + strings.ReplaceAll(strings.TrimSuffix(text, "\n"), "\n", "\n"+indent) + "\n"
+}
+
+func yamlAt(t *testing.T, node *yaml.Node, keys ...string) *yaml.Node {
+	t.Helper()
+	for _, key := range keys {
+		var found *yaml.Node
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Value == key {
+				found = node.Content[i+1]
+				break
+			}
+		}
+		if found == nil {
+			t.Fatalf("missing YAML key %q", key)
+		}
+		node = found
+	}
+	return node
+}
+
+func TestBundleYAMLAliasesAndMerges(t *testing.T) {
+	t.Parallel()
+	api := t.TempDir()
+	put(t, api, "openapi/openapi.yaml", rootSpec)
+	put(t, api, "openapi/schemas/aliases.yaml", `ZBase: &base
+  type: string
+  default: 0123
+Alias: *base
+Merged:
+  <<: *base
+  default: 1e3
+Ref: {$ref: '#/components/schemas/Merged/type'}
+`)
+	got, err := Bundle(api)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(got, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, value string }{{"Alias", "0123"}, {"Merged", "1e3"}} {
+		node := yamlAt(t, doc.Content[0], "components", "schemas", tc.name, "default")
+		if node.Value != tc.value {
+			t.Errorf("%s default: got %q, want %q", tc.name, node.Value, tc.value)
+		}
 	}
 }
