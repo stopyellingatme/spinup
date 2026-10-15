@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -203,12 +204,16 @@ func TestMigrations(t *testing.T) {
 	// This test changes the schema target before parallel tests start.
 	previous := currentSchemaVersion
 	currentSchemaVersion = 3
+	migrationMu.Lock()
+	saved := maps.Clone(migrations)
+	delete(migrations, 1)
+	delete(migrations, 2)
+	migrationMu.Unlock()
 	t.Cleanup(func() {
 		currentSchemaVersion = previous
 		migrationMu.Lock()
 		defer migrationMu.Unlock()
-		delete(migrations, 1)
-		delete(migrations, 2)
+		migrations = saved
 	})
 	if _, err := Parse([]byte(`{"schema":1}`)); err == nil || !strings.Contains(err.Error(), "migration") {
 		t.Fatalf("missing migration error = %v", err)

@@ -22,6 +22,7 @@ Read these before you change anything:
 - cAdvisor is `ghcr.io/google/cadvisor`.
 - The SvelteKit rules are in `docs/adr/0002-sveltekit-version.md`. The backup backend decision is in `docs/adr/0004-backup-backend.md`.
 - The M1 contracts (`db migrate` through the app binary, the API lockfiles, the doc-test format) are in `docs/adr/0005-m1-contracts.md`.
+- The M2 contracts (upgrade engine types, lock schema 2, template versions and archives, the upgrade worktree) are in `docs/adr/0006-m2-contracts.md`.
 
 ## Commands
 
@@ -77,6 +78,7 @@ Only the main loop writes these files. A unit never edits them:
 - `Makefile`, `scripts/tools-check.sh`, `scripts/bump-stack.sh`
 - `cmd/spinup/wire_gen.go`
 - `CLAUDE.md`, `docs/design/plan.md`
+- the M2 contract files: `internal/templates/source.go`, `internal/merge/contract.go`, `internal/upgrade/contract.go`, `internal/migrate/contract.go` (see `docs/adr/0006-m2-contracts.md`)
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
 

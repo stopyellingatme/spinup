@@ -9,4 +9,7 @@ package main
 import (
 	// M1
 	_ "github.com/stopyellingatme/spinup/internal/doctor/composelint"
+	// M2
+	_ "github.com/stopyellingatme/spinup/internal/doctor/checks"
+	_ "github.com/stopyellingatme/spinup/internal/migrate"
 )

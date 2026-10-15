@@ -165,12 +165,13 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	for _, file := range plan.Files {
 		lock.Files[file.Path] = manifest.FileEntry{Class: manifest.Class(file.Class), Template: file.Template, Hash: manifest.Hash(file.Data), Mode: fmt.Sprintf("%04o", file.Mode.Perm())}
 	}
-	if err := lock.Validate(); err != nil {
-		return nil, err
-	}
 	names := make([]string, 0, len(selected))
 	for _, p := range selected {
 		names = append(names, p.Name)
+	}
+	lock.Packs = names
+	if err := lock.Validate(); err != nil {
+		return nil, err
 	}
 	return &Result{Dir: dir, Packs: names, Plan: plan, Lock: lock, Warnings: warnings, KitReplace: replace}, nil
 }

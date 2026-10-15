@@ -86,6 +86,8 @@ func (l *Lock) Marshal() ([]byte, error) {
 	}
 	canonical := *l
 	ensureMaps(&canonical)
+	// Pack order is render order, so it is kept as written.
+	canonical.Packs = append([]string{}, canonical.Packs...)
 	canonical.Tombstones = sortedUnique(l.Tombstones)
 	canonical.Orphans = sortedUnique(l.Orphans)
 	canonical.AppliedMigrations = sortedUnique(l.AppliedMigrations)
@@ -132,6 +134,9 @@ func ensureMaps(l *Lock) {
 	}
 	if l.Files == nil {
 		l.Files = make(map[string]FileEntry)
+	}
+	if l.Packs == nil {
+		l.Packs = []string{}
 	}
 }
 

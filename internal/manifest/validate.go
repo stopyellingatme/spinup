@@ -17,6 +17,13 @@ func (l *Lock) Validate() error {
 	if l.Schema != currentSchemaVersion {
 		problems = append(problems, fmt.Errorf("schema %d is unsupported (expected %d)", l.Schema, currentSchemaVersion))
 	}
+	seenPacks := make(map[string]bool, len(l.Packs))
+	for _, pack := range l.Packs {
+		if pack == "" || seenPacks[pack] {
+			problems = append(problems, fmt.Errorf("packs: %q is empty or repeated", pack))
+		}
+		seenPacks[pack] = true
+	}
 	for _, path := range sortedFilePaths(l.Files) {
 		problems = append(problems, entryProblems(path, l.Files[path])...)
 	}

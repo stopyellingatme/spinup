@@ -1,7 +1,7 @@
 package manifest
 
 // SchemaVersion is the current spinup.lock schema.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // currentSchemaVersion allows tests to exercise future schema migrations.
 var currentSchemaVersion = SchemaVersion
@@ -64,6 +64,8 @@ type Lock struct {
 	CLIVersion string `json:"cli_version"`
 	// TemplateVersion identifies the source template pack.
 	TemplateVersion string `json:"template_version"`
+	// Packs lists the template packs of the app in render order (schema 2).
+	Packs []string `json:"packs"`
 	// MinCLI is the minimum CLI version that can operate this app.
 	MinCLI string `json:"min_cli"`
 	// Kit identifies the runtime module.

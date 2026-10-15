@@ -318,3 +318,14 @@ func TestPromptAnswersAndFlagPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateRecordsPacks(t *testing.T) {
+	t.Parallel()
+	result, err := Generate(context.Background(), Options{Name: "todo", Dir: t.TempDir(), APIOnly: true, Answers: map[string]any{"module": "example.com/todo", "modules": "ci"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(result.Lock.Packs, ","); got != "base,api,ci" {
+		t.Fatalf("lock packs = %q, want base,api,ci", got)
+	}
+}
