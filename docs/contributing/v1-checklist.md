@@ -33,7 +33,7 @@ A maintainer must do these steps. No agent can do them.
 | Item | How to check it | Status |
 | --- | --- | --- |
 | Behavior version reaches the app | `go test ./internal/devloop ./internal/deploy ./internal/project`. `docs/policy/behavior-version.md` describes the rule. | Met. |
-| Deprecation window of one minor | `docs/policy/support.md`. The kit deprecation tests of the API guard. | The policy is published. The tests belong to the kit API guard work. |
+| Deprecation window of one minor | `docs/policy/support.md`. The kit deprecation tests of the API guard. | Met. `TestKitAPI` and `TestKitDeprecations` in `internal/apicompat` enforce the window. |
 | Upgrade matrix | `go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'` | Met for the synthetic corpus. Real corpora follow the releases. |
 | `pnpm test` passes in a new app with no test files | The web `vite.config.js` sets `passWithNoTests: true`. | Met. |
 
