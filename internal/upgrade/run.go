@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"charm.land/huh/v2"
@@ -202,6 +203,15 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 	if err := saveState(r.Root, state); err != nil {
 		return err
 	}
+	if state.Status == "step" {
+		// Discard the interrupted attempt before planning from the last commit.
+		if _, err := r.git(ctx, state.Worktree, "reset", "--hard", "HEAD"); err != nil {
+			return err
+		}
+		if _, err := r.git(ctx, state.Worktree, "clean", "-fd", "-e", ".spinup"); err != nil {
+			return err
+		}
+	}
 	return r.resume(ctx, state)
 }
 
@@ -229,9 +239,17 @@ func (r *Runner) Abort(ctx context.Context, o Options) error {
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("inspect upgrade worktree: %w\nTry: check the worktree permissions", err)
-	}
-	if _, err := r.git(ctx, r.Root, "branch", "-D", state.Branch); err != nil {
+	} else if _, err := r.git(ctx, r.Root, "worktree", "prune"); err != nil {
 		return err
+	}
+	branches, err := r.git(ctx, r.Root, "branch", "--list", state.Branch)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(branches) != "" {
+		if _, err := r.git(ctx, r.Root, "branch", "-D", state.Branch); err != nil {
+			return err
+		}
 	}
 	return r.clearState()
 }
@@ -328,6 +346,9 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			if err := r.commit(ctx, step.Worktree, "spinup upgrade "+step.Plan.From+" -> "+step.Plan.To, true); err != nil {
 				return err
 			}
+			state.CommittedConflicts = append(state.CommittedConflicts, state.Conflicts...)
+			slices.Sort(state.CommittedConflicts)
+			state.CommittedConflicts = slices.Compact(state.CommittedConflicts)
 			state.Status = "gofix"
 			if err := saveState(r.Root, state); err != nil {
 				return err
@@ -396,6 +417,10 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 		}
 	}
 	if err := r.clearState(); err != nil {
+		return err
+	}
+	if len(state.CommittedConflicts) > 0 {
+		_, err := fmt.Fprintf(r.Out, "Warning: committed conflict markers in: %s\nResolve these files before running git merge %s.\nWorktree: %s\n", strings.Join(state.CommittedConflicts, ", "), state.Branch, state.Worktree)
 		return err
 	}
 	_, err := fmt.Fprintf(r.Out, "Next: git merge %s\nWorktree: %s\nRemove it with: git worktree remove %s\n", state.Branch, state.Worktree, state.Worktree)

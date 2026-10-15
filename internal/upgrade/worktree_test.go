@@ -112,3 +112,37 @@ func TestContinueAbort(t *testing.T) {
 		})
 	}
 }
+
+func TestAbortMissingWorktree(t *testing.T) {
+	t.Parallel()
+	for _, branchGone := range []bool{false, true} {
+		t.Run(map[bool]string{false: "registered", true: "branch gone"}[branchGone], func(t *testing.T) {
+			t.Parallel()
+			r, root := runFixture(t, true)
+			ctx := context.Background()
+			if err := r.Run(ctx, Options{To: "0.2.0", Yes: true, NoVerify: true}); ui.ExitCode(err) != 3 {
+				t.Fatalf("expected conflict: %v", err)
+			}
+			work := filepath.Join(root, ".spinup/upgrade/0.2.0")
+			if err := os.RemoveAll(work); err != nil {
+				t.Fatal(err)
+			}
+			if branchGone {
+				testGit(t, root, "worktree", "prune")
+				testGit(t, root, "branch", "-D", "spinup/upgrade-0.2.0")
+			}
+			if err := r.Abort(ctx, Options{Yes: true}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(statePath(root)); !os.IsNotExist(err) {
+				t.Fatalf("state remains: %v", err)
+			}
+			if got := testGit(t, root, "worktree", "list", "--porcelain"); strings.Contains(got, work) {
+				t.Fatalf("registration remains: %s", got)
+			}
+			if got := testGit(t, root, "branch", "--list", "spinup/upgrade-0.2.0"); got != "" {
+				t.Fatalf("branch remains: %s", got)
+			}
+		})
+	}
+}

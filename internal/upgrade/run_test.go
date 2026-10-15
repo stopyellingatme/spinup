@@ -172,6 +172,10 @@ func TestRunCommitConflicts(t *testing.T) {
 	if err := r.Run(context.Background(), Options{To: "0.2.0", Yes: true, NoVerify: true, CommitConflicts: true}); err != nil {
 		t.Fatal(err)
 	}
+	output := r.Out.(*bytes.Buffer).String()
+	if strings.Contains(output, "Next: git merge") || !strings.Contains(output, "Warning:") || !strings.Contains(output, "Resolve these files before") {
+		t.Fatalf("misleading completion output: %s", output)
+	}
 	data, err := os.ReadFile(filepath.Join(root, ".spinup/upgrade/0.2.0/file.txt"))
 	if err != nil || !bytes.Contains(data, []byte("<<<<<<<")) {
 		t.Fatalf("conflicts=%s err=%v", data, err)
@@ -206,6 +210,7 @@ func TestStateValidation(t *testing.T) {
 		{name: "branch", modify: func(s *runState) { s.Branch = "main" }},
 		{name: "status", modify: func(s *runState) { s.Status = "invalid" }},
 		{name: "conflict path", modify: func(s *runState) { s.Conflicts = []string{"../escape"} }},
+		{name: "committed conflict path", modify: func(s *runState) { s.CommittedConflicts = []string{"../escape"} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -255,13 +260,26 @@ func TestRunWritePlan(t *testing.T) {
 
 func TestStateConflictMarkers(t *testing.T) {
 	t.Parallel()
-	for _, prefix := range []string{"<<<<<<< ours", "=======", ">>>>>>> theirs"} {
-		t.Run(prefix, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, data        string
+		missing, conflict bool
+	}{
+		{name: "diff3", data: "<<<<<<< ours\nours\n||||||| base\nbase\n=======\ntheirs\n>>>>>>> theirs\n", conflict: true},
+		{name: "paired", data: "<<<<<<< ours\nours\n>>>>>>> theirs\n", conflict: true},
+		{name: "setext", data: "Heading\n=======\nAnother\n===========\n"},
+		{name: "opening alone", data: "<<<<<<< ours\n"},
+		{name: "closing alone", data: ">>>>>>> theirs\n"},
+		{name: "reverse order", data: ">>>>>>> theirs\n<<<<<<< ours\n"},
+		{name: "deleted", missing: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
-			writePlanFile(t, root, "file.txt", "resolved line\n"+prefix+"\n", 0644)
+			if !tc.missing {
+				writePlanFile(t, root, "file.txt", tc.data, 0644)
+			}
 			paths, err := unresolved(root, []string{"file.txt"})
-			if err != nil || !reflect.DeepEqual(paths, []string{"file.txt"}) {
+			if err != nil || (len(paths) > 0) != tc.conflict {
 				t.Fatalf("paths=%v err=%v", paths, err)
 			}
 		})
@@ -303,6 +321,109 @@ func TestRunMissingBase(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// TestContinueStepRecovery retries failed writes from the last step commit.
+func TestContinueStepRecovery(t *testing.T) {
+	old := CurrentPhases()
+	defer SetPhases(old)
+	for _, phase := range []string{"Apply", "Deps"} {
+		t.Run(phase, func(t *testing.T) {
+			r, root := runFixture(t, true)
+			failed := false
+			hook := func(_ context.Context, s *Step) error {
+				if failed {
+					return nil
+				}
+				failed = true
+				writePlanFile(t, s.Worktree, "partial/output.txt", "partial\n", 0644)
+				return errors.New("interrupted step")
+			}
+			p := Phases{}
+			if phase == "Apply" {
+				p.Apply = hook
+			} else {
+				p.Deps = hook
+			}
+			SetPhases(p)
+			ctx := context.Background()
+			err := r.Run(ctx, Options{To: "0.2.0", Yes: true, NoVerify: true})
+			if err == nil || !strings.Contains(err.Error(), "interrupted step") {
+				t.Fatalf("error=%v", err)
+			}
+			state, err := loadState(root)
+			if err != nil || state.Status != "step" {
+				t.Fatalf("state=%+v error=%v", state, err)
+			}
+			writePlanFile(t, state.Worktree, ".spinup/keep.txt", "keep\n", 0644)
+			writePlanFile(t, root, "main-only.txt", "user data\n", 0644)
+			err = r.Continue(ctx, Options{Yes: true})
+			if err == nil || !strings.Contains(err.Error(), "Upgrade has conflicts") {
+				t.Fatalf("error=%v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(state.Worktree, "file.txt"))
+			if err != nil || bytes.Count(data, []byte("<<<<<<<")) != 1 {
+				t.Fatalf("nested conflicts: %s error=%v", data, err)
+			}
+			if _, err := os.Stat(filepath.Join(state.Worktree, "partial")); !os.IsNotExist(err) {
+				t.Fatalf("partial output remains: %v", err)
+			}
+			for _, path := range []string{filepath.Join(root, "main-only.txt"), filepath.Join(state.Worktree, ".spinup/keep.txt")} {
+				if _, err := os.Stat(path); err != nil {
+					t.Fatalf("recovery removed %s: %v", path, err)
+				}
+			}
+			data, err = os.ReadFile(filepath.Join(root, "file.txt"))
+			if err != nil || string(data) != "user\n" {
+				t.Fatalf("main changed: %s error=%v", data, err)
+			}
+		})
+	}
+}
+
+func TestRunCommitConflictsChain(t *testing.T) {
+	t.Parallel()
+	r, root := runFixture(t, true)
+	r.Source.(chainSource)["0.3.0"] = planVersion("0.3.0")
+	if err := r.Run(context.Background(), Options{To: "0.3.0", Yes: true, NoVerify: true, CommitConflicts: true}); err != nil {
+		t.Fatal(err)
+	}
+	data := testGit(t, root, "show", "spinup/upgrade-0.3.0:file.txt")
+	if !strings.Contains(data, "<<<<<<<") {
+		t.Fatalf("expected committed conflict: %s", data)
+	}
+	output := r.Out.(*bytes.Buffer).String()
+	if strings.Contains(output, "Next: git merge") || !strings.Contains(output, "Warning:") || !strings.Contains(output, "Resolve these files before") {
+		t.Fatalf("misleading chain output: %s", output)
+	}
+}
+
+func TestContinueResolvedContent(t *testing.T) {
+	t.Parallel()
+	for _, deleted := range []bool{false, true} {
+		t.Run(map[bool]string{false: "setext heading", true: "deleted"}[deleted], func(t *testing.T) {
+			t.Parallel()
+			r, root := runFixture(t, true)
+			ctx := context.Background()
+			if err := r.Run(ctx, Options{To: "0.2.0", Yes: true, NoVerify: true}); err == nil {
+				t.Fatal("expected conflict")
+			}
+			work := filepath.Join(root, ".spinup/upgrade/0.2.0")
+			if deleted {
+				if err := os.Remove(filepath.Join(work, "file.txt")); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				writePlanFile(t, work, "file.txt", "Heading\n=======\nAnother\n===========\n", 0644)
+			}
+			if err := r.Continue(ctx, Options{Yes: true}); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(r.Out.(*bytes.Buffer).String(), "Next: git merge") {
+				t.Fatalf("missing merge instruction: %s", r.Out)
 			}
 		})
 	}
