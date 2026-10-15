@@ -1,0 +1,218 @@
+package deploy
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/project"
+	"github.com/stopyellingatme/spinup/internal/ui"
+)
+
+// requiredSecrets are the secrets that the deploy pack reads (docs/deploy.md).
+var requiredSecrets = []string{"DATABASE_URL", "POSTGRES_PASSWORD"}
+
+// local is the result of the preflight: the project, the environment, and the commit.
+type local struct {
+	root       string
+	app        string
+	env        project.Env
+	envFile    EnvFile
+	sha        string
+	secrets    map[string]string
+	web        bool
+	files      []releaseFile
+	migrations []migration
+	origin     string // PUBLIC_ORIGIN
+	site       string // PUBLIC_HOST
+}
+
+var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
+
+func preflightError(why, try string) error {
+	return &ui.Error{What: "Deploy preflight failed", Why: why, Try: try}
+}
+
+// preflight runs the local checks of step 1. It changes nothing.
+// confirm is false for --plan, which changes nothing and needs no confirmation.
+func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bool) (*local, error) {
+	dir := o.Dir
+	if dir == "" {
+		dir = "."
+	}
+	root, err := project.FindRoot(dir)
+	if err != nil {
+		return nil, preflightError("spinup.toml was not found", "run spinup deploy inside a spinup project, or pass --dir")
+	}
+	config, err := project.Load(root)
+	if err != nil {
+		return nil, preflightError(stripTry(err.Error()), "correct spinup.toml")
+	}
+	if err := config.Validate(); err != nil {
+		return nil, preflightError("spinup.toml is not valid: "+stripTry(err.Error()), "correct spinup.toml")
+	}
+	env, err := config.ResolveEnv(o.Env)
+	if err != nil {
+		return nil, preflightError(stripTry(err.Error()), "pass --env <name> with an environment of spinup.toml")
+	}
+	if env.Host == "" {
+		return nil, preflightError(fmt.Sprintf("environment %q has no host", env.Name), "set host in [env."+env.Name+"] of spinup.toml")
+	}
+	l := &local{root: root, app: config.App.Name, env: env}
+	if l.origin, l.site, err = publicOrigin(env.PublicURL, env.Host); err != nil {
+		return nil, preflightError(stripTry(err.Error()), "set public_url in [env."+env.Name+"] of spinup.toml")
+	}
+
+	// A clean tree makes the release reproducible from its git SHA.
+	status, err := d.Exec.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"status", "--porcelain"}, Dir: root})
+	if err != nil {
+		return nil, preflightError("git status failed: "+stripTry(err.Error()), "run spinup deploy inside a git repository with at least one commit")
+	}
+	if len(strings.TrimSpace(string(status.Stdout))) > 0 {
+		if !o.AllowDirty {
+			return nil, preflightError("the git tree has uncommitted changes", "commit the changes, or pass --allow-dirty")
+		}
+		fmt.Fprintln(out, "Warning: the git tree has uncommitted changes (--allow-dirty)")
+	}
+	head, err := d.Exec.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"rev-parse", "HEAD"}, Dir: root})
+	if err != nil {
+		return nil, preflightError("git rev-parse HEAD failed: "+stripTry(err.Error()), "commit the work, and run spinup deploy again")
+	}
+	l.sha = strings.TrimSpace(string(head.Stdout))
+	if !shaPattern.MatchString(l.sha) {
+		return nil, preflightError(fmt.Sprintf("git returned the invalid commit %q", l.sha), "check the git repository")
+	}
+
+	if err := d.Check(ctx, root, out); err != nil {
+		return nil, preflightError("spinup check found problems: "+stripTry(err.Error()), "correct the problems that spinup check reports")
+	}
+	findings, err := d.Lint(root)
+	if err != nil {
+		return nil, preflightError("db lint failed: "+stripTry(err.Error()), "check the migration files")
+	}
+	for _, f := range findings {
+		fmt.Fprintf(out, "%s:%d: %s: %s\n", f.File, f.Line, f.Rule, f.Message)
+	}
+	if len(findings) > 0 {
+		if !o.AllowDestructive {
+			return nil, preflightError(fmt.Sprintf("db lint found %d unsafe migration changes", len(findings)), "split the contract step into a later release, or pass --allow-destructive")
+		}
+		fmt.Fprintf(out, "Warning: deploying %d unsafe migration changes (--allow-destructive)\n", len(findings))
+	}
+
+	if l.envFile, err = LoadEnvFile(root, env.Name); err != nil {
+		return nil, preflightError(stripTry(err.Error()), "create deploy/environments/"+env.Name+".toml")
+	}
+	if l.files, err = deployFiles(root); err != nil {
+		return nil, preflightError(stripTry(err.Error()), "restore the deploy pack files with spinup restore")
+	}
+	_, statErr := os.Stat(filepath.Join(root, "deploy", "Dockerfile.web"))
+	l.web = statErr == nil
+	if l.migrations, err = migrations(root); err != nil {
+		return nil, preflightError(stripTry(err.Error()), "check api/db/migrations")
+	}
+
+	if l.secrets, err = d.Decrypt(ctx, root, env.Name); err != nil {
+		return nil, preflightError("the secrets of "+env.Name+" cannot be decrypted: "+stripTry(err.Error()), "run spinup secrets init --env "+env.Name+", or check the key in ~/.config/spinup/keys")
+	}
+	for _, name := range requiredSecrets {
+		if _, ok := l.secrets[name]; !ok {
+			return nil, preflightError("the secret "+name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name)
+		}
+	}
+
+	if confirm {
+		if err := project.ConfirmProtected(env, "deploy", o.Confirm); err != nil {
+			return nil, &ui.Error{What: "Deploy not confirmed", Why: stripTry(err.Error()), Try: "type the environment name, or pass --yes in CI"}
+		}
+	}
+	return l, nil
+}
+
+// services returns the color services of the app.
+func (l *local) services() []string {
+	if l.web {
+		return []string{"api", "web"}
+	}
+	return []string{"api"}
+}
+
+// envPairs returns the variables of the release .env file in a fixed order.
+func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]string {
+	ref := func(service string) string {
+		for _, img := range images {
+			if img.Service == service {
+				return img.Ref
+			}
+		}
+		return ""
+	}
+	limit := func(service string) ResourceLimits {
+		r := l.envFile.Resources[service]
+		if r.CPUs == "" {
+			r.CPUs = "1.0"
+		}
+		if r.Memory == "" {
+			r.Memory = "512m"
+		}
+		return r
+	}
+	replicas := func(service string) string {
+		n := l.envFile.Replicas[service]
+		if n < 1 {
+			n = 1
+		}
+		return fmt.Sprint(n)
+	}
+	pairs := [][2]string{
+		{"SPINUP_COLOR", color},
+		{"API_IMAGE", ref("api")},
+	}
+	if l.web {
+		pairs = append(pairs, [2]string{"WEB_IMAGE", ref("web")})
+	}
+	pairs = append(pairs,
+		[2]string{"PUBLIC_ORIGIN", l.origin},
+		[2]string{"PUBLIC_HOST", l.site},
+		[2]string{"DEPLOY_UID", uid},
+		[2]string{"DEPLOY_GID", gid},
+	)
+	services := []string{"api"}
+	if l.web {
+		services = append(services, "web")
+	}
+	for _, s := range services {
+		up := strings.ToUpper(s)
+		lim := limit(s)
+		pairs = append(pairs, [2]string{up + "_REPLICAS", replicas(s)}, [2]string{up + "_CPUS", lim.CPUs}, [2]string{up + "_MEMORY", lim.Memory})
+	}
+	pg := l.envFile.Resources["postgres"]
+	if pg.CPUs == "" {
+		pg.CPUs = "1.0"
+	}
+	if pg.Memory == "" {
+		pg.Memory = "1g"
+	}
+	return append(pairs, [2]string{"POSTGRES_CPUS", pg.CPUs}, [2]string{"POSTGRES_MEMORY", pg.Memory})
+}
+
+// sameSHA reports whether a release ID belongs to the commit.
+func sameSHA(release, sha string) bool {
+	return ValidReleaseID(release) && strings.HasPrefix(sha, strings.SplitN(release, "-r", 2)[0][17:])
+}
+
+// secretNames returns the sorted secret names.
+func secretNames(values map[string]string) []string {
+	names := make([]string, 0, len(values))
+	for n := range values {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	return names
+}

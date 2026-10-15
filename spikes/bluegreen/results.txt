@@ -1,0 +1,266 @@
+# Output of spikes/bluegreen/run.sh on 2026-10-15 (Docker Desktop 27.4.0, Compose v2.31.0, macOS arm64).
+# The [bg] times are local (UTC-5). The FAIL lines show UTC.
+
+## Run A (the check): ./run.sh   (defaults: BG_RUNS=3, BG_RELOADS=20, new connections)
+
+[bg 02:35:25] images: golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d | gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab | caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+[bg 02:35:25] build bg-app:blue
+[bg 02:35:26] build bg-app:green
+[bg 02:35:26] start bg-blue and Caddy
+[bg 02:35:28] Caddy serves blue on 127.0.0.1:64386
+[bg 02:35:36] bluegreen run 1 blue->green: window=21954 total=34478 failures=0 slow=0 max=59ms switch=4436ms drain=1266ms (window: blue=11849 green=10105; after: blue=0 green=6373)
+[bg 02:35:44] rollback run 1 green->blue: window=25052 total=41351 failures=0 slow=0 max=88ms switch=4576ms drain=1413ms (window: blue=11191 green=13861; after: blue=9320 green=0)
+[bg 02:35:52] bluegreen run 2 blue->green: window=21546 total=32817 failures=0 slow=0 max=109ms switch=5124ms drain=1152ms (window: blue=11778 green=9768; after: blue=0 green=4735)
+[bg 02:36:00] rollback run 2 green->blue: window=27219 total=45902 failures=0 slow=0 max=58ms switch=4711ms drain=1395ms (window: blue=13324 green=13895; after: blue=7988 green=0)
+[bg 02:36:07] bluegreen run 3 blue->green: window=25398 total=40913 failures=0 slow=0 max=55ms switch=4464ms drain=1269ms (window: blue=11719 green=13679; after: blue=0 green=8189)
+[bg 02:36:14] rollback run 3 green->blue: window=23410 total=38088 failures=0 slow=0 max=40ms switch=3685ms drain=1178ms (window: blue=10670 green=12740; after: blue=5640 green=0)
+[bg 02:36:27] reload-x20 run 1 blue->blue: window=63832 total=76475 failures=0 slow=0 max=150ms switch=9566ms drain=0ms (window: blue=63832 green=0; after: blue=7524 green=0)
+[bg 02:36:40] reload-x20 run 2 blue->blue: window=68185 total=81865 failures=0 slow=0 max=48ms switch=9405ms drain=0ms (window: blue=68185 green=0; after: blue=8276 green=0)
+[bg 02:36:52] reload-x20 run 3 blue->blue: window=70408 total=82335 failures=0 slow=0 max=59ms switch=9345ms drain=0ms (window: blue=70408 green=0; after: blue=3182 green=0)
+[bg 02:36:52] start bg-roll (blue) and move Caddy to app-roll
+[bg 02:37:02] rolling run 1 blue->green: window=19464 total=40269 failures=0 slow=0 max=404ms switch=3055ms drain=449ms (window: blue=13291 green=6173; after: blue=0 green=10252)
+[bg 02:37:08] rolling run 2 green->blue: window=23247 total=39624 failures=0 slow=0 max=654ms switch=2999ms drain=438ms (window: blue=7055 green=16192; after: blue=6064 green=0)
+[bg 02:37:14] rolling run 3 blue->green: window=22086 total=41148 failures=0 slow=0 max=408ms switch=3225ms drain=292ms (window: blue=14330 green=7756; after: blue=0 green=8466)
+
+Per run. window = requests sent during the switch. failures = non-200 answers and
+connection errors over the whole load run. slow = requests that took 1 s or more.
+strategy    run switch         window    total failures  slow  max_ms switch_ms drain_ms
+bluegreen     1 blue->green     21954    34478        0     0      59      4436     1266
+rollback      1 green->blue     25052    41351        0     0      88      4576     1413
+bluegreen     2 blue->green     21546    32817        0     0     109      5124     1152
+rollback      2 green->blue     27219    45902        0     0      58      4711     1395
+bluegreen     3 blue->green     25398    40913        0     0      55      4464     1269
+rollback      3 green->blue     23410    38088        0     0      40      3685     1178
+reload-x20    1 blue->blue      63832    76475        0     0     150      9566        0
+reload-x20    2 blue->blue      68185    81865        0     0      48      9405        0
+reload-x20    3 blue->blue      70408    82335        0     0      59      9345        0
+rolling       1 blue->green     19464    40269        0     0     404      3055      449
+rolling       2 green->blue     23247    39624        0     0     654      2999      438
+rolling       3 blue->green     22086    41148        0     0     408      3225      292
+
+Summary:
+strategy    runs  requests req_total failures  slow  max_ms switch_ms_mean switch_ms_max
+bluegreen      3     68898    108208        0     0     109           4674          5124
+rollback       3     75681    125341        0     0      88           4324          4711
+reload-x20     3    202425    240675        0     0     150           9438          9566
+rolling        3     64797    121041        0     0     654           3093          3225
+
+blue/green: PASS (zero failed requests in all 3 switch and 3 rollback runs)
+strategy: bluegreen
+[bg 02:37:14] cleanup
+
+## Run B: BG_RUNS=10 BG_RELOADS=30 ./run.sh   (new connections)
+
+[bg 02:37:27] images: golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d | gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab | caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+[bg 02:37:28] build bg-app:blue
+[bg 02:37:28] build bg-app:green
+[bg 02:37:29] start bg-blue and Caddy
+[bg 02:37:31] Caddy serves blue on 127.0.0.1:64637
+[bg 02:37:38] bluegreen run 1 blue->green: window=26933 total=46847 failures=0 slow=0 max=49ms switch=3820ms drain=1389ms (window: blue=13206 green=13727; after: blue=0 green=11492)
+[bg 02:37:44] rollback run 1 green->blue: window=28072 total=47869 failures=0 slow=0 max=45ms switch=3967ms drain=1384ms (window: blue=13900 green=14172; after: blue=9839 green=0)
+[bg 02:37:51] bluegreen run 2 blue->green: window=27054 total=45124 failures=0 slow=0 max=47ms switch=4083ms drain=1464ms (window: blue=11896 green=15158; after: blue=0 green=7427)
+[bg 02:37:58] rollback run 2 green->blue: window=26953 total=43027 failures=0 slow=0 max=68ms switch=3563ms drain=1345ms (window: blue=15605 green=11348; after: blue=8668 green=0)
+[bg 02:38:06] bluegreen run 3 blue->green: window=27733 total=41284 failures=0 slow=0 max=70ms switch=4396ms drain=1367ms (window: blue=13719 green=14014; after: blue=0 green=6273)
+[bg 02:38:13] rollback run 3 green->blue: window=28338 total=44662 failures=0 slow=0 max=69ms switch=4238ms drain=1414ms (window: blue=13422 green=14916; after: blue=8256 green=0)
+[bg 02:38:21] bluegreen run 4 blue->green: window=20622 total=34879 failures=0 slow=0 max=52ms switch=4344ms drain=1210ms (window: blue=10782 green=9840; after: blue=0 green=6774)
+[bg 02:38:28] rollback run 4 green->blue: window=21991 total=34632 failures=0 slow=0 max=54ms switch=4537ms drain=1262ms (window: blue=10032 green=11959; after: blue=7229 green=0)
+[bg 02:38:36] bluegreen run 5 blue->green: window=27671 total=44479 failures=0 slow=0 max=50ms switch=4462ms drain=1424ms (window: blue=13995 green=13676; after: blue=0 green=9228)
+[bg 02:38:43] rollback run 5 green->blue: window=26205 total=43188 failures=0 slow=0 max=52ms switch=3730ms drain=1165ms (window: blue=10497 green=15708; after: blue=9390 green=0)
+[bg 02:38:50] bluegreen run 6 blue->green: window=19542 total=37884 failures=0 slow=0 max=117ms switch=3870ms drain=1159ms (window: blue=10682 green=8860; after: blue=0 green=8424)
+[bg 02:38:57] rollback run 6 green->blue: window=28273 total=44229 failures=0 slow=0 max=35ms switch=4258ms drain=1392ms (window: blue=14454 green=13819; after: blue=9368 green=0)
+[bg 02:39:05] bluegreen run 7 blue->green: window=28895 total=43633 failures=0 slow=0 max=100ms switch=4628ms drain=1421ms (window: blue=14387 green=14508; after: blue=0 green=7517)
+[bg 02:39:12] rollback run 7 green->blue: window=27751 total=45910 failures=0 slow=0 max=42ms switch=4156ms drain=1328ms (window: blue=14350 green=13401; after: blue=9526 green=0)
+[bg 02:39:20] bluegreen run 8 blue->green: window=20617 total=35282 failures=0 slow=0 max=62ms switch=4549ms drain=1487ms (window: blue=12615 green=8002; after: blue=0 green=6473)
+[bg 02:39:31] rollback run 8 green->blue: window=25692 total=36113 failures=0 slow=0 max=374ms switch=6937ms drain=1321ms (window: blue=10546 green=15146; after: blue=4427 green=0)
+[bg 02:39:38] bluegreen run 9 blue->green: window=27586 total=45398 failures=0 slow=0 max=34ms switch=3578ms drain=1091ms (window: blue=14587 green=12999; after: blue=0 green=8005)
+[bg 02:39:44] rollback run 9 green->blue: window=28300 total=46019 failures=0 slow=0 max=48ms switch=3704ms drain=1381ms (window: blue=15376 green=12924; after: blue=6550 green=0)
+[bg 02:39:51] bluegreen run 10 blue->green: window=24680 total=42449 failures=0 slow=0 max=56ms switch=4295ms drain=1327ms (window: blue=11324 green=13356; after: blue=0 green=9245)
+[bg 02:39:59] rollback run 10 green->blue: window=30375 total=50119 failures=0 slow=0 max=37ms switch=3831ms drain=1377ms (window: blue=17193 green=13182; after: blue=9482 green=0)
+    FAIL 2026-10-15T07:40:05.349388792Z code=0 took=1.34525ms err=Get "http://bg-caddy:8080/": read tcp 172.20.0.2:33452->172.20.0.4:8080: read: connection reset by peer
+    FAIL 2026-10-15T07:40:05.349452792Z code=0 took=1.180542ms err=Get "http://bg-caddy:8080/": EOF
+[bg 02:40:16] reload-x30 run 1 blue->blue: window=89971 total=104810 failures=2 slow=0 max=175ms switch=14348ms drain=0ms (window: blue=89969 green=0; after: blue=4649 green=0)
+    FAIL 2026-10-15T07:40:22.354827675Z code=0 took=779.375µs err=Get "http://bg-caddy:8080/": EOF
+[bg 02:40:36] reload-x30 run 2 blue->blue: window=89724 total=101204 failures=1 slow=0 max=317ms switch=16375ms drain=0ms (window: blue=89723 green=0; after: blue=2959 green=0)
+[bg 02:40:57] reload-x30 run 3 blue->blue: window=83934 total=94099 failures=0 slow=0 max=571ms switch=17057ms drain=0ms (window: blue=83934 green=0; after: blue=2440 green=0)
+[bg 02:41:15] reload-x30 run 4 blue->blue: window=83602 total=95525 failures=0 slow=0 max=127ms switch=14817ms drain=0ms (window: blue=83602 green=0; after: blue=3636 green=0)
+[bg 02:41:35] reload-x30 run 5 blue->blue: window=80257 total=87726 failures=0 slow=0 max=368ms switch=16764ms drain=0ms (window: blue=80257 green=0; after: blue=3011 green=0)
+    FAIL 2026-10-15T07:41:41.52847717Z code=0 took=1.014166ms err=Get "http://bg-caddy:8080/": EOF
+[bg 02:41:55] reload-x30 run 6 blue->blue: window=81079 total=93510 failures=1 slow=0 max=308ms switch=16537ms drain=0ms (window: blue=81078 green=0; after: blue=2569 green=0)
+    FAIL 2026-10-15T07:42:05.251743833Z code=0 took=1.2305ms err=Get "http://bg-caddy:8080/": EOF
+    FAIL 2026-10-15T07:42:05.252172375Z code=0 took=1.709792ms err=Get "http://bg-caddy:8080/": EOF
+[bg 02:42:14] reload-x30 run 7 blue->blue: window=86672 total=99481 failures=2 slow=0 max=164ms switch=15249ms drain=0ms (window: blue=86670 green=0; after: blue=1883 green=0)
+    FAIL 2026-10-15T07:42:29.929526595Z code=0 took=11.986833ms err=Get "http://bg-caddy:8080/": EOF
+[bg 02:42:33] reload-x30 run 8 blue->blue: window=86525 total=98360 failures=1 slow=0 max=599ms switch=14977ms drain=0ms (window: blue=86524 green=0; after: blue=3678 green=0)
+[bg 02:42:51] reload-x30 run 9 blue->blue: window=81414 total=94728 failures=0 slow=0 max=354ms switch=14802ms drain=0ms (window: blue=81414 green=0; after: blue=3965 green=0)
+    FAIL 2026-10-15T07:42:55.165361801Z code=0 took=3.774791ms err=Get "http://bg-caddy:8080/": EOF
+[bg 02:43:08] reload-x30 run 10 blue->blue: window=93537 total=105671 failures=1 slow=0 max=131ms switch=14422ms drain=0ms (window: blue=93536 green=0; after: blue=2814 green=0)
+[bg 02:43:08] start bg-roll (blue) and move Caddy to app-roll
+[bg 02:43:19] rolling run 1 blue->green: window=15822 total=30503 failures=0 slow=0 max=617ms switch=3783ms drain=690ms (window: blue=10957 green=4865; after: blue=0 green=6611)
+[bg 02:43:26] rolling run 2 green->blue: window=20279 total=29641 failures=0 slow=0 max=927ms switch=3527ms drain=312ms (window: blue=6602 green=13677; after: blue=1652 green=0)
+[bg 02:43:33] rolling run 3 blue->green: window=16747 total=27876 failures=0 slow=0 max=727ms switch=3602ms drain=318ms (window: blue=10670 green=6077; after: blue=0 green=5964)
+[bg 02:43:39] rolling run 4 green->blue: window=20555 total=30960 failures=0 slow=1 max=1254ms switch=3037ms drain=304ms (window: blue=7294 green=13261; after: blue=530 green=0)
+[bg 02:43:46] rolling run 5 blue->green: window=18280 total=33177 failures=0 slow=0 max=931ms switch=3681ms drain=581ms (window: blue=11447 green=6833; after: blue=0 green=5963)
+[bg 02:43:53] rolling run 6 green->blue: window=13987 total=26799 failures=0 slow=0 max=926ms switch=3648ms drain=541ms (window: blue=5034 green=8953; after: blue=6396 green=0)
+[bg 02:43:59] rolling run 7 blue->green: window=18551 total=36533 failures=0 slow=0 max=419ms switch=3320ms drain=300ms (window: blue=11630 green=6921; after: blue=0 green=7493)
+[bg 02:44:05] rolling run 8 green->blue: window=22853 total=37453 failures=0 slow=0 max=506ms switch=3272ms drain=355ms (window: blue=6667 green=16186; after: blue=7523 green=0)
+[bg 02:44:12] rolling run 9 blue->green: window=23773 total=33493 failures=0 slow=0 max=904ms switch=3721ms drain=387ms (window: blue=16303 green=7470; after: blue=0 green=1395)
+[bg 02:44:19] rolling run 10 green->blue: window=17186 total=29661 failures=0 slow=0 max=780ms switch=3518ms drain=427ms (window: blue=5627 green=11559; after: blue=4722 green=0)
+
+Per run. window = requests sent during the switch. failures = non-200 answers and
+connection errors over the whole load run. slow = requests that took 1 s or more.
+strategy    run switch         window    total failures  slow  max_ms switch_ms drain_ms
+bluegreen     1 blue->green     26933    46847        0     0      49      3820     1389
+rollback      1 green->blue     28072    47869        0     0      45      3967     1384
+bluegreen     2 blue->green     27054    45124        0     0      47      4083     1464
+rollback      2 green->blue     26953    43027        0     0      68      3563     1345
+bluegreen     3 blue->green     27733    41284        0     0      70      4396     1367
+rollback      3 green->blue     28338    44662        0     0      69      4238     1414
+bluegreen     4 blue->green     20622    34879        0     0      52      4344     1210
+rollback      4 green->blue     21991    34632        0     0      54      4537     1262
+bluegreen     5 blue->green     27671    44479        0     0      50      4462     1424
+rollback      5 green->blue     26205    43188        0     0      52      3730     1165
+bluegreen     6 blue->green     19542    37884        0     0     117      3870     1159
+rollback      6 green->blue     28273    44229        0     0      35      4258     1392
+bluegreen     7 blue->green     28895    43633        0     0     100      4628     1421
+rollback      7 green->blue     27751    45910        0     0      42      4156     1328
+bluegreen     8 blue->green     20617    35282        0     0      62      4549     1487
+rollback      8 green->blue     25692    36113        0     0     374      6937     1321
+bluegreen     9 blue->green     27586    45398        0     0      34      3578     1091
+rollback      9 green->blue     28300    46019        0     0      48      3704     1381
+bluegreen    10 blue->green     24680    42449        0     0      56      4295     1327
+rollback     10 green->blue     30375    50119        0     0      37      3831     1377
+reload-x30    1 blue->blue      89971   104810        2     0     175     14348        0
+reload-x30    2 blue->blue      89724   101204        1     0     317     16375        0
+reload-x30    3 blue->blue      83934    94099        0     0     571     17057        0
+reload-x30    4 blue->blue      83602    95525        0     0     127     14817        0
+reload-x30    5 blue->blue      80257    87726        0     0     368     16764        0
+reload-x30    6 blue->blue      81079    93510        1     0     308     16537        0
+reload-x30    7 blue->blue      86672    99481        2     0     164     15249        0
+reload-x30    8 blue->blue      86525    98360        1     0     599     14977        0
+reload-x30    9 blue->blue      81414    94728        0     0     354     14802        0
+reload-x30   10 blue->blue      93537   105671        1     0     131     14422        0
+rolling       1 blue->green     15822    30503        0     0     617      3783      690
+rolling       2 green->blue     20279    29641        0     0     927      3527      312
+rolling       3 blue->green     16747    27876        0     0     727      3602      318
+rolling       4 green->blue     20555    30960        0     1    1254      3037      304
+rolling       5 blue->green     18280    33177        0     0     931      3681      581
+rolling       6 green->blue     13987    26799        0     0     926      3648      541
+rolling       7 blue->green     18551    36533        0     0     419      3320      300
+rolling       8 green->blue     22853    37453        0     0     506      3272      355
+rolling       9 blue->green     23773    33493        0     0     904      3721      387
+rolling      10 green->blue     17186    29661        0     0     780      3518      427
+
+Summary:
+strategy    runs  requests req_total failures  slow  max_ms switch_ms_mean switch_ms_max
+bluegreen     10    251333    417259        0     0     117           4202          4628
+rollback      10    271950    435768        0     0     374           4292          6937
+reload-x30    10    856715    975114        8     0     599          15534         17057
+rolling       10    188033    316096        0     1    1254           3510          3783
+
+blue/green: PASS (zero failed requests in all 10 switch and 10 rollback runs)
+strategy: bluegreen
+[bg 02:44:19] cleanup
+
+## Run C: BG_REUSE=1 BG_RUNS=10 BG_RELOADS=30 ./run.sh   (keep-alive connections)
+
+[bg 02:45:24] images: golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d | gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab | caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+[bg 02:45:24] build bg-app:blue
+[bg 02:45:25] build bg-app:green
+[bg 02:45:25] start bg-blue and Caddy
+[bg 02:45:27] Caddy serves blue on 127.0.0.1:65468
+[bg 02:45:33] bluegreen run 1 blue->green: window=32968 total=56074 failures=0 slow=0 max=38ms switch=3383ms drain=1306ms (window: blue=16232 green=16736; after: blue=0 green=11933)
+[bg 02:45:43] rollback run 1 green->blue: window=62505 total=87119 failures=0 slow=0 max=44ms switch=7134ms drain=1207ms (window: blue=48159 green=14346; after: blue=14091 green=0)
+[bg 02:45:50] bluegreen run 2 blue->green: window=26740 total=51585 failures=0 slow=0 max=33ms switch=3698ms drain=1303ms (window: blue=14465 green=12275; after: blue=0 green=10662)
+[bg 02:45:57] rollback run 2 green->blue: window=29867 total=46354 failures=0 slow=0 max=102ms switch=4028ms drain=1386ms (window: blue=16014 green=13853; after: blue=8893 green=0)
+[bg 02:46:04] bluegreen run 3 blue->green: window=27146 total=45357 failures=0 slow=0 max=35ms switch=4000ms drain=1415ms (window: blue=13893 green=13253; after: blue=0 green=8466)
+[bg 02:46:11] rollback run 3 green->blue: window=26981 total=43109 failures=0 slow=0 max=83ms switch=4229ms drain=1154ms (window: blue=12253 green=14728; after: blue=5172 green=0)
+[bg 02:46:18] bluegreen run 4 blue->green: window=26212 total=44227 failures=0 slow=0 max=93ms switch=4175ms drain=1278ms (window: blue=14523 green=11689; after: blue=0 green=11067)
+[bg 02:46:26] rollback run 4 green->blue: window=28367 total=50563 failures=0 slow=0 max=46ms switch=4051ms drain=1125ms (window: blue=13062 green=15305; after: blue=11741 green=0)
+[bg 02:46:32] bluegreen run 5 blue->green: window=26149 total=45984 failures=0 slow=0 max=103ms switch=3912ms drain=1161ms (window: blue=13185 green=12964; after: blue=0 green=11733)
+[bg 02:46:44] rollback run 5 green->blue: window=46551 total=62901 failures=0 slow=0 max=299ms switch=8225ms drain=1313ms (window: blue=29958 green=16593; after: blue=6600 green=0)
+[bg 02:46:52] bluegreen run 6 blue->green: window=23798 total=37655 failures=0 slow=0 max=193ms switch=5101ms drain=1158ms (window: blue=13392 green=10406; after: blue=0 green=6740)
+[bg 02:46:59] rollback run 6 green->blue: window=28503 total=48816 failures=0 slow=0 max=73ms switch=3700ms drain=1129ms (window: blue=13689 green=14814; after: blue=9550 green=0)
+[bg 02:47:06] bluegreen run 7 blue->green: window=29319 total=49430 failures=0 slow=0 max=197ms switch=4125ms drain=1389ms (window: blue=13750 green=15569; after: blue=0 green=11733)
+[bg 02:47:13] rollback run 7 green->blue: window=24649 total=42360 failures=0 slow=0 max=66ms switch=4188ms drain=1246ms (window: blue=10939 green=13710; after: blue=8064 green=0)
+[bg 02:47:21] bluegreen run 8 blue->green: window=28523 total=46468 failures=0 slow=0 max=76ms switch=4358ms drain=1393ms (window: blue=14698 green=13825; after: blue=0 green=8759)
+[bg 02:47:28] rollback run 8 green->blue: window=27233 total=42880 failures=0 slow=0 max=75ms switch=4418ms drain=1473ms (window: blue=12696 green=14537; after: blue=8467 green=0)
+[bg 02:47:35] bluegreen run 9 blue->green: window=30010 total=49129 failures=0 slow=0 max=34ms switch=3921ms drain=1370ms (window: blue=14041 green=15969; after: blue=0 green=10537)
+[bg 02:47:42] rollback run 9 green->blue: window=30259 total=50607 failures=0 slow=0 max=43ms switch=3702ms drain=1410ms (window: blue=16070 green=14189; after: blue=10125 green=0)
+[bg 02:47:48] bluegreen run 10 blue->green: window=32696 total=51803 failures=0 slow=0 max=46ms switch=3447ms drain=1263ms (window: blue=15278 green=17418; after: blue=0 green=7218)
+[bg 02:47:55] rollback run 10 green->blue: window=32863 total=51169 failures=0 slow=0 max=48ms switch=3943ms drain=1314ms (window: blue=17589 green=15274; after: blue=9162 green=0)
+[bg 02:48:11] reload-x30 run 1 blue->blue: window=132160 total=153885 failures=0 slow=0 max=29ms switch=13479ms drain=0ms (window: blue=132160 green=0; after: blue=12898 green=0)
+[bg 02:48:27] reload-x30 run 2 blue->blue: window=146190 total=173598 failures=0 slow=0 max=33ms switch=12888ms drain=0ms (window: blue=146190 green=0; after: blue=12583 green=0)
+[bg 02:48:43] reload-x30 run 3 blue->blue: window=137698 total=161617 failures=0 slow=0 max=24ms switch=13149ms drain=0ms (window: blue=137698 green=0; after: blue=12330 green=0)
+[bg 02:48:59] reload-x30 run 4 blue->blue: window=144481 total=170979 failures=0 slow=0 max=25ms switch=12817ms drain=0ms (window: blue=144481 green=0; after: blue=12979 green=0)
+[bg 02:49:15] reload-x30 run 5 blue->blue: window=126266 total=152508 failures=0 slow=0 max=66ms switch=13804ms drain=0ms (window: blue=126266 green=0; after: blue=12811 green=0)
+[bg 02:49:33] reload-x30 run 6 blue->blue: window=114945 total=131618 failures=0 slow=0 max=101ms switch=14885ms drain=0ms (window: blue=114945 green=0; after: blue=7047 green=0)
+[bg 02:49:52] reload-x30 run 7 blue->blue: window=106138 total=119203 failures=0 slow=0 max=99ms switch=14844ms drain=0ms (window: blue=106138 green=0; after: blue=4761 green=0)
+[bg 02:50:09] reload-x30 run 8 blue->blue: window=111099 total=129135 failures=0 slow=0 max=73ms switch=14014ms drain=0ms (window: blue=111099 green=0; after: blue=11296 green=0)
+[bg 02:50:27] reload-x30 run 9 blue->blue: window=101764 total=120058 failures=0 slow=0 max=139ms switch=14898ms drain=0ms (window: blue=101764 green=0; after: blue=8839 green=0)
+[bg 02:50:44] reload-x30 run 10 blue->blue: window=117714 total=131937 failures=0 slow=0 max=51ms switch=13885ms drain=0ms (window: blue=117714 green=0; after: blue=9620 green=0)
+[bg 02:50:44] start bg-roll (blue) and move Caddy to app-roll
+[bg 02:50:54] rolling run 1 blue->green: window=19816 total=36484 failures=0 slow=0 max=975ms switch=3209ms drain=259ms (window: blue=13305 green=6511; after: blue=0 green=3745)
+[bg 02:51:00] rolling run 2 green->blue: window=27925 total=43782 failures=0 slow=0 max=985ms switch=3259ms drain=435ms (window: blue=10249 green=17676; after: blue=3177 green=0)
+[bg 02:51:06] rolling run 3 blue->green: window=26471 total=46742 failures=0 slow=0 max=422ms switch=2932ms drain=332ms (window: blue=16894 green=9577; after: blue=0 green=9317)
+[bg 02:51:12] rolling run 4 green->blue: window=27709 total=49750 failures=0 slow=0 max=354ms switch=3173ms drain=254ms (window: blue=10095 green=17614; after: blue=11651 green=0)
+[bg 02:51:18] rolling run 5 blue->green: window=25969 total=43269 failures=0 slow=0 max=669ms switch=2784ms drain=263ms (window: blue=17678 green=8291; after: blue=0 green=6855)
+[bg 02:51:24] rolling run 6 green->blue: window=23095 total=45898 failures=0 slow=0 max=408ms switch=3143ms drain=468ms (window: blue=8273 green=14822; after: blue=12206 green=0)
+[bg 02:51:30] rolling run 7 blue->green: window=18938 total=34730 failures=0 slow=0 max=620ms switch=3238ms drain=403ms (window: blue=12429 green=6509; after: blue=0 green=2763)
+[bg 02:51:36] rolling run 8 green->blue: window=26775 total=48760 failures=0 slow=0 max=670ms switch=2790ms drain=298ms (window: blue=7973 green=18802; after: blue=8355 green=0)
+[bg 02:51:42] rolling run 9 blue->green: window=27807 total=47080 failures=0 slow=0 max=408ms switch=3067ms drain=323ms (window: blue=17377 green=10430; after: blue=0 green=9435)
+[bg 02:51:48] rolling run 10 green->blue: window=21016 total=33513 failures=0 slow=0 max=731ms switch=3263ms drain=332ms (window: blue=6113 green=14903; after: blue=4737 green=0)
+
+Per run. window = requests sent during the switch. failures = non-200 answers and
+connection errors over the whole load run. slow = requests that took 1 s or more.
+strategy    run switch         window    total failures  slow  max_ms switch_ms drain_ms
+bluegreen     1 blue->green     32968    56074        0     0      38      3383     1306
+rollback      1 green->blue     62505    87119        0     0      44      7134     1207
+bluegreen     2 blue->green     26740    51585        0     0      33      3698     1303
+rollback      2 green->blue     29867    46354        0     0     102      4028     1386
+bluegreen     3 blue->green     27146    45357        0     0      35      4000     1415
+rollback      3 green->blue     26981    43109        0     0      83      4229     1154
+bluegreen     4 blue->green     26212    44227        0     0      93      4175     1278
+rollback      4 green->blue     28367    50563        0     0      46      4051     1125
+bluegreen     5 blue->green     26149    45984        0     0     103      3912     1161
+rollback      5 green->blue     46551    62901        0     0     299      8225     1313
+bluegreen     6 blue->green     23798    37655        0     0     193      5101     1158
+rollback      6 green->blue     28503    48816        0     0      73      3700     1129
+bluegreen     7 blue->green     29319    49430        0     0     197      4125     1389
+rollback      7 green->blue     24649    42360        0     0      66      4188     1246
+bluegreen     8 blue->green     28523    46468        0     0      76      4358     1393
+rollback      8 green->blue     27233    42880        0     0      75      4418     1473
+bluegreen     9 blue->green     30010    49129        0     0      34      3921     1370
+rollback      9 green->blue     30259    50607        0     0      43      3702     1410
+bluegreen    10 blue->green     32696    51803        0     0      46      3447     1263
+rollback     10 green->blue     32863    51169        0     0      48      3943     1314
+reload-x30    1 blue->blue     132160   153885        0     0      29     13479        0
+reload-x30    2 blue->blue     146190   173598        0     0      33     12888        0
+reload-x30    3 blue->blue     137698   161617        0     0      24     13149        0
+reload-x30    4 blue->blue     144481   170979        0     0      25     12817        0
+reload-x30    5 blue->blue     126266   152508        0     0      66     13804        0
+reload-x30    6 blue->blue     114945   131618        0     0     101     14885        0
+reload-x30    7 blue->blue     106138   119203        0     0      99     14844        0
+reload-x30    8 blue->blue     111099   129135        0     0      73     14014        0
+reload-x30    9 blue->blue     101764   120058        0     0     139     14898        0
+reload-x30   10 blue->blue     117714   131937        0     0      51     13885        0
+rolling       1 blue->green     19816    36484        0     0     975      3209      259
+rolling       2 green->blue     27925    43782        0     0     985      3259      435
+rolling       3 blue->green     26471    46742        0     0     422      2932      332
+rolling       4 green->blue     27709    49750        0     0     354      3173      254
+rolling       5 blue->green     25969    43269        0     0     669      2784      263
+rolling       6 green->blue     23095    45898        0     0     408      3143      468
+rolling       7 blue->green     18938    34730        0     0     620      3238      403
+rolling       8 green->blue     26775    48760        0     0     670      2790      298
+rolling       9 blue->green     27807    47080        0     0     408      3067      323
+rolling      10 green->blue     21016    33513        0     0     731      3263      332
+
+Summary:
+strategy    runs  requests req_total failures  slow  max_ms switch_ms_mean switch_ms_max
+bluegreen     10    283561    477712        0     0     197           4012          5101
+rollback      10    337778    525878        0     0     299           4761          8225
+reload-x30    10   1238455   1444538        0     0     139          13866         14898
+rolling       10    245521    430008        0     0     985           3085          3263
+
+blue/green: PASS (zero failed requests in all 10 switch and 10 rollback runs)
+strategy: bluegreen
+[bg 02:51:48] cleanup

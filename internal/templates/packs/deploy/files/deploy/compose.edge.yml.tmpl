@@ -1,0 +1,133 @@
+[[- $pg := "postgres" -]]
+[[- if eq .db_version "17" ]][[ $pg = "postgres-17" ]][[ else if eq .db_version "16" ]][[ $pg = "postgres-16" ]][[ end -]]
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The base project of a blue/green deploy (docs/adr/0003-deploy-strategy.md). It holds Caddy
+# and Postgres and never changes color, so a switch never restarts them. spinup deploy runs it
+# as the Compose project [[ .app_name ]]. The color projects (compose.yml) join its networks.
+#
+# Stable directories on the VM (spinup deploy and spinup server bootstrap fill them):
+#   /opt/[[ .app_name ]]/caddy      Caddyfile, Caddyfile.d/, and upstream.caddy (the live color)
+#   /opt/[[ .app_name ]]/postgres   postgresql.conf and conf.d/
+#   /opt/[[ .app_name ]]/data/caddy certificates and Caddy state
+#   /opt/[[ .app_name ]]/secrets    one file per secret, mode 0600, owned by the deploy user
+#
+# spinup deploy sets these variables:
+#   PUBLIC_HOST     the Caddy site address: the host of public_url, or http://<host> without TLS
+#   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM
+#   POSTGRES_CPUS, POSTGRES_MEMORY   from deploy/environments/<env>.toml
+name: [[ .app_name ]]
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  caddy:
+    image: [[ image "caddy" ]]
+    labels:
+      # Caddy owns the only public ports of the stack.
+      spinup.public: "true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    # The deploy user owns the certificate directory. An unprivileged process can bind ports
+    # 80 and 443 in the container network namespace without a capability.
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    read_only: true
+    cap_drop: [ALL]
+    # The caddy binary carries the cap_net_bind_service file capability. Without it in the
+    # bounding set, exec fails with "operation not permitted".
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?spinup deploy sets PUBLIC_HOST}
+    volumes:
+      # A directory mount: spinup deploy renames a new upstream.caddy over the old one, and the
+      # container sees the new file. A single-file mount would keep the old file.
+      - /opt/[[ .app_name ]]/caddy:/etc/caddy:ro
+      - /opt/[[ .app_name ]]/data/caddy/data:/data
+      - /opt/[[ .app_name ]]/data/caddy/config:/config
+    networks:
+      app: {}
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget tries ::1 first, and the admin API listens on IPv4.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256m
+    stop_grace_period: 15s
+    restart: unless-stopped
+    logging: *logging
+
+  postgres:
+    # Dockerfile.postgres adds pgBackRest. The tag changes when the pins change.
+    image: [[ .app_name ]]-postgres:[[ (index .Stack.Images $pg).Tag ]]-pgbackrest[[ index .Stack.Apt "pgbackrest" ]]
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    # The deploy user owns the secret files (mode 0600), so Postgres runs as the deploy user.
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD
+[[- if ne .db_version "18" ]]
+      # An arbitrary user can initialize only a subdirectory of the volume.
+      PGDATA: /var/lib/postgresql/data/pgdata
+[[- end ]]
+    volumes:
+      - postgres_data:/var/lib/postgresql[[ if ne .db_version "18" ]]/data[[ end ]]
+      - /opt/[[ .app_name ]]/postgres:/etc/postgresql:ro
+      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+    # Postgres is on the internal network only. It publishes no port.
+    networks:
+      db: {}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "app", "-d", "app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    shm_size: 128m
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPUS:-1.0}"
+          memory: ${POSTGRES_MEMORY:-1g}
+    stop_grace_period: 60s
+    restart: unless-stopped
+    logging: *logging
+
+networks:
+  # Caddy, api, and web. It must not be internal: Docker publishes no port on an internal
+  # network, and the apps need outbound access.
+  app:
+    name: [[ .app_name ]]-app
+  # Postgres, api, and migrate. No outbound access.
+  db:
+    name: [[ .app_name ]]-db
+    internal: true
+
+volumes:
+  postgres_data:

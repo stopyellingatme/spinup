@@ -1,0 +1,44 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The backups override of the base project (compose.edge.yml). spinup deploy loads it after
+# compose.edge.yml when the file exists:
+#   docker compose -p todo -f compose.edge.yml -f compose.backups.yml up -d
+#
+# It changes only the postgres service:
+#   - WAL archiving to pgBackRest (archive_mode and archive_command)
+#   - the PGBACKREST_* secrets as environment variables of the server
+#   - /opt/todo/backups at /var/lib/pgbackrest: pgbackrest.conf and the WAL spool
+#   - the backup network, so that pgBackRest reaches the S3 endpoint
+#
+# The server reads every /run/secrets/PGBACKREST_* file into its environment before it
+# starts. The values never enter this file, the image, or `docker inspect`.
+services:
+  postgres:
+    entrypoint:
+      - sh
+      - -c
+      - 'for f in /run/secrets/PGBACKREST_*; do [ -f "$$f" ] && export "$${f##*/}=$$(cat "$$f")"; done; exec docker-entrypoint.sh "$$@"'
+      - pgbackrest-env
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=todo archive-push %p
+      # Switch the WAL segment after 5 minutes with changes, so a quiet database loses at
+      # most 5 minutes of changes.
+      - -c
+      - archive_timeout=300
+    environment:
+      PGBACKREST_CONFIG: /var/lib/pgbackrest/pgbackrest.conf
+    volumes:
+      - /opt/todo/backups:/var/lib/pgbackrest
+    networks:
+      backup: {}
+
+networks:
+  # Outbound access for pgBackRest. The db network stays internal. Postgres publishes no port.
+  backup:
+    name: todo-backup

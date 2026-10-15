@@ -1,4 +1,8 @@
-// Package backup backs up and restores the app database.
+// Package backup backs up the app database on the VM.
 //
-// STUB from the M5 pre-seed commit. Unit M5.7 owns this file and replaces it.
+// Backend is the interface of a backup backend. PGBackRest is the default backend (ADR 0004):
+// it runs pgbackrest in the postgres container of the base Compose project through
+// remote.Runner, and parses `pgbackrest info --output=json`. Now, List, and ShowStatus are
+// the operations of `spinup backup`. Hook is the pre-deploy hook named "backup", which takes a
+// diff backup before every deploy.
 package backup

@@ -1,0 +1,14 @@
+[[- $pg := "postgres" -]]
+[[- if eq .db_version "17" ]][[ $pg = "postgres-17" ]][[ else if eq .db_version "16" ]][[ $pg = "postgres-16" ]][[ end -]]
+# Managed by spinup: `spinup upgrade` keeps this file current.
+# Build context is deploy/ (compose.edge.yml builds it):
+#   docker build -f deploy/Dockerfile.postgres deploy
+#
+# The official Postgres image already has the apt.postgresql.org repository. pgBackRest comes
+# from it at the version that spinup pins. The backups pack sets archive_mode and
+# archive_command in deploy/compose.backups.yml, an override of compose.edge.yml.
+FROM [[ image $pg ]]
+ARG PGBACKREST_VERSION=[[ index .Stack.Apt "pgbackrest" ]]
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}-*" \
+ && rm -rf /var/lib/apt/lists/*

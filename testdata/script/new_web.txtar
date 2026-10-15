@@ -1,7 +1,7 @@
 # Without --api-only, a new app has the SvelteKit web app in web/.
 env SPINUP_KIT_REPLACE=
 exec spinup new todo --module example.com/todo --no-git --non-interactive
-stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, web'
+stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, deploy, web'
 
 # The files of ADR 0008 §2, the npm inputs, and the shadcn-svelte components.
 exists todo/web/package.json todo/web/pnpm-lock.yaml todo/web/pnpm-workspace.yaml

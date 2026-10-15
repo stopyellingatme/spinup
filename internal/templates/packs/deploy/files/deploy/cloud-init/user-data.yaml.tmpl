@@ -1,0 +1,105 @@
+#cloud-config
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The first boot of a new Ubuntu VM for [[ .app_name ]]. Give this file to the cloud provider as
+# user data. Replace SPINUP_DEPLOY_SSH_KEY with the public SSH key of the deploy user first
+# (`spinup server bootstrap` does this for you). For an existing VM, `spinup server bootstrap`
+# runs the same steps over SSH.
+#
+# The deploy user is in the docker group, which is equal to root access on the VM.
+# Root login and password login are off.
+
+timezone: Etc/UTC
+
+users:
+  - name: deploy
+    uid: 1000
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - SPINUP_DEPLOY_SSH_KEY
+
+disable_root: true
+ssh_pwauth: false
+
+# Docker from the official repository, not the distribution package.
+apt:
+  sources:
+    docker.list:
+      source: "deb [signed-by=$KEY_FILE] https://download.docker.com/linux/ubuntu $RELEASE stable"
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+
+package_update: true
+package_upgrade: true
+packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  # Log rotation for every container (the Compose files set the same values).
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" }
+      }
+  - path: /etc/systemd/journald.conf.d/90-spinup.conf
+    permissions: "0644"
+    content: |
+      [Journal]
+      SystemMaxUse=500M
+  - path: /etc/ssh/sshd_config.d/10-spinup.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      AllowUsers deploy
+  - path: /etc/fail2ban/jail.d/sshd.local
+    permissions: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      maxretry = 5
+      bantime = 1h
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  - path: /etc/sysctl.d/90-spinup.conf
+    permissions: "0644"
+    content: |
+      vm.swappiness = 10
+      net.core.somaxconn = 4096
+
+runcmd:
+  - [usermod, -aG, docker, deploy]
+  - [install, -d, -o, deploy, -g, deploy, -m, "0750", /opt/[[ .app_name ]], /opt/[[ .app_name ]]/releases, /opt/[[ .app_name ]]/backups, /opt/[[ .app_name ]]/data, /opt/[[ .app_name ]]/data/caddy, /opt/[[ .app_name ]]/data/caddy/data, /opt/[[ .app_name ]]/data/caddy/config, /opt/[[ .app_name ]]/caddy, /opt/[[ .app_name ]]/postgres]
+  - [install, -d, -o, deploy, -g, deploy, -m, "0700", /opt/[[ .app_name ]]/secrets]
+  - [sysctl, --system]
+  - [systemctl, restart, systemd-journald]
+  - [ufw, default, deny, incoming]
+  - [ufw, default, allow, outgoing]
+  - [ufw, allow, 22/tcp]
+  - [ufw, allow, 80/tcp]
+  - [ufw, allow, 443/tcp]
+  - [ufw, allow, 443/udp]
+  - [ufw, --force, enable]
+  - [systemctl, enable, --now, fail2ban]
+  - [systemctl, enable, --now, unattended-upgrades]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, restart, ssh]
