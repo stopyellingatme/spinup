@@ -2,29 +2,49 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/routes"
 	"github.com/stopyellingatme/spinup/kit/app"
 	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/db"
+	"github.com/stopyellingatme/spinup/kit/telemetry"
 )
 
 var version = "dev"
 
 func main() {
-	var cfg config.Base
-	if err := config.Load(&cfg); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	pool, err := db.Open(context.Background(), cfg.DatabaseURL)
+}
+
+func run() (err error) {
+	var cfg config.Base
+	if err := config.Load(&cfg); err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	shutdown, err := telemetry.Setup(ctx, telemetry.Options{ServiceName: "todo-api", ServiceVersion: version, Environment: cfg.Env})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		err = errors.Join(err, shutdown(shutdownCtx))
+	}()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
 	}
 	a := app.New(
 		app.WithName("todo"),
@@ -35,5 +55,5 @@ func main() {
 		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
 		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
 	)
-	app.Main(a)
+	return a.Run(ctx, os.Args[1:])
 }
