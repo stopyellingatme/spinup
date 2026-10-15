@@ -22,6 +22,16 @@ func TestParseNameFormsAndInflection(t *testing.T) {
 		{"categories", "category", "categories"},
 		{"statuses", "status", "statuses"},
 		{"addresses", "address", "addresses"},
+		{"cases", "case", "cases"},
+		{"responses", "response", "responses"},
+		{"movies", "movie", "movies"},
+		{"cookies", "cookie", "cookies"},
+		{"series", "series", "series"},
+		{"news", "news", "news"},
+		{"species", "species", "species"},
+		{"ties", "tie", "ties"},
+		{"users", "user", "users"},
+		{"orders", "order", "orders"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -54,7 +64,7 @@ func TestParseNameFormsAndInflection(t *testing.T) {
 func TestParseNameRejectsReservedAndInvalid(t *testing.T) {
 	t.Parallel()
 
-	for _, input := range []string{"user", "order", "select", "func", "string", "9lives", "mötley", strings.Repeat("a", 51)} {
+	for _, input := range []string{"9lives", "mötley", strings.Repeat("a", 51)} {
 		t.Run(input, func(t *testing.T) {
 			t.Parallel()
 			_, err := ParseName(input)
@@ -62,6 +72,21 @@ func TestParseNameRejectsReservedAndInvalid(t *testing.T) {
 				t.Fatalf("ParseName(%q) error = %v", input, err)
 			}
 		})
+	}
+}
+
+func TestParseReferenceAllowsCommonResourceNames(t *testing.T) {
+	t.Parallel()
+
+	fields, err := Parse([]string{"author:ref:user", "owner:ref:orders"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fields[0].Type.Ref != "user" || fields[0].Type.SQL != "bigint REFERENCES users(id)" {
+		t.Fatalf("user reference = %#v", fields[0].Type)
+	}
+	if fields[1].Type.Ref != "order" || fields[1].Type.SQL != "bigint REFERENCES orders(id)" {
+		t.Fatalf("orders reference = %#v", fields[1].Type)
 	}
 }
 
@@ -150,6 +175,10 @@ func TestParseRejectsInvalidFields(t *testing.T) {
 		{"created_at:time"},
 		{"title:string", "title:text"},
 		{"title:unknown"},
+		{"order:string"},
+		{"limit:int"},
+		{"end:date"},
+		{"type:string"},
 		{"state:enum:Draft|published"},
 		{"state:enum:draft|draft"},
 		{"author:ref:"},
