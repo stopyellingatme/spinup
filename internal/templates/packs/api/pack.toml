@@ -1,3 +1,48 @@
-# STUB from the M1 pre-seed commit. Unit M1.3 owns this file and replaces it.
 name = "api"
-description = "Go API (stub)"
+description = "Go API with kit routing, PostgreSQL, and development services."
+requires = ["base"]
+
+[[files]]
+path = "api/cmd/api/main.go"
+source = "files/api/cmd/api/main.go.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/internal/routes/routes.go"
+source = "files/api/internal/routes/routes.go.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/internal/routes/routes_gen.go"
+source = "files/api/internal/routes/routes_gen.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/internal/routes/routes_test.go"
+source = "files/api/internal/routes/routes_test.go.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/db/migrations/embed.go"
+source = "files/api/db/migrations/embed.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/db/migrations/00001_init.sql"
+source = "files/api/db/migrations/00001_init.sql"
+class = "seed"
+
+[[files]]
+path = "api/openapi/paths/.gitkeep"
+source = "files/api/openapi/paths/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "deploy/Dockerfile.api"
+source = "files/deploy/Dockerfile.api.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/compose.dev.yml"
+source = "files/deploy/compose.dev.yml.tmpl"
+class = "managed"

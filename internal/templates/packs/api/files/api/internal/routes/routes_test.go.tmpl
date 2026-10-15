@@ -1,0 +1,21 @@
+package routes_test
+
+import (
+ "net/http"
+ "testing"
+
+ "[[ .module ]]/api/internal/routes"
+ "github.com/stopyellingatme/spinup/kit/app"
+ "github.com/stopyellingatme/spinup/kit/testkit"
+)
+
+func TestHealthz(t *testing.T) {
+ t.Parallel()
+ handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {
+  routes.Register(mux, routes.Deps{})
+ })).Handler()
+ rec := testkit.Do(t, handler, http.MethodGet, "/healthz", nil)
+ if rec.Code != http.StatusOK {
+  t.Fatalf("GET /healthz: status %d, want %d", rec.Code, http.StatusOK)
+ }
+}

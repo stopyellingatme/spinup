@@ -1,0 +1,14 @@
+# Select the kit behavior defaults.
+behavior_version = 1
+# Enable these optional modules.
+modules = [ [[ range $i, $module := .modules ]][[ if $i ]], [[ end ]][[ quote $module ]][[ end ]] ]
+
+[app]
+# Name the application.
+name = [[ quote .app_name ]]
+# Set the root Go module path.
+module = [[ quote .module ]]
+
+[monitoring]
+# Use the small monitoring stack.
+profile = "lite"
