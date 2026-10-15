@@ -49,6 +49,24 @@ func TestCheckChannels(t *testing.T) {
 	}
 }
 
+func TestCheckChoosesHighestVersionBeforePublishTime(t *testing.T) {
+	t.Parallel()
+	srv := newTestHTTP(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`[
+ {"tag_name":"v1.3.0","published_at":"2026-10-12T00:00:00Z"},
+ {"tag_name":"v1.2.5","published_at":"2026-10-15T00:00:00Z"}]`))
+	}))
+	defer srv.Close()
+
+	r, err := (Updater{APIBase: srv.URL, Client: srv.Client()}).Check(context.Background(), Options{Current: "1.2.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Version != "1.3.0" {
+		t.Fatalf("version = %q, want 1.3.0", r.Version)
+	}
+}
+
 func TestCheckDoesNotReplace(t *testing.T) {
 	t.Parallel()
 	srv := fixture(t, false, false)
@@ -63,6 +81,27 @@ func TestCheckDoesNotReplace(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if string(data) != "old" {
 		t.Fatal("check changed the binary")
+	}
+}
+
+func TestCheckWorksForGuardedInstalls(t *testing.T) {
+	t.Parallel()
+	srv := fixture(t, false, false)
+	for _, tt := range []struct {
+		name, current, executable string
+	}{
+		{name: "Homebrew", current: "1.0.0", executable: "/opt/homebrew/bin/spinup"},
+		{name: "development", current: "dev", executable: filepath.Join(t.TempDir(), "spinup")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := (Updater{APIBase: srv.URL, Client: srv.Client(), Executable: tt.executable}).Update(context.Background(), Options{Current: tt.current, Check: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Version != "1.2.0" || !r.Available || r.Command != "" || r.Updated {
+				t.Fatalf("result = %+v", r)
+			}
+		})
 	}
 }
 

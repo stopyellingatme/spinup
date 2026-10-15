@@ -10,6 +10,8 @@ import (
 
 var noticeMu sync.Mutex
 
+const staleNoticeLockAge = time.Minute
+
 // NoticeOptions controls the silent daily release check.
 type NoticeOptions struct {
 	Current  string
@@ -48,7 +50,7 @@ func (u Updater) Notice(ctx context.Context, o NoticeOptions) string {
 	}
 	// Coordinate checks from concurrent CLI processes as well as goroutines.
 	lock := filepath.Join(dir, "update-check.lock")
-	if err := os.Mkdir(lock, 0700); err != nil {
+	if err := acquireNoticeLock(lock, now); err != nil {
 		return ""
 	}
 	defer os.Remove(lock)
@@ -69,4 +71,18 @@ func (u Updater) Notice(ctx context.Context, o NoticeOptions) string {
 		return ""
 	}
 	return "spinup " + r.Version + " is available. Run spinup self-update."
+}
+
+func acquireNoticeLock(lock string, now time.Time) error {
+	if err := os.Mkdir(lock, 0700); err == nil || !os.IsExist(err) {
+		return err
+	}
+	info, err := os.Stat(lock)
+	if err != nil || now.Sub(info.ModTime()) <= staleNoticeLockAge {
+		return err
+	}
+	if err := os.Remove(lock); err != nil {
+		return err
+	}
+	return os.Mkdir(lock, 0700)
 }

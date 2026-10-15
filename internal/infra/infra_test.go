@@ -186,7 +186,7 @@ func TestApplyFailuresPreserveConfig(t *testing.T) {
 	}
 }
 
-func TestInitializedEnvironment(t *testing.T) {
+func TestInitializedEnvironmentReinitializesBeforeOutput(t *testing.T) {
 	t.Parallel()
 	root := fixture(t)
 	dataDir := filepath.Join(root, "deploy/infra/tofu/.terraform/staging")
@@ -197,6 +197,7 @@ func TestInitializedEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := &runexec.Fake{}
+	fake.Expect("tofu", "-chdir=deploy/infra/tofu", "init", "-input=false", "-backend-config=path=terraform.staging.tfstate").Return("initialized\n", "", 0)
 	fake.Expect("tofu", "-chdir=deploy/infra/tofu", "output").Return("192.0.2.5", "", 0)
 	if err := Run(t.Context(), Options{Dir: root, Env: "staging", Action: "output"}, deps(fake)); err != nil {
 		t.Fatal(err)

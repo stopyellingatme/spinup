@@ -109,13 +109,8 @@ func Run(ctx context.Context, o Options, d Deps) error {
 		}
 		return result, nil
 	}
-	if _, err := os.Stat(filepath.Join(dataDir, "terraform.tfstate")); err != nil {
-		if !os.IsNotExist(err) {
-			return failure("inspect OpenTofu initialization", err)
-		}
-		if _, err := run("init", "-input=false", "-backend-config=path=terraform."+env.Name+".tfstate"); err != nil {
-			return err
-		}
+	if _, err := run("init", "-input=false", "-backend-config=path=terraform."+env.Name+".tfstate"); err != nil {
+		return err
 	}
 	args := []string{action}
 	if action != "output" && (action == "plan" || o.Confirm.Yes || !o.Confirm.Interactive) {
