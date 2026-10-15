@@ -11,8 +11,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -38,13 +40,17 @@ type PGBackRest struct {
 	App string
 	// Remote runs commands on the VM.
 	Remote remote.Runner
-	// Config is the rendered pgbackrest.conf. Backup uploads it to the VM. Nil skips the upload.
+	// Config is the rendered pgbackrest.conf. Each backend uploads it before its first
+	// pgBackRest command. Nil skips the upload.
 	Config []byte
 	// RetentionFull replaces repo1-retention-full in the uploaded configuration when it is
 	// above zero. It comes from spinup.toml [backups] retention.
 	RetentionFull int
 	// Progress receives the log output of pgBackRest. Nil discards it.
 	Progress io.Writer
+
+	configMu       sync.Mutex
+	configUploaded bool
 }
 
 func init() {
@@ -82,28 +88,56 @@ func (p *PGBackRest) run(ctx context.Context, what string, args ...string) ([]by
 	if p.Remote == nil {
 		return nil, fmt.Errorf("%s: the remote runner is missing\nTry: report this spinup bug", what)
 	}
+	if err := p.uploadConfig(ctx); err != nil {
+		return nil, err
+	}
 	progress := p.Progress
 	if progress == nil {
 		progress = io.Discard
 	}
 	result, err := p.Remote.Run(ctx, remote.Cmd{Argv: Command(p.App, args...), Stderr: progress})
 	if err != nil {
-		return nil, fmt.Errorf("%s on the VM: %w\nTry: run spinup backup status --env <env>, and check the PGBACKREST_* secrets and deploy/compose.backups.yml", what, err)
+		return nil, fmt.Errorf("%s on the VM: %w\nTry: run spinup backup status --env <env>, and check the PGBACKREST_* secrets and deploy/compose.backups.yml", what, pgBackRestError(err, result))
 	}
 	return result.Stdout, nil
+}
+
+// uploadConfig installs configuration without changing the repository's stanza.
+// A failed upload can be retried. A successful upload is reused by this backend.
+func (p *PGBackRest) uploadConfig(ctx context.Context) error {
+	p.configMu.Lock()
+	defer p.configMu.Unlock()
+	if p.Config == nil || p.configUploaded {
+		return nil
+	}
+	if err := p.Remote.Upload(ctx, WithRetention(p.Config, p.RetentionFull), RemoteConfigPath(p.App), 0o600); err != nil {
+		return fmt.Errorf("upload pgBackRest configuration to %s: %w\nTry: run spinup server bootstrap, which creates /opt/%s/backups", RemoteConfigPath(p.App), err, p.App)
+	}
+	p.configUploaded = true
+	return nil
+}
+
+// pgBackRestError preserves diagnostics from both streams. The remote runner
+// redacts Result before returning it. pgBackRest usually logs errors to stdout.
+func pgBackRestError(err error, result runexec.Result) error {
+	var lines []string
+	for _, output := range [][]byte{result.Stdout, result.Stderr} {
+		for line := range strings.SplitSeq(string(output), "\n") {
+			line = strings.TrimSpace(line)
+			if (strings.Contains(line, "ERROR:") || strings.Contains(line, "WARN:")) && !slices.Contains(lines, line) {
+				lines = append(lines, line)
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return err
+	}
+	return fmt.Errorf("%w\n%s", err, strings.Join(lines, "\n"))
 }
 
 // Prepare uploads the configuration and creates the stanza when the repository has none.
 // It is idempotent. It reports whether it created the stanza.
 func (p *PGBackRest) Prepare(ctx context.Context) (bool, error) {
-	if p.Config != nil {
-		if p.Remote == nil {
-			return false, fmt.Errorf("upload pgBackRest configuration: the remote runner is missing\nTry: report this spinup bug")
-		}
-		if err := p.Remote.Upload(ctx, WithRetention(p.Config, p.RetentionFull), RemoteConfigPath(p.App), 0o600); err != nil {
-			return false, fmt.Errorf("upload pgBackRest configuration to %s: %w\nTry: run spinup server bootstrap, which creates /opt/%s/backups", RemoteConfigPath(p.App), err, p.App)
-		}
-	}
 	status, err := p.Info(ctx)
 	if err != nil {
 		return false, err
@@ -136,6 +170,10 @@ func (p *PGBackRest) backup(ctx context.Context, kind Kind, safety bool) (Result
 	}
 	args = append(args, "backup")
 	if _, err := p.run(ctx, "run pgBackRest "+string(kind)+" backup", args...); err != nil {
+		var exit *runexec.ExitError
+		if safety && errors.As(err, &exit) && exit.Code == 51 {
+			return Result{}, fmt.Errorf("take safety backup: the live database is a new cluster that the repository does not know, so a safety backup is impossible: %w\nTry: pass --no-safety-backup to restore without a safety backup", err)
+		}
 		return Result{}, err
 	}
 	backups, err := p.List(ctx)

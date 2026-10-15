@@ -12,6 +12,7 @@ func TestVerifyRecordsMetrics(t *testing.T) {
 	t.Cleanup(func() { recordMetrics = previous })
 	for _, fail := range []bool{false, true} {
 		vm := &remote.Fake{}
+		vm.ExpectUpload(RemoteConfigPath("todo"))
 		expectRestoreContainer(t, vm, true, fail)
 		var recorded Sample
 		calls := 0

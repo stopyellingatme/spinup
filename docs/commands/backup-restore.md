@@ -5,6 +5,15 @@ The `[backups] backend` value selects the backend.
 The default backend is `pgbackrest`.
 The `backups` module is required.
 
+Each pgBackRest backend uploads `pgbackrest.conf` before its first pgBackRest command.
+The upload applies the configured retention and uses mode 0600.
+Restore, verification, listing, status, and pruning work on a replacement VM without a prior backup.
+These operations do not create a stanza.
+Only backup preparation can create a missing stanza.
+
+If a command fails, the error includes the pgBackRest `ERROR` and `WARN` lines from stdout and stderr.
+The remote runner redacts secrets before the command includes these lines.
+
 `backup verify` restores a backup into a temporary container.
 It waits for recovery and checks `goose_db_version`.
 It prints the label, the recovery time, and the result.
@@ -90,6 +99,12 @@ The command takes a full safety backup before it stops either color.
 For pgBackRest, this backup uses `--no-expire-auto` to preserve the restore target.
 The command checks the target again before it stops any service.
 Use `--no-safety-backup` to skip the safety backup.
+
+A replacement VM usually has a new database cluster with a different system identifier.
+The repository does not know this cluster, so pgBackRest rejects its safety backup with error 051.
+The command reports this failure before it stops any service.
+It never skips the safety backup automatically.
+After you inspect the live database, pass `--no-safety-backup` if you accept restoration without a safety backup.
 
 The command stops the applications and restores the database.
 For pgBackRest, it stops PostgreSQL, restores the live volume, and starts PostgreSQL.

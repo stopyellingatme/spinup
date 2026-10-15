@@ -401,13 +401,6 @@ echo "    VM 2 runs release $rel on an empty database"
 # cannot go into the same repository. It holds no data, so the drill skips it.
 if ! sp restore backup restore --env staging --into in-place --i-know --yes --now --no-safety-backup; then
   show_log restore 80
-  # spinup reports only the exit code of pgBackRest. Print the error of pgBackRest itself.
-  echo "    pgbackrest info in the postgres container of VM 2:" >&2
-  # The single quotes are for the shell in the container.
-  # shellcheck disable=SC2016
-  docker exec "$vm" docker compose -p "$app" exec -T postgres sh -c \
-    'for f in /run/secrets/PGBACKREST_*; do [ -f "$f" ] && export "${f##*/}=$(cat "$f")"; done; exec pgbackrest --stanza="$1" info' \
-    sh "$app" 2>&1 | sed 's/^/    | /' >&2 || true
   fail "spinup backup restore --into in-place failed on VM 2"
 fi
 
