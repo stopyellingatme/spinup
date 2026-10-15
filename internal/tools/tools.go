@@ -419,7 +419,7 @@ func versionOutput(ctx context.Context, runner exec.Runner, path string) (string
 	return strings.TrimSpace(string(result.Stdout)), nil
 }
 func hasVersion(output, version string) bool {
-	for _, field := range strings.FieldsFunc(output, func(r rune) bool { return !(r >= '0' && r <= '9' || r == '.' || r == 'v') }) {
+	for _, field := range strings.FieldsFunc(output, func(r rune) bool { return (r < '0' || r > '9') && r != '.' && r != 'v' }) {
 		if strings.TrimPrefix(field, "v") == version {
 			return true
 		}
