@@ -78,6 +78,25 @@ exec git branch --list spinup/upgrade-0.0.1
 exec git status --porcelain
 ! stdout .
 
+# Abort also recovers when the worktree directory was removed.
+exec sh -c 'spinup upgrade --yes --no-verify; test $? -eq 3'
+rm .spinup/upgrade/0.0.1
+exec spinup upgrade --abort --yes
+! exists .spinup/upgrade.json
+exec git branch --list spinup/upgrade-0.0.1
+! stdout .
+exec git worktree list --porcelain
+! stdout 'spinup/upgrade-0.0.1'
+
+# Committed conflicts require a warning before the merge instruction.
+exec spinup upgrade --yes --no-verify --commit-conflicts
+stdout 'Warning: committed conflict markers in: api/internal/routes/routes.go'
+stdout 'Resolve these files before running git merge'
+! stdout 'Next: git merge'
+! exists .spinup/upgrade.json
+exec git show spinup/upgrade-0.0.1:api/internal/routes/routes.go
+stdout '<<<<<<<'
+
 -- overlay/packs/api/files/api/internal/routes/routes.go.tmpl --
 // Package routes registers the upgraded application routes.
 package routes

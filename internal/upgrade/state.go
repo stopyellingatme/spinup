@@ -3,6 +3,7 @@ package upgrade
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,16 +17,17 @@ import (
 
 // runState is stored only in the main checkout. Status names the next operation.
 type runState struct {
-	Schema    int            `json:"schema"`
-	Chain     []string       `json:"chain"`
-	Index     int            `json:"step"`
-	Worktree  string         `json:"worktree"`
-	Branch    string         `json:"branch"`
-	Status    string         `json:"status"`
-	Conflicts []string       `json:"conflicts,omitempty"`
-	Lock      *manifest.Lock `json:"lock"`
-	Plan      *Plan          `json:"plan,omitempty"`
-	Options   Options        `json:"options"`
+	Schema             int            `json:"schema"`
+	Chain              []string       `json:"chain"`
+	Index              int            `json:"step"`
+	Worktree           string         `json:"worktree"`
+	Branch             string         `json:"branch"`
+	Status             string         `json:"status"`
+	Conflicts          []string       `json:"conflicts,omitempty"`
+	CommittedConflicts []string       `json:"committed_conflicts,omitempty"`
+	Lock               *manifest.Lock `json:"lock"`
+	Plan               *Plan          `json:"plan,omitempty"`
+	Options            Options        `json:"options"`
 }
 
 func statePath(root string) string                 { return filepath.Join(root, ".spinup", "upgrade.json") }
@@ -70,7 +72,7 @@ func (s *runState) validate(root string) error {
 	if err := s.Lock.Validate(); err != nil {
 		return err
 	}
-	for _, name := range s.Conflicts {
+	for _, name := range append(slices.Clone(s.Conflicts), s.CommittedConflicts...) {
 		clean, err := vfs.CleanPath(name)
 		if err != nil || clean != name {
 			return invalid()
@@ -123,11 +125,18 @@ func unresolved(work string, paths []string) ([]string, error) {
 	var result []string
 	for _, name := range paths {
 		data, err := root.ReadFile(name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("read conflict %q: %w\nTry: restore and resolve the file in %s", name, err, work)
 		}
+		open := false
 		for _, line := range bytes.Split(data, []byte{'\n'}) {
-			if bytes.HasPrefix(line, []byte("<<<<<<<")) || bytes.HasPrefix(line, []byte("=======")) || bytes.HasPrefix(line, []byte(">>>>>>>")) {
+			if bytes.HasPrefix(line, []byte("<<<<<<<")) {
+				open = true
+			}
+			if open && bytes.HasPrefix(line, []byte(">>>>>>>")) {
 				result = append(result, name)
 				break
 			}
