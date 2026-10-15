@@ -13,7 +13,7 @@ export PATH := $(CURDIR)/scripts/bin:/opt/homebrew/opt/node@24/bin:$(PATH)
 MODULES := . ./kit
 PKGS ?= ./...
 
-.PHONY: help build test lint vuln golden script app-gate doctest e2e dind tools-check bump-stack
+.PHONY: help build test lint vuln golden script app-gate doctest e2e dind tools-check bump-stack install
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -57,3 +57,16 @@ bump-stack: ## Regenerate the template-pack lockfiles from stackversions.yaml (m
 	@scripts/bump-stack.sh
 
 GOVULNCHECK_VERSION ?= v1.9.0
+
+# Local alpha builds for the dogfood app. Each commit gets a distinct, ordered template version,
+# and its templates are kept, so `spinup upgrade` has a real base for the 3-way merge.
+DEV_TEMPLATES ?= $(HOME)/.cache/spinup/dev-templates
+
+install: ## Build bin/spinup as 0.1.0-alpha.<commit count> and keep its templates in DEV_TEMPLATES
+	@version=0.1.0-alpha.$$(git rev-list --count HEAD); \
+	if [[ -n "$$(git status --porcelain)" ]]; then echo "install: commit your changes first"; echo "Try: git commit, then make install"; exit 1; fi; \
+	go build -ldflags "-X github.com/stopyellingatme/spinup/internal/cli.Version=$$version" -o bin/spinup ./cmd/spinup; \
+	dest="$(DEV_TEMPLATES)/$$version"; rm -rf "$$dest"; mkdir -p "$$dest"; \
+	cp -R internal/templates/packs "$$dest/packs"; cp internal/stackversions/stackversions.yaml "$$dest/"; \
+	echo "Installed bin/spinup $$version (templates in $$dest)"; \
+	echo "Upgrade an app with: SPINUP_TEMPLATES_DIR=$(DEV_TEMPLATES) bin/spinup upgrade"
