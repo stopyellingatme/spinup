@@ -7,6 +7,19 @@ import (
 
 func init() { Register(GroupOperate, newBackup) }
 
+// backupSubcommands holds the builders of the backup subcommands that register with registerBackup.
+var backupSubcommands []func(app *App) *cobra.Command
+
+// registerBackup adds a subcommand to `spinup backup`. Call it from init().
+func registerBackup(build func(app *App) *cobra.Command) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	backupSubcommands = append(backupSubcommands, build)
+}
+
+// The M7 units register their backup subcommands; this keeps the pre-seed lint-clean.
+var _ = registerBackup
+
 func backupOptions(app *App, c *cobra.Command) backup.Options {
 	return backup.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, JSON: app.Flags.JSON, Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}
 }
@@ -34,5 +47,8 @@ func newBackup(app *App) *cobra.Command {
 		_, err := backup.ShowStatus(c.Context(), backupOptions(app, c))
 		return err
 	}})
+	for _, build := range backupSubcommands {
+		group.AddCommand(build(app))
+	}
 	return group
 }

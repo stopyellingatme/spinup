@@ -38,4 +38,10 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/gen/alert"
 	_ "github.com/stopyellingatme/spinup/internal/gen/dashboard"
 	_ "github.com/stopyellingatme/spinup/internal/monitor"
+
+	// M7
+	_ "github.com/stopyellingatme/spinup/internal/backup/pgdump"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/remote"
+	_ "github.com/stopyellingatme/spinup/internal/maintain"
+	_ "github.com/stopyellingatme/spinup/internal/maintain/pg"
 )

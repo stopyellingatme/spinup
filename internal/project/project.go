@@ -77,7 +77,17 @@ type Config struct {
 	} `toml:"monitoring"`
 	Backups struct {
 		Retention string
+		// Backend is "pgbackrest" (default) or "pgdump" (ADR 0011 §1).
+		Backend string
+		// ScheduleFull, ScheduleDiff, and ScheduleVerify are systemd OnCalendar values.
+		ScheduleFull   string `toml:"schedule_full"`
+		ScheduleDiff   string `toml:"schedule_diff"`
+		ScheduleVerify string `toml:"schedule_verify"`
 	} `toml:"backups"`
+	Maintenance struct {
+		// Window is the maintenance window in UTC, such as "Sun 02:00-05:00". Empty means any time.
+		Window string
+	} `toml:"maintenance"`
 	Envs       map[string]Env `toml:"env"`
 	Plugins    []Plugin       `toml:"plugins"`
 	DefaultEnv string         `toml:"default_env"`
@@ -133,7 +143,7 @@ func Parse(data []byte) (*Config, error) {
 	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse %s extra keys: %w", ConfigFile, err)
 	}
-	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "env", "plugins", "default_env"} {
+	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env"} {
 		delete(raw, key)
 	}
 	config.Extra = raw
@@ -154,6 +164,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Monitoring.Profile != "lite" && c.Monitoring.Profile != "full" && c.Monitoring.Profile != "none" {
 		problems = append(problems, fmt.Errorf("monitoring profile %q must be lite, full, or none", c.Monitoring.Profile))
+	}
+	if b := c.Backups.Backend; b != "" && b != "pgbackrest" && b != "pgdump" {
+		problems = append(problems, fmt.Errorf("backups backend %q must be pgbackrest or pgdump", b))
 	}
 	envNames := make([]string, 0, len(c.Envs))
 	for name := range c.Envs {

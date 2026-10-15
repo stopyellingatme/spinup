@@ -255,11 +255,14 @@ The "Row" values are hints for the `model-routing` skill. Orchestrate makes the 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
 | M7.1 | `pgdump` backend | `T ./internal/backup/pgdump/...` | `internal/backup/pgdump/` | – |
-| M7.2 | `backup verify/list/restore --into new\|in-place/schedule/status/prune`. `restore` calls `ConfirmProtected`. Systemd timer templates. | `T ./internal/backup/ -run 'Verify\|Restore\|Schedule'`, then `G backups` | `internal/backup/{verify,restore,schedule}*.go`, `internal/cli/backup_*.go`, `packs/backups/systemd/`, `testdata/golden/backups/` | M7.1 |
+| M7.2 | `backup verify/restore --into new\|in-place/prune`, pgBackRest `Verify`/`Restore`/`Expire`, and `backup.Open` (backend selection). `restore` calls `ConfirmProtected` and takes the deploy lock. | `T ./internal/backup/...` | `internal/backup/{open,verify,restore,prune}*.go`, `internal/cli/backup_{verify,restore,prune}.go` | – |
+| M7.2b | `backup schedule` (systemd timers and `run.sh` on the VM) and the backup metrics file that Alloy reads (ADR 0011 §4, §5) | `T ./internal/backup/...`, then `G backups`, `G monitoring` | `internal/backup/{metrics,schedule}*.go`, `internal/cli/backup_schedule.go`, `packs/backups/` (new files), the monitoring pack's Alloy, Compose, rules, and backups dashboard, `testdata/golden/{backups,monitoring}/` | – |
 | M7.3 | `maintenance` group: `patch`, `vuln-scan`, `prune`, `vacuum`, `certs`, and `window` | `T ./internal/maintain/...` | `internal/maintain/` (not `pg/`), `internal/cli/maintenance.go` | – |
 | M7.4 | `pg-minor-upgrade`, and `pg-major-upgrade` (dump/restore swap) | `T ./internal/maintain/pg/...` | `internal/maintain/pg/`, `internal/cli/maintenance_pg.go` | M7.1, M7.3 |
 | M7.5 | Remote doctor checks, and `renovate.json` through a `pack.d` fragment of the base pack | `T ./internal/doctor/remote/...`, then `G base` | `internal/doctor/remote/`, `packs/base/{renovate.json.tmpl,pack.d/renovate.toml}` | – |
-| M7.6 | DR drill: destroy the VM, bootstrap a new one, restore from MinIO, and assert the RTO | `actionlint`. Gate: `make dind` † | `testdata/dind/dr/`, `.github/workflows/dr.yml` | M7.2 |
+| M7.6 | DR drill: destroy the VM, start a new one, restore from S3 (SeaweedFS; MinIO is archived), and assert the RTO | `bash testdata/dind/dr/run.sh` †, then `actionlint` | `testdata/dind/dr/`, `.github/workflows/dr.yml` | M7.1, M7.2 |
+
+The M7 pre-seed (ADR 0011) adds the contract files `internal/backup/registry.go` and `internal/maintain/window.go`, the `[backups]` and `[maintenance]` keys of `spinup.toml`, and `registerBackup` in `internal/cli/backup.go`.
 
 #### M8 — CI generation and release → a generated repo is green on GitHub, and a `-rc` builds
 
