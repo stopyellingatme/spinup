@@ -156,7 +156,7 @@ func (r *Runner) Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
-	state := &runState{Schema: 1, Chain: versions, Worktree: work, Branch: branch, Status: "step", Lock: lock, Options: o}
+	state := &runState{Schema: 1, Chain: versions, Worktree: work, Branch: branch, Status: "step", Lock: lock, Options: o, UI: uiEnabled.Load()}
 	if err := saveState(r.Root, state); err != nil {
 		return err
 	}
@@ -193,6 +193,12 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 	// Preserve the original policy when the user supplies no additional flags.
 	state.Options.NoVerify = state.Options.NoVerify || o.NoVerify
 	state.Options.CommitConflicts = state.Options.CommitConflicts || o.CommitConflicts
+	state.UI = state.UI || uiEnabled.Load()
+	if state.Status == "conflicts" || state.Status == "after-conflicts" {
+		if err := state.resolvePlanConflicts(); err != nil {
+			return err
+		}
+	}
 	if state.Status == "conflicts" {
 		if err := r.commit(ctx, state.Worktree, "spinup upgrade "+state.Plan.From+" -> "+state.Plan.To, true); err != nil {
 			return err
@@ -307,6 +313,8 @@ func (r *Runner) step(ctx context.Context, state *runState) (*Step, error) {
 }
 
 func (r *Runner) resume(ctx context.Context, state *runState) error {
+	// Extensions use the recorded choice, including after a process restart.
+	ctx = context.WithValue(ctx, uiChoiceKey{}, state.UI)
 	phases := CurrentPhases()
 	for state.Index < len(state.Chain) {
 		step, err := r.step(ctx, state)

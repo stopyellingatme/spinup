@@ -28,6 +28,7 @@ type runState struct {
 	Lock               *manifest.Lock `json:"lock"`
 	Plan               *Plan          `json:"plan,omitempty"`
 	Options            Options        `json:"options"`
+	UI                 bool           `json:"ui,omitempty"`
 }
 
 func statePath(root string) string                 { return filepath.Join(root, ".spinup", "upgrade.json") }
@@ -148,4 +149,30 @@ func unresolved(work string, paths []string) ([]string, error) {
 
 func conflictError(work string, paths []string) error {
 	return &ui.Error{What: "Upgrade has conflicts", Why: strings.Join(paths, ", "), Try: "resolve the markers in " + work + ", then run spinup upgrade --continue", Code: ui.ExitConflicts}
+}
+
+// resolvePlanConflicts records the user's resolved content for subsequent phases.
+// Plan conflicts must no longer make GoFix and Verify skip the resolved step.
+func (s *runState) resolvePlanConflicts() error {
+	root, err := os.OpenRoot(s.Worktree)
+	if err != nil {
+		return fmt.Errorf("open resolved files: %w\nTry: restore the upgrade worktree", err)
+	}
+	defer root.Close()
+	for i := range s.Plan.Files {
+		file := &s.Plan.Files[i]
+		if file.Action != ActionConflict || !slices.Contains(s.Conflicts, file.Path) {
+			continue
+		}
+		data, err := root.ReadFile(file.Path)
+		if errors.Is(err, os.ErrNotExist) {
+			file.Action, file.Data = ActionDelete, nil
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read resolved file %q: %w\nTry: check the file permissions and run spinup upgrade --continue", file.Path, err)
+		}
+		file.Action, file.Data = ActionMerge, data
+	}
+	return nil
 }

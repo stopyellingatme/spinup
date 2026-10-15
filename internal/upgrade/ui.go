@@ -21,6 +21,9 @@ const uiPrefix = "web/src/lib/components/ui/"
 
 var uiEnabled atomic.Bool
 
+// uiChoiceKey carries the saved UI policy without changing the extension contract.
+type uiChoiceKey struct{}
+
 // uiFlag synchronizes access to the boolean extension flag.
 type uiFlag struct{}
 
@@ -48,7 +51,8 @@ func init() {
 			if merger == nil {
 				merger = NewMerger(s.Runner)
 			}
-			return runUI(ctx, s, uiEnabled.Load(), merger)
+			enabled, _ := ctx.Value(uiChoiceKey{}).(bool)
+			return runUI(ctx, s, enabled, merger)
 		},
 	})
 }

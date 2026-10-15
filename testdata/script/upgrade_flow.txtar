@@ -36,6 +36,7 @@ exec sh -c 'spinup upgrade --continue; test $? -eq 3'
 stderr 'api/internal/routes/routes.go'
 cp $WORK/resolved-routes.go .spinup/upgrade/0.0.1/api/internal/routes/routes.go
 exec spinup upgrade --continue --yes --no-verify
+! stdout 'Skipped go fix'
 stdout 'git merge spinup/upgrade-0.0.1'
 ! exists .spinup/upgrade.json
 grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
