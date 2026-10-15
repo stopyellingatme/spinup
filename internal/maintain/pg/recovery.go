@@ -21,6 +21,25 @@ type upgradeState struct {
 	Complete  bool   `json:"complete"`
 }
 
+// ReleaseRecovery releases a strategy's recovery reservation after a safe recovery.
+// The caller must first verify that the original cluster is intact and restart its services.
+func (s *Session) ReleaseRecovery(ctx context.Context) error {
+	u := s.u
+	anchor := fmt.Sprintf("%s-pg-recovery-%d-%d", u.cfg.App.Name, u.current.major, u.current.minor)
+	// Without -v: the anchor shares the live volume.
+	if _, err := u.run(ctx, "docker", "rm", anchor); err != nil {
+		return err
+	}
+	const release = `test ! -L "$1"
+test -d "$1"
+rm -rf -- "$1"`
+	if _, err := u.run(ctx, "sh", "-ec", release, "pg-recovery", u.operationDir()); err != nil {
+		return err
+	}
+	u.recovery = ""
+	return nil
+}
+
 func shell(args ...string) string {
 	quoted := make([]string, len(args))
 	for i, arg := range args {

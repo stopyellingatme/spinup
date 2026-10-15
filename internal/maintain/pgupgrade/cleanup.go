@@ -44,21 +44,37 @@ func (workflow) Cleanup(ctx context.Context, s *pg.Session) error {
 	if err != nil {
 		return err
 	}
+	archive := d.OperationDir + "." + strconv.Itoa(st.From) + "-" + strconv.Itoa(st.To)
+	// Refuse an archive collision before permanently removing the old directory.
+	if _, err = s.Run(ctx, "sh", "-ec", archiveGuard, "pg-upgrade", d.OperationDir, archive); err != nil {
+		return err
+	}
 	fmt.Fprintln(d.Out, "Permanently remove the old data directory. Never start the old cluster.")
 	// Both paths are validated, disjoint subdirectories. Never remove the volume.
 	script := pathGuard + `check_path "$1"
 check_path "$2"
+check_path "$2.spinup-upgrade"
 test -f "/pg/$2/PG_VERSION"
 test ! -f "/pg/$1/global/pg_control"
-rm -rf -- "/pg/$1"`
+rm -rf -- "/pg/$1"
+rm -f -- "/pg/$2.spinup-upgrade"`
 	if _, err = s.Run(ctx, helperArgs(d, image.Ref(), script, st.Old, st.New)...); err != nil {
 		return err
 	}
-	// Keep the guarded rollback script and backup label as permanent recovery guidance.
-	fmt.Fprintln(d.Out, "Retained recovery files and safety backup. Restore command:")
+	if _, err = s.Run(ctx, "sh", "-ec", archiveGuard+"\nmv -- \"$1\" \"$2\"", "pg-upgrade", d.OperationDir, archive); err != nil {
+		return err
+	}
+	fmt.Fprintf(d.Out, "Archived recovery files in %s. Retained the safety backup. Restore command:\n", archive)
 	fmt.Fprintln(d.Out, st.Restore)
 	return nil
 }
+
+const archiveGuard = `if [ -L "$1" ] || [ -e "$2" ] || [ -L "$2" ]; then
+ echo 'Recovery archive refused: the source is a symbolic link or the archive already exists.' >&2
+ echo 'Try: inspect the recovery directories before retrying cleanup.' >&2
+ exit 1
+fi
+test -d "$1"`
 
 func checkRepository(d pg.Details, st state) error {
 	lock, err := manifest.Load(filepath.Join(d.Root, "spinup.lock"))

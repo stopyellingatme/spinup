@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stopyellingatme/spinup/internal/maintain/pg"
 	"github.com/stopyellingatme/spinup/internal/remote"
@@ -117,15 +118,28 @@ func (workflow) Execute(ctx context.Context, s *pg.Session) (err error) {
 	restore := "spinup backup restore --env " + remote.Quote(d.Env.Name) + " --label " + remote.Quote(b.Label) + " --into new"
 	st := state{Volume: d.Volume, Old: old, New: next, From: d.Current, To: d.To, Restore: restore}
 	refusal := "Never start the old cluster after pg_upgrade --link. Restore the safety backup instead:\n" + restore
+	reserved, stopping, initializing, linking := false, false, false, false
 	defer func() {
-		if err != nil {
+		if err == nil {
+			return
+		}
+		if linking {
 			fmt.Fprintln(d.Out, refusal)
 			err = fmt.Errorf("%w\nTry: %s", err, restore)
+		} else if reserved {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+			defer cancel()
+			if recoveryErr := recoverBeforeLink(cleanup, s, helper, st, stopping, initializing); recoveryErr != nil {
+				err = fmt.Errorf("%w\nRecovery before pg_upgrade --link failed: %w\nTry: inspect the retained recovery files in %s before retrying", err, recoveryErr, d.OperationDir)
+			} else {
+				err = fmt.Errorf("%w\nTry: correct the upgrade failure and retry the same command", err)
+			}
 		}
 	}()
-	if err = s.SaveRecovery(ctx, refusal); err != nil {
+	if err = s.SaveRecovery(ctx, ""); err != nil {
 		return err
 	}
+	reserved = true
 	if err = saveState(ctx, s, st); err != nil {
 		return err
 	}
@@ -143,6 +157,7 @@ func (workflow) Execute(ctx context.Context, s *pg.Session) (err error) {
 		return fail("read cluster user", "POSTGRES_USER is missing")
 	}
 	fmt.Fprintln(d.Out, "Stop api and web of both colors, then stop postgres")
+	stopping = true // A lost SSH response can hide a successful stop.
 	if err = s.StopColors(ctx); err != nil {
 		return err
 	}
@@ -156,6 +171,7 @@ func (workflow) Execute(ctx context.Context, s *pg.Session) (err error) {
 	} else if d.To >= 18 {
 		init = append(init, "--no-data-checksums")
 	}
+	initializing = true
 	if _, err = s.Run(ctx, helperArgs(d, helper, initScript, append([]string{old, next}, init...)...)...); err != nil {
 		return err
 	}
@@ -164,7 +180,12 @@ func (workflow) Execute(ctx context.Context, s *pg.Session) (err error) {
 	if _, err = s.Run(ctx, helperArgs(d, helper, execScript, append(upgrade, "--check")...)...); err != nil {
 		return err
 	}
+	script := "#!/bin/sh\nset -eu\nprintf '%s\\n' " + remote.Quote(refusal) + " >&2\nexit 1\n"
+	if err = s.Upload(ctx, []byte(script), d.OperationDir+"/rollback.sh", 0700); err != nil {
+		return err
+	}
 	fmt.Fprintln(d.Out, "Run pg_upgrade --link. Never start the old cluster again")
+	linking = true // An unsuccessful response does not prove that linking never started.
 	if _, err = s.Run(ctx, helperArgs(d, helper, execScript, upgrade...)...); err != nil {
 		return err
 	}

@@ -45,7 +45,13 @@ An existing target directory causes a refusal.
 
 The helper runs `pg_upgrade --check --link` first.
 Any check failure stops the operation before the link upgrade or Compose switch.
-The initialized target directory remains for inspection.
+
+Before the link upgrade starts, a failure removes the target directory created by this operation.
+The command checks the paths and ownership marker before removal.
+It restarts the original PostgreSQL cluster and the live color.
+It then releases the recovery directory, so you can correct the failure and retry.
+If recovery fails, the command retains the recovery files and prints instructions for inspection.
+
 The command then runs `pg_upgrade --link`.
 It disables the old control file and removes the old PostgreSQL container without removing the volume.
 
@@ -59,11 +65,11 @@ The shared smoke checks verify the health paths and release version.
 Never start the old cluster after the link upgrade.
 The clusters share files.
 Starting the old cluster can damage the upgraded database.
-The saved `rollback.sh` always refuses to start it.
+Before the link upgrade starts, the command replaces `rollback.sh` with a refusal script.
 This guard also applies when the command fails during the link upgrade or after the new server starts.
 
 Restore the safety backup into a new database instead.
-Each failure after the backup prints the exact command with its backup label and environment.
+Each failure after the link upgrade starts prints the exact command with its backup label and environment.
 The command uses `--into new` to preserve both directories for inspection.
 Keep the original major available when you restore a physical backup.
 After you change the repository major, use the saved original configuration for that restore.
@@ -95,7 +101,9 @@ $ spinup maintenance pg-upgrade-in-place --env production --cleanup --i-know
 ...
 ```
 
-The recovery files remain in `/opt/<app>/pg-upgrade`, including the guarded script and backup label.
-Archive those files after verification before another major upgrade.
+Cleanup archives the recovery files in `/opt/<app>/pg-upgrade.<from>-<to>`, including the guarded script and backup label.
+For example, an upgrade from 17 to 18 uses `/opt/<app>/pg-upgrade.17-18`.
+The archive preserves the files and releases `/opt/<app>/pg-upgrade` for another major upgrade.
+Cleanup refuses an existing archive before removing the old data directory.
 A major upgrade refuses to replace an existing recovery directory.
 Never use the saved old Compose files to start the old cluster.

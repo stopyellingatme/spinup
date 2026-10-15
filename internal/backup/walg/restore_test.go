@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,50 @@ import (
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
+
+func TestInPlaceRestoreShellRefusesSecondRestore(t *testing.T) {
+	t.Parallel()
+	r := &remote.Fake{}
+	expectInspect(r)
+	r.Expect("docker", "compose") // stop
+	r.Expect("docker", "compose") // restore
+	r.Expect("docker", "compose") // start
+	r.Expect("docker", "compose").Return("1\n", "", 0)
+	if err := backend(t, r).inPlace(context.Background(), backup.Info{Label: "base_000000010000000000000001"}, backup.Target{}); err != nil {
+		t.Fatal(err)
+	}
+	r.AssertDone(t)
+	argv := r.Calls()[3].Argv
+	script := argv[slices.Index(argv, "-c")+1]
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	if err := os.Mkdir(data, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "original"), []byte("retain"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "wal-g"), []byte("#!/bin/sh\nset -eu\nprintf restored > \"$PGDATA/restored\"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	cmd := runexec.Cmd{Name: "/bin/sh", Args: []string{"-c", script, "walg", "base_000000010000000000000001", ""}, Env: []string{"PATH=" + dir + ":/usr/bin:/bin", "PGDATA=" + data, "WALG_S3_PREFIX=s3://test", "WALG_LIBSODIUM_KEY=test"}}
+	if _, err := (runexec.OSRunner{}).Run(context.Background(), cmd); err != nil {
+		t.Fatal(err)
+	}
+	result, err := (runexec.OSRunner{}).Run(context.Background(), cmd)
+	if err == nil || !strings.Contains(string(result.Stderr), "restore refused") || !strings.Contains(string(result.Stderr), "Try:") {
+		t.Fatalf("second restore = %v, stderr %s", err, result.Stderr)
+	}
+	for _, item := range []struct{ path, want string }{{data + ".spinup-before-restore/original", "retain"}, {data + "/restored", "restored"}} {
+		got, err := os.ReadFile(item.path)
+		if err != nil || string(got) != item.want {
+			t.Fatalf("data changed: %s = %q, %v", item.path, got, err)
+		}
+	}
+	if _, err := os.Stat(data + ".spinup-before-restore/data"); !os.IsNotExist(err) {
+		t.Fatalf("live data nested inside retained data: %v", err)
+	}
+}
 
 const inspection = `{"Image":"sha256:postgres","Config":{"User":"1000:1000","Env":["PGDATA=/var/lib/postgresql/18/docker","POSTGRES_USER=app","POSTGRES_DB=app"]},"Mounts":[{"Destination":"/var/lib/postgresql"}]}`
 
