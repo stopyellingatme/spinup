@@ -1,0 +1,7 @@
+name = "example"
+description = "An example pack."
+
+[[files]]
+path = "example.txt"
+source = "files/example.txt.tmpl"
+class = "managed"
