@@ -22,7 +22,12 @@ ENV NODE_ENV=production \
     PORT=3000 \
     API_URL=http://api:8080 \
     BODY_SIZE_LIMIT=1M \
-    SHUTDOWN_TIMEOUT=20
+    SHUTDOWN_TIMEOUT=20 \
+    OTEL_TRACES_SAMPLER=parentbased_traceidratio \
+    OTEL_TRACES_SAMPLER_ARG=1.0
+# Tracing is off until OTEL_EXPORTER_OTLP_ENDPOINT is set (for example http://alloy:4318).
+# Lower OTEL_TRACES_SAMPLER_ARG (0 to 1) to keep a fraction of the new traces. A request that
+# arrives with a sampled traceparent stays sampled.
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
@@ -30,4 +35,5 @@ USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-CMD ["node", "build"]
+# --import runs the OpenTelemetry instrumentation before any application module loads.
+CMD ["node", "--import", "./build/server/instrumentation.server.js", "build"]
