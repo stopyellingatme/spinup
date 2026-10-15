@@ -199,12 +199,21 @@ func (d *pageData) field(f fields.Field) pageField {
 	var control string
 	switch f.Type.Name {
 	case "bool":
+		if f.Nullable {
+			d.Control = true
+			p.ToValue = fmt.Sprintf("item.%s === null ? '' : String(item.%s)", col, col)
+			p.ToBody = fmt.Sprintf("values.%s === '' ? null : values.%s === 'true'", col, col)
+			p.Cell = fmt.Sprintf("{item.%s === null ? '' : item.%s ? 'Yes' : 'No'}", col, col)
+			control = fmt.Sprintf(`<select %s class={control} %s>
+	<option value="" selected={values.%s === ''}>Unset</option>
+	<option value="true" selected={values.%s === 'true'}>True</option>
+	<option value="false" selected={values.%s === 'false'}>False</option>
+</select>`, attrs, invalid, col, col, col)
+			break
+		}
 		p.ValueType, p.Empty = "boolean", "false"
 		p.Read = fmt.Sprintf("form.has('%s')", col)
 		p.ToValue = "item." + col
-		if f.Nullable {
-			p.ToValue = fmt.Sprintf("item.%s ?? false", col)
-		}
 		p.Cell = fmt.Sprintf("{item.%s ? 'Yes' : 'No'}", col)
 		p.Input = fmt.Sprintf(`<div class="grid gap-2">
 	<div class="flex items-center gap-2">
@@ -238,8 +247,8 @@ func (d *pageData) field(f fields.Field) pageField {
 		if f.Nullable {
 			p.ToValue = fmt.Sprintf("item.%s === null ? '' : localTime(item.%s)", col, col)
 		}
-		p.ToBody = nullable(fmt.Sprintf("time(values.%s, '%s', errors)", col, col))
-		control = input("datetime-local", "") + "\n" + `<p class="text-muted-foreground text-xs">UTC</p>`
+		p.ToBody = nullable(fmt.Sprintf("time(values.%s, '%s', errors, original?.%s)", col, col, col))
+		control = input("datetime-local", ` step="1"`) + "\n" + `<p class="text-muted-foreground text-xs">UTC</p>`
 	case "json":
 		d.Object, d.Control = true, true
 		p.ToValue = fmt.Sprintf("JSON.stringify(item.%s, null, 2)", col)
@@ -342,7 +351,7 @@ export function toValues(item: Item): Values {
  * parse reads a submitted form. It returns the values to show again, the request body, and
  * the errors of values that cannot be converted. Send the body only when there are no errors.
  */
-export function parse(form: FormData): { values: Values; body: Input; errors: Errors } {
+export function parse(form: FormData[[ if .Time ]], original?: Item[[ end ]]): { values: Values; body: Input; errors: Errors } {
 	const errors: Errors = {};
 	const values: Values = {
 [[- range $i, $f := .Fields ]][[ if $i ]],[[ end ]]
@@ -398,17 +407,19 @@ function number(value: string, name: string, errors: Errors): number {
 [[- if .Time ]]
 
 // The datetime-local inputs show UTC times.
-function time(value: string, name: string, errors: Errors): string {
+function time(value: string, name: string, errors: Errors, original?: string | null): string {
 	const t = new Date(value + 'Z');
 	if (Number.isNaN(t.getTime())) {
 		errors[name] = 'must be a date and time';
 		return value;
 	}
+	// Browsers can omit zero seconds. Compare instants at the displayed precision.
+	if (original && t.getTime() === new Date(localTime(original) + 'Z').getTime()) return original;
 	return t.toISOString();
 }
 
 function localTime(value: string): string {
-	return new Date(value).toISOString().slice(0, 16);
+	return new Date(value).toISOString().slice(0, 19);
 }
 [[- end ]]
 [[- if .Object ]]
@@ -602,7 +613,15 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
 
 export const actions: Actions = {
 	update: async ({ request, fetch, params }) => {
-		const { values, body, errors } = parse(await request.formData());
+[[- if .Time ]]
+		const { data: original, error: originalProblem, response: originalResponse } = await api.GET('[[ .APIPath ]]/{id}', {
+			fetch,
+			baseUrl: __PUBLIC_ORIGIN__,
+			params: { path: { id: id(params.id) } }
+		});
+		if (!original) error(originalResponse.status, message(originalProblem, originalResponse.status));
+[[- end ]]
+		const { values, body, errors } = parse(await request.formData()[[ if .Time ]], original[[ end ]]);
 		if (Object.keys(errors).length > 0) {
 			return fail(422, { values, errors, message: 'Correct the marked fields.' });
 		}

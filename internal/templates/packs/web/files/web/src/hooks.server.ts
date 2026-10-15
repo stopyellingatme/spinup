@@ -29,7 +29,13 @@ async function loadUser(cookie: string | null): Promise<App.User | null> {
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user =
 		event.url.pathname === '/healthz' ? null : await loadUser(event.request.headers.get('cookie'));
-	return resolve(event);
+	const response = await resolve(event);
+	if (!response.headers.has('X-Frame-Options')) response.headers.set('X-Frame-Options', 'DENY');
+	if (!response.headers.has('Content-Security-Policy')) {
+		response.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+	}
+	if (event.locals.user) response.headers.set('Cache-Control', 'no-store');
+	return response;
 };
 
 // Rewrite `${PUBLIC_ORIGIN}/api/...` to the Go API, and send the browser cookie only there.
