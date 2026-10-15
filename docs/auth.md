@@ -99,7 +99,10 @@ mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.Resp
 ### Sessions
 
 - The session cookie is `session`. It is `HttpOnly`, `SameSite=Lax`, and `Path=/`.
-- The cookie is `Secure` unless `SPINUP_ENV=dev`. In production, set `SPINUP_ENV` to a value other than `dev`.
+- The cookie is `Secure` unless `SPINUP_ENV=dev`.
+- If `SPINUP_ENV` is unset after dotenv loading, kit `config` defaults to `production`. This keeps cookies `Secure` and disables `/_dev`.
+- When `SPINUP_ENV` is empty, kit `config` still reads `.env`, or `../.env` when `.env` is absent. A file with `SPINUP_ENV=dev` enables development.
+- The generated `Dockerfile.api` sets `SPINUP_ENV=production`. `spinup dev` and `.env.example` explicitly select `dev`.
 - The sessions are in the `sessions` table (scs with the pgxstore store). The table holds a SHA-256 hash of each token, not the token.
 - A session lives for 7 days. A new login starts a new lifetime. `auth.WithLifetime` changes the lifetime.
 - There is no idle timeout by default. `auth.WithIdleTimeout` adds one. With an idle timeout, the browser cookie can expire before the server session, because server-side calls do not refresh the browser cookie.
@@ -126,6 +129,7 @@ The result must be a bare address that `net/mail` accepts, with a maximum of 254
 ### Lockout
 
 - After 5 failed logins for one email in 15 minutes, logins for that email get 429 with `Retry-After`.
+- Each login reserves an attempt before password verification. A transaction with a PostgreSQL advisory lock keeps concurrent requests within the threshold.
 - The lock also applies to emails without an account, so it does not show which emails have accounts.
 - The lock opens when the oldest of the 5 failures is 15 minutes old.
 - A successful login clears the failures of the email.

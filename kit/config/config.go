@@ -12,8 +12,8 @@ import (
 
 // Base contains the common settings for a spinup API.
 type Base struct {
-	// Env selects the application environment.
-	Env string `env:"SPINUP_ENV" default:"dev"`
+	// Env selects the application environment. The default is production.
+	Env string `env:"SPINUP_ENV" default:"production"`
 	// Port selects the HTTP listen port.
 	Port int `env:"PORT" default:"8080"`
 	// DatabaseURL contains the PostgreSQL connection string.
@@ -31,8 +31,8 @@ type Base struct {
 // Apps opt in through behavior_version in spinup.toml.
 func (b Base) Behavior(v int) bool { return b.BehaviorVersion >= v }
 
-// Load fills dst from the environment. In development, it also reads ./.env,
-// or ../.env when ./.env is absent. If the environment sets X or X_FILE,
+// Load fills dst from the environment. When SPINUP_ENV is empty or dev, it
+// also reads ./.env, or ../.env when ./.env is absent. If the environment sets X or X_FILE,
 // Load ignores both forms in .env. Load does not modify the process environment.
 func Load(dst any) error {
 	values := map[string]string{}
