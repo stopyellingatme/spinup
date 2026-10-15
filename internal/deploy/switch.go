@@ -109,6 +109,9 @@ type SwitchOptions struct {
 	HealthTimeout time.Duration
 	// NoAutoRollback leaves an unhealthy new color running for debugging.
 	NoAutoRollback bool
+	// Reconnect opens a fresh connection to inspect an uncertain reload.
+	// Without it, Switch closes and reuses the supplied SSH runner.
+	Reconnect func(context.Context) (remote.Runner, error)
 	// Redact lists values that never reach output or errors.
 	Redact []string
 	// Out receives progress lines and the streamed Compose output.
@@ -163,7 +166,8 @@ func (e *HealthError) Unwrap() error { return e.Err }
 //  6. Remove the old color with down -t 15.
 //
 // When the new color is not healthy, Switch stops it (unless NoAutoRollback) and leaves
-// Caddy unchanged. When the reload fails, Switch restores the previous upstream file.
+// Caddy unchanged. A definite reload failure restores the previous upstream file.
+// An uncertain reload leaves both colors running and inspects the VM.
 func Switch(ctx context.Context, r remote.Runner, o SwitchOptions) error {
 	root, err := appRoot(o.App)
 	if err != nil {
@@ -256,7 +260,11 @@ func (s *switcher) run(ctx context.Context) error {
 	}
 	reload := []string{"docker", "exec", caddy, "caddy", "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"}
 	if _, err := s.remote(ctx, reload, false); err != nil {
-		return s.reloadFailed(ctx, previous, live, brief(err))
+		var exit *runexec.ExitError
+		if ctx.Err() == nil && errors.As(err, &exit) && exit.Code > 0 && exit.Code < 255 {
+			return s.reloadFailed(ctx, previous, live, brief(err))
+		}
+		return s.reloadUnknown(ctx, err)
 	}
 
 	if len(oldAddrs) > 0 && live != color {
@@ -401,6 +409,9 @@ func hostPort(addr string, port int) string {
 
 // unhealthy stops the new color unless it is live or NoAutoRollback is set.
 func (s *switcher) unhealthy(ctx context.Context, live string, cause error) error {
+	if ctx.Err() != nil {
+		return cause
+	}
 	e := &HealthError{Color: s.o.Color, Err: cause}
 	if s.o.NoAutoRollback {
 		return e
@@ -416,6 +427,37 @@ func (s *switcher) unhealthy(ctx context.Context, live string, cause error) erro
 	}
 	e.Stopped = true
 	return e
+}
+
+// reloadUnknownError preserves the recovery hint through the deploy step wrapper.
+type reloadUnknownError struct{ err error }
+
+func (e *reloadUnknownError) Error() string {
+	return fmt.Sprintf("the Caddy reload state is unknown, and both colors remain running: %v\nTry: spinup deploy status, then spinup deploy --resume", e.err)
+}
+func (e *reloadUnknownError) Unwrap() error { return e.err }
+
+// reloadUnknown inspects disk and containers without assuming which configuration Caddy loaded.
+func (s *switcher) reloadUnknown(ctx context.Context, cause error) error {
+	inspectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	r := s.r
+	if s.o.Reconnect != nil {
+		var err error
+		r, err = s.o.Reconnect(inspectCtx)
+		if err != nil {
+			return &reloadUnknownError{err: errors.Join(cause, fmt.Errorf("reconnect for inspection: %w", err))}
+		}
+		defer func() { _ = r.Close(inspectCtx) }()
+	} else {
+		// The system SSH runner opens a new session after its master closes.
+		_ = r.Close(inspectCtx)
+	}
+	upstream, readErr := ReadUpstream(inspectCtx, r, s.o.App)
+	blue, blueErr := listContainers(inspectCtx, r, s.o.Redact, s.o.App+"-"+Blue, "")
+	green, greenErr := listContainers(inspectCtx, r, s.o.Redact, s.o.App+"-"+Green, "")
+	fmt.Fprintf(s.o.Out, "Reload inspection: upstream file names %q, running containers: blue=%d green=%d\n", LiveColor(upstream), len(blue), len(green))
+	return &reloadUnknownError{err: errors.Join(cause, readErr, blueErr, greenErr)}
 }
 
 // reloadFailed restores the previous upstream file. Caddy keeps its old configuration after a failed reload.

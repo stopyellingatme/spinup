@@ -25,7 +25,7 @@ import (
 // preflight and build run locally before the lock. The deployer journals them when it takes the lock.
 var Steps = []string{"preflight", "build", "hooks", "transport", "upload", "edge", "migrate", "switch", "smoke", "record", "post"}
 
-// DefaultLockTTL is the lifetime of the deploy lock. The deployer refreshes it between steps.
+// DefaultLockTTL is the lifetime of the deploy lock. The deployer refreshes it throughout the run.
 const DefaultLockTTL = 30 * time.Minute
 
 // Options are the inputs of spinup deploy.
@@ -36,6 +36,8 @@ type Options struct {
 	Plan bool
 	// Resume continues the deploy in the journal from its first step that is not done.
 	Resume bool
+	// Redeploy permits a repeated release ID in a new directory with a -r<N> suffix.
+	Redeploy bool
 	// AllowDirty permits uncommitted changes. AllowDestructive permits db lint findings.
 	AllowDirty, AllowDestructive bool
 	// SkipBuild uses images that exist already. SkipBackup goes to the pre-deploy hooks.
@@ -245,6 +247,10 @@ func deployError(step, env string, err error) error {
 	var locked *LockedError
 	if errors.As(err, &locked) {
 		return err
+	}
+	var unknown *reloadUnknownError
+	if errors.As(err, &unknown) {
+		return &ui.Error{What: "Deploy failed at step " + step, Why: stripTry(err.Error()), Try: "spinup deploy status, then spinup deploy --resume", Err: err}
 	}
 	var health *HealthError
 	try := "correct the problem and run spinup deploy --resume --env " + env

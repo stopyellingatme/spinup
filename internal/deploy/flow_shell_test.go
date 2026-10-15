@@ -59,13 +59,13 @@ func TestShellEdgeSync(t *testing.T) {
 		return string(data)
 	}
 	for name, want := range map[string]string{
-		"caddy/Caddyfile":               "old caddyfile\n", // replaced only after validation
-		"caddy/Caddyfile.next":          "new caddyfile\n",
-		"caddy/Caddyfile.d/a.caddy":     "a\n",
-		"caddy/Caddyfile.d/stale.caddy": "<missing>",
-		"caddy/upstream.caddy":          "live\n",
-		"postgres/postgresql.conf":      "max_connections = 200\n",
-		"postgres/conf.d/archive.conf":  "archive_mode = on\n",
+		"caddy/Caddyfile":                    "old caddyfile\n", // replaced only after validation
+		"caddy/.next/Caddyfile":              "new caddyfile\n",
+		"caddy/.next/Caddyfile.d/a.caddy":    "a\n",
+		"caddy/Caddyfile.d/stale.caddy":      "stale\n",
+		"caddy/upstream.caddy":               "live\n",
+		"postgres/.next/postgresql.conf":     "max_connections = 200\n",
+		"postgres/.next/conf.d/archive.conf": "archive_mode = on\n",
 	} {
 		if got := read(name); got != want {
 			t.Errorf("%s = %q, want %q", name, got, want)
@@ -76,12 +76,20 @@ func TestShellEdgeSync(t *testing.T) {
 			t.Errorf("%s was not created", dir)
 		}
 	}
-	// A release without Caddyfile.d gives an empty directory, not a stale one.
+	// Promotion removes old snippets only after successful validation.
+	run(t, vm, "sh", "-c", edgeInstallScript, "spinup-edge-install", "/opt/app")
+	if got := read("caddy/Caddyfile"); got != "new caddyfile\n" {
+		t.Fatalf("installed Caddyfile = %q", got)
+	}
+	if got := read("caddy/Caddyfile.d/stale.caddy"); got != "<missing>" {
+		t.Fatalf("stale snippet survived: %q", got)
+	}
+	// A release without Caddyfile.d stages an empty directory.
 	if err := os.RemoveAll(filepath.Join(vm.root, "releases", testRelease, "Caddyfile.d")); err != nil {
 		t.Fatal(err)
 	}
 	run(t, vm, "sh", "-c", edgeSyncScript, "spinup-edge", "/opt/app", rel)
-	if entries, err := os.ReadDir(filepath.Join(vm.root, "caddy", "Caddyfile.d")); err != nil || len(entries) != 0 {
+	if entries, err := os.ReadDir(filepath.Join(vm.root, "caddy", ".next", "Caddyfile.d")); err != nil || len(entries) != 0 {
 		t.Fatalf("Caddyfile.d = %v, %v", entries, err)
 	}
 }

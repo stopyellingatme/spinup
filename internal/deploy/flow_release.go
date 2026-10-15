@@ -25,7 +25,7 @@ import (
 // KeepReleases is the number of releases that the VM keeps (ADR 0009 §2).
 const KeepReleases = 5
 
-var releaseIDPattern = regexp.MustCompile(`^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$`)
+var releaseIDPattern = regexp.MustCompile(`^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}(-r[1-9][0-9]*)?$`)
 
 // ReleaseID returns <UTC time YYYYMMDDTHHMMSSZ>-<12-char git SHA> (ADR 0009 §2).
 func ReleaseID(at time.Time, sha string) (string, error) {
@@ -35,7 +35,7 @@ func ReleaseID(at time.Time, sha string) (string, error) {
 	return at.UTC().Format("20060102T150405Z") + "-" + sha[:12], nil
 }
 
-// ValidReleaseID reports whether id has the ADR 0009 release ID format.
+// ValidReleaseID reports whether id is a release ID, including a redeploy suffix.
 func ValidReleaseID(id string) bool { return releaseIDPattern.MatchString(id) }
 
 // releaseTime returns the time encoded in a valid release ID.

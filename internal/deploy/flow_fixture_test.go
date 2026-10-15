@@ -202,6 +202,8 @@ func (x *fx) expectLock() {
 
 // expectBegin scripts the journal start of a new release: read, rotate, preflight, build.
 func (x *fx) expectBegin(previous string) {
+	x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/releases.json").Return("", "", 0)
+	x.vm.Expect("sh", "-c", releaseExistsScript, "spinup-release-exists", testRelDir).Return("", "", 0)
 	x.vm.Expect("sh", "-c").Return(previous, "", 0)
 	x.ok("sh", "-c", rotateJournalScript, "spinup-journal", testRoot+"/deploy.state")
 	x.journal(2)
@@ -244,9 +246,11 @@ func (x *fx) expectEdge(live, caddy string) {
 	}
 	x.vm.Expect(psArgv("todo", "caddy")...).Return(caddy, "", 0)
 	if caddy != "" {
-		x.ok("docker", "exec", strings.TrimSpace(caddy), "caddy", "validate", "--config", "/etc/caddy/Caddyfile.next", "--adapter", "caddyfile")
+		x.ok("docker", "exec", strings.TrimSpace(caddy), "caddy", "validate", "--config", "/etc/caddy/.next/Caddyfile", "--adapter", "caddyfile")
+	} else {
+		x.ok(ComposeArgv("todo", testRelDir, []string{testRelDir + "/compose.edge.yml"}, "run", "--rm", "--no-deps", "-T", "--entrypoint", "caddy", "caddy", "validate", "--config", "/etc/caddy/.next/Caddyfile", "--adapter", "caddyfile")...)
 	}
-	x.ok("mv", "-f", "--", testRoot+"/caddy/Caddyfile.next", testRoot+"/caddy/Caddyfile")
+	x.ok("sh", "-c", edgeInstallScript, "spinup-edge-install", testRoot)
 	x.ok(ComposeArgv("todo", testRelDir, []string{testRelDir + "/compose.edge.yml"}, "up", "-d", "--wait", "--wait-timeout", "4")...)
 }
 

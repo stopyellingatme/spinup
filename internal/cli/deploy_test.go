@@ -18,6 +18,7 @@ func TestDeployCLI(t *testing.T) {
 	}{
 		{"help", []string{"deploy", "--help"}, ui.ExitOK, "--no-auto-rollback"},
 		{"help lists subcommands", []string{"deploy", "--help"}, ui.ExitOK, "unlock"},
+		{"redeploy flag", []string{"deploy", "--help"}, ui.ExitOK, "--redeploy"},
 		{"health timeout flag", []string{"deploy", "--help"}, ui.ExitOK, "--health-timeout duration"},
 		{"status help", []string{"deploy", "status", "--help"}, ui.ExitOK, "--accept-new-host-key"},
 		{"plan and resume", []string{"deploy", "--plan", "--resume", "--dir", dir}, ui.ExitUsage, "Try:"},

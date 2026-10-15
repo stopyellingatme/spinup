@@ -48,6 +48,7 @@ func newDeploy(app *App) *cobra.Command {
 			}
 			opts := deployOptions(app, c)
 			opts.Plan = o.Plan || app.Flags.DryRun
+			opts.Redeploy = o.Redeploy
 			opts.Resume, opts.AllowDirty, opts.AllowDestructive = o.Resume, o.AllowDirty, o.AllowDestructive
 			opts.SkipBuild, opts.SkipBackup, opts.NoAutoRollback = o.SkipBuild, o.SkipBackup, o.NoAutoRollback
 			opts.Tag, opts.Platform, opts.HealthTimeout, opts.AcceptNewHostKey = o.Tag, o.Platform, o.HealthTimeout, acceptNewHostKey
@@ -61,6 +62,7 @@ func newDeploy(app *App) *cobra.Command {
 	f.BoolVar(&o.Resume, "resume", false, "continue the last deploy from its first step that is not done")
 	f.BoolVar(&o.AllowDirty, "allow-dirty", false, "deploy with uncommitted changes")
 	f.BoolVar(&o.AllowDestructive, "allow-destructive", false, "deploy migrations that db lint reports as unsafe")
+	f.BoolVar(&o.Redeploy, "redeploy", false, "reuse a release ID in a new directory with a -r<N> suffix")
 	f.BoolVar(&o.SkipBuild, "skip-build", false, "use the images of the release that exist already")
 	f.BoolVar(&o.SkipBackup, "skip-backup", false, "skip the pre-deploy backup")
 	f.BoolVar(&o.NoAutoRollback, "no-auto-rollback", false, "leave an unhealthy new color running for debugging")
