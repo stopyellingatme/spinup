@@ -32,8 +32,8 @@ func TestOSRunnerKillsGrandchildAfterParentExit(t *testing.T) {
 	t.Parallel()
 
 	result, err := (OSRunner{}).Run(context.Background(), Cmd{
-		Name:    "sh",
-		Args:    []string{"-c", "(sleep 3; echo survived) & echo hi"},
+		Name: "sh",
+		Args: []string{"-c", "(sleep 3; echo survived) & echo hi"},
 		// Long enough for "echo hi" on a loaded machine, and well before the grandchild wakes.
 		Timeout: time.Second,
 	})

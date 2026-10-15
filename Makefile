@@ -18,17 +18,17 @@ help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
 build: ## Build every module
-	@for m in $(MODULES); do (cd $$m && go build ./...); done
+	@for m in $(MODULES); do (cd $$m && go build ./...) || exit 1; done
 
 test: ## Unit tests with the race detector (PKGS=./internal/x/... to narrow the root module)
 	@go test -race $(PKGS)
 	@cd kit && go test -race ./...
 
 lint: ## golangci-lint on every module (offline)
-	@for m in $(MODULES); do (cd $$m && golangci-lint run ./...); done
+	@for m in $(MODULES); do (cd $$m && golangci-lint run ./...) || exit 1; done
 
 vuln: ## govulncheck on every module (needs network; milestone gate only)
-	@for m in $(MODULES); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...); done
+	@for m in $(MODULES); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...) || exit 1; done
 
 golden: ## Golden-tree tests. PACK=<name> narrows, UPDATE=1 rewrites
 	@SPINUP_GOLDEN_PACK='$(or $(PACK),$(SPINUP_GOLDEN_PACK))' SPINUP_GOLDEN_UPDATE='$(or $(UPDATE),$(SPINUP_GOLDEN_UPDATE))' go test ./... -run 'TestGolden'
