@@ -34,8 +34,8 @@ func (m *Mailers) Register(w *jobs.Worker) {
  })
 }
 
-// WorkerCommand returns the mail-worker command. Run it after the River migrations.
-// The mail queue is separate from the default application queue.
+// WorkerCommand returns a dedicated mail-worker command for independent mail capacity.
+// The standard cmd/worker also serves mail. Run either after the River migrations.
 func (m *Mailers) WorkerCommand(pool *pgxpool.Pool) func(context.Context,[]string) error {
  return func(ctx context.Context,args []string) error {
   if len(args) != 0 { return errors.New("mail: cannot start worker: unexpected arguments\nTry: run the API binary with mail-worker") }

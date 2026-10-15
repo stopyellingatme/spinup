@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net"
 	"net/http"
 	netmail "net/mail"
 	"net/url"
@@ -21,6 +20,9 @@ import (
 
 // ResetLifetime is the validity period of a password reset token.
 const ResetLifetime = time.Hour
+
+// resetGlobalThreshold limits admitted reset requests across all accounts per lockout window.
+const resetGlobalThreshold = 100
 
 // ResetOption configures the optional password reset routes.
 type ResetOption func(*resetOptions)
@@ -97,15 +99,9 @@ func (h *resetHandler) request(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	if err := httpx.DecodeJSON(r, &in); err == nil {
 		if email, ok := normalizeEmail(in.Email); ok {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				ip = r.RemoteAddr
-			}
-			// Forwarded headers are untrusted. Use the direct peer address.
-			now := h.auth.now()
-			ipUntil, ipErr := h.auth.reserveAttempt(r.Context(), "reset-ip:"+ip, now)
-			emailUntil, emailErr := h.auth.reserveAttempt(r.Context(), "reset-email:"+email, now)
-			if ipErr == nil && emailErr == nil && ipUntil.IsZero() && emailUntil.IsZero() {
+			// The direct peer can be the shared web tier. Limit by email and globally.
+			allowed, err := h.auth.reserveResetRequest(r.Context(), email, h.auth.now())
+			if err == nil && allowed {
 				select {
 				case h.requests <- email:
 				default:
