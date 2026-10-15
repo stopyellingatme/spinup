@@ -530,7 +530,7 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 	}
 	if len(caddy) > 0 {
 		if _, err := f.cmd(ctx, true, "docker", "exec", caddy[0], "caddy", "validate", "--config", "/etc/caddy/Caddyfile.next", "--adapter", "caddyfile"); err != nil {
-			return "", fmt.Errorf("the new Caddyfile is not valid, and Caddy keeps the old one: %w\nTry: correct deploy/Caddyfile or deploy/Caddyfile.d, commit, and deploy again", err)
+			return "", fmt.Errorf("the new Caddyfile is not valid, and Caddy keeps the old one: %w\nTry: correct deploy/Caddyfile or deploy/Caddyfile.d, commit, and deploy again", brief(err))
 		}
 	}
 	if _, err := f.cmd(ctx, false, "mv", "-f", "--", root+"/caddy/Caddyfile.next", root+"/caddy/Caddyfile"); err != nil {
@@ -543,7 +543,7 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 	fmt.Fprintln(f.out, "Starting Caddy and Postgres")
 	up := ComposeArgv(f.l.app, dir, files, "up", "-d", "--wait", "--wait-timeout", strconv.Itoa(seconds(f.o.HealthTimeout)))
 	if _, err := f.cmd(ctx, true, up...); err != nil {
-		return "", fmt.Errorf("start Caddy and Postgres: %w", err)
+		return "", fmt.Errorf("start Caddy and Postgres: %w", brief(err))
 	}
 	return "", nil
 }
@@ -554,7 +554,7 @@ func (f *flow) migrate(ctx context.Context) (string, error) {
 	fmt.Fprintln(f.out, "Running the migrations")
 	argv := ComposeArgv(f.l.app+"-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")
 	if _, err := f.cmd(ctx, true, argv...); err != nil {
-		return "", fmt.Errorf("the migrations failed, and the old release is still live: %w", err)
+		return "", fmt.Errorf("the migrations failed, and the old release is still live: %w", brief(err))
 	}
 	return migrationVersion(f.l.migrations), nil
 }

@@ -242,7 +242,7 @@ func (x *fx) expectEdge(live, caddy string) {
 	if live == "" {
 		x.vm.ExpectUpload(testRoot+"/caddy/upstream.caddy").Return("", "", 0)
 	}
-	x.vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo", "--filter", "label=com.docker.compose.service=caddy").Return(caddy, "", 0)
+	x.vm.Expect(psArgv("todo", "caddy")...).Return(caddy, "", 0)
 	if caddy != "" {
 		x.ok("docker", "exec", strings.TrimSpace(caddy), "caddy", "validate", "--config", "/etc/caddy/Caddyfile.next", "--adapter", "caddyfile")
 	}
@@ -259,7 +259,7 @@ func (x *fx) colorArgv(color string, args ...string) []string {
 }
 
 func psArgv(project, service string) []string {
-	argv := []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + project}
+	argv := []string{"docker", "ps", "-q", "--filter", "status=running", "--filter", "label=com.docker.compose.project=" + project}
 	if service != "" {
 		argv = append(argv, "--filter", "label=com.docker.compose.service="+service)
 	}
@@ -292,7 +292,7 @@ func (x *fx) reloadArgv() []string {
 }
 
 func (x *fx) drainArgv() []string {
-	return []string{"docker", "exec", "caddy1", "wget", "-q", "-T", "2", "-O", "-", "http://localhost:2019/reverse_proxy/upstreams"}
+	return []string{"docker", "exec", "caddy1", "wget", "-q", "-T", "2", "-O", "-", "http://127.0.0.1:2019/reverse_proxy/upstreams"}
 }
 
 // expectSwitch scripts a successful switch from live (or no live color) to color.

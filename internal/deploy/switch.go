@@ -234,7 +234,7 @@ func (s *switcher) run(ctx context.Context) error {
 	deadline := s.o.Now().Add(s.o.HealthTimeout)
 	up := s.compose(app+"-"+color, "up", "-d", "--wait", "--wait-timeout", strconv.Itoa(seconds(s.o.HealthTimeout)), "--remove-orphans")
 	if _, err := s.remote(ctx, up, true); err != nil {
-		return s.unhealthy(ctx, live, fmt.Errorf("docker compose up failed: %w", err))
+		return s.unhealthy(ctx, live, fmt.Errorf("docker compose up failed: %w", brief(err)))
 	}
 	if err := s.waitReady(ctx, caddy, color, deadline); err != nil {
 		return s.unhealthy(ctx, live, err)
@@ -256,7 +256,7 @@ func (s *switcher) run(ctx context.Context) error {
 	}
 	reload := []string{"docker", "exec", caddy, "caddy", "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"}
 	if _, err := s.remote(ctx, reload, false); err != nil {
-		return s.reloadFailed(ctx, previous, live, err)
+		return s.reloadFailed(ctx, previous, live, brief(err))
 	}
 
 	if len(oldAddrs) > 0 && live != color {
@@ -267,7 +267,7 @@ func (s *switcher) run(ctx context.Context) error {
 	}
 	fmt.Fprintf(s.o.Out, "Removing the %s color\n", old)
 	if _, err := s.remote(ctx, s.compose(app+"-"+old, "down", "-t", stopTimeout, "--remove-orphans"), true); err != nil {
-		return fmt.Errorf("switch: remove the %s color: %w\nTry: run spinup deploy --resume, or run docker compose -p %s-%s down on the VM", old, err, app, old)
+		return fmt.Errorf("switch: remove the %s color: %w\nTry: run spinup deploy --resume, or run docker compose -p %s-%s down on the VM", old, brief(err), app, old)
 	}
 	return nil
 }
@@ -318,7 +318,8 @@ func (s *switcher) containers(ctx context.Context, project, service string) ([]s
 }
 
 func listContainers(ctx context.Context, r remote.Runner, redact []string, project, service string) ([]string, error) {
-	argv := []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + project}
+	// Only running containers: a restarting container cannot run docker exec or serve traffic.
+	argv := []string{"docker", "ps", "-q", "--filter", "status=running", "--filter", "label=com.docker.compose.project=" + project}
 	if service != "" {
 		argv = append(argv, "--filter", "label=com.docker.compose.service="+service)
 	}
@@ -446,7 +447,8 @@ func (s *switcher) drain(ctx context.Context, caddy string, old []string) error 
 	for _, a := range old {
 		oldSet[a] = true
 	}
-	argv := []string{"docker", "exec", caddy, "wget", "-q", "-T", "2", "-O", "-", "http://localhost:2019/reverse_proxy/upstreams"}
+	// 127.0.0.1, not localhost: busybox wget tries ::1 first, and the admin API listens on IPv4 only.
+	argv := []string{"docker", "exec", caddy, "wget", "-q", "-T", "2", "-O", "-", "http://127.0.0.1:2019/reverse_proxy/upstreams"}
 	waited := time.Duration(0)
 	for {
 		if err := s.o.Sleep(ctx, step(waited)); err != nil {

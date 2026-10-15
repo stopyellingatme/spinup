@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -263,4 +264,30 @@ func stripTry(s string) string {
 		}
 	}
 	return strings.Join(out, "; ")
+}
+
+// briefError is a remote command failure without the full ssh command line.
+type briefError struct {
+	msg string
+	err error
+}
+
+func (e *briefError) Error() string { return e.msg }
+func (e *briefError) Unwrap() error { return e.err }
+
+// brief shortens a command failure to its exit code and the last line of its stderr.
+// The streamed output already showed the full stderr. Other errors stay unchanged.
+func brief(err error) error {
+	var exit *runexec.ExitError
+	if !errors.As(err, &exit) {
+		return err
+	}
+	tail := strings.TrimSpace(exit.StderrTail)
+	if i := strings.LastIndex(tail, "\n"); i >= 0 {
+		tail = strings.TrimSpace(tail[i+1:])
+	}
+	if tail == "" {
+		return &briefError{msg: fmt.Sprintf("exit code %d", exit.Code), err: err}
+	}
+	return &briefError{msg: fmt.Sprintf("exit code %d: %s", exit.Code, tail), err: err}
 }

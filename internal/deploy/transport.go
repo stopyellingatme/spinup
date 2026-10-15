@@ -62,22 +62,40 @@ func tags(images []Image) []string {
 	return out
 }
 
-// localIDs returns the local image IDs of refs, in order.
-func localIDs(ctx context.Context, r runexec.Runner, refs []string) ([]string, error) {
-	result, err := r.Run(ctx, runexec.Cmd{Name: "docker", Args: append([]string{"image", "inspect", "--format", "{{.Id}}"}, refs...)})
+// imageFingerprint identifies image content across Docker image stores: the platform and the
+// uncompressed layer digests. The image ID is not portable. The classic store uses the config
+// digest, and the containerd store uses the manifest digest.
+const imageFingerprint = "{{.Os}}/{{.Architecture}} {{json .RootFS.Layers}}"
+
+// localImages returns the local image IDs and fingerprints of refs, in order.
+func localImages(ctx context.Context, r runexec.Runner, refs []string) (ids, prints []string, err error) {
+	result, err := r.Run(ctx, runexec.Cmd{Name: "docker", Args: append([]string{"image", "inspect", "--format", "{{.Id}} " + imageFingerprint}, refs...)})
 	if err != nil {
-		return nil, fmt.Errorf("find the local images %s: %w\nTry: build them with spinup deploy (without --skip-build)", strings.Join(refs, ", "), err)
+		return nil, nil, fmt.Errorf("find the local images %s: %w\nTry: build them with spinup deploy (without --skip-build)", strings.Join(refs, ", "), err)
 	}
-	ids := strings.Fields(string(result.Stdout))
+	for _, line := range lines(result.Stdout) {
+		id, print, _ := strings.Cut(line, " ")
+		ids, prints = append(ids, id), append(prints, print)
+	}
 	if len(ids) != len(refs) {
-		return nil, fmt.Errorf("find the local images %s: docker returned %d IDs\nTry: build the images again", strings.Join(refs, ", "), len(ids))
+		return nil, nil, fmt.Errorf("find the local images %s: docker returned %d images\nTry: build the images again", strings.Join(refs, ", "), len(ids))
 	}
-	return ids, nil
+	return ids, prints, nil
 }
 
-// remoteIDs returns the image IDs on the VM, or nil when an image is missing there.
-func (t transporter) remoteIDs(ctx context.Context, refs []string) ([]string, error) {
-	argv := append([]string{"docker", "image", "inspect", "--format", "{{.Id}}"}, refs...)
+func lines(data []byte) []string {
+	var out []string
+	for _, l := range strings.Split(string(data), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// remotePrints returns the image fingerprints on the VM, or nil when an image is missing there.
+func (t transporter) remotePrints(ctx context.Context, refs []string) ([]string, error) {
+	argv := append([]string{"docker", "image", "inspect", "--format", imageFingerprint}, refs...)
 	result, err := t.vm.Run(ctx, remote.Cmd{Argv: argv, Redact: t.redact})
 	if err != nil {
 		if result.ExitCode == 1 {
@@ -85,13 +103,13 @@ func (t transporter) remoteIDs(ctx context.Context, refs []string) ([]string, er
 		}
 		return nil, fmt.Errorf("inspect the images on the VM: %w\nTry: check the SSH connection and Docker on the VM", err)
 	}
-	return strings.Fields(string(result.Stdout)), nil
+	return lines(result.Stdout), nil
 }
 
 // ssh streams docker save into docker load on the VM. It skips images that the VM already has.
 func (t transporter) ssh(ctx context.Context, images []Image) ([]Image, error) {
 	refs := tags(images)
-	ids, err := localIDs(ctx, t.exec, refs)
+	ids, prints, err := localImages(ctx, t.exec, refs)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +117,11 @@ func (t transporter) ssh(ctx context.Context, images []Image) ([]Image, error) {
 	for i := range out {
 		out[i].Ref, out[i].ID = out[i].Tag, ids[i]
 	}
-	have, err := t.remoteIDs(ctx, refs)
+	have, err := t.remotePrints(ctx, refs)
 	if err != nil {
 		return nil, err
 	}
-	if slices.Equal(have, ids) {
+	if slices.Equal(have, prints) {
 		fmt.Fprintf(t.out, "The VM already has %s\n", strings.Join(refs, ", "))
 		return out, nil
 	}
@@ -126,11 +144,11 @@ func (t transporter) ssh(ctx context.Context, images []Image) ([]Image, error) {
 	if _, err := t.vm.Run(ctx, remote.Cmd{Argv: []string{"docker", "load"}, Stdin: f, Stdout: t.out, Stderr: t.out, Redact: t.redact}); err != nil {
 		return nil, fmt.Errorf("load the images on the VM: %w\nTry: check the SSH connection and the disk space of the VM", err)
 	}
-	have, err = t.remoteIDs(ctx, refs)
+	have, err = t.remotePrints(ctx, refs)
 	if err != nil {
 		return nil, err
 	}
-	if !slices.Equal(have, ids) {
+	if !slices.Equal(have, prints) {
 		return nil, fmt.Errorf("the images on the VM do not match the local images after docker load\nTry: run spinup deploy --resume")
 	}
 	return out, nil

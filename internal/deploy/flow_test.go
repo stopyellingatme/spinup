@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stopyellingatme/spinup/internal/db/lint"
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 	"github.com/stopyellingatme/spinup/internal/ui"
@@ -39,11 +41,11 @@ func TestFlowSSHFirstDeploy(t *testing.T) {
 	x.journal(1)
 	// transport
 	x.journal(1)
-	x.exec.Expect("docker", "image", "inspect", "--format", "{{.Id}}", "todo-api:"+testRelease).Return("sha256:aaa\n", "", 0)
-	x.vm.Expect("docker", "image", "inspect", "--format", "{{.Id}}", "todo-api:"+testRelease).Return("", "No such image", 1)
+	x.exec.Expect("docker", "image", "inspect", "--format", "{{.Id}} "+imageFingerprint, "todo-api:"+testRelease).Return("sha256:aaa linux/amd64 [\"sha256:l1\"]\n", "", 0)
+	x.vm.Expect("docker", "image", "inspect", "--format", imageFingerprint, "todo-api:"+testRelease).Return("", "No such image", 1)
 	x.exec.Expect("docker", "save", "-o").Return("", "", 0)
 	x.ok("docker", "load")
-	x.vm.Expect("docker", "image", "inspect", "--format", "{{.Id}}", "todo-api:"+testRelease).Return("sha256:aaa\n", "", 0)
+	x.vm.Expect("docker", "image", "inspect", "--format", imageFingerprint, "todo-api:"+testRelease).Return("linux/amd64 [\"sha256:l1\"]\n", "", 0)
 	x.journal(1)
 	// upload
 	x.journal(1)
@@ -696,6 +698,20 @@ func TestDeployFilesWithBackups(t *testing.T) {
 	}
 	if _, err := deployFiles(x.root); err == nil || !strings.Contains(err.Error(), "spinup restore deploy/compose.edge.yml") {
 		t.Fatalf("missing edge file = %v", err)
+	}
+}
+
+func TestBriefCommandErrors(t *testing.T) {
+	t.Parallel()
+	exit := &runexec.ExitError{Cmd: "ssh -o ... -- deploy@vm 'docker' 'compose'", Code: 1, StderrTail: "Container x Waiting\ncontainer x is unhealthy\n"}
+	err := brief(fmt.Errorf("wrapped: %w", exit))
+	var got *runexec.ExitError
+	if err.Error() != "exit code 1: container x is unhealthy" || !errors.As(err, &got) {
+		t.Fatalf("brief = %q", err)
+	}
+	plain := errors.New("context deadline exceeded")
+	if brief(plain).Error() != plain.Error() || !errors.Is(brief(plain), plain) || brief(&runexec.ExitError{Code: 255}).Error() != "exit code 255" {
+		t.Fatal("brief changed other errors")
 	}
 }
 
