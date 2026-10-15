@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -86,7 +87,12 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	if err != nil {
 		return nil, err
 	}
-	questions, err := Questions(packs)
+	asked := packs
+	if o.APIOnly {
+		// An API-only app never selects the web pack, so it never asks or records its questions.
+		asked = slices.DeleteFunc(slices.Clone(packs), func(p *templates.Pack) bool { return p.Name == "web" })
+	}
+	questions, err := Questions(asked)
 	if err != nil {
 		return nil, err
 	}

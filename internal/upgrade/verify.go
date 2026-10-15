@@ -59,6 +59,11 @@ func (h *phaseHooks) verify(ctx context.Context, s *Step) error {
 		Root: s.Worktree,
 		Deps: map[string]any{"runner": s.Runner, "cli_version": s.Lock.CLIVersion},
 	}) {
+		// Quick checks test the developer's machine (Docker, ports, .env), not the code the
+		// upgrade produced, and the worktree has no .env. Verify runs only the full checks.
+		if report.Check.Quick {
+			continue
+		}
 		if report.Result.Status == doctor.Fail {
 			failures = append(failures, attributeFailure("doctor "+report.Check.ID+": "+report.Result.Message, owners, s.Worktree))
 		}

@@ -144,6 +144,13 @@ func TestDocs(t *testing.T) {
 		"GOMODCACHE=" + caches[1],
 		"SPINUP_KIT_REPLACE=" + filepath.Join(root, "kit"),
 	}
+	// Pages run with their own HOME: pin the corepack cache and the pnpm store too.
+	if home, err := os.UserHomeDir(); err == nil && os.Getenv("COREPACK_HOME") == "" {
+		vars = append(vars, "COREPACK_HOME="+filepath.Join(home, ".cache", "node", "corepack"))
+	}
+	if store, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "pnpm", Args: []string{"store", "path"}, Dir: root}); err == nil {
+		vars = append(vars, "npm_config_store_dir="+strings.TrimSpace(string(store.Stdout)))
+	}
 	if value := os.Getenv("DATABASE_URL"); value != "" {
 		vars = append(vars, "DATABASE_URL="+value)
 	}

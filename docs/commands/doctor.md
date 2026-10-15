@@ -1,7 +1,7 @@
 # Check local health
 
 `spinup doctor` reports the git version, lock validity, missing managed files, and kit compatibility.
-Use `--quick` to run the git check only.
+Use `--quick` to run only the fast checks: the git version and the dev environment (Go, Node, pnpm, Docker, ports, and `.env`). `spinup dev` runs the same set first.
 Use `--json` for a JSON array of results.
 Checks that require a project skip outside a project.
 Failures produce exit 1.

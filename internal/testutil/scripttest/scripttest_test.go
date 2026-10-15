@@ -1,6 +1,7 @@
 package scripttest
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -99,6 +100,11 @@ func TestScripts(t *testing.T) {
 			}
 			env.Setenv("GOCACHE", caches[0])
 			env.Setenv("GOMODCACHE", caches[1])
+			// pnpm and corepack also find their caches through HOME; pin them so web
+			// scripts install offline from the real store.
+			for key, value := range nodeCaches() {
+				env.Setenv(key, value)
+			}
 			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
 				if value, ok := os.LookupEnv(key); ok {
 					env.Setenv(key, value)
@@ -169,4 +175,25 @@ func makeVersion(root, dir, version, overlay string) error {
 		}
 		return os.WriteFile(dest, data, 0o644)
 	})
+}
+
+// nodeCaches returns COREPACK_HOME and npm_config_store_dir for the real user, so scripts that
+// run with their own HOME still reach the corepack pnpm download and the pnpm store.
+func nodeCaches() map[string]string {
+	caches := map[string]string{}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return caches
+	}
+	if value := os.Getenv("COREPACK_HOME"); value != "" {
+		caches["COREPACK_HOME"] = value
+	} else {
+		caches["COREPACK_HOME"] = filepath.Join(home, ".cache", "node", "corepack")
+	}
+	if value := os.Getenv("npm_config_store_dir"); value != "" {
+		caches["npm_config_store_dir"] = value
+	} else if out, err := exec.CommandContext(context.Background(), "pnpm", "store", "path").Output(); err == nil {
+		caches["npm_config_store_dir"] = strings.TrimSpace(string(out))
+	}
+	return caches
 }
