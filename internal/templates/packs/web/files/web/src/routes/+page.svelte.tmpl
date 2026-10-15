@@ -1,0 +1,32 @@
+<script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+</script>
+
+<Card.Root class="mx-auto max-w-xl">
+	<Card.Header>
+		<Card.Title>Welcome to [[ .app_name ]]</Card.Title>
+		<Card.Description>
+			{#if data.user}
+				You are signed in as {data.user.email}.
+			{:else}
+				A SvelteKit app on the same origin as its Go API.
+			{/if}
+		</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<p class="text-sm">
+			Edit <code>web/src/routes/+page.svelte</code> to change this page. Run
+			<code>spinup g resource</code> to add a typed API and its pages.
+		</p>
+	</Card.Content>
+	<Card.Footer class="gap-2">
+		{#if !data.user}
+			<Button href="/login">Sign in</Button>
+		{/if}
+		<Button href="https://svelte.dev/docs/kit" variant="outline">SvelteKit docs</Button>
+	</Card.Footer>
+</Card.Root>
