@@ -36,6 +36,26 @@ const pack = "jobs"
 // jobs pack (register.go, deps.go, Register, Deps).
 var reserved = map[string]bool{"register": true, "register_gen": true, "deps": true, "generated": true}
 
+// knownGOOS and knownGOARCH match the filename selectors in Go 1.27's
+// internal/syslist package. They include obsolete values because Go still
+// recognizes them in file names.
+var knownGOOS = map[string]bool{
+	"aix": true, "android": true, "darwin": true, "dragonfly": true,
+	"freebsd": true, "hurd": true, "illumos": true, "ios": true,
+	"js": true, "linux": true, "nacl": true, "netbsd": true,
+	"openbsd": true, "plan9": true, "solaris": true, "wasip1": true,
+	"windows": true, "zos": true,
+}
+
+var knownGOARCH = map[string]bool{
+	"386": true, "amd64": true, "amd64p32": true, "arm": true,
+	"armbe": true, "arm64": true, "arm64be": true, "loong64": true,
+	"mips": true, "mipsle": true, "mips64": true, "mips64le": true,
+	"mips64p32": true, "mips64p32le": true, "ppc": true, "ppc64": true,
+	"ppc64le": true, "riscv": true, "riscv64": true, "s390": true,
+	"s390x": true, "sparc": true, "sparc64": true, "wasm": true,
+}
+
 func init() {
 	registry.Register(gen.Generator{
 		Name:  "job",
@@ -69,12 +89,19 @@ func ParseName(s string) (Name, error) {
 		return Name{}, nameError(s, fmt.Sprintf("%q is reserved by the jobs package", snake))
 	case strings.HasSuffix(snake, "_test") || strings.HasSuffix(snake, "_gen"):
 		return Name{}, nameError(s, "a name that ends in _test or _gen is reserved for Go files")
+	case hasBuildSelectorSuffix(words):
+		return Name{}, nameError(s, "a name that ends in a GOOS or GOARCH value is reserved for Go files")
 	}
 	var pascal strings.Builder
 	for _, w := range words {
 		pascal.WriteString(strings.ToUpper(w[:1]) + w[1:])
 	}
 	return Name{Snake: snake, Pascal: pascal.String()}, nil
+}
+
+func hasBuildSelectorSuffix(words []string) bool {
+	last := words[len(words)-1]
+	return knownGOOS[last] || knownGOARCH[last]
 }
 
 func nameError(s, why string) error {
@@ -136,7 +163,15 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		return nil, err
 	}
 	jobPath := path.Join(Dir, name.Snake+".go")
-	found, err := Scan(filepath.Join(in.Root, filepath.FromSlash(Dir)), map[string][]byte{name.Snake + ".go": jobFile})
+	dir := filepath.Join(in.Root, filepath.FromSlash(Dir))
+	existing, err := scan(dir, nil)
+	if err != nil {
+		return nil, err
+	}
+	if existing.hasDeclarationOutside(name.Pascal, name.Snake+".go") {
+		return nil, fmt.Errorf("cannot generate job %q: %s is already declared in %s\nTry: use a different job name", name.Snake, name.Pascal, Dir)
+	}
+	found, err := Scan(dir, map[string][]byte{name.Snake + ".go": jobFile})
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +204,37 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 // extra (base name to content) replace or add files before the scan. It
 // skips test files and register_gen.go. It returns the <X> names, sorted.
 func Scan(dir string, extra map[string][]byte) ([]string, error) {
+	result, err := scan(dir, extra)
+	if err != nil {
+		return nil, err
+	}
+	return result.jobs, nil
+}
+
+type scanResult struct {
+	jobs         []string
+	args         map[string]bool
+	funcs        map[string]bool
+	declarations map[string]map[string]bool
+}
+
+func (r scanResult) hasDeclarationOutside(base, allowedFile string) bool {
+	if !r.args[base] && !r.funcs[base] {
+		return false
+	}
+	for file := range r.declarations[base] {
+		if file != allowedFile {
+			return true
+		}
+	}
+	return false
+}
+
+func scan(dir string, extra map[string][]byte) (scanResult, error) {
 	sources := map[string][]byte{}
 	entries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("read %s: %w\nTry: check the directory permissions", Dir, err)
+		return scanResult{}, fmt.Errorf("read %s: %w\nTry: check the directory permissions", Dir, err)
 	}
 	for _, e := range entries {
 		if e.IsDir() {
@@ -180,7 +242,7 @@ func Scan(dir string, extra map[string][]byte) ([]string, error) {
 		}
 		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("read %s/%s: %w\nTry: check the file permissions", Dir, e.Name(), err)
+			return scanResult{}, fmt.Errorf("read %s/%s: %w\nTry: check the file permissions", Dir, e.Name(), err)
 		}
 		sources[e.Name()] = data
 	}
@@ -195,20 +257,41 @@ func Scan(dir string, extra map[string][]byte) ([]string, error) {
 	}
 	sort.Strings(names)
 	fset := token.NewFileSet()
+	args := map[string]bool{}
 	kinds := map[string]bool{}
 	funcs := map[string]bool{}
+	declarations := map[string]map[string]bool{}
 	for _, name := range names {
 		file, err := parser.ParseFile(fset, path.Join(Dir, name), sources[name], parser.SkipObjectResolution)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s/%s: %w\nTry: fix the Go syntax error, then run spinup g job again", Dir, name, err)
+			return scanResult{}, fmt.Errorf("parse %s/%s: %w\nTry: fix the Go syntax error, then run spinup g job again", Dir, name, err)
 		}
 		for _, decl := range file.Decls {
+			if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
+				for _, spec := range gen.Specs {
+					typ, ok := spec.(*ast.TypeSpec)
+					if !ok || !strings.HasSuffix(typ.Name.Name, "Args") || len(typ.Name.Name) == len("Args") {
+						continue
+					}
+					base := strings.TrimSuffix(typ.Name.Name, "Args")
+					args[base] = true
+					if declarations[base] == nil {
+						declarations[base] = map[string]bool{}
+					}
+					declarations[base][name] = true
+				}
+				continue
+			}
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok {
 				continue
 			}
 			if fn.Recv == nil {
 				funcs[fn.Name.Name] = true
+				if declarations[fn.Name.Name] == nil {
+					declarations[fn.Name.Name] = map[string]bool{}
+				}
+				declarations[fn.Name.Name][name] = true
 				continue
 			}
 			if fn.Name.Name != "Kind" || len(fn.Recv.List) != 1 || fn.Type.Params.NumFields() != 0 {
@@ -219,14 +302,14 @@ func Scan(dir string, extra map[string][]byte) ([]string, error) {
 			}
 		}
 	}
-	var found []string
+	var jobs []string
 	for base := range kinds {
 		if funcs[base] {
-			found = append(found, base)
+			jobs = append(jobs, base)
 		}
 	}
-	sort.Strings(found)
-	return found, nil
+	sort.Strings(jobs)
+	return scanResult{jobs: jobs, args: args, funcs: funcs, declarations: declarations}, nil
 }
 
 func receiverType(expr ast.Expr) string {
