@@ -326,7 +326,7 @@ func addRequiredColumn(tokens []string) bool {
 	if i >= len(tokens) || tokens[i] == "CONSTRAINT" || tokens[i] == "PRIMARY" || tokens[i] == "UNIQUE" || tokens[i] == "CHECK" || tokens[i] == "FOREIGN" {
 		return false
 	}
-	return containsSequence(tokens[i:], "NOT", "NULL") && !contains(tokens[i:], "DEFAULT") && !(contains(tokens[i:], "GENERATED") && contains(tokens[i:], "STORED"))
+	return containsSequence(tokens[i:], "NOT", "NULL") && !contains(tokens[i:], "DEFAULT") && (!contains(tokens[i:], "GENERATED") || !contains(tokens[i:], "STORED"))
 }
 
 func tokenize(sql []byte) []statement {
