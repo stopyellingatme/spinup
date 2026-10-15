@@ -1,0 +1,30 @@
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup routes --json
+stdout '^\[\{"method":"GET","path":"/healthz","source":"kit"\},\{"method":"GET","path":"/readyz","source":"kit"\},\{"method":"GET","path":"/version","source":"kit"\}\]$'
+exec spinup g resource todo title:string
+exec spinup routes
+stdout '^METHOD +PATH +SOURCE$'
+stdout '^GET +/api/todos +openapi:listTodos$'
+stdout '^POST +/api/todos +openapi:createTodo$'
+stdout '^DELETE +/api/todos/\{id\} +openapi:deleteTodo$'
+stdout '^GET +/api/todos/\{id\} +openapi:getTodo$'
+stdout '^PUT +/api/todos/\{id\} +openapi:updateTodo$'
+exec spinup routes --json
+stdout '"source":"openapi:listTodos"'
+
+# Constant registrations in route files also appear. Tests and dynamic patterns do not.
+cp $WORK/custom.go api/internal/routes/custom.go
+exec spinup routes
+stdout '^POST +/custom +custom.go:5$'
+! stdout '/ignored'
+
+-- custom.go --
+package routes
+
+const customPath = "POST /custom"
+func custom() {
+ mux.HandleFunc(customPath, nil)
+ other.HandleFunc("GET /ignored", nil)
+}

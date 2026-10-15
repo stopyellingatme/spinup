@@ -1,0 +1,36 @@
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup g resource todo title:string
+cp spinup.lock before.lock
+exec spinup destroy resource todo --dry-run
+stdout 'would remove api/db/queries/todos.sql'
+cmp spinup.lock before.lock
+exists api/db/queries/todos.sql api/openapi/paths/todos.yaml api/openapi/schemas/todo.yaml
+exists api/internal/handlers/todos.go api/internal/handlers/todos_test.go
+
+# Keep changed files. Preserve the migration and remove only matching files.
+cp $WORK/edited.go api/internal/handlers/todos.go
+exec spinup destroy resource todo
+stdout 'keep api/internal/handlers/todos.go'
+stdout 'Try: delete it by hand, or keep it'
+stdout 'Next: spinup db new drop_todos'
+cmp api/internal/handlers/todos.go $WORK/edited.go
+! exists api/db/queries/todos.sql
+! exists api/openapi/paths/todos.yaml
+! exists api/openapi/schemas/todo.yaml
+! exists api/internal/handlers/todos_test.go
+exists api/db/migrations/00002_create_todos.sql
+! grep '"api/db/queries/todos.sql"' spinup.lock
+! grep '"api/openapi/paths/todos.yaml"' spinup.lock
+! grep '"api/openapi/schemas/todo.yaml"' spinup.lock
+! grep '"api/internal/handlers/todos_test.go"' spinup.lock
+grep '"api/internal/handlers/todos.go"' spinup.lock
+grep '"api/db/migrations/00002_create_todos.sql"' spinup.lock
+exec spinup routes --json
+! stdout 'openapi:'
+
+-- edited.go --
+package handlers
+
+// User edits must survive destruction.
