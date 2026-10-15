@@ -214,13 +214,16 @@ func TestDownloadVerification(t *testing.T) {
 			}
 			_, err = s.Load(context.Background(), "1.2.3")
 			if tc.corrupt {
-				if err == nil || !strings.Contains(err.Error(), "signature") {
+				if err != nil {
 					t.Fatalf("error=%v", err)
+				}
+				if requests.Load() != 4 {
+					t.Fatalf("requests=%d, want 4", requests.Load())
 				}
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			if requests.Load() != 2 {
+			if !tc.corrupt && requests.Load() != 2 {
 				t.Fatal("cached load used network")
 			}
 			if !tc.corrupt {
@@ -309,8 +312,8 @@ func TestCacheRejectsMissingOrChangedSignature(t *testing.T) {
 			if _, err := s.Load(context.Background(), "1.0.0"); err == nil {
 				t.Fatal("accepted invalid cached signature")
 			}
-			if requests.Load() != 0 {
-				t.Fatal("invalid cache triggered a download")
+			if requests.Load() != 1 {
+				t.Fatalf("requests=%d, want 1", requests.Load())
 			}
 			entries, err := s.List(context.Background())
 			if err != nil || len(entries) != 0 {
@@ -325,6 +328,57 @@ func TestCacheRejectsMissingOrChangedSignature(t *testing.T) {
 				t.Fatal("signature was not verified again")
 			}
 		})
+	}
+}
+
+func TestLoadReplacesInvalidCachedArchive(t *testing.T) {
+	t.Parallel()
+	key, private := testKey()
+	data := archiveData(t, "downloaded")
+	cache := t.TempDir()
+	archive := filepath.Join(cache, "templates-v1.0.0.tar.zst")
+	writeFile(t, archive, []byte("corrupted"))
+	writeFile(t, archive+".sig", make([]byte, ed25519.SignatureSize))
+
+	var requests atomic.Int32
+	client := &http.Client{Transport: handlerTransport{handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if strings.HasSuffix(r.URL.Path, ".sig") {
+			_, _ = w.Write(ed25519.Sign(private, data))
+			return
+		}
+		_, _ = w.Write(data)
+	})}}
+	s, err := New(Options{CacheDir: cache, Keys: []ed25519.PublicKey{key}, HTTPClient: client, BaseURL: "http://templates.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := s.Load(context.Background(), "1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker, err := fs.ReadFile(v.Packs, "base/marker")
+	if err != nil || string(marker) != "downloaded" {
+		t.Fatalf("marker=%q, err=%v", marker, err)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("requests=%d, want 2", requests.Load())
+	}
+}
+
+func TestOfflineInvalidCacheSuggestsClean(t *testing.T) {
+	t.Parallel()
+	key, _ := testKey()
+	cache := t.TempDir()
+	writeFile(t, filepath.Join(cache, "templates-v1.0.0.tar.zst"), []byte("corrupted"))
+	writeFile(t, filepath.Join(cache, "templates-v1.0.0.tar.zst.sig"), make([]byte, ed25519.SignatureSize))
+	s, err := New(Options{CacheDir: cache, Keys: []ed25519.PublicKey{key}, Offline: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Load(context.Background(), "1.0.0")
+	if !errors.Is(err, templates.ErrVersionUnavailable) || !strings.HasSuffix(err.Error(), "Try: spinup cache clean") {
+		t.Fatalf("error=%v", err)
 	}
 }
 

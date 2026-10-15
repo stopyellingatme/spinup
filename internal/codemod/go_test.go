@@ -96,3 +96,15 @@ func TestGoVersionedImport(t *testing.T) {
 		}
 	}
 }
+
+func TestGoRenameSelectorWithPackageNameDifferentFromImportPath(t *testing.T) {
+	t.Parallel()
+	const importPath = "github.com/pelletier/go-toml/v2"
+	src := []byte("package p\nimport \"" + importPath + "\"\nfunc f(){toml.Old()}\n")
+	out, changed, err := EditGo("p.go", src, func(_ *token.FileSet, f *ast.File) (bool, error) {
+		return RenameSelector(f, importPath, "Old", "New"), nil
+	})
+	if err != nil || !changed || !bytes.Contains(out, []byte("toml.New()")) {
+		t.Fatalf("changed=%v, output=%s, err=%v", changed, out, err)
+	}
+}
