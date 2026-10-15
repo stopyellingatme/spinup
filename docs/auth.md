@@ -252,8 +252,11 @@ The cookie uses Secure when the session cookie uses Secure.
 The callback verifies the signature, issuer, audience, expiry, and nonce of the ID token.
 
 The API requires a verified email claim.
+The `email_verified` claim must be the boolean `true` or the exact string `"true"`.
 An existing identity keeps its account even when the provider changes its email.
 A new identity links to an account with the same normalized email.
+Linking a provider to an existing account removes the account's password and signs out its other sessions.
+Use password reset to set a password again.
 If no account matches, the API creates an account with no password.
 Password login rejects an account with no password with the usual generic error.
 The callback uses the existing session method, which rotates the token.

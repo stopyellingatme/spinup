@@ -55,6 +55,7 @@ type oidcTestProvider struct {
 	mu                                              sync.Mutex
 	grants                                          map[string]url.Values
 	nonce, issuer, audience                         string
+	emailVerified                                   json.RawMessage
 	expired, unverified, missingToken, badSignature bool
 	discovery                                       atomic.Int32
 	tokens                                          atomic.Int32
@@ -122,7 +123,11 @@ func newOIDCTestProvider(t *testing.T) *oidcTestProvider {
 		if p.expired {
 			exp = time.Now().Add(-time.Hour).Unix()
 		}
-		claims, _ := json.Marshal(map[string]any{"iss": issuer, "aud": audience, "sub": "subject-1", "exp": exp, "iat": time.Now().Unix(), "nonce": nonce, "email": "person@example.com", "email_verified": !p.unverified})
+		var verified any = !p.unverified
+		if p.emailVerified != nil {
+			verified = p.emailVerified
+		}
+		claims, _ := json.Marshal(map[string]any{"iss": issuer, "aud": audience, "sub": "subject-1", "exp": exp, "iat": time.Now().Unix(), "nonce": nonce, "email": "person@example.com", "email_verified": verified})
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","kid":"test"}`))
 		payload := header + "." + base64.RawURLEncoding.EncodeToString(claims)
 		digest := sha256.Sum256([]byte(payload))
@@ -292,6 +297,43 @@ func TestOIDCFlow(t *testing.T) {
 	}
 }
 
+func TestOIDCEmailVerifiedClaim(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		claim string
+		valid bool
+	}{
+		{"boolean true", `true`, true},
+		{"string true", `"true"`, true},
+		{"boolean false", `false`, false},
+		{"string false", `"false"`, false},
+		{"uppercase string", `"TRUE"`, false},
+		{"padded string", `" true "`, false},
+		{"empty string", `""`, false},
+		{"number", `1`, false},
+		{"null", `null`, false},
+		{"object", `{}`, false},
+		{"array", `[true]`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := newOIDCTestProvider(t)
+			p.emailVerified = json.RawMessage(tc.claim)
+			app := newOIDCTestApp(t, p)
+			cookie, callback := app.start(t, "/account")
+			rec := app.callback(t, cookie, callback)
+			if tc.valid {
+				if rec.Code != http.StatusSeeOther || app.linked != 1 || sessionCookie(rec) == nil {
+					t.Fatalf("verified claim rejected: %d %s", rec.Code, rec.Body)
+				}
+			} else if rec.Code != http.StatusBadRequest || app.linked != 0 || sessionCookie(rec) != nil {
+				t.Fatalf("unverified claim accepted: %d %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}
+
 func TestOIDCOpenRedirectAndProviderDown(t *testing.T) {
 	t.Parallel()
 	p := newOIDCTestProvider(t)
@@ -413,9 +455,15 @@ func TestOIDCAccounts(t *testing.T) {
 			t.Parallel()
 			f := oidcDBFixture(t)
 			var existingID int64
-			var oldSession string
+			var oldSession, attackerSession, unrelatedSession string
 			if existing {
 				oldSession = f.register(t, "person@example.com")
+				login := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("person@example.com", goodPassword)})
+				if login.Code != http.StatusOK || sessionCookie(login) == nil {
+					t.Fatalf("attacker login: %d %s", login.Code, login.Body)
+				}
+				attackerSession = sessionCookie(login).Value
+				unrelatedSession = f.register(t, "unrelated@example.com")
 				if err := f.pool.QueryRow(t.Context(), `SELECT id FROM users WHERE email='person@example.com'`).Scan(&existingID); err != nil {
 					t.Fatal(err)
 				}
@@ -439,11 +487,11 @@ func TestOIDCAccounts(t *testing.T) {
 			if err := f.pool.QueryRow(t.Context(), `SELECT u.id,u.password_hash FROM users u JOIN user_identities i ON i.user_id=u.id WHERE i.provider='test' AND i.subject='subject-1'`).Scan(&id, &password); err != nil {
 				t.Fatal(err)
 			}
-			if existing && (id != existingID || password == nil) {
-				t.Fatal("existing password account not preserved")
+			if existing && id != existingID {
+				t.Fatal("existing account not preserved")
 			}
-			if !existing && password != nil {
-				t.Fatal("new account has a password")
+			if password != nil {
+				t.Fatal("linked account has a password")
 			}
 			if c := sessionCookie(rec); c == nil {
 				t.Fatal("no session")
@@ -451,8 +499,13 @@ func TestOIDCAccounts(t *testing.T) {
 				t.Fatalf("session: %d %s", rec.Code, rec.Body)
 			}
 			if existing {
-				if rec := f.do(t, request{method: http.MethodGet, path: "/api/session", cookie: oldSession}); rec.Code != http.StatusUnauthorized {
-					t.Fatalf("old session was not rotated: %d", rec.Code)
+				for _, token := range []string{oldSession, attackerSession} {
+					if rec := f.do(t, request{method: http.MethodGet, path: "/api/session", cookie: token}); rec.Code != http.StatusUnauthorized {
+						t.Fatalf("old session remains valid: %d", rec.Code)
+					}
+				}
+				if rec := f.do(t, request{method: http.MethodGet, path: "/api/session", cookie: unrelatedSession}); rec.Code != http.StatusOK {
+					t.Fatalf("unrelated session removed: %d", rec.Code)
 				}
 			}
 			// An email change never moves a known subject to a different account.
@@ -460,11 +513,9 @@ func TestOIDCAccounts(t *testing.T) {
 			if err != nil || again.ID != id || again.Email != "person@example.com" {
 				t.Fatalf("identity changed: %+v %v", again, err)
 			}
-			if !existing {
-				rec := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("person@example.com", goodPassword)})
-				if rec.Code != http.StatusUnauthorized || problemOf(t, rec).Detail != "The email address or password is incorrect." {
-					t.Fatalf("passwordless login: %d %s", rec.Code, rec.Body)
-				}
+			login := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("person@example.com", goodPassword)})
+			if login.Code != http.StatusUnauthorized || problemOf(t, login).Detail != "The email address or password is incorrect." {
+				t.Fatalf("passwordless login: %d %s", login.Code, login.Body)
 			}
 		})
 	}
@@ -498,5 +549,74 @@ func TestOIDCConcurrentLink(t *testing.T) {
 	var users, identities int
 	if err := f.pool.QueryRow(t.Context(), `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM user_identities)`).Scan(&users, &identities); err != nil || users != 1 || identities != 1 {
 		t.Fatalf("accounts: users=%d identities=%d error=%v", users, identities, err)
+	}
+}
+
+func TestOIDCKnownIdentityPreservesCredentials(t *testing.T) {
+	t.Parallel()
+	f := oidcDBFixture(t)
+	user, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "person@example.com", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A password reset can restore a password after the first link.
+	hash := hashPassword(testParams, goodPassword)
+	if _, err := f.pool.Exec(t.Context(), `UPDATE users SET password_hash=$2 WHERE id=$1`, user.ID, hash); err != nil {
+		t.Fatal(err)
+	}
+	login := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds(user.Email, goodPassword)})
+	if login.Code != http.StatusOK || sessionCookie(login) == nil {
+		t.Fatalf("password login: %d %s", login.Code, login.Body)
+	}
+	again, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "different@example.com", true)
+	if err != nil || again != user {
+		t.Fatalf("known identity: %+v %v", again, err)
+	}
+	_, storedHash, found, err := f.auth.credentialsByEmail(t.Context(), user.Email)
+	if err != nil || !found || storedHash != hash {
+		t.Fatalf("known identity removed the restored password: found=%v err=%v", found, err)
+	}
+	if rec := f.do(t, request{method: http.MethodGet, path: "/api/session", cookie: sessionCookie(login).Value}); rec.Code != http.StatusOK {
+		t.Fatalf("known identity removed another session: %d", rec.Code)
+	}
+}
+
+func TestOIDCLinkRollback(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		sql  string
+	}{
+		{"identity insert", `ALTER TABLE user_identities ADD CHECK (subject <> 'rejected')`},
+		{"session deletion", `CREATE FUNCTION reject_session_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+		BEGIN RAISE EXCEPTION 'session deletion failed'; END; $$;
+		CREATE TRIGGER reject_session_delete BEFORE DELETE ON sessions FOR EACH ROW EXECUTE FUNCTION reject_session_delete()`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := oidcDBFixture(t)
+			token := f.register(t, "person@example.com")
+			_, originalHash, _, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.pool.Exec(t.Context(), tc.sql); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.auth.oidcUser(t.Context(), "test", "rejected", "person@example.com", true); err == nil {
+				t.Fatal("link succeeded despite a store failure")
+			}
+			_, hash, found, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
+			if err != nil || !found || hash != originalHash {
+				t.Fatalf("failed link changed the password: found=%v err=%v", found, err)
+			}
+			if rec := f.do(t, request{method: http.MethodGet, path: "/api/session", cookie: token}); rec.Code != http.StatusOK {
+				t.Fatalf("failed link removed the session: %d", rec.Code)
+			}
+			var count int
+			if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM user_identities`).Scan(&count); err != nil || count != 0 {
+				t.Fatalf("failed link retained an identity: count=%d err=%v", count, err)
+			}
+		})
 	}
 }
