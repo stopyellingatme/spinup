@@ -5,6 +5,8 @@ import (
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
+
+	"github.com/stopyellingatme/spinup/internal/selfupdate"
 )
 
 // Build information. GoReleaser sets these with -ldflags -X.
@@ -50,12 +52,23 @@ func currentVersion() versionInfo {
 
 func init() {
 	Register(GroupMaintain, func(app *App) *cobra.Command {
-		return &cobra.Command{
+		var check bool
+		command := &cobra.Command{
 			Use:   "version",
 			Short: "Print the spinup version",
 			Args:  cobra.NoArgs,
-			RunE: func(*cobra.Command, []string) error {
+			RunE: func(c *cobra.Command, _ []string) error {
 				v := currentVersion()
+				if check {
+					if err := updateOnline(app); err != nil {
+						return err
+					}
+					result, err := (selfupdate.Updater{}).Check(c.Context(), selfupdate.Options{Current: v.Version})
+					if err != nil {
+						return err
+					}
+					return printUpdateResult(app, result)
+				}
 				if app.Flags.JSON {
 					return app.UI.JSON(v)
 				}
@@ -63,5 +76,7 @@ func init() {
 				return nil
 			},
 		}
+		command.Flags().BoolVar(&check, "check", false, "check for a newer stable release")
+		return command
 	})
 }
