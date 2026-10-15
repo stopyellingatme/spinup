@@ -54,9 +54,14 @@ The scan mounts the Docker socket read-only.
 This one-shot operator scan can inspect image metadata through that socket.
 
 `prune` removes unused app images and the Docker build cache.
-It retains images from the last five releases and running containers.
+It retains the image references from the last five releases in `releases.json`.
+It also retains every image that a container uses, including a stopped container.
+It compares image IDs to protect registry digest references and alternative tags.
 It never removes volumes.
-`vacuum` runs `VACUUM (ANALYZE)` and prints ten tables with the most dead tuples.
+
+`vacuum` reads `POSTGRES_USER` and `POSTGRES_DB` inside the PostgreSQL container.
+It runs `VACUUM (ANALYZE)` in that database.
+It prints ten tables with the most dead tuples.
 Use `--full <table>` for one table during the maintenance window.
 
 `certs` reads the public TLS certificate from the operator machine.

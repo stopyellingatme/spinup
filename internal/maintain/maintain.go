@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stopyellingatme/spinup/internal/deploy"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
@@ -282,9 +283,53 @@ func (c client) vulnScan(ctx context.Context, o Options) error {
 	return nil
 }
 
+// pruneImagesScript resolves retained references to image IDs, which also protects tag aliases.
+// Container image IDs include stopped containers. All Docker reads must succeed before removal.
+const pruneImagesScript = `set -eu
+app=$1
+shift
+keep=''
+for ref do
+ id=$(docker image inspect --format '{{.Id}}' "$ref")
+ keep="$keep
+$id"
+done
+containers=$(docker ps -aq)
+if [ -n "$containers" ]; then
+ ids=$(docker inspect --format '{{.Image}}' $containers)
+ keep="$keep
+$ids"
+fi
+images=$(docker image ls --no-trunc --format '{{.Repository}}:{{.Tag}} {{.ID}}')
+printf '%s\n' "$images" | while read -r image id; do
+ case "$image" in "$app"-*) ;; *) continue;; esac
+ [ -n "$id" ]
+ if printf '%s\n' "$keep" | grep -Fxq -- "$id"; then continue; fi
+ printf '%s\n' "$image"
+done`
+
 func (c client) prune(ctx context.Context, o Options) error {
-	script := `set -eu; app=` + remote.Quote(c.app) + `; root=/opt/` + remote.Quote(c.app) + `; keep=$(sed -n 's/.*"release": *"\([^"]*\)".*/\1/p' "$root/releases.json" | head -5 | tr '\n' '|'); docker image ls --format '{{.Repository}}:{{.Tag}}' | while read -r image; do case "$image" in "$app"-*) ;; *) continue;; esac; docker ps --format '{{.Image}}' | grep -Fxq "$image" || case "$image" in *"$keep"*) ;; *) printf '%s\n' "$image";; esac; done`
-	r, err := c.remote(ctx, "sh", "-ec", script)
+	releases, err := deploy.ReadReleases(ctx, c.vm, c.app)
+	if err != nil {
+		return err
+	}
+	argv := []string{"sh", "-ec", pruneImagesScript, "maintenance-prune", c.app}
+	for _, release := range releases[:min(len(releases), deploy.KeepReleases)] {
+		for _, image := range release.Images {
+			ref := image.Ref
+			if ref == "" {
+				ref = image.Tag
+			}
+			if ref == "" {
+				ref = image.ID
+			}
+			if ref == "" {
+				return failure("retain release image", fmt.Errorf("release %s has no image reference", release.Release))
+			}
+			argv = append(argv, ref)
+		}
+	}
+	r, err := c.remote(ctx, argv...)
 	if err != nil {
 		return err
 	}
@@ -298,9 +343,6 @@ func (c client) prune(ctx context.Context, o Options) error {
 		}
 	}
 	if _, err := c.remote(ctx, "docker", "builder", "prune", "-f"); err != nil {
-		return err
-	}
-	if _, err := c.remote(ctx, "docker", "image", "prune", "-f"); err != nil {
 		return err
 	}
 	return c.write(map[string]any{"removed": images}, fmt.Sprintf("Removed %d unused images.\n", len(images)))
@@ -320,14 +362,23 @@ func (c client) vacuum(ctx context.Context, o Options) error {
 	if id == "" {
 		return failure("find postgres container", errors.New("postgres is not running"))
 	}
+	credentials, err := c.remote(ctx, "docker", "exec", id, "printenv", "POSTGRES_USER", "POSTGRES_DB")
+	if err != nil {
+		return err
+	}
+	values := strings.Split(strings.TrimSuffix(string(credentials.Stdout), "\n"), "\n")
+	if len(values) != 2 || values[0] == "" || values[1] == "" {
+		return failure("read postgres environment", errors.New("POSTGRES_USER or POSTGRES_DB is missing or invalid"))
+	}
+	user, database := values[0], values[1]
 	query := "VACUUM (ANALYZE)"
 	if o.FullTable != "" {
 		query = "VACUUM FULL " + quoteIdent(o.FullTable)
 	}
-	if _, err := c.remote(ctx, "docker", "exec", id, "psql", "-U", "postgres", "-d", "postgres", "-c", query); err != nil {
+	if _, err := c.remote(ctx, "docker", "exec", id, "psql", "-U", user, "-d", database, "-c", query); err != nil {
 		return err
 	}
-	r, err := c.remote(ctx, "docker", "exec", id, "psql", "-U", "postgres", "-d", "postgres", "-At", "-c", "SELECT relname, n_dead_tup FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 10")
+	r, err := c.remote(ctx, "docker", "exec", id, "psql", "-U", user, "-d", database, "-At", "-c", "SELECT relname, n_dead_tup FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 10")
 	if err != nil {
 		return err
 	}
