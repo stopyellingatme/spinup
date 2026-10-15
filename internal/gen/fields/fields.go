@@ -61,6 +61,29 @@ func ParseName(s string) (Name, error) {
 	return Name{Singular: singular, Plural: pluralize(singular)}, nil
 }
 
+// parseFieldName normalizes a field name to snake case like ParseName, but never
+// singularizes it: "tags" stays "tags" and "s" stays "s". Singular and Plural are equal.
+func parseFieldName(s string) (Name, error) {
+	if s == "" {
+		return Name{}, nameError(s, "it is empty")
+	}
+	if len(s) > 50 {
+		return Name{}, nameError(s, "it is longer than 50 characters")
+	}
+	words, err := nameWords(s)
+	if err != nil {
+		return Name{}, err
+	}
+	value := strings.Join(words, "_")
+	if value[0] >= '0' && value[0] <= '9' {
+		return Name{}, nameError(s, "it starts with a digit")
+	}
+	if reservedNames[value] {
+		return Name{}, nameError(s, fmt.Sprintf("%q is reserved", value))
+	}
+	return Name{Singular: value, Plural: value}, nil
+}
+
 // Type maps a resource field type across generated layers.
 type Type struct {
 	Name          string
@@ -139,7 +162,7 @@ func parseField(arg string) (Field, error) {
 	if !ok || nameText == "" || typeText == "" {
 		return Field{}, fmt.Errorf("field %q must use name:type\nTry: use a field such as title:string", arg)
 	}
-	name, err := ParseName(nameText)
+	name, err := parseFieldName(nameText)
 	if err != nil {
 		return Field{}, err
 	}

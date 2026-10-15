@@ -175,3 +175,16 @@ func FuzzParse(f *testing.F) {
 		_, _ = Parse([]string{arg})
 	})
 }
+
+func TestFieldNamesAreNotSingularized(t *testing.T) {
+	t.Parallel()
+	fields, err := Parse([]string{"tags:json", "s:string", "dueDate:date", "status:string"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []string{"tags", "s", "due_date", "status"} {
+		if got := fields[i].Column(); got != want {
+			t.Errorf("field %d column = %q, want %q", i, got, want)
+		}
+	}
+}
