@@ -97,6 +97,7 @@ func TestRunPlan(t *testing.T) {
 		"api/openapi/paths/todos.yaml":             "scaffold",
 		"api/openapi/schemas/todo.yaml":            "scaffold",
 		"api/internal/handlers/server.go":          "scaffold",
+		"api/internal/handlers/validation.go":      "scaffold",
 		"api/internal/handlers/todos.go":           "scaffold",
 		"api/internal/handlers/todos_test.go":      "scaffold",
 		"api/internal/routes/routes_gen.go":        "managed",
@@ -116,6 +117,9 @@ func TestRunPlan(t *testing.T) {
 	out, err = run(context.Background(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, "--no-tests")})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, ok := out.Plan.Get(requiredFieldsPath); !ok {
+		t.Fatal("an existing server still needs the shared validation file")
 	}
 	for _, p := range []string{serverPath, handlersTestPath(fields.Name{Singular: "todo", Plural: "todos"})} {
 		if _, ok := out.Plan.Get(p); ok {
@@ -342,8 +346,8 @@ func TestEveryFieldType(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
-		if len(out.Plan.Files) != 8 {
-			t.Fatalf("%v: %d files, want 8", args, len(out.Plan.Files))
+		if len(out.Plan.Files) != 9 {
+			t.Fatalf("%v: %d files, want 9", args, len(out.Plan.Files))
 		}
 	}
 }

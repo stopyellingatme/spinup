@@ -14,7 +14,7 @@ stdout '^update api/internal/routes/routes_gen\.go \(managed\)$'
 
 # The first resource rewrites the untouched routes_gen.go without --force.
 exec spinup g resource todo title:string done:bool
-stdout '^Created 7, updated 1 files$'
+stdout '^Created 8, updated 1 files$'
 stdout '^Next: spinup db migrate up$'
 exists api/db/migrations/00002_create_todos.sql api/db/queries/todos.sql api/openapi/paths/todos.yaml api/openapi/schemas/todo.yaml
 exists api/internal/handlers/server.go api/internal/handlers/todos.go api/internal/handlers/todos_test.go
@@ -39,10 +39,15 @@ stdout 'mux.HandleFunc\("GET /api/ping", handlers.Ping\)'
 exists api/internal/handlers/ping.go api/internal/handlers/ping_test.go
 exec spinup db lint
 
+# Cover the single-field case and all required types through real handlers.
+exec spinup g resource author name:string
+exec spinup g resource post title:string details:text views:int total:bigint flag:bool score:float reqday:date reqat:time requid:uuid reqmeta:json reqprice:decimal 'status:enum:draft|published' author:ref:author note:string?
+
 # Everything builds offline: the post-steps use the module cache.
 cd api
 exec go build ./...
 exec go vet ./...
+exec go test -race -count=1 ./internal/handlers -run 'RejectsBadInput|RequiresFields'
 cd ..
 
 # The real round trip runs only with a database.

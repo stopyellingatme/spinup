@@ -2,6 +2,7 @@ package resource
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
@@ -289,6 +290,18 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	singular, plural := n.Pascal(), n.PluralPascal()
 	words, pluralWords := strings.ReplaceAll(n.Snake(), "_", " "), strings.ReplaceAll(n.PluralSnake(), "_", " ")
 	g := &goFile{pkg: "handlers", local: rc.imports()}
+	g.p("func init() {")
+	g.p("required := []string{")
+	for _, f := range rc.fields {
+		if !f.Nullable {
+			g.p("%q,", f.col)
+		}
+	}
+	g.p("}")
+	g.p("requiredFields[%q] = required", "POST /api/"+n.PluralSnake())
+	g.p("requiredFields[%q] = required", "PUT /api/"+n.PluralSnake()+"/{id}")
+	g.p("}")
+	g.p("")
 	withErr := rc.fromStore(g)
 	rc.toStore(g)
 	single := len(rc.fields) == 1
@@ -601,5 +614,83 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("})")
 	g.p("}")
 	g.p("}")
+	rc.requiredFieldsTest(g, base)
 	return g.bytes()
+}
+
+// requiredFieldsTest tests presence through the complete generated HTTP stack.
+func (rc resourceCode) requiredFieldsTest(g *goFile, base string) {
+	var required []string
+	for _, f := range rc.fields {
+		if !f.Nullable {
+			required = append(required, f.col)
+		}
+	}
+	if len(required) == 0 {
+		return
+	}
+	sort.Strings(required)
+	// Each individual case supplies valid values for every other field.
+	body := func(changed string, null bool) string {
+		var parts []string
+		for _, f := range rc.fields {
+			value := sample(f, false, "")
+			if f.Type.Ref != "" && !f.Nullable {
+				value = "1"
+			}
+			if f.col == changed {
+				if !null {
+					continue
+				}
+				value = "null"
+			}
+			parts = append(parts, fmt.Sprintf("%q: %s", f.col, value))
+		}
+		return "{" + strings.Join(parts, ", ") + "}"
+	}
+	g.p("")
+	g.p("func Test%sRequiresFields(t *testing.T) {", rc.spec.Name.PluralPascal())
+	g.p("t.Parallel()")
+	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
+	g.p("routes.Register(mux, routes.Deps{})")
+	g.p("})).Handler()")
+	g.p("tests := []struct {")
+	g.p("name, body string")
+	g.p("want []httpx.FieldError")
+	g.p("}{")
+	emit := func(name, body string, cols []string) {
+		g.p("{%q, %q, []httpx.FieldError{", name, body)
+		for _, col := range cols {
+			g.p("{Field: %q, Message: \"is required\"},", col)
+		}
+		g.p("}},")
+	}
+	emit("missing all", "{}", required)
+	emit("body null", "null", required)
+	for _, col := range required {
+		emit("missing "+col, body(col, false), []string{col})
+		emit("null "+col, body(col, true), []string{col})
+	}
+	g.p("}")
+	g.p("for _, method := range []string{http.MethodPost, http.MethodPut} {")
+	g.p("for _, tc := range tests {")
+	g.p("t.Run(method+tc.name, func(t *testing.T) {")
+	g.p("t.Parallel()")
+	g.p("path := %q", base)
+	g.p("if method == http.MethodPut { path += \"/1\" }")
+	g.p("rec := testkit.Do(t, handler, method, path, strings.NewReader(tc.body))")
+	g.p("if rec.Code != http.StatusUnprocessableEntity {")
+	g.p("t.Fatalf(\"status %%d, want 422: %%s\", rec.Code, rec.Body)")
+	g.p("}")
+	g.p("if got := rec.Header().Get(\"Content-Type\"); got != \"application/problem+json\" {")
+	g.p("t.Fatalf(\"Content-Type %%q, want application/problem+json\", got)")
+	g.p("}")
+	g.p("problem := testkit.DecodeJSON[httpx.Problem](t, rec)")
+	g.p("if !reflect.DeepEqual(problem.Errors, tc.want) {")
+	g.p("t.Fatalf(\"errors %%+v, want %%+v\", problem.Errors, tc.want)")
+	g.p("}")
+	g.p("})")
+	g.p("}")
+	g.p("}")
+	g.p("}")
 }

@@ -12,6 +12,7 @@ import (
 	"example.com/todo/api/internal/gen"
 	"example.com/todo/api/internal/routes"
 	"github.com/stopyellingatme/spinup/kit/app"
+	"github.com/stopyellingatme/spinup/kit/httpx"
 	"github.com/stopyellingatme/spinup/kit/testkit"
 )
 
@@ -99,5 +100,67 @@ func TestTodosRejectsBadInput(t *testing.T) {
 				t.Fatalf("Content-Type %q, want application/problem+json", got)
 			}
 		})
+	}
+}
+
+func TestTodosRequiresFields(t *testing.T) {
+	t.Parallel()
+	handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {
+		routes.Register(mux, routes.Deps{})
+	})).Handler()
+	tests := []struct {
+		name, body string
+		want       []httpx.FieldError
+	}{
+		{"missing all", "{}", []httpx.FieldError{
+			{Field: "done", Message: "is required"},
+			{Field: "priority", Message: "is required"},
+			{Field: "title", Message: "is required"},
+		}},
+		{"body null", "null", []httpx.FieldError{
+			{Field: "done", Message: "is required"},
+			{Field: "priority", Message: "is required"},
+			{Field: "title", Message: "is required"},
+		}},
+		{"missing done", "{\"title\": \"title 1\", \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+			{Field: "done", Message: "is required"},
+		}},
+		{"null done", "{\"title\": \"title 1\", \"done\": null, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+			{Field: "done", Message: "is required"},
+		}},
+		{"missing priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\"}", []httpx.FieldError{
+			{Field: "priority", Message: "is required"},
+		}},
+		{"null priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": null}", []httpx.FieldError{
+			{Field: "priority", Message: "is required"},
+		}},
+		{"missing title", "{\"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+			{Field: "title", Message: "is required"},
+		}},
+		{"null title", "{\"title\": null, \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+			{Field: "title", Message: "is required"},
+		}},
+	}
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		for _, tc := range tests {
+			t.Run(method+tc.name, func(t *testing.T) {
+				t.Parallel()
+				path := "/api/todos"
+				if method == http.MethodPut {
+					path += "/1"
+				}
+				rec := testkit.Do(t, handler, method, path, strings.NewReader(tc.body))
+				if rec.Code != http.StatusUnprocessableEntity {
+					t.Fatalf("status %d, want 422: %s", rec.Code, rec.Body)
+				}
+				if got := rec.Header().Get("Content-Type"); got != "application/problem+json" {
+					t.Fatalf("Content-Type %q, want application/problem+json", got)
+				}
+				problem := testkit.DecodeJSON[httpx.Problem](t, rec)
+				if !reflect.DeepEqual(problem.Errors, tc.want) {
+					t.Fatalf("errors %+v, want %+v", problem.Errors, tc.want)
+				}
+			})
+		}
 	}
 }
