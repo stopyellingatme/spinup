@@ -2,6 +2,8 @@ version: "2"
 
 run:
   timeout: 5m
+  # Orchestrate lanes lint in parallel worktrees.
+  allow-parallel-runners: true
 
 linters:
   default: standard
