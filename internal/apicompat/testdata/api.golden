@@ -1,0 +1,19 @@
+kit const Limit = 10
+kit const ModeA Mode = iota
+kit const ModeB Mode = iota @1
+kit field Handler.Name string
+kit field Handler.Opts map[string][]int
+kit field Handler.embed http.Client
+kit func New[T any](T, ...int) *Handler
+kit func Old() *Handler deprecated:v0.3
+kit imethod Store.Get(string) ([]byte, error)
+kit imethod Store.embed fmt.Stringer
+kit method Handler.Value() string
+kit ptrmethod Handler.Do(int, ...string) (int, error)
+kit type Alias = http.Client
+kit type Handler struct
+kit type Mode int
+kit type Store interface
+kit var Default Mode
+kit var ErrBad = errors.New("bad")
+kit/sub func Sub()
