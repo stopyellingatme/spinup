@@ -12,7 +12,7 @@
 //	decimal  numeric           string                 string                       string/decimal      string
 //	time     timestamptz       time.Time              time.Time                    string/date-time    string
 //	date     date              time.Time              openapi_types.Date           string/date         string
-//	uuid     uuid              string                 string                       string/uuid         string
+//	uuid     uuid              uuid.UUID              uuid.UUID                    string/uuid         string
 //	json     jsonb             []byte                 map[string]interface{}       object              Record<string, unknown>
 //	ref      bigint            int64                  int64                        integer/int64       number
 //	enum     text              string                 string                       string              enum union

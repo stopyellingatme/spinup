@@ -78,7 +78,7 @@ func TestTypes(t *testing.T) {
 		{Name: "decimal", SQL: "numeric", GoStore: "string", GoAPI: "string", OpenAPIType: "string", OpenAPIFormat: "decimal", TS: "string"},
 		{Name: "time", SQL: "timestamptz", GoStore: "time.Time", GoAPI: "time.Time", OpenAPIType: "string", OpenAPIFormat: "date-time", TS: "string"},
 		{Name: "date", SQL: "date", GoStore: "time.Time", GoAPI: "openapi_types.Date", OpenAPIType: "string", OpenAPIFormat: "date", TS: "string"},
-		{Name: "uuid", SQL: "uuid", GoStore: "string", GoAPI: "string", OpenAPIType: "string", OpenAPIFormat: "uuid", TS: "string"},
+		{Name: "uuid", SQL: "uuid", GoStore: "uuid.UUID", GoAPI: "uuid.UUID", OpenAPIType: "string", OpenAPIFormat: "uuid", TS: "string"},
 		{Name: "json", SQL: "jsonb", GoStore: "[]byte", GoAPI: "map[string]interface{}", OpenAPIType: "object", TS: "Record<string, unknown>"},
 		{Name: "ref", SQL: "bigint", GoStore: "int64", GoAPI: "int64", OpenAPIType: "integer", OpenAPIFormat: "int64", TS: "number"},
 		{Name: "enum", SQL: "text", GoStore: "string", GoAPI: "string", OpenAPIType: "string", TS: "string"},
