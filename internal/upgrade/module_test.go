@@ -241,8 +241,12 @@ func TestModuleMonitoringDependencyProfile(t *testing.T) {
 	}
 	work := filepath.Join(root, ".spinup/upgrade/0.1.0")
 	cfg, err := project.Load(work)
-	if err != nil || cfg.Monitoring.Profile != "lite" || !slices.Contains(cfg.Modules, "monitoring") {
+	if err != nil || cfg.Monitoring.Profile != "none" || !slices.Contains(cfg.Modules, "monitoring") {
 		t.Fatalf("configuration=%+v error=%v", cfg, err)
+	}
+	lock, err := manifest.Load(filepath.Join(work, "spinup.lock"))
+	if err != nil || lock.Answers["monitoring_profile"] != "none" {
+		t.Fatalf("lock=%+v error=%v", lock, err)
 	}
 	if !strings.Contains(r.Out.(*bytes.Buffer).String(), "Adding required modules: deploy, monitoring") {
 		t.Fatalf("output=%s", r.Out)

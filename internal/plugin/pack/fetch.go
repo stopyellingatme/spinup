@@ -17,7 +17,21 @@ func (m *Manager) fetch(ctx context.Context, source, version, name string) (tree
 		return tree{}, problem("fetch plugin", fmt.Errorf("invalid source %q", source))
 	}
 	if m.Offline {
-		return m.cached(name, version, source)
+		cfg, lock, err := m.state()
+		if err != nil {
+			return tree{}, err
+		}
+		for _, decl := range cfg.Plugins {
+			if decl.Source != source || (name != "" && decl.Name != name) {
+				continue
+			}
+			for _, entry := range lock.Plugins {
+				if entry.Name == decl.Name && (version == "" || sameVersion(entry.Version, version)) {
+					return m.cached(entry.Name, entry.Version, source, entry.SHA256)
+				}
+			}
+		}
+		return tree{}, problem("read plugin cache", fmt.Errorf("no current project approval for %q at %q", source, version))
 	}
 	if local, ok := strings.CutPrefix(source, "path:"); ok {
 		if local == "" {
@@ -56,26 +70,26 @@ func (m *Manager) fetch(ctx context.Context, source, version, name string) (tree
 		"GIT_DIR=", "GIT_WORK_TREE=", "GIT_CONFIG=", "GIT_CONFIG_PARAMETERS=", "GIT_TEMPLATE_DIR=",
 		"GIT_COMMON_DIR=", "GIT_OBJECT_DIRECTORY=", "GIT_ALTERNATE_OBJECT_DIRECTORIES=", "GIT_INDEX_FILE=",
 	}
-	_, err = runner.Run(ctx, execx.Cmd{Name: "git", Args: []string{
+	_, err = runFetchGit(ctx, runner, execx.Cmd{Name: "git", Args: []string{
 		"-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never",
 		"-c", "protocol.allow=never", "-c", "protocol.https.allow=always",
 		"-c", "protocol.ssh.allow=always", "-c", "protocol.git.allow=always",
 		"-c", "core.hooksPath=" + filepath.Join(temp, "no-hooks"),
-		"clone", "--depth", "1", "--branch", version, "--single-branch", "--no-recurse-submodules", "--template=",
+		"clone", "--depth", "1", "--branch", version, "--single-branch", "--no-recurse-submodules", "--template=", "--filter=blob:limit=5m",
 		"--", remote, filepath.Join(temp, "repo"),
 	}, Dir: temp, Timeout: 2 * time.Minute, Env: gitEnv})
 	if err != nil {
 		return tree{}, problem("fetch git plugin", err)
 	}
 	repo := filepath.Join(temp, "repo")
-	result, err := runner.Run(ctx, execx.Cmd{Name: "git", Args: []string{"-c", "protocol.file.allow=never", "-C", repo, "show-ref", "--head", "--tags", "--dereference"}, Dir: temp, Timeout: 30 * time.Second, Env: gitEnv})
+	result, err := runFetchGit(ctx, runner, execx.Cmd{Name: "git", Args: []string{"-c", "protocol.file.allow=never", "-C", repo, "show-ref", "--head", "--tags", "--dereference"}, Dir: temp, Timeout: 30 * time.Second, Env: gitEnv})
 	if err != nil {
 		return tree{}, problem("verify plugin tag", err)
 	}
 	if err := verifyTag(result.Stdout, version); err != nil {
 		return tree{}, err
 	}
-	index, err := runner.Run(ctx, execx.Cmd{Name: "git", Args: []string{"-c", "protocol.file.allow=never", "-C", repo, "ls-files", "--stage", "-z"}, Dir: temp, Timeout: 30 * time.Second, Env: gitEnv})
+	index, err := runFetchGit(ctx, runner, execx.Cmd{Name: "git", Args: []string{"-c", "protocol.file.allow=never", "-C", repo, "ls-files", "--stage", "-z"}, Dir: temp, Timeout: 30 * time.Second, Env: gitEnv})
 	if err != nil {
 		return tree{}, problem("inspect plugin git index", err)
 	}

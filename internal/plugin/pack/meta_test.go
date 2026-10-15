@@ -59,7 +59,7 @@ func TestExamplePluginFixtures(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		valid bool
-	}{{"example", true}, {"bad-api", false}, {"path-escape", false}} {
+	}{{"example", true}, {"bad-api", false}, {"path-escape", false}, {"protected-path", false}} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tr, err := readTree("../../../testdata/plugins/" + tc.name)
@@ -71,6 +71,73 @@ func TestExamplePluginFixtures(t *testing.T) {
 				t.Fatalf("got %v", err)
 			}
 		})
+	}
+}
+
+func TestProtectedOutputPaths(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{".git/hooks/pre-commit", ".GIT/config", ".spinup/plugins.allow", ".SPINUP/plugins.history", ".github/workflows/ci.yml", ".GitHub/CODEOWNERS", "spinup.lock", "SPINUP.TOML", "api/.GiT/config"} {
+		for _, kind := range []string{"output", "rename", "generator"} {
+			t.Run(kind+"/"+path, func(t *testing.T) {
+				t.Parallel()
+				root := fixture(t)
+				file := root + "/pack.toml"
+				data := "name='example'\n[[files]]\npath=" + tomlString(path) + "\nsource='files/example.txt.tmpl'\nclass='managed'\n"
+				switch kind {
+				case "rename":
+					data = "name='example'\n[[files]]\npath='safe.txt'\nsource='files/example.txt.tmpl'\nclass='managed'\nrenamed_from=" + tomlString(path) + "\n"
+				case "generator":
+					file = root + "/plugin.toml"
+					original, err := os.ReadFile(file)
+					if err != nil {
+						t.Fatal(err)
+					}
+					data = string(original) + "\n[[generators]]\nname='evil'\n[[generators.files]]\npath=" + tomlString(path) + "\nsource='files/example.txt.tmpl'\nclass='managed'\n"
+				}
+				if err := os.WriteFile(file, []byte(data), 0644); err != nil {
+					t.Fatal(err)
+				}
+				tr, err := readTree(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := validate(tr, "1.2.3"); err == nil || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("protected %s accepted: %v", path, err)
+				}
+			})
+		}
+	}
+}
+
+func TestCheckOutputPath(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		path  string
+		valid bool
+	}{
+		{"api/handlers/example.go", true}, {".github-notes.txt", true},
+		{"api/spinup.lock", true}, {"api/.spinup/data", true},
+		{"api/.gitkeep", true}, {".git", false}, {".SPINUP", false},
+		{".GitHub", false}, {"spinup.LOCK", false}, {"spinup.toml", false},
+		{"../escape", false}, {"/absolute", false}, {"a//b", false},
+		{"a/./b", false}, {"a\\b", false}, {"", false},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+			if err := CheckOutputPath(tc.path); (err == nil) != tc.valid {
+				t.Fatalf("CheckOutputPath(%q) = %v", tc.path, err)
+			}
+		})
+	}
+	// Metadata samples are safe. The actual argument can select a protected path.
+	for _, arg := range []string{".GiT/hooks/pre-commit", ".spinup/plugins.allow", ".github/workflows/ci.yml", "spinup.lock"} {
+		path, err := checkTemplatePath("{{.Name}}", map[string]string{"Name": arg})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := CheckOutputPath(path); err == nil {
+			t.Fatalf("rendered argument %q accepted", arg)
+		}
 	}
 }
 

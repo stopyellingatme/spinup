@@ -80,15 +80,29 @@ func (m *Manager) resolveAll(ctx context.Context, o plugin.Options, refresh bool
 			return nil, problem("resolve plugin", fmt.Errorf("invalid version %q", version))
 		}
 		var tr tree
-		// Historical overrides use the locally retained receipt of a previous approval.
-		// Current authorization must still match the project's lock and allowlist.
+		// Historical overrides require a hash approved in this project's history.
 		historical := !sameVersion(version, entry.Version)
 		if historical && o.Versions[decl.Name] == "" {
 			return nil, problem("resolve plugin", fmt.Errorf("plugin %q version differs from lock", decl.Name))
 		}
+		expectedHash := entry.SHA256
+		if _, overridden := o.Versions[decl.Name]; overridden {
+			historyHash, historyErr := m.historyHash(decl.Name, version, decl.Source)
+			if historyErr != nil {
+				return nil, historyErr
+			}
+			if historical && historyHash == "" {
+				return nil, problem("resolve historical plugin", fmt.Errorf("project history has no approved hash for %s@%s", decl.Name, version))
+			}
+			if historical {
+				expectedHash = historyHash
+			} else if historyHash != "" && historyHash != expectedHash {
+				return nil, problem("resolve historical plugin", fmt.Errorf("project history differs from the lock for %s@%s", decl.Name, version))
+			}
+		}
 		useCache := m.Offline || o.Offline || historical || (!refresh && strings.HasPrefix(decl.Source, "git:"))
 		if useCache {
-			tr, err = m.cached(decl.Name, version, decl.Source)
+			tr, err = m.cached(decl.Name, version, decl.Source, expectedHash)
 		}
 		if !useCache || errors.Is(err, fs.ErrNotExist) && !m.Offline && !o.Offline && !historical {
 			tr, err = m.fetch(ctx, decl.Source, version, decl.Name)
@@ -104,8 +118,8 @@ func (m *Manager) resolveAll(ctx context.Context, o plugin.Options, refresh bool
 			return nil, problem("resolve plugin", fmt.Errorf("metadata differs from declaration for %q", decl.Name))
 		}
 		hash := tr.hash()
-		if !historical && hash != entry.SHA256 {
-			return nil, problem("resolve plugin", fmt.Errorf("plugin %q hash mismatch: got %s, locked %s", decl.Name, hash, entry.SHA256))
+		if hash != expectedHash {
+			return nil, problem("resolve plugin", fmt.Errorf("plugin %q hash mismatch: got %s, approved %s", decl.Name, hash, expectedHash))
 		}
 		loaded := plugin.Loaded{Meta: meta, Source: decl.Source, SHA256: hash, FS: tr.fs()}
 		if !m.Offline && !o.Offline && !historical {

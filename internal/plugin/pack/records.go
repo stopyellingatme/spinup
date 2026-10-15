@@ -200,6 +200,10 @@ func (m *Manager) writeRecords(cfg *project.Config, lock *manifest.Lock, decl pr
 	if err != nil {
 		return err
 	}
+	history, err := m.historyBytes(cfg, lock, allow, loaded)
+	if err != nil {
+		return err
+	}
 	entries := make([]manifest.Plugin, 0, len(lock.Plugins)+1)
 	for _, entry := range lock.Plugins {
 		if entry.Name != decl.Name {
@@ -217,7 +221,7 @@ func (m *Manager) writeRecords(cfg *project.Config, lock *manifest.Lock, decl pr
 		return err
 	}
 	var plan vfs.Plan
-	for _, file := range []vfs.File{{Path: project.ConfigFile, Data: data, Mode: 0644}, {Path: project.LockFile, Data: locked, Mode: 0644}, {Path: plugin.AllowlistFile, Data: allowBytes(allow), Mode: 0644}} {
+	for _, file := range []vfs.File{{Path: project.ConfigFile, Data: data, Mode: 0644}, {Path: project.LockFile, Data: locked, Mode: 0644}, {Path: plugin.AllowlistFile, Data: allowBytes(allow), Mode: 0644}, {Path: historyFile, Data: history, Mode: 0644}} {
 		if err := plan.Add(file); err != nil {
 			return err
 		}

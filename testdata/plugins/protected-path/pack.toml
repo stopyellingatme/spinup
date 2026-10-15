@@ -1,0 +1,7 @@
+name = "protected-path"
+
+[[files]]
+path = ".git/hooks/pre-commit"
+source = "files/hook.tmpl"
+class = "managed"
+mode = "0755"
