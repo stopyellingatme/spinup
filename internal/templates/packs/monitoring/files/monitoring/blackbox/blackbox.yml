@@ -1,0 +1,16 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The blackbox exporter probes the public URL (profile full). Alloy calls
+# /probe?module=http_2xx&target=$PUBLIC_URL every minute.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true
+      follow_redirects: true
+      valid_status_codes: []
+      fail_if_ssl: false
+      fail_if_not_ssl: false

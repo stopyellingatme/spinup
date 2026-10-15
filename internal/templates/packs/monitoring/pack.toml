@@ -1,4 +1,152 @@
-# STUB from the M6 pre-seed commit. Unit M6.2 owns this file and replaces it.
 name = "monitoring"
-description = "Monitoring stack (stub)"
+description = "Production monitoring next to the app: Alloy, Prometheus, Loki, and Grafana (lite), plus Tempo and exporters (full)."
 requires = ["deploy"]
+
+# The profile picks the services (docs/adr/0010-m6-contracts.md §2). spinup.toml repeats it as
+# [monitoring] profile, and that value wins at deploy time (docs/monitoring.md).
+[[questions]]
+key = "monitoring_profile"
+prompt = "Monitoring profile"
+type = "enum"
+choices = ["lite", "full", "none"]
+default = "lite"
+
+# The Compose project <app>-monitoring. It joins the <app>-app network of compose.edge.yml.
+[[files]]
+path = "monitoring/compose.monitoring.yml"
+source = "files/monitoring/compose.monitoring.yml.tmpl"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/alloy/config.alloy"
+source = "files/monitoring/alloy/config.alloy.tmpl"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/loki/loki.yml"
+source = "files/monitoring/loki/loki.yml"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/tempo/tempo.yml"
+source = "files/monitoring/tempo/tempo.yml"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+[[files]]
+path = "monitoring/prometheus/prometheus.yml"
+source = "files/monitoring/prometheus/prometheus.yml.tmpl"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+# The default alert rules. Prometheus evaluates them, and Grafana sends the notifications.
+[[files]]
+path = "monitoring/prometheus/rules/app.yml"
+source = "files/monitoring/prometheus/rules/app.yml"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/prometheus/rules/stack.yml"
+source = "files/monitoring/prometheus/rules/stack.yml"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/prometheus/rules/host.yml"
+source = "files/monitoring/prometheus/rules/host.yml"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+[[files]]
+path = "monitoring/prometheus/rules/postgres.yml"
+source = "files/monitoring/prometheus/rules/postgres.yml"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+[[files]]
+path = "monitoring/prometheus/rules/certs.yml"
+source = "files/monitoring/prometheus/rules/certs.yml"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+# Your own Prometheus rules. spinup never changes this file after `spinup new`.
+[[files]]
+path = "monitoring/alerts/custom.yml"
+source = "files/monitoring/alerts/custom.yml"
+class = "seed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/blackbox/blackbox.yml"
+source = "files/monitoring/blackbox/blackbox.yml"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+# Grafana: the start script writes the contact points and the notification policy from the
+# environment, then starts Grafana.
+[[files]]
+path = "monitoring/grafana/entrypoint.sh"
+source = "files/monitoring/grafana/entrypoint.sh"
+class = "managed"
+mode = "0755"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/provisioning/datasources/datasources.yml"
+source = "files/monitoring/grafana/provisioning/datasources/datasources.yml.tmpl"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/provisioning/dashboards/dashboards.yml"
+source = "files/monitoring/grafana/provisioning/dashboards/dashboards.yml"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/provisioning/alerting/rules.yml"
+source = "files/monitoring/grafana/provisioning/alerting/rules.yml"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+# spinup's own dashboards. The vendored community dashboards are in pack.d/vendor.toml.
+[[files]]
+path = "monitoring/grafana/dashboards/stack/http-red.json"
+source = "files/monitoring/grafana/dashboards/stack/http-red.json"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/go-runtime.json"
+source = "files/monitoring/grafana/dashboards/stack/go-runtime.json"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/caddy.json"
+source = "files/monitoring/grafana/dashboards/stack/caddy.json"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/backups.json"
+source = "files/monitoring/grafana/dashboards/stack/backups.json"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/deploys.json"
+source = "files/monitoring/grafana/dashboards/stack/deploys.json"
+class = "managed"
+when = "monitoring_profile != 'none'"
+
+# Your own dashboards. spinup never changes this folder after `spinup new`.
+[[files]]
+path = "monitoring/grafana/dashboards/custom/.gitkeep"
+source = "files/monitoring/grafana/dashboards/custom/.gitkeep"
+class = "seed"
+when = "monitoring_profile != 'none'"
