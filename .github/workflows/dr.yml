@@ -1,0 +1,49 @@
+name: DR drill
+
+# The disaster-recovery drill (docs/contributing/dr-drill.md, ADR 0011 §8): deploy to a
+# containerized VM, back up to SeaweedFS, destroy the VM, deploy to a new VM, restore the
+# database in place, and check the rows and the RTO budget.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      rto_budget:
+        description: "RTO budget in seconds"
+        required: false
+        default: "900"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dr-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  drill:
+    name: DR drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+      - name: Install sops and age
+        env:
+          SPINUP_TOOLS_DIR: ${{ runner.temp }}/spinup-tools
+          SPINUP_NO_UPDATE_CHECK: "1"
+        run: |
+          go run ./cmd/spinup tools install
+          echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
+      - name: Run the DR drill
+        env:
+          DR_RTO_BUDGET: ${{ inputs.rto_budget || '900' }}
+        run: bash testdata/dind/dr/run.sh
