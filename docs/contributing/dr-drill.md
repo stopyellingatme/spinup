@@ -58,18 +58,17 @@ The drill runs `spinup backup restore --env staging --into in-place --i-know --y
 - `--now` ignores the maintenance window.
 - `--no-safety-backup` skips the safety backup. The new database on VM 2 is empty. Its system identifier is different from the stanza in the repository, so pgBackRest cannot back it up into the same stanza.
 
-## Known failure (2026-10-15)
+### Configuration on the replacement VM
 
-The drill stops at step 4. `spinup backup restore` on VM 2 fails, and pgBackRest reports this error:
+Each pgBackRest backend uploads `pgbackrest.conf` before its first pgBackRest command.
+The upload applies the configured retention and uses mode 0600.
+VM 2 needs no prior backup or manual configuration upload before restoration.
+Configuration upload does not create a stanza.
 
-```
-ERROR: [055]: unable to open missing file '/var/lib/pgbackrest/pgbackrest.conf' for read
-```
-
-Only the backup command uploads `pgbackrest.conf` to `/opt/<app>/backups/` (`PGBackRest.Prepare` in `internal/backup/pgbackrest.go`).
-A replacement VM has no backup yet, so the file is missing when the restore reads the repository.
-When the file is uploaded by hand, the rest of the drill passes. The RTO was 73 seconds on an Apple silicon Mac.
-The script prints the error of pgBackRest when the restore fails, because spinup reports only the exit code.
+Without `--no-safety-backup`, pgBackRest rejects the new cluster with error 051 during the safety backup.
+The command explains that the repository does not know the new cluster and suggests `--no-safety-backup`.
+It stops before any service shutdown.
+If a pgBackRest command fails, spinup includes its redacted `ERROR` and `WARN` lines from stdout and stderr.
 
 ## Run the drill
 

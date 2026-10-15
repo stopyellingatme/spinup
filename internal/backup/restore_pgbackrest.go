@@ -76,7 +76,7 @@ func (p *PGBackRest) remoteCommand(ctx context.Context, args ...string) ([]byte,
 	}
 	result, err := p.Remote.Run(ctx, remote.Cmd{Argv: args, Stderr: p.Progress, Timeout: 30 * time.Minute})
 	if err != nil {
-		return nil, fmt.Errorf("run backup command on the VM: %w\nTry: check spinup backup status --env <env> and the server logs", err)
+		return nil, fmt.Errorf("run backup command on the VM: %w\nTry: check spinup backup status --env <env> and the server logs", pgBackRestError(err, result))
 	}
 	return result.Stdout, nil
 }

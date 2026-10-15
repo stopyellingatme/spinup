@@ -131,6 +131,7 @@ func TestVerifyJSONAndFailure(t *testing.T) {
 	t.Parallel()
 	for _, fail := range []bool{false, true} {
 		vm := &remote.Fake{}
+		vm.ExpectUpload(RemoteConfigPath("todo"))
 		expectRestoreContainer(t, vm, true, fail)
 		var out strings.Builder
 		result, err := Verify(context.Background(), Options{Dir: newProject(t, true, "", nil), Env: "staging", Remote: vm, Out: &out, JSON: true}, Target{Label: restoreLabel})

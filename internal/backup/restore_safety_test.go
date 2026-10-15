@@ -64,14 +64,53 @@ func expectLiveRelease(vm *remote.Fake) {
 	vm.Expect("cat", "/opt/todo/current/release.json").Return(`{"release":"`+liveRelease+`","color":"blue","git_sha":"abcdef1234567890"}`, "", 0)
 }
 
+func TestRestoreNewClusterSafetyBackupRefusesBeforeStop(t *testing.T) {
+	t.Parallel()
+	for _, stream := range []string{"stdout", "stderr"} {
+		t.Run(stream, func(t *testing.T) {
+			t.Parallel()
+			vm := &remote.Fake{}
+			expectRestoreLock(vm)
+			vm.ExpectUpload(RemoteConfigPath("todo"))
+			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			expectLiveRelease(vm)
+			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			stdout, stderr := "", ""
+			const diagnostic = "P00 ERROR: [051]: PostgreSQL version or system-id does not match stanza\n"
+			if stream == "stdout" {
+				stdout = diagnostic
+			} else {
+				stderr = diagnostic
+			}
+			vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return(stdout, stderr, 51)
+			vm.Expect("sh", "-c").Return("", "", 0) // Release the deploy lock.
+			err := Restore(context.Background(), RestoreOptions{Options: Options{Dir: restoreProject(t), Env: "staging", Remote: vm}, Into: "in-place", IKnow: true})
+			if err == nil {
+				t.Fatal("silently skipped the safety backup")
+			}
+			for _, want := range []string{"new cluster", "repository", "safety backup is impossible", "Try:", "--no-safety-backup", "ERROR: [051]"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error omitted %q: %v", want, err)
+				}
+			}
+			vm.AssertDone(t)
+			for _, c := range vm.Calls() {
+				if slices.Contains(c.Argv, "stop") || slices.Contains(c.Argv, "restore") {
+					t.Fatalf("failed safety backup changed services: %+v", c)
+				}
+			}
+		})
+	}
+}
+
 func TestRestoreTargetRecheckedAfterSafetyBackup(t *testing.T) {
 	t.Parallel()
 	dir := restoreProject(t)
 	vm := &remote.Fake{}
 	expectRestoreLock(vm)
+	vm.ExpectUpload(RemoteConfigPath("todo"))
 	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	expectLiveRelease(vm)
-	vm.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
 	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return("", "", 0)
 	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
@@ -97,6 +136,7 @@ func TestRestoreFailureRecovery(t *testing.T) {
 			t.Parallel()
 			vm := &remote.Fake{}
 			expectRestoreLock(vm)
+			vm.ExpectUpload(RemoteConfigPath("todo"))
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			expectLiveRelease(vm)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
@@ -204,6 +244,7 @@ func TestVerifyPreRestoreFailuresPreserveMetrics(t *testing.T) {
 			t.Parallel()
 			vm := &remote.Fake{}
 			target := Target{Label: restoreLabel}
+			vm.ExpectUpload(RemoteConfigPath("todo"))
 			e := vm.Expect(Command("todo", "--output=json", "info")...)
 			switch stage {
 			case "missing":

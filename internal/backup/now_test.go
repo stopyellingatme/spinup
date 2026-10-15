@@ -64,9 +64,12 @@ func TestListAndStatusCommands(t *testing.T) {
 	dir := newProject(t, true, "", nil)
 	f := &remote.Fake{}
 	for range 4 {
+		f.ExpectUpload(RemoteConfigPath("todo"))
 		f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	}
+	f.ExpectUpload(RemoteConfigPath("todo"))
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info_missing.json"), "", 0)
+	f.ExpectUpload(RemoteConfigPath("todo"))
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info_missing.json"), "", 0)
 	ctx := context.Background()
 	run := func(json bool, fn func(Options) error) string {

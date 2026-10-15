@@ -12,6 +12,7 @@ func TestPruneAndPlan(t *testing.T) {
 	t.Parallel()
 	for _, plan := range []bool{false, true} {
 		vm := &remote.Fake{}
+		vm.ExpectUpload(RemoteConfigPath("todo"))
 		args := []string{"expire"}
 		if plan {
 			args = append(args, "--dry-run")
@@ -24,8 +25,8 @@ func TestPruneAndPlan(t *testing.T) {
 			t.Fatalf("prune: %s %v", out.String(), err)
 		}
 		vm.AssertDone(t)
-		if len(vm.Uploads()) != 0 {
-			t.Fatal("prune uploaded configuration")
+		if len(vm.Uploads()) != 1 || vm.Uploads()[0].Mode != 0o600 {
+			t.Fatal("prune did not upload configuration once with mode 0600")
 		}
 	}
 }

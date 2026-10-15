@@ -106,6 +106,7 @@ func TestRestoreInPlace(t *testing.T) {
 			}
 			vm := &remote.Fake{}
 			expectRestoreLock(vm)
+			vm.ExpectUpload(RemoteConfigPath("todo"))
 			// The latest target is selected before the safety backup exists.
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			rel := deploy.Release{Release: liveRelease, Color: deploy.Blue, GitSHA: "abcdef1234567890"}
@@ -114,7 +115,6 @@ func TestRestoreInPlace(t *testing.T) {
 				t.Fatal(err)
 			}
 			vm.Expect("cat", "/opt/todo/current/release.json").Return(string(data), "", 0)
-			vm.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return("", "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
@@ -167,6 +167,7 @@ func TestRestoreInPlace(t *testing.T) {
 func TestRestoreNewNeedsNoConfirmation(t *testing.T) {
 	t.Parallel()
 	vm := &remote.Fake{}
+	vm.ExpectUpload(RemoteConfigPath("todo"))
 	expectRestoreContainer(t, vm, false, false)
 	var out strings.Builder
 	err := Restore(context.Background(), RestoreOptions{Options: Options{Dir: newProject(t, true, "", nil), Env: "staging", Remote: vm, Out: &out}, Target: Target{Label: restoreLabel}, Into: "new"})
