@@ -82,6 +82,21 @@ $ pnpm build
 $ PORT=3000 API_URL=http://localhost:8080 node build
 ```
 
+## Browser tests
+
+The web pack includes Playwright with a home-page smoke test.
+The `auth` module also tests registration, login, session reload, and logout.
+CI starts the API and web services before it runs the tests.
+For local tests, start `spinup dev` in another terminal.
+
+<!-- doctest: skip -->
+```console
+$ pnpm test:e2e
+```
+
+Set `PUBLIC_ORIGIN` when the web service uses a different URL.
+The default URL is `http://localhost:5173`.
+
 Build the image from the app root:
 
 <!-- doctest: skip -->
