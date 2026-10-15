@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -122,6 +123,22 @@ func TestQuestionsAndPrompt(t *testing.T) {
 	}
 	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version"}) {
 		t.Fatalf("prompt keys=%q", p.keys)
+	}
+}
+
+func TestModuleQuestionsOnlyForSelectedPacks(t *testing.T) {
+	t.Parallel()
+	p := &fakePrompter{answers: map[string]any{"modules": "deploy,monitoring", "monitoring_profile": "full"}}
+	o := Options{Name: "todo", Dir: t.TempDir(), Interactive: true, Answers: map[string]any{"module": "example.com/todo"}}
+	result, err := Generate(context.Background(), o, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(p.keys, "monitoring_profile") {
+		t.Fatalf("prompt keys=%q, want monitoring_profile", p.keys)
+	}
+	if got := result.Lock.Answers["monitoring_profile"]; got != "full" {
+		t.Fatalf("monitoring_profile=%v", got)
 	}
 }
 

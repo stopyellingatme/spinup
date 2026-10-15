@@ -20,7 +20,7 @@ app.yml
 stack.yml
 $ grep -A2 '^\[monitoring\]' spinup.toml
 [monitoring]
-# Use the small monitoring stack.
+# Pick the monitoring stack: lite, full, or none.
 profile = "lite"
 ```
 
@@ -57,11 +57,10 @@ stack.yml
 ```
 
 `spinup.toml` repeats the profile as `[monitoring] profile`.
-The base pack always writes `profile = "lite"`.
-If you select another profile, change `spinup.toml` to match it.
 At deploy time, `spinup.toml` wins.
 The profile `none` renders no monitoring file.
-The vendored dashboards in `monitoring/grafana/dashboards/stack/vendor/` are the only exception for now.
+The vendored community dashboards in `monitoring/grafana/dashboards/stack/vendor/` need the exporters, so only the profile `full` renders them.
+`spinup new` asks the monitoring question only when you select the `monitoring` module.
 
 Measured on an idle stack, the services use about this much memory:
 
@@ -166,10 +165,11 @@ A down VM cannot send an alert, so the missing heartbeat is the alert.
 ## Dashboards
 
 The folder Stack holds spinup's dashboards: HTTP RED, Go runtime, Caddy, Backups, and Deploys.
-It also holds the vendored Node Exporter Full, cAdvisor, and PostgreSQL dashboards.
+In the profile `full`, it also holds the vendored Node Exporter Full, cAdvisor, and PostgreSQL dashboards.
 The folder Custom holds your own dashboards from `monitoring/grafana/dashboards/custom/`.
 
 - HTTP RED reads `http_server_request_duration_seconds`, the kit request metric.
 - Backups reads `backup_last_age_seconds`, the kit gauge `backup.last_age`, and the Postgres archiver metrics.
 - Deploys shows the Grafana annotations with the tag `deploy`.
-- Caddy reads the Caddy metrics on `caddy:2020`.
+- Go runtime reads the kit runtime metrics (`go_goroutine_count`, `go_memory_used_bytes`, and the others). `telemetry.Setup` starts them.
+- Caddy reads the Caddy metrics on `caddy:2020`. The deploy Caddyfile serves them there, and it does not publish the port.

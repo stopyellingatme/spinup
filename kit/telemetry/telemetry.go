@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -102,6 +103,10 @@ func setup(ctx context.Context, o Options, client *http.Client) (func(context.Co
 		sdkmetric.NewPeriodicReader(metrics, sdkmetric.WithInterval(30*time.Second)),
 	))
 	lp := sdklog.NewLoggerProvider(sdklog.WithResource(res), sdklog.WithProcessor(sdklog.NewBatchProcessor(logs)))
+	// The Go runtime dashboard reads these metrics (goroutines, memory, GC goal, scheduler latency).
+	if err := otelruntime.Start(otelruntime.WithMeterProvider(mp)); err != nil {
+		return nil, setupError("runtime metrics", errors.Join(err, tp.Shutdown(ctx), mp.Shutdown(ctx), lp.Shutdown(ctx)))
+	}
 	previousTP, previousMP := otel.GetTracerProvider(), otel.GetMeterProvider()
 	previousLP, previousProp := otel.GetLoggerProvider(), otel.GetTextMapPropagator()
 	otel.SetTracerProvider(tp)

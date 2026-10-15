@@ -20,9 +20,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// monitoringVendorDir holds the vendored dashboards of the main-loop fragment pack.d/vendor.toml.
-const monitoringVendorDir = "monitoring/grafana/dashboards/stack/vendor/"
-
 func renderMonitoring(t *testing.T, profile string) fs.FS {
 	t.Helper()
 	all := testutil.RenderPack(t, []string{"base", "api", "web", "deploy", "monitoring"}, map[string]any{
@@ -64,13 +61,12 @@ func TestGoldenMonitoring(t *testing.T) {
 		})
 	}
 
-	// Profile none renders no monitoring file. The vendored dashboards come from the main-loop
-	// fragment pack.d/vendor.toml, which has no profile condition yet.
+	// Profile none renders no monitoring file.
 	t.Run("none", func(t *testing.T) {
 		t.Parallel()
 		fsys := renderMonitoring(t, "none")
 		err := fs.WalkDir(fsys, ".", func(name string, entry fs.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() && !strings.HasPrefix(name, monitoringVendorDir) {
+			if err == nil && !entry.IsDir() {
 				t.Errorf("profile none renders %s", name)
 			}
 			return err
@@ -85,12 +81,12 @@ func TestGoldenMonitoring(t *testing.T) {
 		all := testutil.RenderPack(t, []string{"base", "api", "deploy", "monitoring"}, map[string]any{
 			"app_name": "todo", "module": "example.com/todo", "modules": "ci,deploy,monitoring",
 		})
-		// The question default and the base pack's literal [monitoring] profile agree.
+		// spinup.toml repeats the profile answer, and the question default is lite.
 		data, err := fs.ReadFile(all, "spinup.toml")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(data), "[monitoring]\n# Use the small monitoring stack.\nprofile = \"lite\"\n") {
+		if !strings.Contains(string(data), "[monitoring]\n# Pick the monitoring stack: lite, full, or none.\nprofile = \"lite\"\n") {
 			t.Errorf("spinup.toml does not select the lite profile:\n%s", data)
 		}
 		if _, err := fs.Stat(all, "monitoring/compose.monitoring.yml"); err != nil {
@@ -242,8 +238,9 @@ func checkMonitoringTree(t *testing.T, fsys fs.FS, full bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(dashboards) < 8 {
-		t.Errorf("dashboards = %v, want spinup's five and the three vendored ones", dashboards)
+	// The vendored dashboards need the full exporters, so only the full profile renders them.
+	if want := map[bool]int{false: 5, true: 8}[full]; len(dashboards) < want {
+		t.Errorf("dashboards = %v, want spinup's five (plus the three vendored ones in full)", dashboards)
 	}
 	for _, name := range dashboards {
 		var dashboard struct {
