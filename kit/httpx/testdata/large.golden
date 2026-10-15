@@ -1,0 +1,5 @@
+HTTP 413
+Content-Type: application/problem+json
+X-Request-ID: golden-request
+
+{"type":"about:blank","title":"Request Entity Too Large","status":413,"detail":"The request body exceeds the size limit.","request_id":"golden-request"}

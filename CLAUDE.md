@@ -49,6 +49,7 @@ Check forms that the plan uses:
 Test contracts:
 - `TestGolden*` tests read the environment variables `SPINUP_GOLDEN_PACK` (narrow to one pack) and `SPINUP_GOLDEN_UPDATE` (`1` rewrites the golden files).
 - `internal/testutil/scripttest` has `TestScripts`. It builds the `spinup` binary and runs `testdata/script/*.txtar`. It reads `SPINUP_SCRIPT_RUN` (a glob) and skips `app_gate_*` scripts unless `SPINUP_APP_GATE=1`.
+  Scripts can use `[env:NAME]` (true when `NAME` is set) and `$SPINUP_REPO` (the repository root).
 - `internal/doctest` has `TestDocs`.
 
 ## Toolchain

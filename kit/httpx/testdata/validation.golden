@@ -1,0 +1,5 @@
+HTTP 422
+Content-Type: application/problem+json
+X-Request-ID: golden-request
+
+{"type":"about:blank","title":"Unprocessable Entity","status":422,"detail":"Validation failed.","errors":[{"field":"name","message":"is required"}],"request_id":"golden-request"}

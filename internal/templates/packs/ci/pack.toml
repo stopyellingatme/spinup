@@ -1,0 +1,15 @@
+name = "ci"
+description = "Build and test the Go API with PostgreSQL in GitHub Actions."
+requires = []
+
+[[questions]]
+key = "db_version"
+prompt = "PostgreSQL major version"
+type = "enum"
+choices = ["18", "17", "16"]
+default = "18"
+
+[[files]]
+path = ".github/workflows/ci.yml"
+source = "files/.github/workflows/ci.yml.tmpl"
+class = "managed"

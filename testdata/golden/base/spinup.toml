@@ -1,0 +1,14 @@
+# Select the kit behavior defaults.
+behavior_version = 1
+# Enable these optional modules.
+modules = [ "ci" ]
+
+[app]
+# Name the application.
+name = "todo"
+# Set the root Go module path.
+module = "example.com/todo"
+
+[monitoring]
+# Use the small monitoring stack.
+profile = "lite"

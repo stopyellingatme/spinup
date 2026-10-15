@@ -1,0 +1,51 @@
+# Managed by spinup. Regenerated on upgrade.
+# Add extensions in a separate workflow file.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: [[ if eq .db_version "18" ]][[ image "postgres" ]][[ else if eq .db_version "17" ]][[ image "postgres-17" ]][[ else ]][[ image "postgres-16" ]][[ end ]]
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: api
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/app?sslmode=disable
+      GOTOOLCHAIN: local
+      CI: "true"
+    steps:
+      - uses: [[ uses "actions/checkout" ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses "actions/setup-go" ]]
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - run: go mod verify
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race ./...

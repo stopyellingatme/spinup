@@ -1,0 +1,38 @@
+# App gate: a generated API-only app builds, tests, migrates, and serves health checks.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to poll the health endpoints'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gateapp --api-only --module example.com/gateapp --no-git --non-interactive
+cd gateapp/api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+
+# The real environment wins over .env, so DATABASE_URL points the app at the lane database.
+cd ..
+exec spinup db migrate up
+exec spinup db migrate status
+stdout '^applied  00001_init\.sql$'
+! stdout '^pending'
+exec spinup db migrate up
+stdout 'migrate: no pending migrations'
+
+# Build, start the server, and check both endpoints.
+exec spinup build
+exists api/bin/api
+env PORT=38417
+cd api
+exec bin/api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38417/healthz
+stdout '^200$'
+grep '"status":\s*"ok"' health.json
+exec curl -sS -o ready.json -w '%{http_code}' http://127.0.0.1:38417/readyz
+stdout '^200$'
+kill server
+cd ..
+
+# Roll back the first migration.
+exec spinup db migrate down --i-know
+exec spinup db migrate status
+! stdout 'Applied'
