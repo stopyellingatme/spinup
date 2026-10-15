@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -138,6 +139,7 @@ func TestPrunePlan(t *testing.T) {
 	t.Parallel()
 	root := maintenanceProject(t, "", "")
 	vm := &remote.Fake{}
+	vm.Expect("sh", "-c").Return("[]", "", 0)
 	vm.Expect("sh", "-ec").Return("todo-api:old\n", "", 0)
 	out, err := runMaintenance(t, root, Options{Action: "prune", Plan: true, JSON: true}, Deps{Remote: vm})
 	if err != nil {
@@ -150,7 +152,7 @@ func TestPrunePlan(t *testing.T) {
 		t.Fatalf("prune --plan JSON = %q, %v", out.String(), err)
 	}
 	calls := vm.Calls()
-	if len(calls) != 1 || !strings.Contains(calls[0].Argv[2], `case "$image" in "$app"-*`) {
+	if len(calls) != 2 || !strings.Contains(calls[1].Argv[2], `case "$image" in "$app"-*`) {
 		t.Fatalf("prune script does not limit images to the app: %#v", calls)
 	}
 	vm.AssertDone(t)
@@ -158,22 +160,48 @@ func TestPrunePlan(t *testing.T) {
 
 func TestVacuum(t *testing.T) {
 	t.Parallel()
-	root := maintenanceProject(t, "", "")
-	vm := &remote.Fake{}
-	vm.Expect("docker", "ps", "--filter", "label=com.docker.compose.project=todo", "--filter", "label=com.docker.compose.service=postgres", "--format", "{{.ID}}").Return("postgres-id\n", "", 0)
-	vm.Expect("docker", "exec", "postgres-id", "psql", "-U", "postgres", "-d", "postgres", "-c", "VACUUM (ANALYZE)")
-	vm.Expect("docker", "exec", "postgres-id", "psql", "-U", "postgres", "-d", "postgres", "-At", "-c").Return("events|12\n", "", 0)
-	out, err := runMaintenance(t, root, Options{Action: "vacuum", JSON: true}, Deps{Remote: vm})
-	if err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct{ name, table, query string }{
+		{"analyze", "", "VACUUM (ANALYZE)"},
+		{"full", `events"archive`, `VACUUM FULL "events""archive"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := maintenanceProject(t, "", "")
+			vm := &remote.Fake{}
+			vm.Expect("docker", "ps", "--filter", "label=com.docker.compose.project=todo", "--filter", "label=com.docker.compose.service=postgres", "--format", "{{.ID}}").Return("postgres-id\n", "", 0)
+			vm.Expect("docker", "exec", "postgres-id", "printenv", "POSTGRES_USER", "POSTGRES_DB").Return("app-user\napp-db\n", "", 0)
+			vm.Expect("docker", "exec", "postgres-id", "psql", "-U", "app-user", "-d", "app-db", "-c", tc.query)
+			vm.Expect("docker", "exec", "postgres-id", "psql", "-U", "app-user", "-d", "app-db", "-At", "-c").Return("events|12\n", "", 0)
+			out, err := runMaintenance(t, root, Options{Action: "vacuum", FullTable: tc.table, JSON: true}, Deps{Remote: vm})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Bloat []string `json:"bloat"`
+			}
+			if err := json.Unmarshal(out.Bytes(), &got); err != nil || len(got.Bloat) != 1 || got.Bloat[0] != "events|12" {
+				t.Fatalf("vacuum JSON = %q, %v", out.String(), err)
+			}
+			vm.AssertDone(t)
+		})
 	}
-	var got struct {
-		Bloat []string `json:"bloat"`
+}
+
+func TestVacuumRejectsMissingEnvironment(t *testing.T) {
+	t.Parallel()
+	for _, data := range []string{"", "app\n", "\napp\n", "app\n\n", "app\ndb\nextra\n"} {
+		t.Run(data, func(t *testing.T) {
+			t.Parallel()
+			vm := &remote.Fake{}
+			vm.Expect("docker", "ps").Return("postgres-id\n", "", 0)
+			vm.Expect("docker", "exec", "postgres-id", "printenv", "POSTGRES_USER", "POSTGRES_DB").Return(data, "", 0)
+			_, err := runMaintenance(t, maintenanceProject(t, "", ""), Options{Action: "vacuum"}, Deps{Remote: vm})
+			if err == nil || !strings.Contains(err.Error(), "read postgres environment") || !strings.Contains(err.Error(), "Try:") {
+				t.Fatalf("vacuum with environment %q: %v", data, err)
+			}
+			vm.AssertDone(t)
+		})
 	}
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil || len(got.Bloat) != 1 || got.Bloat[0] != "events|12" {
-		t.Fatalf("vacuum JSON = %q, %v", out.String(), err)
-	}
-	vm.AssertDone(t)
 }
 
 func TestVacuumFullRefusesOutsideWindow(t *testing.T) {
@@ -306,4 +334,68 @@ func certificate(t *testing.T, notBefore, notAfter time.Time) tls.Certificate {
 		t.Fatal(err)
 	}
 	return cert
+}
+
+func TestPruneRetainsReleaseAndContainerImages(t *testing.T) {
+	t.Parallel()
+	root := maintenanceProject(t, "", "")
+	bin := t.TempDir()
+	fakeDocker := `#!/bin/sh
+set -eu
+case "${FAIL_STAGE-}" in
+ "") ;;
+ "$1"|"$1 ${2-}") exit 1;;
+esac
+case "$*" in
+ 'image ls --no-trunc --format {{.Repository}}:{{.Tag}} {{.ID}}')
+  printf '%s\n' 'todo-api:r6 sha256:6' 'todo-api:r5 sha256:5' 'todo-api:r4 sha256:4' 'todo-api:alias sha256:4' 'todo-api:r3 sha256:3' 'todo-api:r2 sha256:2' 'todo-api:r1 sha256:1' 'todo-postgres:x sha256:pg' 'todo-api:stopped sha256:stopped' 'other-api:r1 sha256:other';;
+ 'ps -aq') printf '%s\n' running stopped;;
+ 'inspect --format {{.Image}} running stopped') printf '%s\n' sha256:6 sha256:pg sha256:stopped;;
+ 'image inspect --format {{.Id}} todo-api:r6') echo sha256:6;;
+ 'image inspect --format {{.Id}} todo-api:r5') echo sha256:5;;
+ 'image inspect --format {{.Id}} registry.example:5000/todo-api@sha256:4') echo sha256:4;;
+ 'image inspect --format {{.Id}} todo-api:r3') echo sha256:3;;
+ 'image inspect --format {{.Id}} todo-api:r2') echo sha256:2;;
+ *) echo "unexpected docker: $*" >&2; exit 1;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(fakeDocker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	vm := &remote.Fake{}
+	vm.Expect("sh", "-c").Return(`[{"release":"r6","images":[{"ref":"todo-api:r6"}]},{"release":"r5","images":[{"ref":"todo-api:r5"}]},{"release":"r4","images":[{"ref":"registry.example:5000/todo-api@sha256:4"}]},{"release":"r3","images":[{"ref":"todo-api:r3"}]},{"release":"r2","images":[{"ref":"todo-api:r2"}]},{"release":"r1","images":[{"ref":"todo-api:r1"}]}]`, "", 0)
+	vm.Expect("sh", "-ec")
+	if _, err := runMaintenance(t, root, Options{Action: "prune", Plan: true}, Deps{Remote: vm}); err != nil {
+		t.Fatal(err)
+	}
+	calls := vm.Calls()
+	cmd := calls[len(calls)-1]
+	for _, stage := range []string{"", "image inspect", "ps", "inspect", "image ls"} {
+		t.Run("failure="+stage, func(t *testing.T) {
+			t.Parallel()
+			result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: cmd.Argv[0], Args: cmd.Argv[1:], Env: []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "FAIL_STAGE=" + stage}})
+			if stage == "" {
+				if err != nil || string(result.Stdout) != "todo-api:r1\n" {
+					t.Fatalf("prune candidates = %q, stderr = %q, error = %v", result.Stdout, result.Stderr, err)
+				}
+			} else if err == nil || len(result.Stdout) != 0 {
+				t.Fatalf("failed inspection produced candidates: %q, error = %v", result.Stdout, err)
+			}
+		})
+	}
+	vm.AssertDone(t)
+}
+
+func TestPruneRemovesOnlySelectedImages(t *testing.T) {
+	t.Parallel()
+	vm := &remote.Fake{}
+	vm.Expect("sh", "-c").Return("[]", "", 0)
+	vm.Expect("sh", "-ec").Return("todo-api:old\n", "", 0)
+	vm.Expect("docker", "image", "rm", "todo-api:old")
+	vm.Expect("docker", "builder", "prune", "-f")
+	_, err := runMaintenance(t, maintenanceProject(t, "", ""), Options{Action: "prune"}, Deps{Remote: vm})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.AssertDone(t)
 }

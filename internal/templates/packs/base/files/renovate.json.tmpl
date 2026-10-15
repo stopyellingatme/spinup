@@ -1,9 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "semanticCommits": {
-    "enabled": false
-  },
+  "semanticCommits": "disabled",
   "schedule": ["before 5am on Monday"],
   "packageRules": [
     {
@@ -22,6 +20,12 @@
       "description": "Group GitHub Actions updates.",
       "groupName": "GitHub Actions",
       "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "spinup upgrade owns these managed workflows.",
+      "enabled": false,
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/**"]
     },
     {
       "description": "spinup upgrade owns this kit dependency.",

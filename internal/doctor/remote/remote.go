@@ -153,31 +153,40 @@ func disk(ctx context.Context, c *doctor.Context) doctor.Result {
 	if !ok {
 		return skip
 	}
+	worst := doctor.Result{Status: doctor.OK, Message: "Disk use is below 80%."}
 	for _, path := range []string{"/", "/var/lib/docker"} {
-		out, err := run(ctx, r, "df", "-P", path)
-		if err != nil {
-			return doctor.Result{Status: doctor.Fail, Message: "Cannot inspect disk space.", Try: "Check SSH access and the df command."}
-		}
-		lines := strings.Split(out, "\n")
-		if len(lines) < 2 {
-			return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
-		}
-		fields := strings.Fields(lines[len(lines)-1])
-		if len(fields) < 5 {
-			return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
-		}
-		used, err := strconv.Atoi(strings.TrimSuffix(fields[4], "%"))
-		if err != nil {
-			return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
-		}
-		if used > 90 {
-			return doctor.Result{Status: doctor.Fail, Message: fmt.Sprintf("Disk use on %s is %d%%.", path, used), Try: "Free disk space before deployment."}
-		}
-		if used > 80 {
-			return doctor.Result{Status: doctor.Warn, Message: fmt.Sprintf("Disk use on %s is %d%%.", path, used), Try: "Free disk space before deployment."}
+		result := diskPath(ctx, r, path)
+		if result.Status > worst.Status {
+			worst = result
 		}
 	}
-	return doctor.Result{Status: doctor.OK, Message: "Disk use is below 80%."}
+	return worst
+}
+
+func diskPath(ctx context.Context, r sshremote.Runner, path string) doctor.Result {
+	out, err := run(ctx, r, "df", "-P", path)
+	if err != nil {
+		return doctor.Result{Status: doctor.Fail, Message: "Cannot inspect disk space.", Try: "Check SSH access and the df command."}
+	}
+	lines := strings.Split(out, "\n")
+	if len(lines) < 2 {
+		return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
+	}
+	fields := strings.Fields(lines[len(lines)-1])
+	if len(fields) < 5 {
+		return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
+	}
+	used, err := strconv.Atoi(strings.TrimSuffix(fields[4], "%"))
+	if err != nil {
+		return doctor.Result{Status: doctor.Fail, Message: "Cannot read disk use.", Try: "Check df output on the VM."}
+	}
+	status := doctor.OK
+	if used > 90 {
+		status = doctor.Fail
+	} else if used > 80 {
+		status = doctor.Warn
+	}
+	return doctor.Result{Status: status, Message: fmt.Sprintf("Disk use on %s is %d%%.", path, used), Try: "Free disk space before deployment."}
 }
 
 func docker(ctx context.Context, c *doctor.Context) doctor.Result {
@@ -317,6 +326,10 @@ func backupAge(ctx context.Context, c *doctor.Context) doctor.Result {
 	return doctor.Result{Status: doctor.OK, Message: "The newest backup is less than 26 hours old."}
 }
 
+// Capture s_client separately so a successful x509 cannot hide a verification failure.
+const certsScript = `certificate=$(openssl s_client -connect "$1:443" -servername "$1" -verify_return_error -verify_hostname "$1" </dev/null 2>/dev/null) || exit 1
+printf '%s\n' "$certificate" | openssl x509 -noout -enddate`
+
 func certs(ctx context.Context, c *doctor.Context) doctor.Result {
 	r, _, env, skip, ok := remoteRunner(c)
 	if !ok {
@@ -326,9 +339,9 @@ func certs(ctx context.Context, c *doctor.Context) doctor.Result {
 	if err != nil || u.Hostname() == "" {
 		return doctor.Result{Status: doctor.Skip, Message: "The environment has no public URL."}
 	}
-	out, err := run(ctx, r, "sh", "-c", "echo | openssl s_client -connect \"$1:443\" -servername \"$1\" 2>/dev/null | openssl x509 -noout -enddate", "doctor-certs", u.Hostname())
+	out, err := run(ctx, r, "sh", "-c", certsScript, "doctor-certs", u.Hostname())
 	if err != nil {
-		return doctor.Result{Status: doctor.Warn, Message: "Cannot inspect the TLS certificate.", Try: "Check the public URL certificate."}
+		return doctor.Result{Status: doctor.Fail, Message: "Cannot verify the TLS certificate.", Try: "Check the public URL certificate chain and hostname."}
 	}
 	value := strings.TrimPrefix(out, "notAfter=")
 	expires, err := time.Parse("Jan 2 15:04:05 2006 MST", value)
