@@ -148,6 +148,9 @@ func TestDocs(t *testing.T) {
 	if home, err := os.UserHomeDir(); err == nil && os.Getenv("COREPACK_HOME") == "" {
 		vars = append(vars, "COREPACK_HOME="+filepath.Join(home, ".cache", "node", "corepack"))
 	}
+	if dir, err := os.UserCacheDir(); err == nil && os.Getenv("npm_config_cache_dir") == "" {
+		vars = append(vars, "npm_config_cache_dir="+filepath.Join(dir, "pnpm"))
+	}
 	if store, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "pnpm", Args: []string{"store", "path"}, Dir: root}); err == nil {
 		vars = append(vars, "npm_config_store_dir="+strings.TrimSpace(string(store.Stdout)))
 	}

@@ -46,12 +46,13 @@ An exception permits changes to a managed file when the lock records a template 
 
 The runner records each written file in `spinup.lock`.
 Each record contains the class, generator template, hash, and mode.
-Requested post-steps run once each, in this order: `openapi`, `sqlc`, `gofmt`.
+Some generators also ask the runner to run external commands (such as the shadcn-svelte CLI for `g component`). These run after the write and before the post-steps.
+Requested post-steps run once each, in this order: `openapi`, `sqlc`, `client`, `gofmt`.
 The tools run inside `api/`.
 The `gofmt` step formats the planned Go files.
 
 If a tool fails, the written files and their lock records remain available.
 The error includes the tool output and a command for manual execution.
 After a successful run, the runner prints the file counts and the generator’s `Next:` commands.
-JSON output uses the fields `files`, `post_steps`, and `next`.
+JSON output uses the fields `files`, `commands`, `post_steps`, and `next`.
 Previews with `--json` use the same JSON structure.

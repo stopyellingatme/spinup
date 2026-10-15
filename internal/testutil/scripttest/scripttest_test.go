@@ -190,6 +190,13 @@ func nodeCaches() map[string]string {
 	} else {
 		caches["COREPACK_HOME"] = filepath.Join(home, ".cache", "node", "corepack")
 	}
+	// pnpm keeps its package metadata in cache-dir (default <home>/Library/Caches/pnpm on macOS,
+	// <home>/.cache/pnpm elsewhere); offline installs need it too.
+	if value := os.Getenv("npm_config_cache_dir"); value != "" {
+		caches["npm_config_cache_dir"] = value
+	} else if dir, err := os.UserCacheDir(); err == nil {
+		caches["npm_config_cache_dir"] = filepath.Join(dir, "pnpm")
+	}
 	if value := os.Getenv("npm_config_store_dir"); value != "" {
 		caches["npm_config_store_dir"] = value
 	} else if out, err := exec.CommandContext(context.Background(), "pnpm", "store", "path").Output(); err == nil {
