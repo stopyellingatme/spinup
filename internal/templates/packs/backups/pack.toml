@@ -16,3 +16,9 @@ class = "managed"
 path = "deploy/compose.backups.yml"
 source = "files/deploy/compose.backups.yml.tmpl"
 class = "managed"
+
+# Both overrides are generated. The deployer selects exactly one by backend.
+[[files]]
+path = "deploy/compose.backups-walg.yml"
+source = "files/deploy/compose.backups-walg.yml.tmpl"
+class = "managed"

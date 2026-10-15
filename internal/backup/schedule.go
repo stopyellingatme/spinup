@@ -225,8 +225,8 @@ func scheduleFiles(c *project.Config, env project.Env) ([]vfs.File, error) {
 			return nil, fmt.Errorf("render backup timer: invalid calendar value\nTry: use a single systemd OnCalendar expression without escapes")
 		}
 	}
-	if c.Backups.Backend != "" && c.Backups.Backend != "pgbackrest" && c.Backups.Backend != "pgdump" {
-		return nil, fmt.Errorf("render backup script: unknown backend %q\nTry: set [backups] backend to pgbackrest or pgdump", c.Backups.Backend)
+	if c.Backups.Backend != "" && c.Backups.Backend != "pgbackrest" && c.Backups.Backend != "pgdump" && c.Backups.Backend != "walg" {
+		return nil, fmt.Errorf("render backup script: unknown backend %q\nTry: set [backups] backend to pgbackrest, pgdump, or walg", c.Backups.Backend)
 	}
 	retention, err := Retention(c)
 	if err != nil {

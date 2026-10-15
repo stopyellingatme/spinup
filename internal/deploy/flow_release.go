@@ -184,8 +184,12 @@ func deployFiles(root string) ([]releaseFile, error) {
 			}
 			return nil
 		}
-		// pgdump has no WAL repository. Never enable the pgBackRest archive command.
-		if rel == "compose.backups.yml" && config.Backups.Backend == "pgdump" {
+		// Select exactly one archive override for the configured backend.
+		backend := config.Backups.Backend
+		if rel == "compose.backups.yml" && backend != "" && backend != "pgbackrest" {
+			return nil
+		}
+		if rel == "compose.backups-walg.yml" && backend != "walg" {
 			return nil
 		}
 		if d.Name() == ".gitkeep" || slices.Contains(excludedDeployFiles, rel) || strings.HasPrefix(d.Name(), ".") {

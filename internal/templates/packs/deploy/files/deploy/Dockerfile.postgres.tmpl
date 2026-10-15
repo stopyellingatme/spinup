@@ -12,3 +12,21 @@ ARG PGBACKREST_VERSION=[[ index .Stack.Apt "pgbackrest" ]]
 RUN apt-get update \
  && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}-*" \
  && rm -rf /var/lib/apt/lists/*
+
+# WAL-G supports the optional walg backend. Verify the asset before extraction.
+# TARGETARCH follows the target image, including a cross-platform build.
+ARG TARGETARCH
+RUN set -eu; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in \
+      amd64) asset='[[ (index (index .Stack.Binaries "wal-g").Assets "linux-amd64").Name ]]'; checksum='[[ (index (index .Stack.Binaries "wal-g").Assets "linux-amd64").SHA256 ]]' ;; \
+      arm64) asset='[[ (index (index .Stack.Binaries "wal-g").Assets "linux-arm64").Name ]]'; checksum='[[ (index (index .Stack.Binaries "wal-g").Assets "linux-arm64").SHA256 ]]' ;; \
+      *) echo 'Unsupported WAL-G architecture' >&2; exit 1 ;; \
+    esac; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl libsodium23 liblzo2-2; \
+    curl --fail --location --retry 3 "https://github.com/[[ (index .Stack.Binaries "wal-g").Repo ]]/releases/download/v[[ (index .Stack.Binaries "wal-g").Version ]]/$asset" -o /tmp/wal-g.tar.gz; \
+    printf '%s  /tmp/wal-g.tar.gz\n' "$checksum" | sha256sum -c -; \
+    mkdir /tmp/wal-g; \
+    tar -xzf /tmp/wal-g.tar.gz -C /tmp/wal-g; \
+    install -m 0755 "/tmp/wal-g/${asset%.tar.gz}" /usr/local/bin/wal-g; \
+    rm -rf /tmp/wal-g /tmp/wal-g.tar.gz /var/lib/apt/lists/*

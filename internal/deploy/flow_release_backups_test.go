@@ -9,7 +9,7 @@ import (
 
 func TestDeployFilesBackupBackend(t *testing.T) {
 	t.Parallel()
-	for _, backend := range []string{"pgdump", "pgbackrest", ""} {
+	for _, backend := range []string{"pgdump", "pgbackrest", "walg", ""} {
 		t.Run(backend, func(t *testing.T) {
 			t.Parallel()
 			x := newFx(t, true, "")
@@ -22,14 +22,17 @@ func TestDeployFilesBackupBackend(t *testing.T) {
 			if err := os.WriteFile(name, data, 0600); err != nil {
 				t.Fatal(err)
 			}
-			writeTree(t, x.root, map[string]string{"deploy/compose.backups.yml": "services: {}\n"})
+			writeTree(t, x.root, map[string]string{"deploy/compose.backups.yml": "services: {}\n", "deploy/compose.backups-walg.yml": "services: {}\n"})
 			files, err := deployFiles(x.root)
 			if err != nil {
 				t.Fatal(err)
 			}
 			got := slices.Contains(edgeComposeFiles(files), "compose.backups.yml")
-			if got != (backend != "pgdump") {
+			if got != (backend == "pgbackrest" || backend == "") {
 				t.Fatalf("backend %q: archive override enabled = %v", backend, got)
+			}
+			if got := slices.Contains(edgeComposeFiles(files), "compose.backups-walg.yml"); got != (backend == "walg") {
+				t.Fatalf("backend %q: WAL-G override enabled = %v", backend, got)
 			}
 		})
 	}

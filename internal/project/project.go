@@ -165,8 +165,8 @@ func (c *Config) Validate() error {
 	if c.Monitoring.Profile != "lite" && c.Monitoring.Profile != "full" && c.Monitoring.Profile != "none" {
 		problems = append(problems, fmt.Errorf("monitoring profile %q must be lite, full, or none", c.Monitoring.Profile))
 	}
-	if b := c.Backups.Backend; b != "" && b != "pgbackrest" && b != "pgdump" {
-		problems = append(problems, fmt.Errorf("backups backend %q must be pgbackrest or pgdump", b))
+	if b := c.Backups.Backend; b != "" && b != "pgbackrest" && b != "pgdump" && b != "walg" {
+		problems = append(problems, fmt.Errorf("backups backend %q must be pgbackrest, pgdump, or walg", b))
 	}
 	envNames := make([]string, 0, len(c.Envs))
 	for name := range c.Envs {
