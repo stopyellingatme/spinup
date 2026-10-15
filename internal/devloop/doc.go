@@ -1,4 +1,2 @@
-// Package devloop supervises the spinup dev processes.
-//
-// STUB from the M4 pre-seed commit. Unit M4.4 owns this file and replaces it.
+// Package devloop runs the local development stack, process supervisor, and input watcher.
 package devloop

@@ -1,0 +1,39 @@
+# Without --api-only, a new app has the SvelteKit web app in web/.
+env SPINUP_KIT_REPLACE=
+exec spinup new todo --module example.com/todo --no-git --non-interactive
+stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, web'
+
+# The files of ADR 0008 §2, the npm inputs, and the shadcn-svelte components.
+exists todo/web/package.json todo/web/pnpm-lock.yaml todo/web/pnpm-workspace.yaml
+exists todo/web/vite.config.js todo/web/tsconfig.json todo/web/components.json
+exists todo/web/src/app.html todo/web/src/app.css todo/web/src/app.d.ts todo/web/src/env.ts
+exists todo/web/src/hooks.server.ts todo/web/src/lib/utils.ts
+exists todo/web/src/lib/api/client.ts todo/web/src/lib/api/schema.d.ts
+exists todo/web/src/routes/+layout.svelte todo/web/src/routes/+layout.server.ts todo/web/src/routes/+page.svelte
+exists todo/web/src/routes/healthz/+server.ts
+exists todo/web/src/lib/components/ui/button/button.svelte todo/web/src/lib/components/ui/card/card.svelte
+exists todo/deploy/Dockerfile.web
+
+# One PUBLIC_ORIGIN source for paths.origin and the CSRF check, and the dev proxy to API_URL.
+grep 'paths: \{ origin \}' todo/web/vite.config.js
+grep 'trustedOrigins: \[origin\]' todo/web/vite.config.js
+grep '''/api'': \{ target: apiURL' todo/web/vite.config.js
+grep '"extends": "\$app/tsconfig"' todo/web/tsconfig.json
+grep '<title>todo</title>' todo/web/src/routes/+layout.svelte
+grep '^ARG PUBLIC_ORIGIN' todo/deploy/Dockerfile.web
+
+# The lock records the classes and the shadcn-svelte registry version.
+exec cat todo/spinup.lock
+stdout '"shadcn_registry": "1.7.0"'
+stdout '"web/src/hooks.server.ts": \{\n[[:space:]]+"class": "scaffold"'
+stdout '"web/src/lib/components/ui/button/button.svelte": \{\n[[:space:]]+"class": "seed"'
+stdout '"web/src/lib/api/schema.d.ts": \{\n[[:space:]]+"class": "seed"'
+stdout '"web/vite.config.js": \{\n[[:space:]]+"class": "managed"'
+
+# The flag sets the registry version. An API-only app has no web/.
+exec spinup new pinned --module example.com/pinned --shadcn-registry 1.8.0 --no-git --non-interactive
+exec cat pinned/spinup.lock
+stdout '"shadcn_registry": "1.8.0"'
+exec spinup new apionly --api-only --module example.com/apionly --no-git --non-interactive
+! exists apionly/web
+! exists apionly/deploy/Dockerfile.web

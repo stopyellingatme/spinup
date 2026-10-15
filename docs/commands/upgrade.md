@@ -82,3 +82,28 @@ $ spinup upgrade --help
 Upgrade app templates in a separate Git worktree
 ...
 ```
+
+## Updating UI components
+
+The shadcn-svelte components are seed files under `web/src/lib/components/ui/`.
+A normal upgrade preserves these files.
+If the target registry differs from the lock answer, the upgrade prints a note.
+
+Run `spinup upgrade --ui --yes` to update the components during a template upgrade.
+The command uses the old render, the worktree file, and the new render for a three-way merge.
+Files without user changes receive the new render.
+Deleted components stay deleted.
+New components are created.
+The lock records the target `shadcn_registry` default and the component entries.
+
+Conflicting edits receive conflict markers and exit code 3.
+The error lists the component paths in the upgrade worktree.
+The step commits successful updates before verification.
+
+```console
+$ spinup upgrade --ui --plan --continue
+Error: Invalid upgrade flags
+  --plan, --continue, and --abort are mutually exclusive
+  Try: select only one upgrade mode
+[exit 2]
+```

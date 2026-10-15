@@ -10,6 +10,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/merge"
 	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
@@ -91,6 +92,11 @@ type Step struct {
 	Options Options
 	Runner  exec.Runner
 	Out     io.Writer
+	// Merger is the step's three-way merger, for extensions that merge files.
+	Merger merge.Merger
+	// Conflicts lists paths that got conflict markers after planning, for example from an
+	// extension. The state machine stops with exit 3 on them, like plan conflicts.
+	Conflicts []string
 }
 
 // Phases are the pluggable parts of a step. The state machine (unit M2.4) calls them in

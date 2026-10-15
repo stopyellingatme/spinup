@@ -1,0 +1,58 @@
+name = "auth"
+description = "Accounts with kit auth: register, log in, log out, and PostgreSQL sessions, with login pages."
+# The pages need the web app. `spinup new --api-only` cannot take the auth module.
+requires = ["web"]
+
+# The api pack wires kit auth into api/cmd/api/main.go when the auth module is on.
+
+# The users, sessions (scs pgxstore), and login_attempts tables. An existing migration never changes.
+[[files]]
+path = "api/db/migrations/00002_create_auth.sql"
+source = "files/api/db/migrations/00002_create_auth.sql"
+class = "seed"
+
+# The helper that form actions use to call the Go API and pass its session cookie to the browser.
+[[files]]
+path = "web/src/lib/server/auth.ts"
+source = "files/web/src/lib/server/auth.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/server/auth.test.ts"
+source = "files/web/src/lib/server/auth.test.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/routes/login/+page.svelte"
+source = "files/web/src/routes/login/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/login/+page.server.ts"
+source = "files/web/src/routes/login/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/register/+page.svelte"
+source = "files/web/src/routes/register/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/register/+page.server.ts"
+source = "files/web/src/routes/register/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/logout/+page.server.ts"
+source = "files/web/src/routes/logout/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/account/+page.svelte"
+source = "files/web/src/routes/account/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/account/+page.server.ts"
+source = "files/web/src/routes/account/+page.server.ts"
+class = "scaffold"

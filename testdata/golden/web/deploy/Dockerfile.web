@@ -1,0 +1,33 @@
+# Managed by spinup. Build context is web/:
+#   docker build -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=https://app.example.com web
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS build
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY . .
+# adapter-node does not read ORIGIN at run time: the build bakes the public origin into
+# paths.origin, the CSRF check, and handleFetch.
+ARG PUBLIC_ORIGIN=http://localhost:3000
+ENV PUBLIC_ORIGIN=${PUBLIC_ORIGIN}
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.
+RUN pnpm exec svelte-kit sync && pnpm build \
+ && rm -rf node_modules && pnpm install --prod --frozen-lockfile --ignore-scripts --offline
+
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000 \
+    API_URL=http://api:8080 \
+    BODY_SIZE_LIMIT=1M \
+    SHUTDOWN_TIMEOUT=20
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+CMD ["node", "build"]

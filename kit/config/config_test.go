@@ -75,13 +75,49 @@ func TestBaseAndInvalidDestination(t *testing.T) {
 	if err := LoadFrom(&b, lookup, os.ReadFile); err != nil {
 		t.Fatal(err)
 	}
-	if b.Env != "dev" || b.Port != 8080 || b.LogLevel != "info" || b.ShutdownTimeout != 20*time.Second || !b.Behavior(1) || b.Behavior(2) {
+	if b.Env != "production" || b.Port != 8080 || b.LogLevel != "info" || b.ShutdownTimeout != 20*time.Second || !b.Behavior(1) || b.Behavior(2) {
 		t.Fatalf("%+v", b)
 	}
 	for _, dst := range []any{nil, Base{}, (*Base)(nil), new(string)} {
 		if err := LoadFrom(dst, lookup, os.ReadFile); err == nil || !strings.Contains(err.Error(), "Try:") {
 			t.Fatalf("invalid destination: %v", err)
 		}
+	}
+}
+
+func TestLoadEnvironmentDefault(t *testing.T) {
+	// Environment and working directory are process-wide.
+	for _, tc := range []struct {
+		name, env, dotenv, want string
+	}{
+		{"unset", "", "", "production"},
+		{"dotenv development", "", "SPINUP_ENV=dev\n", "dev"},
+		{"explicit development", "dev", "", "dev"},
+		{"explicit production", "production", "SPINUP_ENV=dev\n", "production"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			t.Setenv("SPINUP_ENV", tc.env)
+			t.Setenv("SPINUP_ENV_FILE", "")
+			if err := os.Unsetenv("SPINUP_ENV_FILE"); err != nil {
+				t.Fatal(err)
+			}
+			if tc.env == "" {
+				if err := os.Unsetenv("SPINUP_ENV"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(".env", []byte(tc.dotenv), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var b Base
+			if err := Load(&b); err != nil {
+				t.Fatal(err)
+			}
+			if b.Env != tc.want {
+				t.Fatalf("Env = %q, want %q", b.Env, tc.want)
+			}
+		})
 	}
 }
 

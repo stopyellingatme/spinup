@@ -1,0 +1,74 @@
+# The auth module adds kit auth to the API and login pages to the web app. The app builds offline.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --module example.com/todo --modules ci,auth --no-git --non-interactive
+stdout 'from packs base, api, ci, web, auth'
+cd todo
+
+# The files of ADR 0008 §3 and their classes.
+exists api/db/migrations/00002_create_auth.sql
+exists web/src/lib/server/auth.ts web/src/lib/server/auth.test.ts
+exists web/src/routes/login/+page.svelte web/src/routes/login/+page.server.ts
+exists web/src/routes/register/+page.svelte web/src/routes/register/+page.server.ts
+exists web/src/routes/logout/+page.server.ts
+! exists web/src/routes/logout/+page.svelte
+exists web/src/routes/account/+page.svelte web/src/routes/account/+page.server.ts
+exec cat spinup.lock
+stdout '"api/db/migrations/00002_create_auth.sql": \{\n[[:space:]]+"class": "seed"'
+stdout '"web/src/lib/server/auth.ts": \{\n[[:space:]]+"class": "managed"'
+stdout '"web/src/routes/login/\+page.server.ts": \{\n[[:space:]]+"class": "scaffold"'
+
+# main.go wires kit auth. Form actions re-set the Go cookie with getSetCookie() (ADR 0002 rule 7).
+grep 'auth.New\(pool, auth.WithSecureCookie\(cfg.Env != "dev"\), auth.WithTrustedOrigins\(web.PublicOrigin\)\)' api/cmd/api/main.go
+grep 'app.WithMiddleware\(authn.Middleware\(\)\)' api/cmd/api/main.go
+grep 'app.WithRoutes\(authn.Routes\)' api/cmd/api/main.go
+grep 'res.headers.getSetCookie\(\)' web/src/lib/server/auth.ts
+grep 'postAuth\(fetch, cookies, ''/api/auth/login''' web/src/routes/login/+page.server.ts
+
+# The API builds and vets offline.
+cd api
+exec go build ./...
+exec go vet ./...
+cd ..
+
+# An API-only app cannot take the auth module: the pages need the web app.
+cd $WORK
+! exec spinup new apionly --api-only --module example.com/apionly --modules auth --no-git --non-interactive
+stderr 'needs the web frontend'
+stderr 'Try: '
+! exists apionly
+cd todo
+
+# With a database: the migration applies, the app tests pass, and the API registers, signs in,
+# and signs out a user. The real environment wins over .env.
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00002_create_auth\.sql'
+[env:DATABASE_URL] cd api
+[env:DATABASE_URL] exec go test -count=1 ./...
+[env:DATABASE_URL] exec go build -o bin/api ./cmd/api
+[env:DATABASE_URL] env PORT=38437
+[env:DATABASE_URL] env SPINUP_ENV=dev
+[env:DATABASE_URL] exec bin/api &server&
+[env:DATABASE_URL] exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o /dev/null -w '%{http_code}' http://127.0.0.1:38437/healthz
+[env:DATABASE_URL] stdout '^200$'
+[env:DATABASE_URL] exec curl -sS -o session.json -w '%{http_code}' http://127.0.0.1:38437/api/session
+[env:DATABASE_URL] stdout '^401$'
+[env:DATABASE_URL] exec curl -sS -c jar -o register.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"Script@Example.com","password":"correct horse battery"}' http://127.0.0.1:38437/api/auth/register
+[env:DATABASE_URL] stdout '^201$'
+[env:DATABASE_URL] grep '"email":"script@example.com"' register.json
+[env:DATABASE_URL] grep 'session' jar
+[env:DATABASE_URL] exec curl -sS -b jar -o session.json -w '%{http_code}' http://127.0.0.1:38437/api/session
+[env:DATABASE_URL] stdout '^200$'
+[env:DATABASE_URL] grep '"email":"script@example.com"' session.json
+[env:DATABASE_URL] exec curl -sS -b jar -o /dev/null -w '%{http_code}' -H 'Sec-Fetch-Site: cross-site' -X POST http://127.0.0.1:38437/api/auth/logout
+[env:DATABASE_URL] stdout '^403$'
+[env:DATABASE_URL] exec curl -sS -b jar -c jar -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:38437/api/auth/logout
+[env:DATABASE_URL] stdout '^204$'
+[env:DATABASE_URL] exec curl -sS -b jar -o /dev/null -w '%{http_code}' http://127.0.0.1:38437/api/session
+[env:DATABASE_URL] stdout '^401$'
+[env:DATABASE_URL] kill -INT server
+[env:DATABASE_URL] wait server
+
+# Roll back so that the next run starts from an empty database.
+[env:DATABASE_URL] cd ..
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] stdout 'rolled back  00002_create_auth\.sql'

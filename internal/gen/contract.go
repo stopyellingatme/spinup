@@ -43,6 +43,16 @@ type Output struct {
 	PostSteps []PostStep
 	// Next holds up to two commands to suggest after the run.
 	Next []string
+	// Commands are external generator commands (such as `pnpm dlx shadcn-svelte@<v> add
+	// button`) that the runner runs through exec.Runner after the write and before the
+	// post-steps. Each is an argv; Dir is relative to the project root. --dry-run prints them.
+	Commands []Command
+}
+
+// Command is one external command a generator asks the runner to run (ADR 0008).
+type Command struct {
+	Dir  string
+	Argv []string
 }
 
 // Generator is one `spinup generate <name>` kind.

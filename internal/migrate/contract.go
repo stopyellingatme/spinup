@@ -3,6 +3,7 @@ package migrate
 import (
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
 // Contract file from the M2 pre-seed (ADR 0006). Main loop only: units do not edit it.
@@ -30,6 +31,10 @@ type Ctx struct {
 	Lock *manifest.Lock
 	// Runner runs every subprocess (go, gofmt, and similar).
 	Runner exec.Runner
+	// Old and New are the template versions of the step (packs and stack versions), so a
+	// codemod can compare pins, such as a SvelteKit major bump. Old may be nil when the
+	// old version cannot be loaded.
+	Old, New *templates.Version
 }
 
 // Change is one planned file change, for `upgrade --plan`.

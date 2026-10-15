@@ -156,7 +156,7 @@ func (r *Runner) Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
-	state := &runState{Schema: 1, Chain: versions, Worktree: work, Branch: branch, Status: "step", Lock: lock, Options: o}
+	state := &runState{Schema: 1, Chain: versions, Worktree: work, Branch: branch, Status: "step", Lock: lock, Options: o, UI: uiEnabled.Load()}
 	if err := saveState(r.Root, state); err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 	if err := r.checkWorktree(ctx, state); err != nil {
 		return err
 	}
-	if state.Status == "conflicts" {
+	if state.Status == "conflicts" || state.Status == "after-conflicts" {
 		paths, err := unresolved(state.Worktree, state.Conflicts)
 		if err != nil {
 			return err
@@ -193,12 +193,23 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 	// Preserve the original policy when the user supplies no additional flags.
 	state.Options.NoVerify = state.Options.NoVerify || o.NoVerify
 	state.Options.CommitConflicts = state.Options.CommitConflicts || o.CommitConflicts
+	state.UI = state.UI || uiEnabled.Load()
+	if state.Status == "conflicts" || state.Status == "after-conflicts" {
+		if err := state.resolvePlanConflicts(); err != nil {
+			return err
+		}
+	}
 	if state.Status == "conflicts" {
 		if err := r.commit(ctx, state.Worktree, "spinup upgrade "+state.Plan.From+" -> "+state.Plan.To, true); err != nil {
 			return err
 		}
 		state.Conflicts = nil
 		state.Status = "gofix"
+	}
+	if state.Status == "after-conflicts" {
+		// The lock commit includes the resolved files.
+		state.Conflicts = nil
+		state.Status = "lock"
 	}
 	if err := saveState(r.Root, state); err != nil {
 		return err
@@ -298,10 +309,12 @@ func (r *Runner) step(ctx context.Context, state *runState) (*Step, error) {
 	if err != nil && !errors.Is(err, templates.ErrVersionUnavailable) {
 		return nil, err
 	}
-	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: clonePlanAnswers(state.Lock.Answers), Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out}, nil
+	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: clonePlanAnswers(state.Lock.Answers), Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out, Merger: r.Merger}, nil
 }
 
 func (r *Runner) resume(ctx context.Context, state *runState) error {
+	// Extensions use the recorded choice, including after a process restart.
+	ctx = context.WithValue(ctx, uiChoiceKey{}, state.UI)
 	phases := CurrentPhases()
 	for state.Index < len(state.Chain) {
 		step, err := r.step(ctx, state)
@@ -383,8 +396,21 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 					}
 				}
 			}
-			state.Status = "lock"
 			state.Lock = step.Lock
+			if len(step.Conflicts) > 0 && !step.Options.CommitConflicts {
+				// Markers added after planning (by an extension) stop the step like plan
+				// conflicts; --continue resumes at the lock commit, which includes them.
+				state.Conflicts = slices.Compact(slices.Sorted(slices.Values(step.Conflicts)))
+				state.Status = "after-conflicts"
+				if err := saveState(r.Root, state); err != nil {
+					return err
+				}
+				return conflictError(state.Worktree, state.Conflicts)
+			}
+			state.CommittedConflicts = append(state.CommittedConflicts, step.Conflicts...)
+			slices.Sort(state.CommittedConflicts)
+			state.CommittedConflicts = slices.Compact(state.CommittedConflicts)
+			state.Status = "lock"
 			if err := saveState(r.Root, state); err != nil {
 				return err
 			}

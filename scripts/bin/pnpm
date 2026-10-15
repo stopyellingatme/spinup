@@ -5,4 +5,9 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 version=$(awk '/^npm:/{s=1;next} /^[^ #]/{s=0} s && $1=="pnpm:"{print $2; exit}' "$here/internal/stackversions/stackversions.yaml")
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_ENABLE_STRICT=0
+# Test harnesses run with their own HOME. pnpm keeps its store, metadata cache, and state under
+# the real home, so they pass it here, and offline installs keep working.
+if [[ -n "${SPINUP_PNPM_HOME:-}" ]]; then
+  export HOME="$SPINUP_PNPM_HOME"
+fi
 exec corepack "pnpm@${version}" "$@"

@@ -1,0 +1,5 @@
+# Managed live reload configuration for spinup dev.
+[[files]]
+path = "api/.air.toml"
+source = "files/api/.air.toml.tmpl"
+class = "managed"

@@ -13,10 +13,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/stopyellingatme/spinup/kit/config"
+	"github.com/stopyellingatme/spinup/kit/devtools"
 	"github.com/stopyellingatme/spinup/kit/httpx"
 	"github.com/stopyellingatme/spinup/kit/logx"
 )
@@ -25,23 +27,26 @@ import (
 // Construct an App with New. Handler supports concurrent requests.
 // Call Run once for the server lifecycle.
 type App struct {
-	name       string
-	version    string
-	addr       string
-	config     config.Base
-	logger     *slog.Logger
-	routes     []func(*http.ServeMux)
-	middleware []httpx.Middleware
-	readiness  map[string]func(context.Context) error
-	commands   map[string]func(context.Context, []string) error
-	shutdown   []func(context.Context) error
-	handler    http.Handler
+	name            string
+	version         string
+	addr            string
+	config          config.Base
+	logger          *slog.Logger
+	routes          []func(*http.ServeMux)
+	middleware      []httpx.Middleware
+	readiness       map[string]func(context.Context) error
+	commands        map[string]func(context.Context, []string) error
+	shutdown        []func(context.Context) error
+	handler         http.Handler
+	migrationStatus func(context.Context) ([]devtools.Migration, error)
+	routeMu         sync.Mutex
+	routePatterns   map[string]struct{}
 }
 
 // New constructs an API with the default middleware and built-in routes.
 // The defaults are port 8080, a 20-second shutdown timeout, and JSON logging to stderr.
 func New(opts ...Option) *App {
-	a := &App{readiness: make(map[string]func(context.Context) error), commands: make(map[string]func(context.Context, []string) error)}
+	a := &App{readiness: make(map[string]func(context.Context) error), commands: make(map[string]func(context.Context, []string) error), routePatterns: make(map[string]struct{})}
 	for _, opt := range opts {
 		opt(a)
 	}
@@ -62,12 +67,14 @@ func New(opts ...Option) *App {
 		a.logger = logx.New(os.Stderr, logx.Options{Level: level})
 	}
 	mux := http.NewServeMux()
+	a.addRoute("GET /healthz")
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_ = httpx.WriteJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`
 		}{Status: "ok"})
 	})
 	mux.HandleFunc("GET /readyz", a.ready)
+	a.addRoute("GET /readyz")
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, _ *http.Request) {
 		_ = httpx.WriteJSON(w, http.StatusOK, struct {
 			Name    string `json:"name"`
@@ -75,16 +82,58 @@ func New(opts ...Option) *App {
 			Go      string `json:"go"`
 		}{Name: a.name, Version: a.version, Go: runtime.Version()})
 	})
+	a.addRoute("GET /version")
 	for _, routes := range a.routes {
 		routes(mux)
 	}
 	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders()}
+	if a.config.Env == "dev" {
+		dev := devtools.New(devtools.Options{Name: a.name, Version: a.version, Config: a.config, Routes: a.devRoutes, Migrations: a.migrationStatus})
+		handler := dev.Handler()
+		mux.Handle("/_dev", handler)
+		mux.Handle("/_dev/", handler)
+		a.addRoute("/_dev")
+		a.addRoute("/_dev/")
+		middleware = append(middleware, dev.Middleware(), a.recordRoute())
+	}
 	a.handler = httpx.Chain(mux, append(middleware, a.middleware...)...)
 	return a
 }
 
 // Handler returns the complete HTTP handler, including the default middleware.
 func (a *App) Handler() http.Handler { return a.handler }
+
+func (a *App) addRoute(pattern string) {
+	a.routeMu.Lock()
+	defer a.routeMu.Unlock()
+	a.routePatterns[pattern] = struct{}{}
+}
+
+func (a *App) recordRoute() httpx.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+			if r.Pattern != "" {
+				a.addRoute(r.Pattern)
+			}
+		})
+	}
+}
+
+func (a *App) devRoutes() []devtools.Route {
+	a.routeMu.Lock()
+	defer a.routeMu.Unlock()
+	patterns := make([]string, 0, len(a.routePatterns))
+	for pattern := range a.routePatterns {
+		patterns = append(patterns, pattern)
+	}
+	slices.Sort(patterns)
+	routes := make([]devtools.Route, len(patterns))
+	for i, pattern := range patterns {
+		routes[i] = devtools.Route{Pattern: pattern}
+	}
+	return routes
+}
 
 func (a *App) ready(w http.ResponseWriter, r *http.Request) {
 	checks := make(map[string]string, len(a.readiness))
