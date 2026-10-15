@@ -1,0 +1,11 @@
+# The mkversion harness command builds a synthetic template version with an overlay.
+mkversion 9.9.9 overlay
+exists templates/9.9.9/stackversions.yaml
+exists templates/9.9.9/packs/base/pack.toml
+grep 'synthetic' templates/9.9.9/packs/base/files/README.md.tmpl
+! exists templates/9.9.9/packs/ci
+
+-- overlay/packs/base/files/README.md.tmpl --
+# [[ .app_name ]] (synthetic)
+-- overlay/DELETE --
+packs/ci

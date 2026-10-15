@@ -2,6 +2,7 @@ package scripttest
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -78,7 +79,24 @@ func TestScripts(t *testing.T) {
 			}
 			return os.Getenv(name) != "", nil
 		},
+		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
+			"mkversion": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) < 1 || len(args) > 2 {
+					ts.Fatalf("usage: mkversion <version> [overlay-dir]")
+				}
+				if err := makeVersion(root, ts.MkAbs("templates"), args[0], overlayArg(ts, args)); err != nil {
+					ts.Fatalf("mkversion: %v", err)
+				}
+			},
+		},
 		Setup: func(env *testscript.Env) error {
+			// Scripts have their own HOME, so give git an identity for commits.
+			for key, value := range map[string]string{
+				"GIT_AUTHOR_NAME": "spinup test", "GIT_AUTHOR_EMAIL": "test@example.com",
+				"GIT_COMMITTER_NAME": "spinup test", "GIT_COMMITTER_EMAIL": "test@example.com",
+			} {
+				env.Setenv(key, value)
+			}
 			env.Setenv("GOCACHE", caches[0])
 			env.Setenv("GOMODCACHE", caches[1])
 			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
@@ -94,5 +112,61 @@ func TestScripts(t *testing.T) {
 			env.Setenv("NO_COLOR", "1")
 			return nil
 		},
+	})
+}
+
+func overlayArg(ts *testscript.TestScript, args []string) string {
+	if len(args) < 2 {
+		return ""
+	}
+	return ts.MkAbs(args[1])
+}
+
+// makeVersion writes a synthetic template version for SPINUP_TEMPLATES_DIR (ADR 0006 §3):
+// <dir>/<version>/packs and stackversions.yaml copied from the repository, then the files of
+// overlay (which mirrors that layout) copied on top. Each line of <overlay>/DELETE names a
+// path, relative to the version directory, to remove.
+func makeVersion(root, dir, version, overlay string) error {
+	target := filepath.Join(dir, version)
+	if err := os.CopyFS(filepath.Join(target, "packs"), os.DirFS(filepath.Join(root, "internal", "templates", "packs"))); err != nil {
+		return err
+	}
+	stack, err := os.ReadFile(filepath.Join(root, "internal", "stackversions", "stackversions.yaml"))
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(target, "stackversions.yaml"), stack, 0o644); err != nil {
+		return err
+	}
+	if overlay == "" {
+		return nil
+	}
+	return filepath.WalkDir(overlay, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(overlay, path)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if rel == "DELETE" {
+			for _, line := range strings.Split(string(data), "\n") {
+				if line = strings.TrimSpace(line); line != "" {
+					if err := os.RemoveAll(filepath.Join(target, filepath.FromSlash(line))); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+		dest := filepath.Join(target, rel)
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(dest, data, 0o644)
 	})
 }

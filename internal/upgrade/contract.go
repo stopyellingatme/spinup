@@ -94,8 +94,10 @@ type Step struct {
 }
 
 // Phases are the pluggable parts of a step. The state machine (unit M2.4) calls them in
-// this order: Before, plan, Apply, Deps, commit, GoFix (its own commit when it changed
-// files), After, lock write, commit, Verify. A nil phase is skipped. Unit M2.8 sets them.
+// this order: Before, plan, write the plan's files, Apply, Deps, commit, GoFix (its own
+// commit when it changed files), After, lock write, commit, Verify. The state machine
+// itself writes the plan's files; Apply is extra work after that write (for example the
+// kit replace directive). A nil phase is skipped. Unit M2.8 sets them.
 type Phases struct {
 	Before func(ctx context.Context, s *Step) error
 	Apply  func(ctx context.Context, s *Step) error
