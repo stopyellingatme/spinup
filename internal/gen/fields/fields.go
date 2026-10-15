@@ -55,10 +55,11 @@ func ParseName(s string) (Name, error) {
 		return Name{}, nameError(s, "it starts with a digit")
 	}
 	singular := singularize(value)
-	if reservedNames[singular] {
-		return Name{}, nameError(s, fmt.Sprintf("%q is reserved", singular))
+	plural := pluralize(singular)
+	if sqlReservedNames[plural] {
+		return Name{}, nameError(s, fmt.Sprintf("table name %q is reserved", plural))
 	}
-	return Name{Singular: singular, Plural: pluralize(singular)}, nil
+	return Name{Singular: singular, Plural: plural}, nil
 }
 
 // parseFieldName normalizes a field name to snake case like ParseName, but never
@@ -78,7 +79,7 @@ func parseFieldName(s string) (Name, error) {
 	if value[0] >= '0' && value[0] <= '9' {
 		return Name{}, nameError(s, "it starts with a digit")
 	}
-	if reservedNames[value] {
+	if goReservedNames[value] {
 		return Name{}, nameError(s, fmt.Sprintf("%q is reserved", value))
 	}
 	return Name{Singular: value, Plural: value}, nil
@@ -147,6 +148,9 @@ func Parse(args []string) ([]Field, error) {
 		column := field.Column()
 		if column == "id" || column == "created_at" || column == "updated_at" {
 			return nil, fmt.Errorf("field %q is automatic\nTry: choose a field other than id, created_at, or updated_at", field.Name.Snake())
+		}
+		if sqlReservedNames[column] {
+			return nil, nameError(field.Name.Snake(), fmt.Sprintf("column name %q is reserved", column))
 		}
 		if _, ok := seen[column]; ok {
 			return nil, fmt.Errorf("field %q is duplicated\nTry: use each field name once", field.Name.Snake())
@@ -327,10 +331,14 @@ func nameError(value, reason string) error {
 
 var irregularSingular = map[string]string{
 	"person": "people", "child": "children", "man": "men", "woman": "women", "mouse": "mice", "goose": "geese", "tooth": "teeth", "foot": "feet",
+	"series": "series", "news": "news", "species": "species",
+	"movie": "movies", "cookie": "cookies", "tie": "ties",
 }
 
 var irregularPlural = map[string]string{
 	"people": "person", "children": "child", "men": "man", "women": "woman", "mice": "mouse", "geese": "goose", "teeth": "tooth", "feet": "foot",
+	"series": "series", "news": "news", "species": "species",
+	"movies": "movie", "cookies": "cookie", "ties": "tie",
 }
 
 func pluralize(value string) string {
@@ -351,9 +359,20 @@ func singularize(value string) string {
 		return singular
 	}
 	if strings.HasSuffix(value, "ies") && len(value) > 3 {
-		return value[:len(value)-3] + "y"
+		stem := value[:len(value)-3]
+		if len(stem) <= 1 || isVowel(stem[len(stem)-1]) {
+			return value[:len(value)-1]
+		}
+		return stem + "y"
 	}
-	if strings.HasSuffix(value, "ses") || strings.HasSuffix(value, "xes") || strings.HasSuffix(value, "zes") || strings.HasSuffix(value, "ches") || strings.HasSuffix(value, "shes") {
+	if strings.HasSuffix(value, "ses") {
+		stem := value[:len(value)-2]
+		if strings.HasSuffix(stem, "ss") || strings.HasSuffix(stem, "us") || strings.HasSuffix(stem, "is") {
+			return stem
+		}
+		return value[:len(value)-1]
+	}
+	if strings.HasSuffix(value, "xes") || strings.HasSuffix(value, "zes") || strings.HasSuffix(value, "ches") || strings.HasSuffix(value, "shes") {
 		return value[:len(value)-2]
 	}
 	if strings.HasSuffix(value, "s") && !strings.HasSuffix(value, "ss") && !strings.HasSuffix(value, "us") && !strings.HasSuffix(value, "is") {
@@ -366,16 +385,28 @@ func isVowel(value byte) bool {
 	return value == 'a' || value == 'e' || value == 'i' || value == 'o' || value == 'u'
 }
 
-var reservedNames = makeReservedNames()
+var goReservedNames = makeGoReservedNames()
 
-func makeReservedNames() map[string]bool {
+func makeGoReservedNames() map[string]bool {
 	words := strings.Fields(`
 		break default func interface select case defer go map struct chan else goto package switch
 		const fallthrough if range type continue for import return var
 		any bool byte comparable complex64 complex128 error float32 float64 int int8 int16 int32 int64
 		rune string uint uint8 uint16 uint32 uint64 uintptr true false iota nil
+	`)
+	return makeReservedNames(words)
+}
+
+var sqlReservedNames = makeSQLReservedNames()
+
+func makeSQLReservedNames() map[string]bool {
+	words := strings.Fields(`
 		all analyse analyze and any array as asc asymmetric authorization between binary both case cast check collate column concurrently constraint create cross current_catalog current_date current_role current_time current_timestamp current_user default deferrable desc distinct do else end except false fetch for foreign from grant group having ilike in initially inner intersect into is join lateral leading left like limit localtime localtimestamp natural not notnull null offset on only or order outer overlaps placing primary references returning right select session_user similar some symmetric table then to trailing true union unique user using variadic verbose when where window with
 	`)
+	return makeReservedNames(words)
+}
+
+func makeReservedNames(words []string) map[string]bool {
 	result := make(map[string]bool, len(words))
 	for _, word := range words {
 		result[word] = true
