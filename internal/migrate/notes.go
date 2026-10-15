@@ -17,6 +17,16 @@ type KitNotes struct {
 	Version string `json:"version"`
 	// Steps lists the changes in presentation order.
 	Steps []KitStep `json:"steps"`
+	// Behaviors lists the behavior versions that an app can opt in to with behavior_version.
+	Behaviors []KitBehavior `json:"behaviors,omitempty"`
+}
+
+// KitBehavior describes one opt-in behavior version (docs/policy/behavior-version.md).
+type KitBehavior struct {
+	// Version is the behavior_version value that turns the behavior on. It is 2 or more.
+	Version int `json:"version"`
+	// Desc describes what changes for an app that opts in.
+	Desc string `json:"desc"`
 }
 
 // KitStep describes a codemod, an inline fix, or a manual change.
@@ -59,6 +69,19 @@ func ParseKitNotes(data []byte) (*KitNotes, error) {
 		default:
 			return nil, notesError(fmt.Errorf("step %q has unknown kind %q", step.ID, step.Kind))
 		}
+	}
+	seen := make(map[int]bool)
+	for _, behavior := range notes.Behaviors {
+		if behavior.Version < 2 {
+			return nil, notesError(fmt.Errorf("behavior version %d is below 2", behavior.Version))
+		}
+		if seen[behavior.Version] {
+			return nil, notesError(fmt.Errorf("behavior version %d is listed twice", behavior.Version))
+		}
+		if strings.TrimSpace(behavior.Desc) == "" {
+			return nil, notesError(fmt.Errorf("behavior version %d has no description", behavior.Version))
+		}
+		seen[behavior.Version] = true
 	}
 	return notes, nil
 }

@@ -33,7 +33,7 @@ If you do not set it, `kit/config` uses 1.
 ## How an app opts in
 
 1. Run `spinup upgrade`. It does not change `behavior_version`.
-2. Read the entry for each new behavior version in `CHANGELOG.md`.
+2. Read the new behavior versions. `spinup upgrade --plan` lists each one that is higher than your `behavior_version`, as a `Kit behavior` line. `CHANGELOG.md` gives the details.
 3. Change `behavior_version` in `spinup.toml` to the new number.
 4. Run the tests and `spinup dev`.
 5. Run `spinup deploy`. The deployer writes the new value to the release.
@@ -69,3 +69,4 @@ These rules follow from it:
 - Keep the old path until the deprecation window ends. See `docs/policy/support.md`.
 - A bug fix is not a behavior change. Fix a security flaw for every behavior version.
 - List each new behavior version in the changelog, with the old and new behavior.
+- Add each new behavior version to the `behaviors` list in `kit/MIGRATION.json` (`version` and `desc`). `spinup upgrade --plan` shows it to apps that have not opted in.

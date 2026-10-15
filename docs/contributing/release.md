@@ -117,6 +117,8 @@ The archives use `scripts/release/README.md` as their README.
 The release includes `templates-v<version>.tar.zst` and its raw ed25519 `.sig` file.
 The helper uses `store.WriteArchive` and validates the result with `store.ReadArchive`.
 It includes `kit/MIGRATION.json` when that file exists.
+Before each release, set its `version`, list the kit steps (`codemod`, `fix-inline`, or `manual`), and list new behavior versions in `behaviors`.
+`spinup upgrade --plan` prints both.
 The release also includes `compat.json`, `stack-versions.json`, and `install.sh`.
 The minimum CLI in `compat.json` equals the release version.
 The supported behavior version is `1`, as defined by the current kit configuration.

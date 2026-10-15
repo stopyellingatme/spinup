@@ -12,6 +12,8 @@ import (
 	"slices"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/migrate"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
@@ -160,7 +162,7 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err := plan.Format(r.Out); err != nil {
 			return nil, err
 		}
-		if err := printKitNotes(r.Out, to); err != nil {
+		if err := printKitNotes(r.Out, to, r.behaviorVersion(lock)); err != nil {
 			return nil, err
 		}
 		report.Steps = append(report.Steps, plan)
@@ -175,31 +177,42 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 	return report, nil
 }
 
-func printKitNotes(out io.Writer, to *templates.Version) error {
+// printKitNotes prints the kit steps of a target version and the behavior versions that are
+// newer than the one the app selects. Behaviors are opt-in: the plan only names them.
+func printKitNotes(out io.Writer, to *templates.Version, behavior int) error {
 	if len(to.KitMigration) == 0 {
 		return nil
 	}
-	var notes struct {
-		Schema  int    `json:"schema"`
-		Version string `json:"version"`
-		Steps   []struct {
-			ID   string `json:"id"`
-			Desc string `json:"desc"`
-			Kind string `json:"kind"`
-		} `json:"steps"`
-	}
-	if err := json.Unmarshal(to.KitMigration, &notes); err != nil {
-		return fmt.Errorf("read kit notes for %s: %w\nTry: repair MIGRATION.json in the target templates", to.Version, err)
-	}
-	if notes.Schema != 1 {
-		return fmt.Errorf("read kit notes for %s: unsupported schema\nTry: repair MIGRATION.json in the target templates", to.Version)
+	notes, err := migrate.ParseKitNotes(to.KitMigration)
+	if err != nil {
+		return fmt.Errorf("read kit notes for %s: %w", to.Version, err)
 	}
 	for _, step := range notes.Steps {
 		if _, err := fmt.Fprintf(out, "Kit %s [%s]: %s\n", step.ID, step.Kind, step.Desc); err != nil {
 			return fmt.Errorf("print kit notes: %w\nTry: use a writable output", err)
 		}
 	}
+	for _, b := range notes.Behaviors {
+		if b.Version <= behavior {
+			continue
+		}
+		if _, err := fmt.Fprintf(out, "Kit behavior %d (opt in with behavior_version = %d in spinup.toml): %s\n", b.Version, b.Version, b.Desc); err != nil {
+			return fmt.Errorf("print kit notes: %w\nTry: use a writable output", err)
+		}
+	}
 	return nil
+}
+
+// behaviorVersion returns the behavior version that the app selects in spinup.toml. It falls back
+// to the lock, and then to 1, when spinup.toml cannot be read.
+func (r *Runner) behaviorVersion(lock *manifest.Lock) int {
+	if cfg, err := project.Load(r.Root); err == nil {
+		return cfg.EffectiveBehaviorVersion()
+	}
+	if lock != nil && lock.BehaviorVersion > 1 {
+		return lock.BehaviorVersion
+	}
+	return 1
 }
 
 // Copy only paths that planning reads. Unrelated files and ignored dependency trees

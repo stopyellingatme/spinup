@@ -26,7 +26,7 @@ func TestRunPlanChain(t *testing.T) {
 	testGit(t, root, "commit", "-m", "unrelated link")
 	source := r.Source.(chainSource)
 	source["0.3.0"] = planVersion("0.3.0", planSpec{path: "file.txt", data: "third\n"})
-	source["0.2.0"].KitMigration = []byte(`{"schema":1,"version":"0.2.0","steps":[{"id":"kit-note","desc":"Review this change","kind":"manual"}]}`)
+	source["0.2.0"].KitMigration = []byte(`{"schema":1,"version":"0.2.0","steps":[{"id":"kit-note","desc":"Review this change","kind":"manual"}],"behaviors":[{"version":2,"desc":"Stricter cookies"}]}`)
 	report, err := r.Plan(context.Background(), Options{To: "0.3.0"})
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +40,9 @@ func TestRunPlanChain(t *testing.T) {
 	}
 	if !json.Valid(first) || bytes.Contains(first, []byte("Data")) || bytes.Contains(first, []byte("third")) {
 		t.Fatalf("plan JSON: %s", first)
+	}
+	if !strings.Contains(r.Out.(*bytes.Buffer).String(), "Kit behavior 2 (opt in with behavior_version = 2 in spinup.toml): Stricter cookies") {
+		t.Fatalf("output: %s", r.Out)
 	}
 	if !strings.Contains(r.Out.(*bytes.Buffer).String(), "Kit kit-note [manual]: Review this change") {
 		t.Fatalf("output: %s", r.Out)
