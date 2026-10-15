@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .spinup/
 api/bin/
 node_modules/
