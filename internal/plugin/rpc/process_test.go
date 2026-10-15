@@ -129,6 +129,34 @@ func TestScrubbedEnvironment(t *testing.T) {
 		t.Fatalf("stderr=%q", stderr.String())
 	}
 }
+
+func TestProcessAfterHandshakeExit(t *testing.T) {
+	t.Parallel()
+	p := buildFake(t)
+	for _, behavior := range []string{"handshake-exit", "handshake-exit-nonzero"} {
+		t.Run(behavior, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "behavior"), []byte(behavior), 0644); err != nil {
+				t.Fatal(err)
+			}
+			c := Client{Plugin: p, Root: root, Timeout: 10 * time.Second}
+			for attempt := 0; attempt < 20; attempt++ {
+				start := time.Now()
+				_, err := c.Plan(t.Context(), sdk.PlanParams{Generator: "hello"})
+				if err == nil || !strings.Contains(err.Error(), "exited") {
+					t.Fatalf("attempt %d: want process exit error, got %v", attempt, err)
+				}
+				if behavior == "handshake-exit-nonzero" && !strings.Contains(err.Error(), "exit code 7") {
+					t.Fatalf("attempt %d: lost exit status: %v", attempt, err)
+				}
+				if elapsed := time.Since(start); elapsed >= c.Timeout/2 {
+					t.Fatalf("attempt %d: exit took %s, timeout %s", attempt, elapsed, c.Timeout)
+				}
+			}
+		})
+	}
+}
 func TestGeneratorRunner(t *testing.T) {
 	t.Parallel()
 	p := buildFake(t)

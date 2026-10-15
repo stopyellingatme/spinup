@@ -9,6 +9,7 @@ The host validates every returned path before it applies a plan.
 The generator runner supports `--dry-run`, `--diff`, and `--force`.
 The host rejects protected files, path escapes, duplicate paths, and unsafe permissions.
 The lock records generated files with `plugin/<name>/@exec/<generator>` as the template.
+`spinup upgrade` preserves these files and their lock entries, including local edits.
 
 ## Metadata and trust
 
@@ -80,6 +81,8 @@ The host combines findings into a doctor result.
 A failed finding takes precedence over a warning.
 
 The host enforces a 60-second limit for each call.
+If the plugin exits without a response, the host reports the exit immediately.
+The error retains a nonzero exit status.
 Cancellation terminates the process group on Unix.
 A response cannot exceed 16 MiB before its newline.
 Invalid JSON, unexpected response IDs, and API mismatches cause errors.
@@ -99,8 +102,12 @@ On Windows, cancellation terminates the direct child process.
 `internal/plugin/rpc.ProjectGenerators` adds trusted exec generators beside declarative generators.
 `internal/plugin/rpc.ProjectChecks` returns checks for a project.
 `internal/plugin/rpc.RegisterProjectChecks` registers those checks through the doctor registry.
-Call the registration function after locating the project root.
-The CLI must supply a project root before it calls these functions.
+`spinup doctor` locates the project root and registers checks from trusted executable plugins.
+It calls `describe` to discover checks, then calls `check` for each check alongside the other local checks.
+Each report uses the ID `plugin/<name>/<check>` and includes findings and corrective instructions.
+`--json` includes these reports, and `--offline` requires cached plugin bytes.
+Projects without executable plugins start no plugin processes.
+`spinup doctor --remote` runs only the remote checks.
 The `plugin add` and `plugin update` commands accept `--trust-exec <name>`.
 
 The fixture in `testdata/plugins/exec-hello/src/` demonstrates an SDK handler.

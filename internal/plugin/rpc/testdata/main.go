@@ -60,11 +60,21 @@ func main() {
 			}
 			result = sdk.PlanResult{Files: []sdk.File{{Path: path, Data: content, Class: "managed", Mode: 0644}}}
 		case "check":
-			result = sdk.CheckResult{Findings: []sdk.Finding{{Status: "warn", Message: "Review hello", Try: "repair hello"}}}
+			status := "warn"
+			if string(behavior) == "check-fail" {
+				status = "fail"
+			}
+			result = sdk.CheckResult{Findings: []sdk.Finding{{Status: status, Message: "Review hello", Try: "repair hello"}}}
 		}
 		raw, _ := json.Marshal(result)
 		encoded, _ := json.Marshal(sdk.Response{JSONRPC: "2.0", ID: request.ID, Result: raw})
 		fmt.Println(string(encoded))
+		if string(behavior) == "handshake-exit" && request.Method == "handshake" {
+			return
+		}
+		if string(behavior) == "handshake-exit-nonzero" && request.Method == "handshake" {
+			os.Exit(7)
+		}
 		if string(behavior) == "exit" && request.Method != "handshake" {
 			os.Exit(1)
 		}
