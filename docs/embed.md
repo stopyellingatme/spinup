@@ -24,33 +24,34 @@ SvelteKit 3 configures the adapter in `web/vite.config.js`.
 The layout fetches `/api/session` from the browser.
 An absent session endpoint means that no user has signed in.
 
-Install the dependencies with the selected package manager.
-Run the web build before the Go build.
-The adapter copies `web/build/` into `api/internal/webdist/dist/` after each successful build.
-It removes old assets before the copy.
-The generated `.gitignore` excludes this directory.
+Run `spinup build` to build the embedded application.
+The command installs dependencies with the selected package manager and a frozen lockfile.
+The command builds the web app and replaces `api/internal/webdist/dist/` with `web/build/`.
+It then builds `api/bin/api` with `-tags embedweb`.
+The generated `.gitignore` excludes the static assets.
 
 <!-- doctest: skip -->
 ```console
-$ cd web
-$ pnpm install --frozen-lockfile --offline
-$ pnpm build
-$ cd ../api
-$ go build -tags embedweb -o bin/api ./cmd/api
-$ ./bin/api
+$ spinup build
+...
+$ ./api/bin/api
+...
 ```
 
-For bun apps, use `bun install --frozen-lockfile` and `bun run build`.
-The copy step also runs with bun.
+For bun apps, the command uses `bun install --frozen-lockfile` and `bun run build`.
 An untagged Go build uses a stub without static assets.
 Development continues to use Vite and its API proxy through `spinup dev`.
 
-Build the Docker image with an additional context for the web app.
+Run `spinup build --image` to build only the API image.
+The command supplies `--build-context web=web` to Docker buildx.
 The Docker template builds the static app and embeds it in the API image.
+Deploy uses the same API image build.
+A local kit replace must be removed before an image build.
 
 <!-- doctest: skip -->
 ```console
-$ docker build -f deploy/Dockerfile.api --build-context web=web -t embedded-api api
+$ spinup build --image
+...
 ```
 
 The generated Compose file has no `web` service.
@@ -77,8 +78,7 @@ Run `make script RUN=embed` to verify an offline build and the embedded HTTP han
 Set `SPINUP_EMBED_LIVE=1` to test the generated binary through a listening socket.
 The live check does not need PostgreSQL.
 
-The CLI build integration requires changes outside the M10.3 file set.
-Until integration, run the build commands above.
-The integration must build the web app and add `-tags embedweb` to the Go command.
-For Docker, it must supply `--build-context web=web` and omit the separate web image.
-The bun variant also needs the Docker tooling from M10.4.
+Image previews and the fake Docker check run without a Docker engine.
+Set `SPINUP_EMBED_DOCKER=1` for the optional Docker check.
+The check skips the image build if Docker is absent.
+The Docker cache must contain the images and published dependencies before this check.

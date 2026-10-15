@@ -13,8 +13,10 @@ import (
 	"strings"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 // Options selects the application and local build output.
@@ -51,6 +53,16 @@ func Local(ctx context.Context, o Options, runner run.Runner) error {
 		}
 		return err
 	}
+	lock, err := loadBuildLock(root)
+	if err != nil {
+		return buildError(err)
+	}
+	if embedsWeb(lock) {
+		if err := buildWeb(ctx, root, lock, o, runner); err != nil {
+			return buildError(err)
+		}
+		c.Args = append([]string{"build", "-tags", "embedweb"}, c.Args[1:]...)
+	}
 	if o.Target == "all" {
 		if _, err := fmt.Fprintln(o.Out, "Building available targets: api"); err != nil {
 			return buildError(err)
@@ -63,6 +75,54 @@ func Local(ctx context.Context, o Options, runner run.Runner) error {
 	_, err = runner.Run(ctx, c)
 	if err != nil {
 		return buildError(err)
+	}
+	return nil
+}
+
+// loadBuildLock preserves builds for older projects without a lock.
+func loadBuildLock(root string) (*manifest.Lock, error) {
+	lock, err := manifest.Load(filepath.Join(root, project.LockFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return lock, err
+}
+
+func embedsWeb(lock *manifest.Lock) bool {
+	return lock != nil && lock.Answers["frontend_mode"] == "embed"
+}
+
+func buildWeb(ctx context.Context, root string, lock *manifest.Lock, o Options, runner run.Runner) error {
+	tool := webtool.FromLock(lock)
+	for _, c := range []run.Cmd{tool.Install(true, false), tool.Run("build")} {
+		c = tool.InWeb(root, c)
+		c.Stdout, c.Stderr = o.Out, o.ErrOut
+		if o.DryRun {
+			if _, err := fmt.Fprintln(o.Out, c.String()); err != nil {
+				return err
+			}
+		} else if _, err := runner.Run(ctx, c); err != nil {
+			return err
+		}
+	}
+	if o.DryRun {
+		_, err := fmt.Fprintln(o.Out, "Copy web/build to api/internal/webdist/dist, replacing old assets")
+		return err
+	}
+	source := filepath.Join(root, "web", "build")
+	dest := filepath.Join(root, "api", "internal", "webdist", "dist")
+	info, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("read web/build: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("copy web/build: the build output is not a directory")
+	}
+	if err := os.RemoveAll(dest); err != nil {
+		return fmt.Errorf("replace api/internal/webdist/dist: %w", err)
+	}
+	if err := os.CopyFS(dest, os.DirFS(source)); err != nil {
+		return fmt.Errorf("copy web/build to api/internal/webdist/dist: %w", err)
 	}
 	return nil
 }
