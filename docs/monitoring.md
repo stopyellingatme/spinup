@@ -57,7 +57,10 @@ stack.yml
 ```
 
 `spinup.toml` repeats the profile as `[monitoring] profile`.
-At deploy time, `spinup.toml` wins.
+At deploy time, the profile must match `monitoring_profile` in `spinup.lock`.
+If they differ, preflight fails before the deploy changes the VM.
+Restore the locked profile, or re-render the monitoring pack to change its services.
+The rendered files determine which services run.
 The profile `none` renders no monitoring file.
 The vendored community dashboards in `monitoring/grafana/dashboards/stack/vendor/` need the exporters, so only the profile `full` renders them.
 `spinup new` asks the monitoring question only when you select the `monitoring` module.
@@ -94,7 +97,7 @@ spinup never changes a seed file after `spinup new`.
 
 ## How the data flows
 
-- The app sends OTLP to `http://alloy:4318` on the `<app>-app` network. Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318` to turn it on.
+- The app sends OTLP to `http://alloy:4318` on the `<app>-app` network. `spinup deploy` configures this endpoint for the API and web services.
 - Alloy removes secrets, batches the data, and sends it on.
   Metrics go to Prometheus with remote write. Logs go to Loki over OTLP. Traces go to Tempo (profile `full`).
 - Alloy scrapes Loki, Grafana, Caddy (`caddy:2020`), and itself.
@@ -141,22 +144,37 @@ Grafana sends a notification for each firing Prometheus alert.
 
 ### Notifications and the heartbeat
 
-`spinup deploy` sets these variables for `compose.monitoring.yml`:
+`spinup deploy` reads these optional strings from `[monitoring]` in `spinup.toml`:
 
-| Variable | From | Purpose |
+| Key | Compose variable | Purpose or default |
 | --- | --- | --- |
-| `ALERT_EMAIL_TO` | `spinup.toml` | Email notifications. They need `SMTP_HOST`, `SMTP_USER`, and `SMTP_FROM`. |
-| `ALERT_NTFY_URL` | `spinup.toml` | ntfy notifications. Grafana uses the ntfy `grafana` template. |
-| `HEARTBEAT_URL` | `[monitoring] heartbeat_url` | Grafana calls the URL every 5 minutes. |
-| `PUBLIC_URL` | `spinup.toml` | The blackbox exporter probes it (profile `full`). |
-| `PROMETHEUS_RETENTION`, `PROMETHEUS_RETENTION_SIZE` | environment file | The retention of Prometheus. The defaults are `30d` and `5GB`. |
-| `TEMPO_RETENTION` | environment file | The retention of Tempo. The default is `336h`. |
+| `profile` | none | Selects `lite`, `full`, or `none`. Must match the rendered profile in `spinup.lock`. |
+| `heartbeat_url` | `HEARTBEAT_URL` | Grafana calls the URL every 5 minutes. |
+| `alert_email` | `ALERT_EMAIL_TO` | Email recipient. Requires the SMTP settings. |
+| `smtp_host` | `SMTP_HOST` | SMTP relay address and port. |
+| `smtp_user` | `SMTP_USER` | SMTP user. |
+| `smtp_from` | `SMTP_FROM` | Email sender. |
+| `ntfy_url` | `ALERT_NTFY_URL` | ntfy destination. Uses the ntfy `grafana` template. |
+| `prometheus_retention` | `PROMETHEUS_RETENTION` | Metrics retention. Default: `30d`. |
+| `prometheus_retention_size` | `PROMETHEUS_RETENTION_SIZE` | Metrics storage limit. Default: `5GB`. |
+| `tempo_retention` | `TEMPO_RETENTION` | Trace retention. Default: `336h`. |
+
+The deployer writes these values to `/opt/<app>/monitoring/.env` with mode 0600.
+It quotes values and omits unset values, so Compose defaults apply.
+It also writes `DEPLOY_UID` and `DEPLOY_GID` from the VM user.
+The environment's `public_url` supplies `PUBLIC_URL` for the blackbox exporter.
+
+The journaled `monitoring` step starts the stack after the app release is recorded and before the `post` hooks.
+A failure leaves the app running and fails the deploy.
+Correct the monitoring problem, then run `spinup deploy --resume --env staging`.
 
 These values are secrets in `/opt/<app>/secrets`:
 
-- `GRAFANA_ADMIN_PASSWORD` (required). Grafana does not start without it.
+- `GRAFANA_ADMIN_PASSWORD` (required). Deploy preflight checks the decrypted secrets before the deploy changes the VM.
 - `SLACK_WEBHOOK_URL` (optional). It turns on Slack notifications.
 - `SMTP_PASSWORD` (optional).
+
+Set the password from standard input with `spinup secrets set --env staging GRAFANA_ADMIN_PASSWORD`.
 
 If you set no channel, Grafana still shows the alerts, but it sends nothing.
 Point the heartbeat at an external service, for example a healthchecks.io check with a 5-minute period.

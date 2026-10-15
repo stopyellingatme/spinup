@@ -23,7 +23,7 @@ import (
 
 // Steps are the journaled steps of a deploy, in order (ADR 0009 §2, architecture §14).
 // preflight and build run locally before the lock. The deployer journals them when it takes the lock.
-var Steps = []string{"preflight", "build", "hooks", "transport", "upload", "edge", "migrate", "switch", "smoke", "record", "post"}
+var Steps = []string{"preflight", "build", "hooks", "transport", "upload", "edge", "migrate", "switch", "smoke", "record", "monitoring", "post"}
 
 // DefaultLockTTL is the lifetime of the deploy lock. The deployer refreshes it throughout the run.
 const DefaultLockTTL = 30 * time.Minute

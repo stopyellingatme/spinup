@@ -145,6 +145,49 @@ The secret files have mode 0600 and the deploy user owns them.
 For this reason, `api`, `migrate`, `caddy`, and `postgres` run as `DEPLOY_UID:DEPLOY_GID`.
 `web` runs as the `node` user of its image.
 
+## Monitoring
+
+When the app selects the `monitoring` module, `spinup deploy` starts its rendered stack after `record` and before `post`.
+The `post` hooks can then annotate Grafana.
+The step uploads `monitoring/` to `/opt/<app>/monitoring.new/` and preserves file permissions.
+It replaces `/opt/<app>/monitoring/` and retains the previous tree as `monitoring.old/`.
+Docker keeps the data in named volumes.
+
+The step runs Compose as project `<app>-monitoring` with `up -d --wait --remove-orphans` and a five-minute timeout.
+The deployed API and web services send OTLP to `http://alloy:4318`.
+Their service names are `<app>-api` and `<app>-web`.
+
+Preflight requires `GRAFANA_ADMIN_PASSWORD` in the decrypted secrets for the selected environment.
+Set it from standard input with `spinup secrets set --env staging GRAFANA_ADMIN_PASSWORD`.
+The upload step writes it to `/opt/<app>/secrets/GRAFANA_ADMIN_PASSWORD` with mode 0600.
+Secret values never enter the monitoring `.env` file.
+
+The deployer writes `/opt/<app>/monitoring/.env` with mode 0600:
+
+| Key | Source |
+| --- | --- |
+| `DEPLOY_UID`, `DEPLOY_GID` | `id -u` and `id -g` on the VM |
+| `PUBLIC_URL` | `public_url` of the selected environment |
+| `HEARTBEAT_URL` | `[monitoring] heartbeat_url` |
+| `ALERT_EMAIL_TO` | `[monitoring] alert_email` |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_FROM` | `[monitoring] smtp_host`, `smtp_user`, `smtp_from` |
+| `ALERT_NTFY_URL` | `[monitoring] ntfy_url` |
+| `PROMETHEUS_RETENTION` | `[monitoring] prometheus_retention` |
+| `PROMETHEUS_RETENTION_SIZE` | `[monitoring] prometheus_retention_size` |
+| `TEMPO_RETENTION` | `[monitoring] tempo_retention` |
+
+The deployer quotes values and omits unset values, so Compose defaults apply.
+
+The profile in `spinup.toml` must match `monitoring_profile` in `spinup.lock`.
+If they differ, preflight fails before the deploy changes the VM.
+Restore the locked profile, or re-render the monitoring pack to change its services.
+The rendered files determine which services run.
+
+The journal records `skipped` when the module is absent, the profile is `none`, or `monitoring/compose.monitoring.yml` is absent.
+A monitoring failure fails the deploy after the app release is recorded.
+It does not roll back the app.
+Correct the monitoring problem, then run `spinup deploy --resume --env staging` to repeat the failed step.
+
 ## Hardening
 
 Every service has these settings:

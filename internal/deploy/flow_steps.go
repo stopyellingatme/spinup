@@ -118,7 +118,7 @@ func (f *flow) run(ctx context.Context) (err error) {
 		run  func(context.Context) (string, error)
 	}{
 		{"hooks", f.hooks}, {"transport", f.transport}, {"upload", f.upload}, {"edge", f.edge},
-		{"migrate", f.migrate}, {"switch", f.doSwitch}, {"smoke", f.smoke}, {"record", f.record}, {"post", f.post},
+		{"migrate", f.migrate}, {"switch", f.doSwitch}, {"smoke", f.smoke}, {"record", f.record}, {"monitoring", f.monitoring}, {"post", f.post},
 	}
 	for _, s := range steps {
 		if slices.Index(Steps, s.name) < start {

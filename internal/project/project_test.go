@@ -200,3 +200,41 @@ func TestEnvTransport(t *testing.T) {
 		}
 	}
 }
+
+func TestMonitoringSettings(t *testing.T) {
+	t.Parallel()
+	c, err := Parse([]byte(`[app]
+name = "todo"
+module = "example.com/todo"
+[monitoring]
+alert_email = "ops@example.com"
+smtp_host = "smtp.example.com:587"
+smtp_user = "alerts"
+smtp_from = "Alerts <alerts@example.com>"
+ntfy_url = "https://ntfy.example.com/alerts"
+prometheus_retention = "14d"
+prometheus_retention_size = "2GB"
+tempo_retention = "72h"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ got, want string }{
+		{c.Monitoring.Profile, "lite"},
+		{c.Monitoring.AlertEmail, "ops@example.com"},
+		{c.Monitoring.SMTPHost, "smtp.example.com:587"},
+		{c.Monitoring.SMTPUser, "alerts"},
+		{c.Monitoring.SMTPFrom, "Alerts <alerts@example.com>"},
+		{c.Monitoring.NtfyURL, "https://ntfy.example.com/alerts"},
+		{c.Monitoring.PrometheusRetention, "14d"},
+		{c.Monitoring.PrometheusRetentionSize, "2GB"},
+		{c.Monitoring.TempoRetention, "72h"},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("setting = %q, want %q", tc.got, tc.want)
+		}
+	}
+}
