@@ -15,6 +15,21 @@ Use `--dir <directory>` to select a project.
 Use `--offline` to prevent template downloads.
 If a template is unavailable, use `spinup cache warm`.
 
+## Remote checks
+
+Use `spinup doctor --remote --env <name>` to check a deployed VM.
+The command checks Docker, disk space, backups, secrets, certificates, monitoring, and host maintenance.
+The command also runs the existing VM memory check.
+Use `--json` to write the same result format as local doctor.
+Failures produce exit 1.
+Warnings do not produce a failure.
+
+This example needs a deployed environment, so the doc test does not run it:
+
+```sh
+spinup doctor --remote --env production --json
+```
+
 ```console
 $ spinup doctor --help
 ...
