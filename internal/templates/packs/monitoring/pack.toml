@@ -134,7 +134,7 @@ when = "monitoring_profile != 'none'"
 
 [[files]]
 path = "monitoring/grafana/dashboards/stack/backups.json"
-source = "files/monitoring/grafana/dashboards/stack/backups.json"
+source = "files/monitoring/grafana/dashboards/stack/backups.json.tmpl"
 class = "managed"
 when = "monitoring_profile != 'none'"
 

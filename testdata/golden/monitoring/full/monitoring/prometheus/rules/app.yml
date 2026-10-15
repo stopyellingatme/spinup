@@ -1,11 +1,21 @@
 # Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
 # monitoring/alerts/custom.yml.
 #
-# The app alerts. The kit sends the request metrics over OTLP (otelhttp):
-# http_server_request_duration_seconds, with one job label per service (<app>-api, <app>-web).
+# The API alerts. The kit sends HTTP RED metrics over OTLP (otelhttp):
+# http_server_request_duration_seconds, with the API service name as the job label (<app>-api).
+# The web service exports traces only. Web request metrics are out of scope.
 groups:
   - name: app
     rules:
+      # No traffic can also cause missing request metrics. This is a telemetry warning.
+      - alert: APIRequestMetricsMissing
+        expr: absent_over_time(http_server_request_duration_seconds_count[10m])
+        labels:
+          severity: warning
+        annotations:
+          summary: "API: no request metrics for 10 minutes"
+          description: "The API stopped sending HTTP request metrics. Check the API and Alloy. An API with no requests can also trigger this alert."
+
       - alert: HighErrorRate
         expr: |
           (

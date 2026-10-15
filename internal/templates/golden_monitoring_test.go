@@ -7,7 +7,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -311,5 +313,268 @@ func promtool(t *testing.T, dir string, args ...string) {
 	result, err := spexec.OSRunner{}.Run(ctx, spexec.Cmd{Name: "promtool", Args: args, Dir: dir})
 	if err != nil {
 		t.Errorf("promtool %s: %v\n%s%s", strings.Join(args, " "), err, result.Stdout, result.Stderr)
+	}
+}
+
+// TestMonitoringBodyRedaction applies the rendered OTTL regexes in their export order.
+func TestMonitoringBodyRedaction(t *testing.T) {
+	t.Parallel()
+	alloy := readDeployFile(t, renderMonitoring(t, "lite"), "monitoring/alloy/config.alloy")
+	// OTTL and Go use the same quoted string escapes and RE2 regex syntax.
+	statements := regexp.MustCompile(`replace_pattern\(body, ("(?:\\.|[^"\\])*"), ("(?:\\.|[^"\\])*")\)`).FindAllStringSubmatch(alloy, -1)
+	if len(statements) == 0 {
+		t.Fatal("no log-body replacements found")
+	}
+	for _, tc := range []struct{ name, body, secret string }{
+		{"header", "request failed Authorization: Bearer abcdef123456.xyz", "abcdef123456.xyz"},
+		{"logfmt", `authorization="Bearer abcdef123456xyz"`, "abcdef123456xyz"},
+		{"basic", "authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"},
+		{"short credential", "Authorization: Bearer short", "short"},
+		{"JSON spaces", `{"password":"hunter2 and more","message":"keep me"}`, "hunter2 and more"},
+		{"single quotes", "password='hunter2 and more' message=keep", "hunter2 and more"},
+		{"escaped quote", `{"password":"hunter2 \" and more"}`, "and more"},
+		{"ordinary text", "request completed successfully", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.body
+			for _, statement := range statements {
+				pattern, err := strconv.Unquote(statement[1])
+				if err != nil {
+					t.Fatal(err)
+				}
+				replacement, err := strconv.Unquote(statement[2])
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = regexp.MustCompile(pattern).ReplaceAllString(got, replacement)
+			}
+			if tc.secret == "" {
+				if got != tc.body {
+					t.Errorf("ordinary text changed: %q", got)
+				}
+				return
+			}
+			for _, word := range strings.Fields(tc.secret) {
+				if strings.Contains(got, word) {
+					t.Errorf("secret remains in %q", got)
+				}
+			}
+			if !strings.Contains(got, "[REDACTED]") {
+				t.Errorf("no redaction in %q", got)
+			}
+			if strings.Contains(tc.body, "keep me") && !strings.Contains(got, "keep me") {
+				t.Errorf("nonsecret field removed: %q", got)
+			}
+		})
+	}
+}
+
+func TestMonitoringDashboardCoverage(t *testing.T) {
+	t.Parallel()
+	for _, profile := range []string{"lite", "full"} {
+		t.Run(profile, func(t *testing.T) {
+			t.Parallel()
+			fsys := renderMonitoring(t, profile)
+			runtime := readDeployFile(t, fsys, "monitoring/grafana/dashboards/stack/go-runtime.json")
+			if strings.Contains(runtime, "process_cpu_seconds_total") {
+				t.Error("runtime dashboard queries a CPU metric the API does not produce")
+			}
+			backups := readDeployFile(t, fsys, "monitoring/grafana/dashboards/stack/backups.json")
+			if got := strings.Contains(backups, "pg_stat_archiver_"); got != (profile == "full") {
+				t.Errorf("WAL panels present = %v in profile %s", got, profile)
+			}
+			if !strings.Contains(backups, "backup_last_age_seconds") {
+				t.Error("backup age panel missing")
+			}
+			app := readDeployFile(t, fsys, "monitoring/prometheus/rules/app.yml")
+			if strings.Contains(app, "<app>-web") || !strings.Contains(app, "API") {
+				t.Error("HTTP RED must describe API coverage")
+			}
+		})
+	}
+}
+
+func TestMonitoringAlloyJob(t *testing.T) {
+	t.Parallel()
+	alloy := readDeployFile(t, renderMonitoring(t, "lite"), "monitoring/alloy/config.alloy")
+	// The self exporter supplies job=integrations/self, which overrides job_name.
+	if !strings.Contains(alloy, `replacement = "alloy"`) || !strings.Contains(alloy, `target_label = "job"`) {
+		t.Error("self scrape must replace the exporter job label with alloy")
+	}
+}
+
+func TestMonitoringAbsenceAlerts(t *testing.T) {
+	t.Parallel()
+	for _, profile := range []string{"lite", "full"} {
+		t.Run(profile, func(t *testing.T) {
+			t.Parallel()
+			fsys := renderMonitoring(t, profile)
+			dir := writeMonitoringTree(t, fsys)
+			// A healthy stack stays quiet. Missing and stale data fire the absence alerts.
+			tests := `rule_files:
+  - monitoring/prometheus/rules/stack.yml
+  - monitoring/prometheus/rules/app.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="alloy",instance="self"}'
+        values: '1+0x20'
+      - series: 'http_server_request_duration_seconds_count{job="todo-api"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AlloyMissing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: APIRequestMetricsMissing
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{job="alloy",instance="self"}'
+        values: '1 1 stale _x15'
+      - series: 'http_server_request_duration_seconds_count{job="todo-api"}'
+        values: '1 2 stale _x15'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="AlloyMissing",alertstate="firing"}'
+        eval_time: 4m
+        exp_samples: []
+      - expr: 'ALERTS{alertname="AlloyMissing",alertstate="firing"}'
+        eval_time: 8m
+        exp_samples:
+          - labels: 'ALERTS{alertname="AlloyMissing",alertstate="firing",job="alloy",severity="critical"}'
+            value: 1
+      - expr: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing"}'
+        eval_time: 13m
+        exp_samples:
+          - labels: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing",severity="warning"}'
+            value: 1
+  - interval: 1m
+    promql_expr_test:
+      - expr: 'ALERTS{alertname=~"AlloyMissing|APIRequestMetricsMissing",alertstate="firing"}'
+        eval_time: 15m
+        exp_samples:
+          - labels: 'ALERTS{alertname="AlloyMissing",alertstate="firing",job="alloy",severity="critical"}'
+            value: 1
+          - labels: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing",severity="warning"}'
+            value: 1
+`
+			if err := os.WriteFile(filepath.Join(dir, "absence.yml"), []byte(tests), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			promtool(t, dir, "test", "rules", "absence.yml")
+		})
+	}
+}
+
+func TestMonitoringGrafanaPassword(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name                  string
+		supported, resetFails bool
+	}{
+		{name: "rotate", supported: true},
+		{name: "reset failure", supported: true, resetFails: true},
+		{name: "manual fallback"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			const password = `new ' " $(touch injected) ` + "`touch injected`" + ` ; $HOME \\ password`
+			files := map[string]string{
+				"secrets/GRAFANA_ADMIN_PASSWORD": password,
+				"source/.keep":                   "",
+				"bin/wget": `#!/bin/sh
+if [ -f "$TEST_ROOT/started" ]; then
+ touch "$TEST_ROOT/healthy"
+ exit 0
+fi
+exit 1
+`,
+				"bin/grafana": `#!/bin/sh
+for arg do
+ if [ "$arg" = --help ]; then
+  if [ "$SUPPORTED" = true ]; then echo --password-from-stdin; fi
+  exit 0
+ fi
+done
+if [ ! -f "$TEST_ROOT/healthy" ]; then exit 2; fi
+printf '%s\n' "$@" > "$TEST_ROOT/args"
+IFS= read -r password
+printf '%s' "$password" > "$TEST_ROOT/password"
+if [ "$RESET_FAILS" = true ]; then exit 1; fi
+touch "$TEST_ROOT/reset"
+`,
+				"server.sh": `#!/bin/sh
+trap 'exit 0' TERM INT
+touch "$TEST_ROOT/started"
+# A reset failure must stop the server. The outer test timeout catches a missing stop.
+if [ "$RESET_FAILS" = true ]; then
+ while :; do sleep 0.1; done
+fi
+if [ "$SUPPORTED" = true ]; then
+ while [ ! -f "$TEST_ROOT/reset" ]; do sleep 0.1; done
+fi
+exit 0
+`,
+			}
+			for name, data := range files {
+				target := filepath.Join(root, name)
+				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(target, []byte(data), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			script := readDeployFile(t, renderMonitoring(t, "lite"), "monitoring/grafana/entrypoint.sh")
+			script = strings.NewReplacer("/run/secrets", filepath.Join(root, "secrets"), "/etc/spinup/provisioning", filepath.Join(root, "source"), "/run.sh", filepath.Join(root, "server.sh")).Replace(script)
+			scriptPath := filepath.Join(root, "entrypoint.sh")
+			if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			result, err := spexec.OSRunner{}.Run(t.Context(), spexec.Cmd{
+				Name: "sh", Args: []string{scriptPath}, Dir: root, Timeout: 5 * time.Second,
+				Env: []string{"TEST_ROOT=" + root, "PATH=" + filepath.Join(root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"), "GF_PATHS_PROVISIONING=" + filepath.Join(root, "provisioning"), "SUPPORTED=" + strconv.FormatBool(tc.supported), "RESET_FAILS=" + strconv.FormatBool(tc.resetFails)},
+			})
+			if tc.resetFails {
+				if err == nil {
+					t.Fatal("Grafana started despite a failed password reset")
+				}
+				if !strings.Contains(string(result.Stderr), "Try:") {
+					t.Errorf("reset failure has no guidance: %s", result.Stderr)
+				}
+			} else if err != nil {
+				t.Fatalf("start Grafana: %v\n%s%s", err, result.Stdout, result.Stderr)
+			}
+			if tc.supported {
+				got, readErr := os.ReadFile(filepath.Join(root, "password"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				if string(got) != password {
+					t.Errorf("password changed during stdin transfer: %q", got)
+				}
+				args, readErr := os.ReadFile(filepath.Join(root, "args"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				if !strings.Contains(string(args), "--password-from-stdin") || strings.Contains(string(args), password) {
+					t.Errorf("password must enter the CLI through stdin: %s", args)
+				}
+				if !strings.Contains(string(args), "cfg:default.paths.data=") {
+					t.Errorf("CLI must use the server database: %s", args)
+				}
+			} else if !strings.Contains(string(result.Stderr), "manual reset") {
+				t.Errorf("unsupported CLI needs manual reset guidance: %s", result.Stderr)
+			}
+			if _, err := os.Stat(filepath.Join(root, "injected")); !os.IsNotExist(err) {
+				t.Fatal("password executed as shell code")
+			}
+			if strings.Contains(string(result.Stdout)+string(result.Stderr), password) {
+				t.Fatal("password leaked in startup output")
+			}
+		})
 	}
 }
