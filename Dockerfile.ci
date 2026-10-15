@@ -1,0 +1,46 @@
+# Pins come from internal/stackversions/stackversions.yaml.
+FROM golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS golang
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+
+ARG TARGETARCH
+ARG TARGETPLATFORM
+ENV PATH=/usr/local/go/bin:$PATH \
+    GOTOOLCHAIN=local \
+    CGO_ENABLED=0 \
+    COREPACK_HOME=/opt/corepack \
+    COREPACK_DEFAULT_TO_LATEST=0 \
+    SPINUP_NO_UPDATE_CHECK=1
+COPY --from=golang /usr/local/go /usr/local/go
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git openssh-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack install --global pnpm@12.11.2 \
+    && chmod -R a+rX /opt/corepack
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) sops_sum=e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b; \
+             age_sum=cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10 ;; \
+      arm64) sops_sum=53b0abacd38ef1b12a66d6c100956691b9cefce018d91f81e73ddf7438b94d77; \
+             age_sum=6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4 ;; \
+      *) echo 'Unsupported TARGETARCH' >&2; exit 1 ;; \
+    esac; \
+    curl --fail --silent --show-error --location \
+      "https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.$TARGETARCH" -o /tmp/sops; \
+    printf '%s  /tmp/sops\n' "$sops_sum" | sha256sum -c -; \
+    install -m 0755 /tmp/sops /usr/local/bin/sops; \
+    curl --fail --silent --show-error --location \
+      "https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-$TARGETARCH.tar.gz" -o /tmp/age.tar.gz; \
+    printf '%s  /tmp/age.tar.gz\n' "$age_sum" | sha256sum -c -; \
+    tar -xzf /tmp/age.tar.gz -C /tmp; \
+    install -m 0755 /tmp/age/age /tmp/age/age-keygen /usr/local/bin/; \
+    rm -rf /tmp/sops /tmp/age /tmp/age.tar.gz
+
+# GoReleaser provides the binary for this target in the Docker build context.
+COPY --chmod=0755 $TARGETPLATFORM/spinup /usr/local/bin/spinup
+RUN useradd --create-home --uid 10001 --shell /bin/sh spinup \
+    && mkdir /workspace \
+    && chown spinup:spinup /workspace
+USER spinup
+WORKDIR /workspace
+CMD ["spinup", "version"]
