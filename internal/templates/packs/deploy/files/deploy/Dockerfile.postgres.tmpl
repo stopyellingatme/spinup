@@ -6,7 +6,7 @@
 #
 # The official Postgres image already has the apt.postgresql.org repository. pgBackRest comes
 # from it at the version that spinup pins. The backups pack sets archive_mode and
-# archive_command in postgres/conf.d/, which compose.edge.yml mounts.
+# archive_command in deploy/compose.backups.yml, an override of compose.edge.yml.
 FROM [[ image $pg ]]
 ARG PGBACKREST_VERSION=[[ index .Stack.Apt "pgbackrest" ]]
 RUN apt-get update \

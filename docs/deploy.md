@@ -176,7 +176,7 @@ A new pin gives a new tag, so Compose builds the new image.
 
 Postgres reads `/etc/postgresql/postgresql.conf`. On the VM, this directory is `/opt/<app>/postgres`.
 The file sets `max_connections = 200`, because both colors connect during a switch.
-It includes `conf.d/`. The backups pack puts its archive settings there.
+It includes `conf.d/` for your own settings. The backups pack sets its archive settings in `deploy/compose.backups.yml`, which the deployer loads after `compose.edge.yml`.
 
 ## Environments
 
