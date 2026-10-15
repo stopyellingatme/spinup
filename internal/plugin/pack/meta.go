@@ -48,7 +48,15 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 	if err != nil {
 		return meta, err
 	}
+	for _, question := range p.Questions {
+		if !question.HasDefault() {
+			return meta, fmt.Errorf("validate plugin question %q: a default is required for upgrades\nTry: add a default to the plugin question", question.Key)
+		}
+	}
 	for _, file := range p.Files {
+		if strings.Split(file.Source, "/")[0] == "@gen" {
+			return meta, problem("validate plugin source", fmt.Errorf("source %q uses the reserved @gen namespace", file.Source))
+		}
 		if err := CheckOutputPath(file.Path); err != nil {
 			return meta, err
 		}

@@ -40,7 +40,7 @@ func addPlugins(ctx context.Context, o Options, result *Result, prompter Prompte
 		return err
 	}
 	var out bytes.Buffer
-	m := &pack.Manager{Root: temp, CLIVersion: o.Version, Trust: o.Trust, Offline: o.Offline, Out: &out}
+	m := &pack.Manager{Root: temp, PathRoot: result.Dir, CLIVersion: o.Version, Trust: o.Trust, Offline: o.Offline, Out: &out}
 	if o.Interactive && !o.Trust && prompter != nil {
 		m.Interactive = true
 		m.In = &trustReader{ctx: ctx, prompter: prompter, out: &out}
@@ -55,13 +55,17 @@ func addPlugins(ctx context.Context, o Options, result *Result, prompter Prompte
 			if err != nil {
 				return creationError(err)
 			}
-			source = "path:" + absolute
+			relative, err := filepath.Rel(result.Dir, absolute)
+			if err != nil {
+				return creationError(err)
+			}
+			source = "path:" + filepath.ToSlash(relative)
 		}
 		if err := m.Add(ctx, source, version); err != nil {
 			return err
 		}
 	}
-	loaded, err := plugin.Resolve(ctx, plugin.Options{Root: temp, Offline: o.Offline})
+	loaded, err := plugin.Resolve(ctx, plugin.Options{Root: temp, Offline: true})
 	if err != nil {
 		return err
 	}

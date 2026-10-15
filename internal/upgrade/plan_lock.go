@@ -29,14 +29,18 @@ func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[st
 		selection = target[0]
 	}
 	version, packs := selection.resolve(to, old.Packs)
-	rendered, err := Render(version, packs, answers)
+	_, completed, err := loadPlanPacks(version, packs, answers)
+	if err != nil {
+		return nil, err
+	}
+	rendered, err := Render(version, packs, completed)
 	if err != nil {
 		return nil, err
 	}
 	next := *old
 	next.TemplateVersion = to.Version
 	next.FormatterGo = runtime.Version()
-	next.Answers = clonePlanAnswers(answers)
+	next.Answers = clonePlanAnswers(completed)
 	next.Packs = slices.Clone(packs)
 	next.Plugins = pluginrender.Plugins(version.Packs)
 	next.AppliedMigrations = slices.Clone(old.AppliedMigrations)

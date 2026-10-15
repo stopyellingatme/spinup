@@ -112,7 +112,7 @@ func generate(ctx context.Context, p plugin.Loaded, spec plugin.GeneratorSpec, i
 				return nil, fmt.Errorf("format plugin output %q: %w\nTry: correct the plugin template", dest, err)
 			}
 		}
-		if err := output.Plan.Add(vfs.File{Path: dest, Data: manifest.Normalize(content), Class: file.Class, Mode: 0644, Template: "plugin/" + p.Meta.Name + "/gen/" + spec.Name}); err != nil {
+		if err := output.Plan.Add(vfs.File{Path: dest, Data: manifest.Normalize(content), Class: file.Class, Mode: 0644, Template: "plugin/" + p.Meta.Name + "/@gen/" + spec.Name}); err != nil {
 			return nil, err
 		}
 	}
