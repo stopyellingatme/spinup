@@ -1,0 +1,19 @@
+# Alternate path expressions keep metadata keys unique before conditional rendering.
+
+[[files]]
+path = '[[ "web/vite.config.js" ]]'
+source = "embed/vite.config.js"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = '[[ "web/src/routes/+layout.ts" ]]'
+source = "embed/layout.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = '[[ "web/src/routes/+layout.svelte" ]]'
+source = "embed/layout.svelte.tmpl"
+class = "scaffold"
+when = "frontend_mode == 'embed'"

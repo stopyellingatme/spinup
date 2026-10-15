@@ -1,5 +1,4 @@
-// Package sdk is the protocol of tier-2 spinup plugins: JSON-RPC 2.0 over stdin and stdout
-// (ADR 0014 §1). Plugins call Serve.
-//
-// Stub from the M10 pre-seed. Unit M10.1 replaces it.
+// Package sdk defines API 1 for executable spinup plugins.
+// Plugins implement Handler and call Serve to exchange JSON-RPC 2.0 objects,
+// one per line, over stdin and stdout. Diagnostics belong on stderr.
 package sdk

@@ -161,3 +161,63 @@ func TestRegisteredPostStepAndPreview(t *testing.T) {
 		})
 	}
 }
+
+func TestVariants(t *testing.T) {
+	t.Parallel()
+	for _, pm := range []string{"pnpm", "bun"} {
+		for _, api := range []string{"openapi-fetch", "heyapi"} {
+			t.Run(pm+"/"+api, func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				lock := manifest.New()
+				lock.Packs = []string{"base", "api", "web"}
+				lock.Answers = map[string]any{"package_manager": pm, "api_client": api}
+				if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+					t.Fatal(err)
+				}
+				write(t, root, "api/openapi/bundle.gen.yaml", "openapi: 3.0.3\n")
+				var fake exec.Fake
+				name, prefix := pm, []string{"--dir", "web"}
+				install := append(append([]string{}, prefix...), "install", "--frozen-lockfile")
+				if pm == "bun" {
+					install = []string{"install", "--frozen-lockfile"}
+				}
+				fake.Expect(pm, install...)
+				execPrefix := append(append([]string{}, prefix...), "exec")
+				if pm == "bun" {
+					name = "bunx"
+					execPrefix = []string{"--no-install"}
+				}
+				if api == "heyapi" {
+					fake.Expect(name, append(append([]string{}, execPrefix...), "openapi-ts", "--input", "../api/openapi/bundle.gen.yaml", "--output", "src/lib/api/client")...)
+				}
+				fake.Expect(name, append(append([]string{}, execPrefix...), "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", "src/lib/api/schema.d.ts")...)
+				var notices bytes.Buffer
+				if err := generate(t.Context(), root, &fake, &notices); err != nil {
+					t.Fatal(err)
+				}
+				fake.AssertDone(t)
+				for _, call := range fake.Calls() {
+					wantDir := root
+					if pm == "bun" {
+						wantDir = filepath.Join(root, "web")
+					}
+					if call.Dir != wantDir {
+						t.Fatalf("command directory = %s, want %s", call.Dir, wantDir)
+					}
+				}
+				out, err := plan(t.Context(), gen.Input{Lock: lock})
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := "cd web && pnpm check"
+				if pm == "bun" {
+					want = "cd web && bun run check"
+				}
+				if out.Next[0] != want {
+					t.Fatalf("next = %v", out.Next)
+				}
+			})
+		}
+	}
+}

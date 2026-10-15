@@ -35,9 +35,15 @@ jobs:
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+[[- if eq (index . "package_manager") "bun" ]]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+[[- end ]]
 [[- end ]]
       - uses: ./.github/actions/setup-spinup
         id: setup

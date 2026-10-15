@@ -1,4 +1,4 @@
-[[- $web := index . "shadcn_registry" -]]
+[[- $web := and (index . "shadcn_registry") (ne (index . "frontend_mode") "embed") -]]
 # Deploy settings of the staging environment. `spinup deploy --env staging` reads this file.
 # The host, the SSH user, public_url, and the protected flag are in spinup.toml
 # under [env.staging]. The secrets are in secrets/staging.enc.yaml.

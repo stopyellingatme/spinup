@@ -1,0 +1,8 @@
+name = "exec-hello"
+version = "1.0.0"
+api = 1
+spinup = ">=0.0.0"
+description = "A small executable generator and check"
+kind = "exec"
+[exec]
+binaries = { "darwin-arm64" = "bin/exec-hello_darwin_arm64", "linux-amd64" = "bin/exec-hello_linux_amd64" }

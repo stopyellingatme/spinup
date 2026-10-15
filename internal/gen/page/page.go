@@ -16,6 +16,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/vfs"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
@@ -91,6 +92,9 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if in.Flags != nil {
 		server, _ = in.Flags.GetBool("server")
 	}
+	if server && in.Lock.Answers["frontend_mode"] == "embed" {
+		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")
+	}
 	dir := "web/src/routes/" + strings.Join(segments, "/")
 	name := title(segments)
 	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server), Class: string(manifest.Scaffold)}}
@@ -103,7 +107,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 			return nil, err
 		}
 	}
-	return &gen.Output{Plan: p, Next: []string{"cd web && pnpm check"}}, nil
+	return &gen.Output{Plan: p, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
 }
 
 func pageSvelte(dir, name string, server bool) []byte {

@@ -1,0 +1,21 @@
+name = "example"
+version = "0.1.0"
+api = 1
+spinup = ">=0.0.0"
+kind = "exec"
+description = "Templates for example."
+
+[exec]
+# Build each declared binary before distributing this plugin.
+binaries = { "linux-amd64" = "bin/example_linux_amd64" }
+
+[[generators]]
+name = "example-note"
+short = "Create a note"
+usage = "example-note <Name>"
+args = ["Name"]
+
+[[generators.files]]
+path = "notes/{{.Name}}.txt"
+source = "files/note.txt.tmpl"
+class = "scaffold"

@@ -3,6 +3,7 @@ package quick
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -174,5 +175,34 @@ func TestRegisteredQuickChecks(t *testing.T) {
 		if !found[name] {
 			t.Errorf("missing quick check: %s", name)
 		}
+	}
+}
+
+func TestBunPackageManager(t *testing.T) {
+	t.Parallel()
+	for _, absent := range []bool{false, true} {
+		t.Run(fmt.Sprint(absent), func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			lock := manifest.New()
+			lock.Packs = []string{"web"}
+			lock.Answers["package_manager"] = "bun"
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			var fake exec.Fake
+			e := fake.Expect("bun", "--version").Return("1.3.9", "", 0)
+			if absent {
+				e.Fail(errors.New("not installed"))
+			}
+			got := pnpm(t.Context(), &doctor.Context{Root: root, Deps: map[string]any{"runner": &fake}})
+			if absent && (got.Status != doctor.Fail || !strings.Contains(got.Message, "bun")) {
+				t.Fatalf("result = %+v", got)
+			}
+			if !absent && (got.Status != doctor.OK || got.Message != "bun 1.3.9") {
+				t.Fatalf("result = %+v", got)
+			}
+			fake.AssertDone(t)
+		})
 	}
 }

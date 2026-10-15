@@ -1,10 +1,42 @@
+[[- if eq (index . "frontend_mode") "embed" -]]
+# Build with the API context and the web context:
+# docker build -f deploy/Dockerfile.api --build-context web=web api
+FROM [[ image "node" ]] AS web-build
+[[- if eq (index . "package_manager") "bun" ]]
+RUN npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+[[- end ]]
+WORKDIR /web
+[[- if eq (index . "package_manager") "bun" ]]
+COPY --from=web package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts
+[[- else ]]
+COPY --from=web package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+[[- end ]]
+COPY --from=web . .
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.
+[[- if eq (index . "package_manager") "bun" ]]
+RUN bunx --no-install svelte-kit sync && bun run build
+[[- else ]]
+RUN pnpm exec svelte-kit sync && pnpm build
+[[- end ]]
+
+[[ end -]]
 FROM [[ image "golang" ]] AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+[[- if eq (index . "frontend_mode") "embed" ]]
+# A local web build can leave old assets in the context. The image embeds only the new build.
+RUN rm -rf internal/webdist/dist
+COPY --from=web-build /web/build ./internal/webdist/dist
+[[- end ]]
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 go build[[ if eq (index . "frontend_mode") "embed" ]] -tags embedweb[[ end ]] -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
 
 FROM [[ image "distroless-static" ]]
 ENV SPINUP_ENV=production

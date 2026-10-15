@@ -1,0 +1,23 @@
+package main
+
+import (
+	"context"
+	"os/exec"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/stopyellingatme/spinup/plugin-sdk/sdk/conformance"
+)
+
+func TestConformance(t *testing.T) {
+	t.Parallel()
+	binary := filepath.Join(t.TempDir(), "plugin")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", binary, ".")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build plugin: %v\n%s", err, output)
+	}
+	conformance.Run(t, binary)
+}

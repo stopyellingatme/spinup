@@ -1,0 +1,53 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      # The pages show GitHub expressions such as ${{ secrets.X }}. Liquid must not render them,
+      # so wrap each page body (after any front matter) in a raw block in this checkout only.
+      - name: Escape Liquid
+        run: |
+          find docs -name '*.md' -print0 | while IFS= read -r -d '' f; do
+            awk '
+              NR == 1 && $0 == "---" { fm = 1; print; next }
+              fm { print; if ($0 == "---") { fm = 0; print "{% raw %}"; opened = 1 }; next }
+              !opened { print "{% raw %}"; opened = 1 }
+              { print }
+              END { if (!opened) print "{% raw %}"; print "{% endraw %}" }
+            ' "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+          done
+      - id: build
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1.0.13
+        with:
+          source: ./docs
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@fc430e030ddbb5b0abf93d22962f4752f3646cd9 # v5.0.0
+        with:
+          path: ./_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+

@@ -257,3 +257,41 @@ func TestDepsRefreshesWebLockfile(t *testing.T) {
 		})
 	}
 }
+
+func TestBunLockRefresh(t *testing.T) {
+	t.Parallel()
+	for _, conflict := range []bool{false, true} {
+		t.Run(fmt.Sprint(conflict), func(t *testing.T) {
+			t.Parallel()
+			s := phaseStep(t)
+			s.Answers = map[string]any{"package_manager": "bun"}
+			dir := filepath.Join(s.Worktree, "web")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			s.Out = &out
+			fake := s.Runner.(*exec.Fake)
+			if conflict {
+				s.Plan = &Plan{Files: []FileDecision{{Path: "web/package.json", Action: ActionConflict}}}
+			} else {
+				fake.Expect("bun", "install", "--lockfile-only")
+			}
+			if err := webDeps(t.Context(), s); err != nil {
+				t.Fatal(err)
+			}
+			fake.AssertDone(t)
+			if conflict && (!strings.Contains(out.String(), "web/bun.lock") || !strings.Contains(out.String(), "bun install")) {
+				t.Fatal(out.String())
+			}
+			for _, c := range fake.Calls() {
+				if c.Dir != dir || len(c.Args) != 2 {
+					t.Fatalf("command = %+v", c)
+				}
+			}
+		})
+	}
+}

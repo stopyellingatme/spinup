@@ -72,3 +72,15 @@ func TestPlanRefusals(t *testing.T) {
 		})
 	}
 }
+
+func TestBunComponent(t *testing.T) {
+	t.Parallel()
+	out, err := plan(t.Context(), gen.Input{Lock: lock(web, map[string]any{"package_manager": "bun"}), Args: []string{"dialog"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"bunx", "shadcn-svelte@1.7.0", "add", "dialog", "--yes", "--no-deps-install"}
+	if !reflect.DeepEqual(out.Commands[0].Argv, want) || out.Next[0] != "cd web && bun install" || out.Next[1] != "cd web && bun run check" {
+		t.Fatalf("output = %+v", out)
+	}
+}

@@ -1,0 +1,147 @@
+# Embed mode builds offline and serves the static build through kit app.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+# Bun apps use Bun in the embedded image and the upgrade workflow.
+exec spinup new embeddedbun --module example.com/embeddedbun --frontend-mode embed --package-manager bun --modules ci --no-git --non-interactive
+grep 'RUN npm install --global bun@[0-9]' embeddedbun/deploy/Dockerfile.api
+grep 'COPY --from=web package.json bun.lock ./' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bun install --frozen-lockfile --ignore-scripts' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bunx --no-install svelte-kit sync && bun run build' embeddedbun/deploy/Dockerfile.api
+! grep 'pnpm|corepack' embeddedbun/deploy/Dockerfile.api
+grep 'npm install --global bun@[0-9]' embeddedbun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' embeddedbun/.github/workflows/upgrade-check.yml
+exec spinup new nodebun --module example.com/nodebun --package-manager bun --modules ci --no-git --non-interactive
+grep 'npm install --global bun@[0-9]' nodebun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' nodebun/.github/workflows/upgrade-check.yml
+exec spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
+cd embedded
+! exists deploy/Dockerfile.web web/src/hooks.server.ts web/src/routes/+layout.server.ts
+! grep 'WEB_IMAGE' deploy/compose.yml
+grep 'ssr = false' web/src/routes/+layout.ts
+exec spinup g page about
+! exec spinup g page settings --server
+stderr 'embed mode'
+stderr 'Try:'
+! exists web/src/routes/settings/+page.svelte
+! exec spinup g resource todo title:string --dry-run
+stderr 'embed mode'
+stderr 'Try:'
+! exists api/db/migrations/00002_create_todos.sql
+cd ..
+! exec spinup new invalid --module example.com/invalid --frontend-mode embed --modules auth --no-git --non-interactive
+stderr 'cannot use auth in embed mode'
+stderr 'Try:'
+! exists invalid
+cd embedded
+env GOWORK=off
+exec spinup build --dry-run
+stdout 'pnpm --dir web install --frozen-lockfile'
+stdout 'pnpm --dir web build'
+stdout 'go build -tags embedweb'
+# Image previews need no Docker engine. Keep the local kit restriction.
+! exec spinup build --image --dry-run
+stderr 'local kit replace'
+cp api/go.mod api/go.mod.local
+exec sh $WORK/image-mod.sh
+exec spinup build --image --dry-run
+stdout '--build-context web=web'
+! stdout 'Dockerfile.web'
+# The optional Docker gate requires cached images and published kit dependencies.
+[env:SPINUP_EMBED_DOCKER] [exec:docker] exec spinup build --image
+# A fake Docker binary tests the CLI image path without an engine or network.
+mkdir $WORK/fakebin
+cp $WORK/docker.sh $WORK/fakebin/docker
+chmod 0755 $WORK/fakebin/docker
+env PATH=$WORK/fakebin:$PATH
+env SPINUP_DOCKER_ARGS=$WORK/docker.args
+exec spinup build --image
+grep '--build-context web=web' $WORK/docker.args
+stdout 'embedded-api:dev'
+! grep 'Dockerfile.web' $WORK/docker.args
+cp api/go.mod.local api/go.mod
+rm api/go.mod.local
+cd web
+exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_HOME/Library/pnpm/store
+exec pnpm check
+stdout '(?i)\b0 errors\b'
+cd ..
+# Keep every package manager invocation offline, including spinup build.
+env npm_config_offline=true
+exec spinup build
+exists web/build/index.html api/internal/webdist/dist/index.html api/bin/api
+! exists web/build/index.js
+cd api
+# The recorder verifies the actual embedded build without requiring a listening socket.
+# The SvelteKit SPA shell starts the app with an inline script that imports the hashed start entry.
+cp $WORK/spa_test.go internal/webdist/spa_test.go
+exec go test -tags embedweb ./internal/webdist
+# The milestone gate also tests the generated process over HTTP.
+[!env:SPINUP_EMBED_LIVE] stop
+[!exec:curl] skip 'curl is required for the live HTTP check'
+env DATABASE_URL=postgres://unused:unused@127.0.0.1:1/unused?sslmode=disable
+env SPINUP_ENV=production
+env PORT=38439
+exec ./bin/api &api&
+exec curl -sS --retry 15 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38439/healthz
+stdout '^200$'
+grep '"status":"ok"' health.json
+exec curl -sS -o index.html -w '%{http_code}' http://127.0.0.1:38439/
+stdout '^200$'
+grep 'import\("/_app/immutable/entry/start\.' index.html
+exec curl -sS -o deep.html -w '%{http_code}' http://127.0.0.1:38439/deep/link
+stdout '^200$'
+cmp index.html deep.html
+exec sh $WORK/asset.sh
+grep 'Cache-Control: public, max-age=31536000, immutable' asset.headers
+kill -INT api
+wait api
+
+-- image-mod.sh --
+set -eu
+sed '/^replace github.com\/stopyellingatme\/spinup\/kit => /d' api/go.mod > api/go.mod.image
+mv api/go.mod.image api/go.mod
+
+-- docker.sh --
+#!/bin/sh
+set -eu
+printf '%s\n' "$*" > "$SPINUP_DOCKER_ARGS"
+
+-- asset.sh --
+set -eu
+asset=$(find internal/webdist/dist/_app/immutable -type f -name '*.js' | head -n 1)
+path=${asset#internal/webdist/dist}
+curl -sS -D asset.headers -o /dev/null "http://127.0.0.1:38439$path"
+
+-- spa_test.go --
+package webdist
+
+import (
+ "io/fs"
+ "net/http"
+ "net/http/httptest"
+ "strings"
+ "testing"
+
+ "github.com/stopyellingatme/spinup/kit/app"
+)
+
+func TestEmbeddedBuild(t *testing.T) {
+ t.Parallel()
+ handler := app.New(app.WithSPA(FS)).Handler()
+ for _, path := range []string{"/", "/deep/link"} {
+  w := httptest.NewRecorder()
+  handler.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", path, nil))
+  if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `import("/_app/immutable/entry/start.`) || w.Header().Get("Cache-Control") != "no-cache" {
+   t.Fatalf("SPA %s: %d %v %s", path, w.Code, w.Header(), w.Body)
+  }
+ }
+ w := httptest.NewRecorder()
+ handler.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", "/healthz", nil))
+ if w.Code != 200 || !strings.Contains(w.Body.String(), `"status":"ok"`) { t.Fatal(w.Code, w.Body) }
+ assets, err := fs.Glob(FS, "_app/immutable/entry/*.js")
+ if err != nil || len(assets) == 0 { t.Fatalf("hashed assets: %v %v", assets, err) }
+ for _, asset := range assets {
+  w := httptest.NewRecorder()
+  handler.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", "/"+asset, nil))
+  if w.Code != 200 || w.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" { t.Fatal(asset, w.Code, w.Header()) }
+ }
+}

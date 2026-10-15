@@ -13,6 +13,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/gen/run"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 func init() {
@@ -24,7 +25,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate client: expected no positional arguments\nTry: spinup g client")
 	}
-	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI, gen.PostClient}, Next: []string{"cd web && pnpm check"}}, nil
+	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI, gen.PostClient}, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
 }
 
 func postStep(ctx context.Context, root string, _ []string, r exec.Runner) error {
@@ -54,10 +55,11 @@ func generate(ctx context.Context, root string, r exec.Runner, notices io.Writer
 		}
 		return nil
 	}
+	tool := webtool.FromLock(lock)
 	info, err := os.Stat(filepath.Join(root, "web/node_modules"))
 	switch {
 	case os.IsNotExist(err):
-		if err := pnpm(ctx, root, r, "--dir", "web", "install", "--frozen-lockfile"); err != nil {
+		if err := command(ctx, r, tool.InWeb(root, tool.Install(true, false))); err != nil {
 			return err
 		}
 	case err != nil:
@@ -65,22 +67,34 @@ func generate(ctx context.Context, root string, r exec.Runner, notices io.Writer
 	case !info.IsDir():
 		return fmt.Errorf("cannot generate client: web/node_modules is not a directory\nTry: remove web/node_modules, then run spinup g client")
 	}
-	return GenerateTypes(ctx, root, "src/lib/api/schema.d.ts", r)
+	return GenerateTypes(ctx, root, tool.ClientOutput(), r)
 }
 
-// GenerateTypes runs openapi-typescript from root and writes to output relative to web/.
-// An absolute output path permits drift checks without changing the application schema.
+// GenerateTypes runs the selected client generator with output relative to web/.
+// An absolute output path permits drift checks without changing application files.
+// Heyapi also generates schema.d.ts beside its output for resource page types.
 func GenerateTypes(ctx context.Context, root, output string, r exec.Runner) error {
-	return pnpm(ctx, root, r, "--dir", "web", "exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", output)
+	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+	if err != nil {
+		return err
+	}
+	tool := webtool.FromLock(lock)
+	if err := command(ctx, r, tool.InWeb(root, tool.Client(output))); err != nil {
+		return err
+	}
+	if tool.HeyAPI() {
+		return command(ctx, r, tool.InWeb(root, tool.Schema(filepath.ToSlash(filepath.Join(filepath.Dir(output), "schema.d.ts")))))
+	}
+	return nil
 }
 
-func pnpm(ctx context.Context, root string, r exec.Runner, args ...string) error {
-	result, err := r.Run(ctx, exec.Cmd{Name: "pnpm", Args: args, Dir: root})
+func command(ctx context.Context, r exec.Runner, cmd exec.Cmd) error {
+	result, err := r.Run(ctx, cmd)
 	if err != nil {
-		return fmt.Errorf("run pnpm for client generation: %w\n%s%s\nTry: ensure pnpm is on PATH, correct the tool error, then run spinup g client", err, result.Stdout, result.Stderr)
+		return fmt.Errorf("run %s for client generation: %w\n%s%s\nTry: ensure %s is on PATH, correct the tool error, then run spinup g client", cmd.Name, err, result.Stdout, result.Stderr, cmd.Name)
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("pnpm for client generation exited with code %d\n%s%s\nTry: correct the tool error, then run spinup g client", result.ExitCode, result.Stdout, result.Stderr)
+		return fmt.Errorf("%s for client generation exited with code %d\n%s%s\nTry: correct the tool error, then run spinup g client", cmd.Name, result.ExitCode, result.Stdout, result.Stderr)
 	}
 	return nil
 }

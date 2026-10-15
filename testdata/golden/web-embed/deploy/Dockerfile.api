@@ -1,0 +1,29 @@
+# Build with the API context and the web context:
+# docker build -f deploy/Dockerfile.api --build-context web=web api
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS web-build
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /web
+COPY --from=web package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY --from=web . .
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.
+RUN pnpm exec svelte-kit sync && pnpm build
+
+FROM golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# A local web build can leave old assets in the context. The image embeds only the new build.
+RUN rm -rf internal/webdist/dist
+COPY --from=web-build /web/build ./internal/webdist/dist
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -tags embedweb -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+ENV SPINUP_ENV=production
+COPY --from=build /out/api /api
+USER nonroot
+EXPOSE 8080
+ENTRYPOINT ["/api"]

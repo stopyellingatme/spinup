@@ -1,4 +1,4 @@
-[[- $web := index . "shadcn_registry" -]]
+[[- $web := and (index . "shadcn_registry") (ne (index . "frontend_mode") "embed") -]]
 [[- $monitoring := index . "monitoring_profile" -]]
 # Managed by spinup: `spinup upgrade` keeps this file current.
 # Put your own services in compose.override.yml.

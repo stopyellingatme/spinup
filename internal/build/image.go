@@ -36,8 +36,16 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 	if o.Platform == "" {
 		o.Platform = "linux/amd64"
 	}
+	lock, err := loadBuildLock(o.Root)
+	if err != nil {
+		return nil, buildError(err)
+	}
+	embed := embedsWeb(lock)
 	if len(o.Targets) == 0 {
 		o.Targets = []string{"api", "web"}
+		if embed {
+			o.Targets = []string{"api"}
+		}
 	}
 	if err := rejectLocalKitReplace(o.Root); err != nil {
 		return nil, err
@@ -65,7 +73,7 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 		if o.Push {
 			ref = strings.TrimSuffix(o.Registry, "/") + "/" + owner + "/" + ref
 		}
-		digest, err := buildImage(ctx, r, o, target, ref)
+		digest, err := buildImage(ctx, r, o, target, ref, embed)
 		if err != nil {
 			return nil, err
 		}
@@ -74,12 +82,15 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 	return images, nil
 }
 
-func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref string) (string, error) {
+func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref string, embed bool) (string, error) {
 	args := []string{"buildx", "build", "--platform", o.Platform, "-f", "deploy/Dockerfile." + target, "-t", ref, "--build-arg"}
 	if target == "api" {
 		args = append(args, "VERSION="+o.Tag)
 	} else {
 		args = append(args, "PUBLIC_ORIGIN="+o.PublicOrigin)
+	}
+	if target == "api" && embed {
+		args = append(args, "--build-context", "web=web")
 	}
 	if !o.Push {
 		args = append(args, "--load", target)

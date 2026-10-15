@@ -1,0 +1,113 @@
+# Command reference
+
+- [`spinup backup`](backup.md) — Back up the production database with pgBackRest
+- [`spinup backup list`](backup-list.md) — List the backups in the repository
+- [`spinup backup now`](backup-now.md) — Take a backup now and print its label, size, and duration
+- [`spinup backup prune`](backup-prune.md) — Apply backup retention and list the remaining backups
+- [`spinup backup restore`](backup-restore.md) — Restore a backup into a new or live database
+- [`spinup backup schedule`](backup-schedule.md) — Install or remove backup timers on the VM
+- [`spinup backup status`](backup-status.md) — Show the repository status and the last backup
+- [`spinup backup verify`](backup-verify.md) — Restore a backup in isolation and check the database
+- [`spinup build`](build.md) — Build the application API
+- [`spinup cache`](cache.md) — Manage cached template versions
+- [`spinup cache clean`](cache-clean.md) — Remove downloaded template archives and signatures
+- [`spinup cache list`](cache-list.md) — List loadable template versions and their sources
+- [`spinup cache warm`](cache-warm.md) — Download and verify missing template versions
+- [`spinup check`](check.md) — Check application drift for CI
+- [`spinup ci`](ci.md) — Generate and verify GitHub Actions files
+- [`spinup ci generate`](ci-generate.md) — Render the locked ci pack
+- [`spinup ci verify`](ci-verify.md) — Check workflow safety and run optional actionlint
+- [`spinup db`](db.md) — Operate the application database
+- [`spinup db doctor`](db-doctor.md) — Check the PostgreSQL version and pending migrations
+- [`spinup db dump`](db-dump.md) — Dump the development database (default .spinup/dumps/app.dump)
+- [`spinup db lint`](db-lint.md) — Check migrations for unsafe deploy changes
+- [`spinup db migrate`](db-migrate.md) — Run migrations through the application API
+- [`spinup db new`](db-new.md) — Create an empty SQL migration
+- [`spinup db psql`](db-psql.md) — Open psql on the development database
+- [`spinup db redo`](db-redo.md) — Roll back the last migration and apply it again
+- [`spinup db reset`](db-reset.md) — Recreate the development database and migrate up
+- [`spinup db restore`](db-restore.md) — Restore a dump into the development database
+- [`spinup db seed`](db-seed.md) — Run the seed files in the development database
+- [`spinup db sqlc`](db-sqlc.md) — Generate the Go query code with sqlc
+- [`spinup db status`](db-status.md) — List applied and pending migrations
+- [`spinup db to`](db-to.md) — Migrate up or down to a version
+- [`spinup deploy`](deploy.md) — Ship the current commit to an environment with zero downtime
+- [`spinup deploy status`](deploy-status.md) — Show the current release, the deploy lock, and the last deploy journal
+- [`spinup deploy unlock`](deploy-unlock.md) — Remove the deploy lock of an environment
+- [`spinup destroy`](destroy.md) — Remove unchanged generated files
+- [`spinup dev`](dev.md) — Run the local development stack
+- [`spinup diff`](diff.md) — Compare tracked files with their templates
+- [`spinup docs`](docs.md) — Print compatibility data and generate command references
+- [`spinup docs compat`](docs-compat.md) — Print compatible CLI, kit, template, and stack versions
+- [`spinup docs reference`](docs-reference.md) — Write a Markdown reference page for every command
+- [`spinup doctor`](doctor.md) — Check local application health
+- [`spinup eject`](eject.md) — Take ownership of a managed file
+- [`spinup generate`](generate.md) — Generate application files
+- [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
+- [`spinup generate openapi`](generate-openapi.md) — Bundle OpenAPI files and generate Go types
+- [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
+- [`spinup infra`](infra.md) — Provision Hetzner Cloud infrastructure with OpenTofu
+- [`spinup infra apply`](infra-apply.md) — Apply infrastructure changes and update the environment host
+- [`spinup infra destroy`](infra-destroy.md) — Destroy the environment infrastructure
+- [`spinup infra output`](infra-output.md) — Show infrastructure outputs
+- [`spinup infra plan`](infra-plan.md) — Preview infrastructure changes
+- [`spinup maintenance`](maintenance.md) — Keep a deployed VM healthy
+- [`spinup maintenance certs`](maintenance-certs.md) — Check the public certificate expiry
+- [`spinup maintenance patch`](maintenance-patch.md) — Install available package updates
+- [`spinup maintenance pg-major-upgrade`](maintenance-pg-major-upgrade.md) — Upgrade the PostgreSQL major with a verified dump and retained old volume
+- [`spinup maintenance pg-minor-upgrade`](maintenance-pg-minor-upgrade.md) — Upgrade PostgreSQL to the pinned minor after a backup
+- [`spinup maintenance pg-upgrade-in-place`](maintenance-pg-upgrade-in-place.md) — Upgrade PostgreSQL with pg_upgrade --link and retain the old directory
+- [`spinup maintenance prune`](maintenance-prune.md) — Remove unused app images and build cache
+- [`spinup maintenance vacuum`](maintenance-vacuum.md) — Vacuum the production database
+- [`spinup maintenance vuln-scan`](maintenance-vuln-scan.md) — Scan running images with Trivy
+- [`spinup maintenance window`](maintenance-window.md) — Show the maintenance window
+- [`spinup module`](module.md) — List and enable built-in modules
+- [`spinup module add`](module-add.md) — Enable modules on a branch at the locked template version
+- [`spinup module list`](module-list.md) — List modules and their enabled state
+- [`spinup monitor`](monitor.md) — Operate monitoring services through SSH
+- [`spinup monitor alerts`](monitor-alerts.md) — Show firing and pending alerts
+- [`spinup monitor dashboards`](monitor-dashboards.md) — Manage custom Grafana dashboards
+- [`spinup monitor dashboards sync`](monitor-dashboards-sync.md) — Export UI dashboards into the project's custom directory
+- [`spinup monitor logs`](monitor-logs.md) — Query Loki logs
+- [`spinup monitor open`](monitor-open.md) — Open Grafana through a local SSH tunnel
+- [`spinup monitor silence`](monitor-silence.md) — Silence alerts matching label=value
+- [`spinup monitor status`](monitor-status.md) — Show monitoring health and disk use
+- [`spinup monitor test-alert`](monitor-test-alert.md) — Send a test alert to configured contact points
+- [`spinup monitor trace`](monitor-trace.md) — Show a Tempo span tree (full profile)
+- [`spinup new`](new.md) — Create an application from template packs
+- [`spinup plugin`](plugin.md) — Manage trusted template pack plugins
+- [`spinup plugin add`](plugin-add.md) — Inspect and trust a plugin without rendering files
+- [`spinup plugin info`](plugin-info.md) — Show verified plugin metadata, generators, and files
+- [`spinup plugin list`](plugin-list.md) — List declared plugins and their locked hashes
+- [`spinup plugin new`](plugin-new.md) — Create a declarative or executable plugin project
+- [`spinup plugin remove`](plugin-remove.md) — Remove plugin records and retain rendered files
+- [`spinup plugin update`](plugin-update.md) — Inspect and trust a plugin version
+- [`spinup plugin verify`](plugin-verify.md) — Re-fetch plugins and verify their trust records
+- [`spinup releases`](releases.md) — Inspect and prune stored releases
+- [`spinup releases list`](releases-list.md) — List the release history and current marker
+- [`spinup releases prune`](releases-prune.md) — Prune old releases while retaining current and previous
+- [`spinup releases show`](releases-show.md) — Show a release snapshot with secret hashes only
+- [`spinup restore`](restore.md) — Restore a tracked file from its template
+- [`spinup rollback`](rollback.md) — Switch to a stored release without changing the database
+- [`spinup routes`](routes.md) — List application HTTP routes
+- [`spinup secrets`](secrets.md) — Manage encrypted secrets for each environment
+- [`spinup secrets diff`](secrets-diff.md) — Show names changed since Git HEAD
+- [`spinup secrets edit`](secrets-edit.md) — Edit secrets in a terminal
+- [`spinup secrets get`](secrets-get.md) — Write one secret value to stdout
+- [`spinup secrets init`](secrets-init.md) — Create an environment key and encrypted secrets
+- [`spinup secrets push`](secrets-push.md) — Write the environment's decrypted secrets to the host, under the deploy lock
+- [`spinup secrets rekey`](secrets-rekey.md) — Update encryption recipients from .sops.yaml
+- [`spinup secrets rotate`](secrets-rotate.md) — Replace the data encryption key
+- [`spinup secrets set`](secrets-set.md) — Read a secret value from stdin
+- [`spinup self-update`](self-update.md) — Verify and install a spinup release
+- [`spinup server`](server.md) — Prepare, audit, and access a VM
+- [`spinup server audit`](server-audit.md) — Report unsafe settings on the host
+- [`spinup server bootstrap`](server-bootstrap.md) — Prepare a Debian or Ubuntu host
+- [`spinup server logs`](server-logs.md) — Read service logs from the host
+- [`spinup server ssh`](server-ssh.md) — Open an interactive shell on the host
+- [`spinup test`](test.md) — Run application tests
+- [`spinup tools`](tools.md) — Install and inspect checksum-verified host tools
+- [`spinup tools install`](tools-install.md) — Download and verify pinned tool releases
+- [`spinup tools list`](tools-list.md) — List pinned tools and installed versions
+- [`spinup upgrade`](upgrade.md) — Upgrade app templates in a separate Git worktree
+- [`spinup version`](version.md) — Print the spinup version

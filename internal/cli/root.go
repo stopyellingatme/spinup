@@ -88,10 +88,11 @@ func newRoot(app *App, in io.Reader, out, errOut io.Writer, entered *bool) *cobr
 		Short:         "Create and operate a full-stack app",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(*cobra.Command, []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Cobra validates arguments before this hook, so a later error is not a usage error.
 			*entered = true
 			*app.UI = *ui.New(in, out, errOut, app.Flags.options())
+			printUpdateNotice(cmd, app, errOut)
 			return nil
 		},
 		RunE: func(*cobra.Command, []string) error {

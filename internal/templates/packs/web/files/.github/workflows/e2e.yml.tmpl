@@ -29,9 +29,15 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/app?sslmode=disable
+[[- if eq (index . "frontend_mode") "embed" ]]
+      PUBLIC_ORIGIN: http://127.0.0.1:8080
+      API_URL: http://127.0.0.1:8080
+      E2E_BASE_URL: http://127.0.0.1:8080
+[[- else ]]
       PUBLIC_ORIGIN: http://127.0.0.1:3000
       API_URL: http://127.0.0.1:8080
       E2E_BASE_URL: http://127.0.0.1:3000
+[[- end ]]
       SPINUP_ENV: dev
       GOTOOLCHAIN: local
       CI: "true"
@@ -46,15 +52,26 @@ jobs:
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+[[- if eq (index . "package_manager") "bun" ]]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+[[- end ]]
       - name: Install the web dependencies and Chromium
         working-directory: web
         run: |
           set -euo pipefail
+[[- if eq (index . "package_manager") "bun" ]]
+          bun install --frozen-lockfile
+          bunx --no-install playwright install --with-deps chromium
+[[- else ]]
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
+[[- end ]]
       - name: Migrate the database
         working-directory: api
         run: |
@@ -64,16 +81,26 @@ jobs:
         working-directory: web
         run: |
           set -euo pipefail
+[[- if eq (index . "package_manager") "bun" ]]
+          bun run build
+[[- else ]]
           pnpm build
+[[- end ]]
       - name: Start the API and the web app, then run Playwright
         shell: bash
         run: |
           set -euo pipefail
+[[- if eq (index . "frontend_mode") "embed" ]]
+          (cd api && PORT=8080 go run -tags embedweb ./cmd/api) > "$RUNNER_TEMP/api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+[[- else ]]
           (cd api && PORT=8080 go run ./cmd/api) > "$RUNNER_TEMP/api.log" 2>&1 &
           api_pid=$!
           (cd web && PORT=3000 HOST=127.0.0.1 node build) > "$RUNNER_TEMP/web.log" 2>&1 &
           web_pid=$!
           trap 'kill "$api_pid" "$web_pid" 2>/dev/null || true' EXIT
+[[- end ]]
           for url in "$API_URL/healthz" "$PUBLIC_ORIGIN/healthz"; do
             ready=false
             for ((attempt=0; attempt<120; attempt++)); do
@@ -90,7 +117,11 @@ jobs:
             fi
           done
           cd web
+[[- if eq (index . "package_manager") "bun" ]]
+          bun run test:e2e
+[[- else ]]
           pnpm test:e2e
+[[- end ]]
       - uses: [[ uses "actions/upload-artifact" ]]
         if: failure()
         with:

@@ -1,0 +1,29 @@
+# Managed by spinup. Select this override with [backups] backend = "walg".
+# Load it after compose.edge.yml. Load only one backup override.
+services:
+  postgres:
+    entrypoint:
+      - sh
+      - -c
+      - 'set -eu; for f in /run/secrets/WALG_* /run/secrets/AWS_*; do [ -f "$$f" ] || continue; value=$$(cat "$$f"); export "$${f##*/}=$$value"; done; : "$${WALG_S3_PREFIX:?WALG_S3_PREFIX is required}" "$${WALG_LIBSODIUM_KEY:?WALG_LIBSODIUM_KEY is required}"; exec docker-entrypoint.sh "$$@"'
+      - walg-env
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=wal-g wal-push %p
+      - -c
+      - archive_timeout=300
+    environment:
+      PGUSER: app
+      PGDATABASE: app
+    networks:
+      backup: {}
+
+networks:
+  # The backup network permits access to S3. The db network remains internal.
+  backup:
+    name: [[ .app_name ]]-backup

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/deploy"
+	"github.com/stopyellingatme/spinup/internal/stackversions"
 )
 
 const snapshotSQL = `SELECT id, version_id, is_applied FROM goose_db_version ORDER BY id;
@@ -29,7 +30,7 @@ func (u *upgrade) major(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	backupConfig, err := u.majorBackupConfig()
+	_, err = u.majorBackupConfig()
 	if err != nil {
 		return err
 	}
@@ -130,27 +131,25 @@ exec docker volume create "$1"`
 	if _, err = u.run(ctx, u.base("stop", "postgres")...); err != nil {
 		return err
 	}
-	if err = u.updateCompose(ctx, image, volume); err != nil {
+	if err = u.switchMajor(ctx, image, volume, "", false); err != nil {
 		return err
 	}
-	if _, err = u.run(ctx, u.base("build", "postgres")...); err != nil {
+	if err = u.finish(ctx); err != nil {
 		return err
 	}
-	if backupConfig != nil {
-		if err = u.vm.Upload(ctx, backupConfig, backup.RemoteConfigPath(u.cfg.App.Name), 0600); err != nil {
-			return failure("write pgBackRest configuration for the new major", err)
-		}
-	}
-	if _, err = u.run(ctx, u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...); err != nil {
+	state := upgradeState{OldVolume: oldVolume, NewVolume: volume, Anchor: fmt.Sprintf("%s-pg-recovery-%d-%d", u.cfg.App.Name, u.current.major, u.current.minor), Complete: true}
+	if err = u.writeState(ctx, state); err != nil {
 		return err
 	}
-	if backupConfig != nil {
-		fmt.Fprintln(u.o.Out, "Upgrade the pgBackRest stanza for the new PostgreSQL cluster")
-		if _, err = u.run(ctx, u.base(backup.Command(u.cfg.App.Name, "stanza-upgrade")[4:]...)...); err != nil {
-			return failure("upgrade pgBackRest stanza (WAL archiving requires repair)", err)
-		}
-		fmt.Fprintf(u.o.ErrOut, "WARNING: Take a new full backup after the repository changes below: spinup backup now --env %s --type full\n", u.env.Name)
-	}
+	fmt.Fprintf(u.o.Out, "PostgreSQL now runs major %d. Retained old volume: %s\n", u.o.To, oldVolume)
+	fmt.Fprintf(u.o.Out, "Remove it after verification: spinup maintenance pg-major-upgrade --env %s --cleanup --i-know\n", u.env.Name)
+	fmt.Fprintln(u.o.Out, "Recovery returns to the pre-upgrade database. It discards writes made after the swap.")
+	u.repositoryChange()
+	return nil
+}
+
+func (u *upgrade) finish(ctx context.Context) error {
+	var err error
 	fmt.Fprintln(u.o.Out, "Run migrate with the live release")
 	if _, err = u.run(ctx, u.color("--profile", "migrate", "run", "--rm", "-T", "migrate")...); err != nil {
 		return err
@@ -163,13 +162,49 @@ exec docker volume create "$1"`
 	if err = u.smoke(ctx); err != nil {
 		return err
 	}
-	state := upgradeState{OldVolume: oldVolume, NewVolume: volume, Anchor: fmt.Sprintf("%s-pg-recovery-%d-%d", u.cfg.App.Name, u.current.major, u.current.minor), Complete: true}
-	if err = u.writeState(ctx, state); err != nil {
+
+	return nil
+}
+
+func (u *upgrade) switchMajor(ctx context.Context, image stackversions.Image, volume, dataPath string, fullBackup bool) error {
+	if err := u.updateComposeAt(ctx, image, volume, dataPath); err != nil {
 		return err
 	}
-	fmt.Fprintf(u.o.Out, "PostgreSQL now runs major %d. Retained old volume: %s\n", u.o.To, oldVolume)
-	fmt.Fprintf(u.o.Out, "Remove it after verification: spinup maintenance pg-major-upgrade --env %s --cleanup --i-know\n", u.env.Name)
-	fmt.Fprintln(u.o.Out, "Recovery returns to the pre-upgrade database. It discards writes made after the swap.")
-	u.repositoryChange()
+	if _, err := u.run(ctx, u.base("build", "postgres")...); err != nil {
+		return err
+	}
+	config, err := u.majorBackupConfig()
+	if err != nil {
+		return err
+	}
+	if config != nil {
+		// Preserve every repository option while replacing the standard target data path.
+		standard := "/var/lib/postgresql/data/pgdata"
+		if u.o.To == 18 {
+			standard = "/var/lib/postgresql/18/docker"
+		}
+		if dataPath != "" {
+			config = []byte(strings.Replace(string(config), "pg1-path="+standard, "pg1-path="+dataPath, 1))
+		}
+		if err = u.vm.Upload(ctx, config, backup.RemoteConfigPath(u.cfg.App.Name), 0600); err != nil {
+			return failure("write pgBackRest configuration for the new major", err)
+		}
+	}
+	if _, err = u.run(ctx, u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...); err != nil {
+		return err
+	}
+	if config != nil {
+		fmt.Fprintln(u.o.Out, "Upgrade the pgBackRest stanza for the new PostgreSQL cluster")
+		if _, err = u.run(ctx, u.base(backup.Command(u.cfg.App.Name, "stanza-upgrade")[4:]...)...); err != nil {
+			return failure("upgrade pgBackRest stanza (WAL archiving requires repair)", err)
+		}
+		if fullBackup {
+			if _, err = u.backupAt(ctx, "", config); err != nil {
+				return err
+			}
+		} else {
+			fmt.Fprintf(u.o.ErrOut, "WARNING: Take a new full backup after the repository changes below: spinup backup now --env %s --type full\n", u.env.Name)
+		}
+	}
 	return nil
 }

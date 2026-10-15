@@ -94,6 +94,17 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	if err != nil {
 		return nil, err
 	}
+	// API-only renders need the shared condition default, but no frontend prompt.
+	if o.APIOnly {
+		explicit := make(map[string]any, len(o.Answers)+1)
+		for key, value := range o.Answers {
+			explicit[key] = value
+		}
+		if _, ok := explicit["frontend_mode"]; !ok {
+			explicit["frontend_mode"] = "node"
+		}
+		o.Answers = explicit
+	}
 	// Ask the core questions first. The modules answer selects the other packs, and only the
 	// selected packs ask their own questions. An API-only app never asks the web questions.
 	core := slices.DeleteFunc(slices.Clone(packs), func(p *templates.Pack) bool {
@@ -106,6 +117,14 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	answers, warnings, err := completeAnswers(ctx, o, questions, prompter)
 	if err != nil {
 		return nil, err
+	}
+	if answers["frontend_mode"] == "embed" {
+		if o.APIOnly {
+			return nil, fmt.Errorf("cannot embed a frontend with --api-only: the web pack is absent\nTry: remove --api-only, or use --frontend-mode node")
+		}
+		if modules, ok := answers["modules"].([]string); ok && slices.Contains(modules, "auth") {
+			return nil, fmt.Errorf("cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules")
+		}
 	}
 	selected, err := selectPacks(packs, answers, o.APIOnly)
 	if err != nil {

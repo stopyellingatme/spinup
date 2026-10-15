@@ -21,6 +21,25 @@ type upgradeState struct {
 	Complete  bool   `json:"complete"`
 }
 
+// ReleaseRecovery releases a strategy's recovery reservation after a safe recovery.
+// The caller must first verify that the original cluster is intact and restart its services.
+func (s *Session) ReleaseRecovery(ctx context.Context) error {
+	u := s.u
+	anchor := fmt.Sprintf("%s-pg-recovery-%d-%d", u.cfg.App.Name, u.current.major, u.current.minor)
+	// Without -v: the anchor shares the live volume.
+	if _, err := u.run(ctx, "docker", "rm", anchor); err != nil {
+		return err
+	}
+	const release = `test ! -L "$1"
+test -d "$1"
+rm -rf -- "$1"`
+	if _, err := u.run(ctx, "sh", "-ec", release, "pg-recovery", u.operationDir()); err != nil {
+		return err
+	}
+	u.recovery = ""
+	return nil
+}
+
 func shell(args ...string) string {
 	quoted := make([]string, len(args))
 	for i, arg := range args {
@@ -78,6 +97,10 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	script.WriteString(shell(u.base("up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...) + "\n")
 	if u.o.Major {
 		script.WriteString(shell(u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.services()...)...)...) + "\n")
+	}
+	if u.rollbackRefusal != "" {
+		script.Reset()
+		script.WriteString("#!/bin/sh\nset -eu\nprintf '%s\\n' " + remote.Quote(u.rollbackRefusal) + " >&2\nexit 1\n")
 	}
 	if err := u.vm.Upload(ctx, []byte(script.String()), dir+"/rollback.sh", 0700); err != nil {
 		return failure("save rollback script", err)

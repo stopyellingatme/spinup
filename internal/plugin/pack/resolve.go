@@ -77,6 +77,19 @@ func (m *Manager) loadInputs(ctx context.Context, o plugin.Options, inputs []res
 		if hash != expectedHash {
 			return nil, problem("resolve plugin", fmt.Errorf("plugin %q hash mismatch: got %s, approved %s", decl.Name, hash, expectedHash))
 		}
+		execConfig, err := ReadExec(tr.fs())
+		if err != nil {
+			return nil, err
+		}
+		if execConfig.Kind == "exec" && !input.historical {
+			allow, err := readAllowlist(m.Root, false)
+			if err != nil {
+				return nil, err
+			}
+			if !allow[decl.Name].Exec {
+				return nil, fmt.Errorf("resolve exec plugin %q: allowlist lacks exec approval\nTry: inspect the plugin, then run spinup plugin update %s --trust-exec %s", decl.Name, decl.Name, decl.Name)
+			}
+		}
 		// Preserve the declared tag spelling in the lock without changing tree bytes.
 		meta.Version = decl.Version
 		loaded := plugin.Loaded{Meta: meta, Source: decl.Source, SHA256: hash, FS: tr.fs()}

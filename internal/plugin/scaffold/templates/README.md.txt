@@ -1,0 +1,35 @@
+# <%.Name%>
+
+This plugin provides the declarative `<%.Name%>-note <Name>` generator.
+The host applies its plan and records ownership in `spinup.lock`.
+
+<%if eq .Kind "exec"%>This executable plugin also provides `<%.Name%>-hello <Name>` and `<%.Name%>-ready`.
+Executable plugins run with your full user privileges.
+The conformance kit detects protocol failures and tree changes during its probes.
+It is a test suite, not a security sandbox.
+Review all code before you grant trust.
+
+Use Go 1.26 or later.
+If you did not supply `--sdk-path`, replace the SDK placeholder version in `go.mod` with a published version.
+For a local checkout, add a replacement for `github.com/stopyellingatme/spinup/plugin-sdk` to its `plugin-sdk` directory.
+
+Run `make test` to build the plugin and run the conformance kit.
+Run `make build` to build the binary declared in `plugin.toml`.
+The host requires every declared binary to exist.
+The plugin tree, including binaries, must fit within the host limit of 5 MiB.
+Use `--platform` to select a different target when you create a scaffold.
+Do not commit binaries.
+Distribute an archive that contains the declared binaries and these source files.
+
+In a generated app, run `spinup plugin add path:/path/to/<%.Name%> --trust-exec <%.Name%>`.
+Run `spinup g <%.Name%>-hello sample` to create `greetings/sample.txt`.
+
+The executable implements JSON-RPC 2.0 with API 1 through the SDK.
+Keep stdout for protocol responses.
+Send diagnostics to stderr.
+Return files from `Plan` without writing them.
+Validate arguments before you construct paths.
+<%else%>In a generated app, run `spinup plugin add path:/path/to/<%.Name%> --trust`.
+<%end%>
+Run `spinup g <%.Name%>-note sample` to create `notes/sample.txt`.
+Edit `files/note.txt.tmpl` to change the declarative output.
