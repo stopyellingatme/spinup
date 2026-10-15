@@ -75,6 +75,11 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 	if err != nil {
 		return err
 	}
+	_, pluginSet, err := r.pluginPacks(ctx, lock, version, version, PackSet{}, o.Options.Offline)
+	if err != nil {
+		return err
+	}
+	version, _ = pluginSet.resolve(version, lock.Packs)
 	selection, err := modules.Select(ctx, modules.SelectOptions{Config: cfg, Lock: lock, FS: version.Packs, Names: o.Names, Answers: o.Answers, Interactive: r.Interactive, Prompter: o.Prompter})
 	if err != nil {
 		return err

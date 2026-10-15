@@ -7,9 +7,11 @@ Generated source can change the behavior of your app.
 
 Commit the declaration, lock, `.spinup/plugins.allow`, and `.spinup/plugins.history` together.
 Each allowlist line contains `<name> <source> <sha256>`.
-The CLI requires matching records before resolution.
+Approval changes the declaration, allowlist, and history.
+Approval leaves the lock unchanged.
+Upgrade records the plugins rendered into the app.
 A hash change requires another explicit approval with `--trust` or a terminal confirmation.
-If Git ignores `.spinup/`, use `git add -f .spinup/plugins.allow .spinup/plugins.history` to include these records.
+Ignore `.spinup/*` and permit `.spinup/plugins.allow` and `.spinup/plugins.history` in `.gitignore`.
 
 The tree hash covers sorted portable paths, normalized contents, and file modes.
 Text uses the normalization from `internal/manifest`.
@@ -40,16 +42,17 @@ It does not prompt for git credentials.
 Use an existing SSH agent for private repositories.
 
 Offline resolution requires the cache.
-The CLI checks cached bytes against the lock and allowlist.
+The CLI checks NEW bytes against the allowlist.
+The CLI checks OLD bytes against the lock and history.
 Cache receipts bind an approved source to its hash.
 Cache paths include the name, version, source hash, and tree hash.
 Approving different bytes preserves the previous cache entry.
 
 The project history records each approved name, version, source, and tree hash.
 Historical version overrides require a matching project history record and cached tree.
-They also require current project authorization for that plugin and source.
+The lock identifies the previously rendered version and hash.
 A missing history record stops resolution, even when another project cached that version.
-Multiple approved hashes for one historical version also stop resolution.
+If the lock has no matching identity, multiple hashes for one historical version stop resolution.
 Use distinct plugin versions when the contents change.
 
 A missing historical cache entry stops the upgrade.

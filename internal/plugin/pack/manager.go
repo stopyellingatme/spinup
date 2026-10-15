@@ -150,7 +150,7 @@ func (m *Manager) Add(ctx context.Context, source, version string) error {
 	if err := m.writeRecords(cfg, lock, project.Plugin{Name: loaded.Meta.Name, Source: source, Version: version}, &loaded); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintln(m.output(), "Next: spinup upgrade")
+	_, err = fmt.Fprintln(m.output(), "Next: spinup upgrade --plan")
 	if err != nil {
 		return problem("write plugin next step", err)
 	}
@@ -175,10 +175,12 @@ func (m *Manager) Update(ctx context.Context, name, version string) error {
 			return err
 		}
 		oldHash := "(missing)"
-		for _, entry := range lock.Plugins {
-			if entry.Name == name {
-				oldHash = entry.SHA256
-			}
+		allow, err := readAllowlist(m.Root, true)
+		if err != nil {
+			return err
+		}
+		if approved, ok := allow[name]; ok {
+			oldHash = approved.SHA256
 		}
 		if _, err := fmt.Fprintf(m.output(), "Hash: %s -> %s\n", oldHash, loaded.SHA256); err != nil {
 			return problem("write hash change", err)

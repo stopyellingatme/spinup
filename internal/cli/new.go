@@ -16,6 +16,8 @@ func newNew(app *App) *cobra.Command {
 	packs, loadErr := newapp.Catalog()
 	questions, questionErr := newapp.Questions(packs)
 	c := &cobra.Command{Use: "new <name>", Short: "Create an application from template packs", Args: cobra.ExactArgs(1)}
+	c.Flags().StringArrayVar(&o.Plugins, "plugin", nil, "add a trusted pack source with optional @version (repeatable)")
+	c.Flags().BoolVar(&o.Trust, "trust", false, "trust plugin sources and hashes")
 	c.Flags().BoolVar(&o.APIOnly, "api-only", false, "create only the Go API")
 	c.Flags().BoolVar(&o.NoGit, "no-git", false, "do not initialize a git repository")
 	for _, q := range questions {
@@ -43,6 +45,7 @@ func newNew(app *App) *cobra.Command {
 		o.Interactive = app.UI.Interactive()
 		o.DryRun = app.Flags.DryRun
 		o.JSON = app.Flags.JSON
+		o.Offline = app.Flags.Offline
 		o.Answers = map[string]any{}
 		for _, q := range questions {
 			name := strings.ReplaceAll(q.Key, "_", "-")
