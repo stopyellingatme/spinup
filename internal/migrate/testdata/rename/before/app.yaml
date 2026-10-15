@@ -1,0 +1,3 @@
+# App configuration.
+app:
+  name: old # Keep this comment.
