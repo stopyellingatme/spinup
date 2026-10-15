@@ -41,7 +41,7 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 			return failure("Git returned an unsafe path")
 		}
 		switch {
-		case path.Base(name) == ".env" || strings.HasSuffix(name, ".agekey"):
+		case privateDotenv(name) || strings.HasSuffix(name, ".agekey"):
 			problems = append(problems, "tracked private file: "+name)
 		case strings.HasPrefix(name, "secrets/") && (strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml")):
 			file := filepath.Join(c.Root, filepath.FromSlash(name))
@@ -55,7 +55,7 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 				problems = append(problems, "tracked plaintext secrets: "+name)
 				continue
 			}
-			staged, err := r.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"show", ":" + name}, Dir: c.Root})
+			staged, err := r.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"show", ":./" + name}, Dir: c.Root})
 			if err != nil || !encrypted(staged.Stdout) {
 				problems = append(problems, "staged plaintext secrets: "+name)
 			}
@@ -63,13 +63,18 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 	}
 	ignore, err := os.ReadFile(filepath.Join(c.Root, ".gitignore"))
 	if err != nil || !ignoresDotenv(string(ignore)) {
-		problems = append(problems, ".gitignore does not exclude .env")
+		problems = append(problems, ".gitignore does not exclude .env files")
 	}
 	if len(problems) > 0 {
 		sort.Strings(problems)
 		return failure(strings.Join(problems, ", "))
 	}
-	return doctor.Result{Status: doctor.OK, Message: "tracked secrets are encrypted and .env is ignored"}
+	return doctor.Result{Status: doctor.OK, Message: "tracked secrets are encrypted and .env files are ignored"}
+}
+
+func privateDotenv(name string) bool {
+	base := path.Base(name)
+	return base == ".env" || base != ".env.example" && strings.HasPrefix(base, ".env.")
 }
 
 func fsPath(name string) bool {
@@ -99,6 +104,10 @@ func encrypted(data []byte) bool {
 }
 
 func ignoresDotenv(data string) bool {
+	return ignored(data, ".env") && ignored(data, ".env.local")
+}
+
+func ignored(data, target string) bool {
 	ignored := false
 	for _, line := range strings.Split(data, "\n") {
 		line = strings.TrimSpace(line)
@@ -107,8 +116,11 @@ func ignoresDotenv(data string) bool {
 		}
 		negative := strings.HasPrefix(line, "!")
 		pattern := strings.TrimPrefix(strings.TrimPrefix(line, "!"), "/")
-		matched, _ := path.Match(pattern, ".env")
-		if pattern == "**/.env" {
+		matched, _ := path.Match(pattern, target)
+		if strings.HasPrefix(pattern, "**/") {
+			matched, _ = path.Match(strings.TrimPrefix(pattern, "**/"), target)
+		}
+		if pattern == "**/.env" && target == ".env" {
 			matched = true
 		}
 		if matched {
@@ -119,5 +131,5 @@ func ignoresDotenv(data string) bool {
 }
 
 func failure(message string) doctor.Result {
-	return doctor.Result{Status: doctor.Fail, Message: message, Try: "encrypt secrets with sops, remove private files from Git with git rm --cached, and add .env and *.agekey to .gitignore"}
+	return doctor.Result{Status: doctor.Fail, Message: message, Try: "encrypt secrets with sops, remove private files from Git with git rm --cached, and add .env, .env.*, and *.agekey to .gitignore"}
 }
