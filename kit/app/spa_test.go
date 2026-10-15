@@ -47,6 +47,9 @@ func TestSPA(t *testing.T) {
 			if w.Code != tc.status || w.Header().Get("Cache-Control") != tc.cache || !strings.Contains(w.Header().Get("Content-Type"), tc.content) || !strings.Contains(w.Body.String(), tc.body) {
 				t.Fatalf("response = %d %v %s", w.Code, w.Header(), w.Body)
 			}
+			if tc.status == http.StatusMethodNotAllowed && w.Header().Get("Allow") != "GET, HEAD" {
+				t.Fatal("missing allowed methods")
+			}
 			if tc.method == http.MethodHead && w.Body.Len() != 0 {
 				t.Fatal("HEAD returned a body")
 			}
@@ -54,5 +57,23 @@ func TestSPA(t *testing.T) {
 				t.Fatal("reserved route returned the SPA")
 			}
 		})
+	}
+}
+
+func TestSPAReservedPaths(t *testing.T) {
+	t.Parallel()
+	files := fstest.MapFS{"index.html": {Data: []byte("SPA")}}
+	a := New(WithLogger(discardLogger()), WithSPA(files))
+	for _, prefix := range []string{"api", "healthz", "readyz", "metrics", "version", "_deploy", "_dev"} {
+		for _, method := range []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
+			t.Run(method+"/"+prefix+"/missing", func(t *testing.T) {
+				t.Parallel()
+				w := httptest.NewRecorder()
+				a.Handler().ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), method, "/"+prefix+"/missing", nil))
+				if w.Code != http.StatusNotFound || w.Header().Get("Allow") != "" || strings.Contains(w.Body.String(), "SPA") {
+					t.Fatalf("response = %d %v %s", w.Code, w.Header(), w.Body)
+				}
+			})
+		}
 	}
 }

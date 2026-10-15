@@ -15,17 +15,17 @@ import (
 func WithSPA(files fs.FS) Option {
 	return WithRoutes(func(mux *http.ServeMux) {
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet && r.Method != http.MethodHead {
-				w.Header().Set("Allow", "GET, HEAD")
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
 			name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 			for _, prefix := range []string{"api", "healthz", "readyz", "metrics", "version", "_deploy", "_dev"} {
 				if name == prefix || strings.HasPrefix(name, prefix+"/") {
 					http.NotFound(w, r)
 					return
 				}
+			}
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				w.Header().Set("Allow", "GET, HEAD")
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
 			}
 			if files == nil {
 				http.NotFound(w, r)

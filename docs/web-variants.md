@@ -3,9 +3,7 @@
 Select the package manager and the API client when you create the app.
 The lock records both answers.
 The defaults remain `pnpm` and `openapi-fetch`.
-Both options support local builds with `--frontend-mode node` and `--frontend-mode embed`.
-The embed container still needs a Bun branch in `deploy/Dockerfile.api`.
-That template belongs to the API pack and is outside this unit's permitted files.
+Both options support local builds and container builds with `--frontend-mode node` and `--frontend-mode embed`.
 Embed mode retains its restrictions on auth and server pages.
 
 ```console

@@ -63,6 +63,9 @@ func Select(ctx context.Context, o SelectOptions) (*Selection, error) {
 	visiting := map[string]bool{}
 	var add func(string) error
 	add = func(name string) error {
+		if name == "auth" && o.Lock.Answers["frontend_mode"] == "embed" {
+			return fmt.Errorf("cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules")
+		}
 		if selected[name] != nil {
 			return nil
 		}
