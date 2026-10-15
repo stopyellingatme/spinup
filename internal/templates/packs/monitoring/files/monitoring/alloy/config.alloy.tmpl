@@ -177,3 +177,26 @@ prometheus.scrape "public_url" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 }
 [[- end ]]
+
+// Backups use a text file on the VM in both monitoring profiles.
+prometheus.exporter.unix "backups" {
+    set_collectors = ["textfile"]
+    textfile {
+        directory = "/var/lib/spinup/backup-metrics"
+    }
+}
+
+discovery.relabel "backups" {
+    targets = prometheus.exporter.unix.backups.targets
+    rule {
+        target_label = "job"
+        replacement = "backups"
+    }
+}
+
+prometheus.scrape "backups" {
+    targets         = discovery.relabel.backups.output
+    job_name        = "backups"
+    scrape_interval = "30s"
+    forward_to      = [prometheus.remote_write.default.receiver]
+}

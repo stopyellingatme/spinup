@@ -145,6 +145,7 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 	if err != nil {
 		return fmt.Errorf("pre-deploy backup: %w", err)
 	}
+	backupMetrics(ctx, c.Remote, app, result, out)
 	if c.Results != nil {
 		// A point-in-time restore to just before the backup started returns the database as
 		// it was before this deploy's migrations.

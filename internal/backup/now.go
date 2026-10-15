@@ -149,11 +149,12 @@ func Now(ctx context.Context, o Options) (Result, error) {
 		return Result{}, err
 	}
 	defer s.close()
-	out, _ := writers(o)
+	out, errOut := writers(o)
 	result, err := s.backend.Backup(ctx, kind)
 	if err != nil {
 		return Result{}, err
 	}
+	backupMetrics(ctx, s.remote, s.app, result, errOut)
 	if o.JSON {
 		return result, writeJSON(out, result)
 	}

@@ -17,7 +17,12 @@ import (
 )
 
 // backupsFiles lists the files of the backups pack.
-var backupsFiles = []string{"deploy/compose.backups.yml", "deploy/pgbackrest/pgbackrest.conf"}
+var backupsFiles = []string{
+	"deploy/compose.backups.yml", "deploy/pgbackrest/pgbackrest.conf", "deploy/backups/run.sh",
+	"deploy/systemd/spinup-todo-backup-full.service", "deploy/systemd/spinup-todo-backup-full.timer",
+	"deploy/systemd/spinup-todo-backup-diff.service", "deploy/systemd/spinup-todo-backup-diff.timer",
+	"deploy/systemd/spinup-todo-backup-verify.service", "deploy/systemd/spinup-todo-backup-verify.timer",
+}
 
 func renderBackups(t *testing.T, answers map[string]any) (fs.FS, fs.FS) {
 	t.Helper()
@@ -28,7 +33,11 @@ func renderBackups(t *testing.T, answers map[string]any) (fs.FS, fs.FS) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		selected[name] = &fstest.MapFile{Data: data, Mode: 0o644}
+		info, err := fs.Stat(all, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		selected[name] = &fstest.MapFile{Data: data, Mode: info.Mode()}
 	}
 	return selected, all
 }
