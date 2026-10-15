@@ -1,4 +1,6 @@
-// Package migrate holds upgrade codemods and runs them in order.
+// Package migrate registers and runs upgrade codemods.
 //
-// STUB from the M2 pre-seed commit. Unit M2.3 owns this file and replaces it.
+// Each codemod lives in a file named NNNN_slug.go and registers from init.
+// Codemods edit code through internal/codemod. Plan must leave the project
+// unchanged. Apply must be idempotent. This package ships no real codemod.
 package migrate

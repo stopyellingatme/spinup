@@ -1,4 +1,6 @@
-// Package codemod edits Go, YAML, TOML, and JSON files while it keeps comments.
-//
-// STUB from the M2 pre-seed commit. Unit M2.3 owns this file and replaces it.
+// Package codemod edits Go, YAML, TOML, and JSON documents through their syntax.
+// The editors preserve comments and return original bytes for unchanged edits.
+// Go edits use go/format. YAML edits use two spaces for indentation.
+// TOML edits preserve byte ranges outside the changed entry. JSON edits retain
+// object key order and the source indentation.
 package codemod

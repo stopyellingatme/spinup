@@ -1,0 +1,15 @@
+// File comment.
+package example
+
+import (
+ alias "example.com/old" // Import comment.
+ "fmt"
+)
+
+// Function comment.
+func use() {
+ alias.Old() // Call comment.
+ fmt.Println("keep")
+ alias := struct { Old func() }{}
+ alias.Old() // Shadow comment.
+}
