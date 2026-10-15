@@ -60,7 +60,8 @@ var goldenArgs = []string{"todo", "title:string", "done:bool", "due:date?", "pri
 func TestGoldenGenResource(t *testing.T) {
 	t.Parallel()
 	testutil.GoldenSelected(t, "gen-resource")
-	root := freshApp(t)
+	// The golden app has the web pack, so the golden files include the pages.
+	root := webApp(t)
 	render := func() (fs.FS, error) {
 		out, err := run(context.Background(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t)})
 		if err != nil {
