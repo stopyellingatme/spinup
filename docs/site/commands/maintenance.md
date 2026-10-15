@@ -28,6 +28,7 @@ spinup maintenance
 - [`spinup maintenance patch`](maintenance-patch.md) — Install available package updates
 - [`spinup maintenance pg-major-upgrade`](maintenance-pg-major-upgrade.md) — Upgrade the PostgreSQL major with a verified dump and retained old volume
 - [`spinup maintenance pg-minor-upgrade`](maintenance-pg-minor-upgrade.md) — Upgrade PostgreSQL to the pinned minor after a backup
+- [`spinup maintenance pg-upgrade-in-place`](maintenance-pg-upgrade-in-place.md) — Upgrade PostgreSQL with pg_upgrade --link and retain the old directory
 - [`spinup maintenance prune`](maintenance-prune.md) — Remove unused app images and build cache
 - [`spinup maintenance vacuum`](maintenance-vacuum.md) — Vacuum the production database
 - [`spinup maintenance vuln-scan`](maintenance-vuln-scan.md) — Scan running images with Trivy

@@ -27,6 +27,7 @@ spinup plugin
 - [`spinup plugin add`](plugin-add.md) — Inspect and trust a plugin without rendering files
 - [`spinup plugin info`](plugin-info.md) — Show verified plugin metadata, generators, and files
 - [`spinup plugin list`](plugin-list.md) — List declared plugins and their locked hashes
+- [`spinup plugin new`](plugin-new.md) — Create a declarative or executable plugin project
 - [`spinup plugin remove`](plugin-remove.md) — Remove plugin records and retain rendered files
 - [`spinup plugin update`](plugin-update.md) — Inspect and trust a plugin version
 - [`spinup plugin verify`](plugin-verify.md) — Re-fetch plugins and verify their trust records

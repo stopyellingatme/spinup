@@ -46,11 +46,17 @@
 - [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
 - [`spinup generate openapi`](generate-openapi.md) — Bundle OpenAPI files and generate Go types
 - [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
+- [`spinup infra`](infra.md) — Provision Hetzner Cloud infrastructure with OpenTofu
+- [`spinup infra apply`](infra-apply.md) — Apply infrastructure changes and update the environment host
+- [`spinup infra destroy`](infra-destroy.md) — Destroy the environment infrastructure
+- [`spinup infra output`](infra-output.md) — Show infrastructure outputs
+- [`spinup infra plan`](infra-plan.md) — Preview infrastructure changes
 - [`spinup maintenance`](maintenance.md) — Keep a deployed VM healthy
 - [`spinup maintenance certs`](maintenance-certs.md) — Check the public certificate expiry
 - [`spinup maintenance patch`](maintenance-patch.md) — Install available package updates
 - [`spinup maintenance pg-major-upgrade`](maintenance-pg-major-upgrade.md) — Upgrade the PostgreSQL major with a verified dump and retained old volume
 - [`spinup maintenance pg-minor-upgrade`](maintenance-pg-minor-upgrade.md) — Upgrade PostgreSQL to the pinned minor after a backup
+- [`spinup maintenance pg-upgrade-in-place`](maintenance-pg-upgrade-in-place.md) — Upgrade PostgreSQL with pg_upgrade --link and retain the old directory
 - [`spinup maintenance prune`](maintenance-prune.md) — Remove unused app images and build cache
 - [`spinup maintenance vacuum`](maintenance-vacuum.md) — Vacuum the production database
 - [`spinup maintenance vuln-scan`](maintenance-vuln-scan.md) — Scan running images with Trivy
@@ -73,6 +79,7 @@
 - [`spinup plugin add`](plugin-add.md) — Inspect and trust a plugin without rendering files
 - [`spinup plugin info`](plugin-info.md) — Show verified plugin metadata, generators, and files
 - [`spinup plugin list`](plugin-list.md) — List declared plugins and their locked hashes
+- [`spinup plugin new`](plugin-new.md) — Create a declarative or executable plugin project
 - [`spinup plugin remove`](plugin-remove.md) — Remove plugin records and retain rendered files
 - [`spinup plugin update`](plugin-update.md) — Inspect and trust a plugin version
 - [`spinup plugin verify`](plugin-verify.md) — Re-fetch plugins and verify their trust records
@@ -92,6 +99,7 @@
 - [`spinup secrets rekey`](secrets-rekey.md) — Update encryption recipients from .sops.yaml
 - [`spinup secrets rotate`](secrets-rotate.md) — Replace the data encryption key
 - [`spinup secrets set`](secrets-set.md) — Read a secret value from stdin
+- [`spinup self-update`](self-update.md) — Verify and install a spinup release
 - [`spinup server`](server.md) — Prepare, audit, and access a VM
 - [`spinup server audit`](server-audit.md) — Report unsafe settings on the host
 - [`spinup server bootstrap`](server-bootstrap.md) — Prepare a Debian or Ubuntu host

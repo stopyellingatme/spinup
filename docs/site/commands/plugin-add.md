@@ -20,6 +20,7 @@ spinup plugin add <source> [flags]
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--trust` | `false` | trust the displayed plugin source and hash |
+| `--trust-exec` | `` | trust execution of the named plugin with your user privileges |
 | `--verbose` | `false` | write extra detail |
 | `--version` | `` | fixed git tag or path plugin version |
 | `-y, --yes` | `false` | answer yes to prompts |

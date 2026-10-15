@@ -5,13 +5,14 @@ Print the spinup version
 ## Use
 
 ```text
-spinup version
+spinup version [flags]
 ```
 
 ## Flags
 
 | Flag | Default | Description |
 | --- | --- | --- |
+| `--check` | `false` | check for a newer stable release |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |
