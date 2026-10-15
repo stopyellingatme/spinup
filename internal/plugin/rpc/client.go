@@ -138,19 +138,17 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 	if runner == nil {
 		runner = execx.OSRunner{}
 	}
-	done := make(chan error, 1)
+	exited := make(chan struct{})
 	var exitErr error
 	go func() {
-		_, err := runner.Run(processCtx, execx.Cmd{Name: binary, Env: env, ReplaceEnv: true, Dir: c.Root, Stdin: input, Stdout: output, Stderr: diagnostic})
-		done <- err
+		_, exitErr = runner.Run(processCtx, execx.Cmd{Name: binary, Env: env, ReplaceEnv: true, Dir: c.Root, Stdin: input, Stdout: output, Stderr: diagnostic})
+		close(exited)
 	}()
 	// Always reap the process before removing its executable.
 	defer func() {
 		cancel(nil)
 		_ = input.Close()
-		if done != nil {
-			<-done
-		}
+		<-exited
 	}()
 	timeout := c.Timeout
 	if timeout <= 0 || timeout > CallTimeout {
@@ -163,25 +161,29 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 		}
 		select {
 		case requests <- sdk.Request{JSONRPC: "2.0", ID: json.RawMessage(fmt.Sprint(id)), Method: method, Params: raw}:
+		case <-exited:
+			// A completed response can still be queued after the process exits.
 		case <-callCtx.Done():
 			return context.Cause(callCtx)
+		}
+		if id == 2 {
+			// Close stdin after the final frame so the runner can reap an early exit.
+			close(requests)
 		}
 		var response sdk.Response
 		select {
 		case response = <-responses:
 		case <-callCtx.Done():
 			return context.Cause(callCtx)
-		case err = <-done:
-			done = nil
-			exitErr = err
+		case <-exited:
 			select {
 			case response = <-responses:
 			default:
 				if cause := context.Cause(processCtx); cause != nil {
 					return cause
 				}
-				if err != nil {
-					return err
+				if exitErr != nil {
+					return fmt.Errorf("process exited without a complete response: %w", exitErr)
 				}
 				return errors.New("process exited without a complete response")
 			}
@@ -230,17 +232,10 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 			return c.failure(method, errors.New("description exceeds advertised capabilities"))
 		}
 	}
-	close(requests)
-	if done != nil {
-		select {
-		case err := <-done:
-			done = nil
-			if err != nil {
-				return c.failure(method, err)
-			}
-		case <-methodCtx.Done():
-			return c.failure(method, context.Cause(methodCtx))
-		}
+	select {
+	case <-exited:
+	case <-methodCtx.Done():
+		return c.failure(method, context.Cause(methodCtx))
 	}
 	if exitErr != nil {
 		return c.failure(method, exitErr)

@@ -364,5 +364,5 @@ func generatorTemplate(name string) bool {
 		return true
 	}
 	parts := strings.SplitN(name, "/", 4)
-	return len(parts) == 4 && parts[0] == "plugin" && (parts[2] == "@gen" || parts[2] == "gen")
+	return len(parts) == 4 && parts[0] == "plugin" && (parts[2] == "@gen" || parts[2] == "@exec" || parts[2] == "gen")
 }

@@ -3,6 +3,8 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -114,5 +116,41 @@ func TestCallTimeout(t *testing.T) {
 	_, err := c.Describe(t.Context())
 	if err == nil {
 		t.Fatal("timeout ignored")
+	}
+}
+
+func TestPlanAfterHandshakeExit(t *testing.T) {
+	t.Parallel()
+	exitErr := errors.New("exit status 7")
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{{"clean", nil}, {"nonzero", exitErr}} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := fakeClient(t)
+			c.Timeout = time.Second
+			c.Runner = wireRunner{func(_ context.Context, cmd execx.Cmd) (execx.Result, error) {
+				result, _ := json.Marshal(sdk.HandshakeResult{Name: "hello", Version: "1", API: 1, Capabilities: []string{sdk.CapabilityGenerator}})
+				if err := json.NewEncoder(cmd.Stdout).Encode(sdk.Response{JSONRPC: "2.0", ID: json.RawMessage("1"), Result: result}); err != nil {
+					return execx.Result{}, err
+				}
+				return execx.Result{}, tc.err
+			}}
+			// Exercise both select orders when the handshake and exit are ready together.
+			for attempt := 0; attempt < 100; attempt++ {
+				start := time.Now()
+				_, err := c.Plan(t.Context(), sdk.PlanParams{Generator: "hello"})
+				if err == nil || !strings.Contains(err.Error(), "exited") || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("attempt %d: want process exit error, got %v", attempt, err)
+				}
+				if tc.err != nil && !errors.Is(err, tc.err) {
+					t.Fatalf("attempt %d: lost exit status: %v", attempt, err)
+				}
+				if elapsed := time.Since(start); elapsed >= c.Timeout/2 {
+					t.Fatalf("attempt %d: exit took %s, timeout %s", attempt, elapsed, c.Timeout)
+				}
+			}
+		})
 	}
 }
