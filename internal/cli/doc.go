@@ -1,4 +1,5 @@
 // Package cli wires the cobra commands. It holds no logic.
 //
-// STUB from the M0 pre-seed commit. Unit M0.1 owns this package and replaces this file.
+// Commands register themselves from init() with Register. Execute builds the
+// root command and runs it.
 package cli
