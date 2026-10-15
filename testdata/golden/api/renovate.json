@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "semanticCommits": {
+    "enabled": false
+  },
+  "schedule": ["before 5am on Monday"],
+  "packageRules": [
+    {
+      "description": "Group Go minor and patch updates.",
+      "groupName": "gomod minor and patch",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group npm minor and patch updates.",
+      "groupName": "npm minor and patch",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group GitHub Actions updates.",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "spinup upgrade owns this kit dependency.",
+      "enabled": false,
+      "matchDepNames": ["github.com/stopyellingatme/spinup/kit"]
+    },
+    {
+      "description": "spinup upgrade owns these generated Go dependencies.",
+      "enabled": false,
+      "matchFileNames": ["api/go.mod"],
+      "matchManagers": ["gomod"]
+    },
+    {
+      "description": "spinup upgrade owns these generated Docker images.",
+      "enabled": false,
+      "matchFileNames": ["deploy/**", "monitoring/**"],
+      "matchManagers": ["dockerfile", "docker-compose"]
+    }
+  ],
+  "pinDigests": true
+}

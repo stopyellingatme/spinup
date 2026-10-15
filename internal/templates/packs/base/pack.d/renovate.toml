@@ -1,0 +1,4 @@
+[[files]]
+path = "renovate.json"
+source = "files/renovate.json.tmpl"
+class = "seed"
