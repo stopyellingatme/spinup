@@ -1,0 +1,60 @@
+// Command worker runs the background jobs of the app.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	jobsapp "[[ .module ]]/api/internal/jobs"
+	"github.com/stopyellingatme/spinup/kit/config"
+	"github.com/stopyellingatme/spinup/kit/db"
+	"github.com/stopyellingatme/spinup/kit/jobs"
+	"github.com/stopyellingatme/spinup/kit/logx"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	var cfg config.Base
+	if err := config.Load(&cfg); err != nil {
+		return err
+	}
+	level := slog.LevelInfo
+	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
+		level = slog.LevelInfo
+	}
+	logger := logx.New(os.Stderr, logx.Options{Level: level})
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithAppName([[ quote .app_name ]]+"-worker"))
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	w, err := jobs.NewWorker(pool, jobs.WithLogger(logger))
+	if err != nil {
+		return err
+	}
+	jobsapp.Register(w, jobsapp.Deps{DB: pool})
+	if err := w.Start(ctx); err != nil {
+		return err
+	}
+
+	<-ctx.Done()
+	logger.Info("worker: stopping", "timeout", cfg.ShutdownTimeout.String())
+	stopCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	return w.Stop(stopCtx)
+}

@@ -11,6 +11,9 @@ import (
  "github.com/stopyellingatme/spinup/kit/app"
  "github.com/stopyellingatme/spinup/kit/config"
  "github.com/stopyellingatme/spinup/kit/db"
+[[- if has "jobs" .modules ]]
+ "github.com/stopyellingatme/spinup/kit/jobs"
+[[- end ]]
 )
 
 var version = "dev"
@@ -32,7 +35,10 @@ func main() {
   app.WithConfig(cfg),
   app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
   app.WithReadiness("db", pool.Ping),
-  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
+  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),
+[[- if has "jobs" .modules ]]
+  app.WithCommand("jobs-migrate", jobs.MigrateCommand(jobs.WithMigrateDatabaseURL(cfg.DatabaseURL))),
+[[- end ]]
   app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
  )
  app.Main(a)
