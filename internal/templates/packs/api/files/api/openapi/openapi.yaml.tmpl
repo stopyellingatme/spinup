@@ -1,0 +1,35 @@
+openapi: 3.0.3
+info:
+  title: [[ printf "%q" .app_name ]]
+  version: 0.1.0
+servers:
+  - url: /
+paths: {}
+components:
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        request_id:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
