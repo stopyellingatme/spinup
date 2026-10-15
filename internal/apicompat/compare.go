@@ -156,7 +156,7 @@ func ReadLines(path string) ([]string, error) {
 func ReadMinor(path string) (int, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("read kit minor: %w\nTry: create %s with the current development version, for example 0.8", err, path)
+		return 0, fmt.Errorf("read kit minor: %w\nTry: create %s with the current development version, for example 0.1", err, path)
 	}
 	text := strings.TrimSpace(string(data))
 	text = strings.TrimPrefix(text, "v")

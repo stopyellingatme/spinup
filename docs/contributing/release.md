@@ -30,7 +30,7 @@ Snapshots and prereleases generate the cask without updating the tap.
 
 ## Bump the kit minor
 
-The file `kit/api/minor.txt` holds the kit minor in development, for example `0.8`.
+The file `kit/api/minor.txt` holds the kit minor in development, for example `0.1`.
 The kit API guard reads this file to decide if a deprecated API can go.
 See `docs/policy/kit-compat.md`.
 
