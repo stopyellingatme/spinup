@@ -1,0 +1,5 @@
+HTTP 400
+Content-Type: application/problem+json
+X-Request-ID: golden-request
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"The request body must contain one JSON value.","request_id":"golden-request"}
