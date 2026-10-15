@@ -63,7 +63,7 @@ func YAMLGet(doc *yaml.Node, path ...string) *yaml.Node {
 // It preserves comments and style on an existing value.
 func YAMLSet(doc *yaml.Node, value *yaml.Node, path ...string) error {
 	if doc == nil || value == nil || len(path) == 0 {
-		return editorError("YAML", fmt.Errorf("a document, value, and nonempty path are required"))
+		return fmt.Errorf("a document, value, and nonempty path are required")
 	}
 	if doc.Kind == 0 {
 		doc.Kind = yaml.DocumentNode
@@ -74,7 +74,7 @@ func YAMLSet(doc *yaml.Node, value *yaml.Node, path ...string) error {
 	n := yamlRoot(doc)
 	for i, key := range path {
 		if n == nil || n.Kind != yaml.MappingNode {
-			return editorError("YAML", fmt.Errorf("path %q crosses a non-mapping value", path[:i]))
+			return fmt.Errorf("path %q crosses a non-mapping value", path[:i])
 		}
 		index := yamlIndex(n, key)
 		if i == len(path)-1 {
@@ -113,7 +113,14 @@ func YAMLSet(doc *yaml.Node, value *yaml.Node, path ...string) error {
 			n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, child)
 			n = child
 		} else {
-			n = n.Content[index+1]
+			child := n.Content[index+1]
+			if child.Kind == yaml.ScalarNode && (child.Tag == "!!null" || child.Value == "") {
+				child.Kind = yaml.MappingNode
+				child.Tag = "!!map"
+				child.Value = ""
+				child.Content = nil
+			}
+			n = child
 		}
 	}
 	return nil

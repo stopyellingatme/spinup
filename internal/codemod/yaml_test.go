@@ -97,3 +97,22 @@ func TestYAMLReplaceComments(t *testing.T) {
 		t.Fatal("not idempotent", err, string(again))
 	}
 }
+
+func TestYAMLSetReplacesNullIntermediateMapping(t *testing.T) {
+	t.Parallel()
+	src := []byte("# about a\na: # remains\n")
+	out, changed, err := EditYAML(src, func(doc *yaml.Node) (bool, error) {
+		return true, YAMLSet(doc, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "v"}, "a", "b")
+	})
+	if err != nil || !changed {
+		t.Fatalf("changed=%v, err=%v", changed, err)
+	}
+	for _, comment := range []string{"# about a", "# remains"} {
+		if !bytes.Contains(out, []byte(comment)) {
+			t.Fatalf("lost %s:\n%s", comment, out)
+		}
+	}
+	if !bytes.Contains(out, []byte("b: v")) {
+		t.Fatalf("missing value:\n%s", out)
+	}
+}

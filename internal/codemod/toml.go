@@ -113,10 +113,10 @@ func locateTOML(src []byte, table []string, key string) (map[string]any, tomlLoc
 			it := n.Key()
 			it.Next()
 			header := lineStart(src, int(it.Node().Raw.Offset))
-			if active {
+			if active && loc.tableEnd == len(src) {
 				loc.tableEnd = header
-				active = false
 			}
+			active = false
 			current = keys
 			currentArray = n.Kind == unstable.ArrayTable
 			if slices.Equal(current, table) {
@@ -130,6 +130,9 @@ func locateTOML(src []byte, table []string, key string) (map[string]any, tomlLoc
 		case unstable.KeyValue:
 			if currentArray {
 				continue
+			}
+			if active && slices.Equal(current, table) {
+				loc.tableEnd = lineEnd(src, int(n.Raw.Offset+n.Raw.Length))
 			}
 			full := append(slices.Clone(current), tomlNodeKey(n)...)
 			if !slices.Equal(full, target) {
@@ -215,6 +218,12 @@ func newline(src []byte) string {
 	return "\n"
 }
 func lineStart(src []byte, offset int) int { return bytes.LastIndexByte(src[:offset], '\n') + 1 }
+func lineEnd(src []byte, offset int) int {
+	if end := bytes.IndexByte(src[offset:], '\n'); end >= 0 {
+		return offset + end + 1
+	}
+	return len(src)
+}
 func splice(src []byte, start, end int, value []byte) []byte {
 	out := make([]byte, 0, len(src)-end+start+len(value))
 	out = append(out, src[:start]...)

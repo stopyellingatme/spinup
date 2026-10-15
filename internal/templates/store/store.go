@@ -192,6 +192,16 @@ func (s *Store) Load(ctx context.Context, version string) (*templates.Version, e
 	if err == nil {
 		return v, nil
 	}
+	if source == "cache" {
+		if s.options.Offline {
+			return nil, s.invalidCache(version, err)
+		}
+		v, err = s.download(ctx, version)
+		if err != nil {
+			return nil, s.unavailable(version, err)
+		}
+		return v, nil
+	}
 	if source != "" || !errors.Is(err, fs.ErrNotExist) || s.options.Offline {
 		return nil, s.unavailable(version, err)
 	}
@@ -233,14 +243,17 @@ func (s *Store) local(ctx context.Context, version string) (*templates.Version, 
 	cached := os.DirFS(s.options.CacheDir)
 	data, err = readFS(cached, archiveName(version), maxArchive)
 	if err != nil {
-		return nil, "", err
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, "", err
+		}
+		return nil, "cache", err
 	}
 	sig, err := readFS(cached, archiveName(version)+".sig", ed25519.SignatureSize)
 	if err != nil {
 		return nil, "cache", fmt.Errorf("cannot read cached signature: %w", err)
 	}
 	if err := s.verify(data, sig); err != nil {
-		return nil, "", err
+		return nil, "cache", err
 	}
 	v, err := ReadArchive(data, version)
 	return v, "cache", err
@@ -280,6 +293,10 @@ func (s *Store) unavailable(version string, reason error) error {
 		suggestion = "run once without --offline"
 	}
 	return fmt.Errorf("cannot load templates %q: %w: %w\nTry: %s", version, templates.ErrVersionUnavailable, reason, strings.TrimSpace(suggestion))
+}
+
+func (s *Store) invalidCache(version string, reason error) error {
+	return fmt.Errorf("cannot load templates %q: %w: %w\nTry: spinup cache clean", version, templates.ErrVersionUnavailable, reason)
 }
 
 // Warm downloads and verifies versions that have no loadable local source.

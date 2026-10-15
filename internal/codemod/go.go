@@ -81,6 +81,7 @@ func RenameSelector(f *ast.File, importPath, oldName, newName string) bool {
 		return false
 	}
 	local := ""
+	explicit := false
 	for _, spec := range f.Imports {
 		p, err := strconv.Unquote(spec.Path.Value)
 		if err != nil || p != importPath {
@@ -89,26 +90,36 @@ func RenameSelector(f *ast.File, importPath, oldName, newName string) bool {
 		local = importLocalName(importPath)
 		if spec.Name != nil {
 			local = spec.Name.Name
+			explicit = true
 		}
 		break
 	}
 	if local == "" || local == "." || local == "_" {
 		return false
 	}
-	changed := false
-	ast.Inspect(f, func(n ast.Node) bool {
-		s, ok := n.(*ast.SelectorExpr)
-		if !ok || s.Sel.Name != oldName {
+	rename := func(match func(*ast.Ident) bool) bool {
+		changed := false
+		ast.Inspect(f, func(n ast.Node) bool {
+			s, ok := n.(*ast.SelectorExpr)
+			if !ok || s.Sel.Name != oldName {
+				return true
+			}
+			id, ok := s.X.(*ast.Ident)
+			if ok && id.Obj == nil && match(id) {
+				s.Sel.Name = newName
+				changed = true
+			}
 			return true
-		}
-		id, ok := s.X.(*ast.Ident)
-		if ok && id.Name == local && id.Obj == nil {
-			s.Sel.Name = newName
-			changed = true
-		}
-		return true
-	})
-	return changed
+		})
+		return changed
+	}
+	if changed := rename(func(id *ast.Ident) bool { return id.Name == local }); changed || explicit {
+		return changed
+	}
+	// Go AST parsing does not resolve package names. For an aliasless import whose
+	// package name differs from its path, the remaining unresolved selectors are
+	// package references unless they were declared in this file.
+	return rename(func(*ast.Ident) bool { return true })
 }
 
 func editorError(kind string, err error) error {

@@ -94,3 +94,16 @@ func TestTOMLErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTOMLInsertKeepsFollowingTableComment(t *testing.T) {
+	t.Parallel()
+	src := []byte("[x]\nb = 2\n\n# about y\n[y]\nc = 3\n")
+	out, err := SetTOML(src, []string{"x"}, "n", "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "[x]\nb = 2\n\"n\" = 'v'\n\n# about y\n[y]\nc = 3\n"
+	if string(out) != want {
+		t.Fatalf("output:\n%s\nwant:\n%s", out, want)
+	}
+}
