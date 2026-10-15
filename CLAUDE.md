@@ -89,6 +89,7 @@ The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the p
 - **File classes.** Every template file is `managed`, `scaffold`, or `seed`, and its `pack.toml` (or a `pack.d/*.toml` fragment) declares the class. If you are not sure, use `managed` with an extension point.
 - **Errors.** Every user-facing error says what failed and why, and ends with a `Try:` line. Every prompt has a flag. With no TTY, the CLI never prompts. It fails and names the missing flag.
 - **Determinism.** A render is a pure function of the template version, the answers, the plugin set, and the stack versions. Do not use the clock, random values, or map iteration order in rendered output.
+- **Pack changes.** `TestPacksDigest` guards `internal/templates/packs.digest`. If you change a template pack, run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/templates -run PacksDigest`. Then replace `REVIEW` with the ID of the codemod that migrates existing apps, or with `none` when existing apps need no codemod (a new file, or a change the 3-way merge handles). See `docs/contributing/upgrade-matrix.md`.
 - **Docs.** Each command or feature unit adds its own page under `docs/` with runnable code blocks. `make doctest` runs them.
 - **No CGO.** No custom DSL, no ORM, no telemetry from the CLI.
 
