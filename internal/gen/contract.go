@@ -47,6 +47,10 @@ type Output struct {
 	// button`) that the runner runs through exec.Runner after the write and before the
 	// post-steps. Each is an argv; Dir is relative to the project root. --dry-run prints them.
 	Commands []Command
+	// Edits lists the plan paths that the generator built from the current content on disk
+	// (an in-place edit that keeps the user's content, such as a rule appended to a seed
+	// file). The runner updates them without --force and keeps their lock template.
+	Edits []string
 }
 
 // Command is one external command a generator asks the runner to run (ADR 0008).
