@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -138,16 +139,14 @@ func (p predicate) matches(answers map[string]any) (bool, error) {
 		}
 		return s == p.value, nil
 	case "contains":
-		values, ok := v.([]string)
-		if !ok {
-			return false, fmt.Errorf("answer %q must be a string slice", p.key)
+		// Answers decoded from spinup.lock hold lists as []any; validated answers hold []string.
+		switch values := v.(type) {
+		case []string:
+			return slices.Contains(values, p.value), nil
+		case []any:
+			return slices.Contains(values, any(p.value)), nil
 		}
-		for _, s := range values {
-			if s == p.value {
-				return true, nil
-			}
-		}
-		return false, nil
+		return false, fmt.Errorf("answer %q must be a string slice", p.key)
 	default:
 		return false, invalidCondition(p.op)
 	}
