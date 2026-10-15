@@ -1,12 +1,19 @@
 env SPINUP_KIT_REPLACE=
 exec spinup new app --api-only --no-git --module example.com/app --non-interactive
 cd app
+unquote ../setext ../conflict
 exec spinup check
 cp ../edited deploy/compose.dev.yml
 ! exec spinup check
 stderr 'Application check failed'
 stdout 'spinup eject deploy/compose.dev.yml'
 exec spinup restore deploy/compose.dev.yml --force
+cp ../setext README.md
+exec spinup check
+rm .env.example
+[symlink] symlink .env.example -> ../edited
+[symlink] ! exec spinup check
+[symlink] stdout 'not a regular file'
 cp ../conflict api/cmd/api/main.go
 ! exec spinup check
 stdout 'conflict markers'
@@ -15,9 +22,12 @@ stdout '"problems": \['
 stdout '"state": "conflict"'
 -- edited --
 edited
+-- setext --
+>Title
+>=======
 -- conflict --
-<<<<<<< ours
-ours
-=======
-theirs
->>>>>>> theirs
+><<<<<<< ours
+>ours
+>=======
+>theirs
+>>>>>>>> theirs
