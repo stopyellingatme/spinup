@@ -1,0 +1,6 @@
+name = "example"
+
+[[files]]
+path = "../escaped.txt"
+source = "files/example.txt.tmpl"
+class = "managed"
