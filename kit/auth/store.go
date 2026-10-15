@@ -43,28 +43,36 @@ func (a *Auth) updatePasswordHash(ctx context.Context, id int64, old, hash strin
 	return err
 }
 
-// lockedUntil returns the time when logins for email open again, or the zero
-// time when they are open now. Logins are locked while the window holds
-// threshold failed attempts. The oldest of the last threshold attempts opens
-// the lock when it leaves the window.
-func (a *Auth) lockedUntil(ctx context.Context, email string, now time.Time) (time.Time, error) {
-	rows, err := a.pool.Query(ctx,
+// reserveAttempt checks the lockout and records an attempt before password verification.
+// The email lock serializes reservations across all instances that share the database.
+// A nonzero time means the threshold was reached, so no attempt was recorded.
+func (a *Auth) reserveAttempt(ctx context.Context, email string, now time.Time) (time.Time, error) {
+	// Each statement must see reservations committed by the previous lock holder.
+	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email); err != nil {
+		return time.Time{}, err
+	}
+	rows, err := tx.Query(ctx,
 		`SELECT attempted_at FROM login_attempts WHERE email = $1 AND attempted_at > $2 ORDER BY attempted_at DESC LIMIT $3`,
 		email, now.Add(-a.window), a.threshold)
 	if err != nil {
 		return time.Time{}, err
 	}
 	times, err := pgx.CollectRows(rows, pgx.RowTo[time.Time])
-	if err != nil || len(times) < a.threshold {
+	if err != nil {
 		return time.Time{}, err
 	}
-	return times[len(times)-1].Add(a.window), nil
-}
-
-// recordFailure stores one failed login for email.
-func (a *Auth) recordFailure(ctx context.Context, email string, now time.Time) error {
-	_, err := a.pool.Exec(ctx, `INSERT INTO login_attempts (email, attempted_at) VALUES ($1, $2)`, email, now)
-	return err
+	if len(times) >= a.threshold {
+		return times[len(times)-1].Add(a.window), nil
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO login_attempts (email, attempted_at) VALUES ($1, $2)`, email, now); err != nil {
+		return time.Time{}, err
+	}
+	return time.Time{}, tx.Commit(ctx)
 }
 
 // clearFailures deletes the failed logins of email.

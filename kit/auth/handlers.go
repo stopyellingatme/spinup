@@ -120,9 +120,9 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	now := a.now()
-	until, err := a.lockedUntil(ctx, email, now)
+	until, err := a.reserveAttempt(ctx, email, now)
 	if err != nil {
-		a.internalError(w, r, "read failed logins", err)
+		a.internalError(w, r, "reserve a login attempt", err)
 		return
 	}
 	if !until.IsZero() {
@@ -151,10 +151,6 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !found || !match {
-		if err := a.recordFailure(ctx, email, now); err != nil {
-			a.internalError(w, r, "record a failed login", err)
-			return
-		}
 		noStore(w)
 		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusUnauthorized, Detail: "The email address or password is incorrect."})
 		return

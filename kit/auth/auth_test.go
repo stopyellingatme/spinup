@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/httpx"
 	"github.com/stopyellingatme/spinup/kit/testkit"
 )
@@ -209,6 +211,48 @@ func TestSecureCookieByDefault(t *testing.T) {
 	}
 }
 
+func TestCookieSecurityFromEnvironment(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, env string
+		secure    bool
+	}{
+		{"unset", "", true},
+		{"development", "dev", false},
+		{"production", "production", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var cfg config.Base
+			if err := config.LoadFrom(&cfg, func(key string) (string, bool) {
+				return tc.env, key == "SPINUP_ENV" && tc.env != ""
+			}, os.ReadFile); err != nil {
+				t.Fatal(err)
+			}
+			// New does not connect until a request needs the store.
+			pool, err := pgxpool.New(t.Context(), "postgres://localhost/unused")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(pool.Close)
+			a, err := New(pool, WithSecureCookie(cfg.Env != "dev"), func(o *options) {
+				o.params, o.cleanup = testParams, 0
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := a.Close(t.Context()); err != nil {
+					t.Error(err)
+				}
+			}()
+			if got := a.sessions.Cookie.Secure; got != tc.secure {
+				t.Fatalf("Secure = %v, want %v (Env = %q)", got, tc.secure, cfg.Env)
+			}
+		})
+	}
+}
+
 func TestRegisterValidation(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -387,6 +431,104 @@ func TestLockoutOption(t *testing.T) {
 	var left int
 	if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts`).Scan(&left); err != nil || left != 0 {
 		t.Fatalf("login_attempts after cleanup = %d (%v), want 0", left, err)
+	}
+}
+
+// loginCheckTracer signals when a login reaches the password lookup.
+// Busy hash slots then keep password verification from finishing.
+type loginCheckTracer struct{ checked chan struct{} }
+type loginCheckKey struct{}
+
+// TraceQueryStart marks credential queries for TraceQueryEnd.
+func (tr *loginCheckTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	return context.WithValue(ctx, loginCheckKey{}, strings.HasPrefix(data.SQL, "SELECT id, email, password_hash FROM users"))
+}
+
+// TraceQueryEnd reports a completed credential query.
+func (tr *loginCheckTracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryEndData) {
+	if checked, _ := ctx.Value(loginCheckKey{}).(bool); checked {
+		tr.checked <- struct{}{}
+	}
+}
+
+func TestConcurrentLoginLockout(t *testing.T) {
+	t.Parallel()
+	for _, known := range []bool{true, false} {
+		t.Run(strconv.FormatBool(known), func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			if known {
+				f.register(t, "burst@example.com")
+			}
+			const attempts = 20
+			tracer := &loginCheckTracer{checked: make(chan struct{}, attempts)}
+			cfg := f.pool.Config()
+			cfg.ConnConfig.Tracer = tracer
+			pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(pool.Close)
+			f.auth.pool = pool
+			// Hold every hash slot until all requests are admitted or refused.
+			for range cap(f.auth.slots) {
+				f.auth.slots <- struct{}{}
+			}
+			var release sync.Once
+			releaseSlots := func() {
+				release.Do(func() {
+					for range cap(f.auth.slots) {
+						<-f.auth.slots
+					}
+				})
+			}
+			results := make(chan *httptest.ResponseRecorder, attempts)
+			var wg sync.WaitGroup
+			defer wg.Wait()
+			// Release the slots before waiting, including on a test failure.
+			defer releaseSlots()
+			start := make(chan struct{})
+			for i := range attempts {
+				wg.Go(func() {
+					<-start
+					email := "burst@example.com"
+					if i%2 == 0 {
+						email = "  BURST@Example.COM  "
+					}
+					results <- f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds(email, "wrong password!")})
+				})
+			}
+			close(start)
+			timeout := time.NewTimer(10 * time.Second)
+			defer timeout.Stop()
+			checks, locked := 0, 0
+			for range attempts {
+				select {
+				case <-tracer.checked:
+					checks++
+				case rec := <-results:
+					if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "900" {
+						t.Fatalf("blocked login: status %d, Retry-After %q: %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+					}
+					locked++
+				case <-timeout.C:
+					t.Fatal("logins did not reach the password check or return 429")
+				}
+			}
+			if checks != DefaultLockoutThreshold || locked != attempts-DefaultLockoutThreshold {
+				t.Errorf("password checks = %d, locked = %d, want 5 and 15", checks, locked)
+			}
+			releaseSlots()
+			for range checks {
+				if rec := <-results; rec.Code != http.StatusUnauthorized {
+					t.Errorf("wrong login: status %d: %s", rec.Code, rec.Body)
+				}
+			}
+			var rows int
+			if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts WHERE email = 'burst@example.com'`).Scan(&rows); err != nil || rows != DefaultLockoutThreshold {
+				t.Fatalf("login attempts = %d (%v), want 5", rows, err)
+			}
+		})
 	}
 }
 

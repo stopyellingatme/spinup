@@ -89,8 +89,11 @@ func New(opts ...Option) *App {
 	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders()}
 	if a.config.Env == "dev" {
 		dev := devtools.New(devtools.Options{Name: a.name, Version: a.version, Config: a.config, Routes: a.devRoutes, Migrations: a.migrationStatus})
-		mux.Handle("/_dev", dev.Handler())
+		handler := dev.Handler()
+		mux.Handle("/_dev", handler)
+		mux.Handle("/_dev/", handler)
 		a.addRoute("/_dev")
+		a.addRoute("/_dev/")
 		middleware = append(middleware, dev.Middleware(), a.recordRoute())
 	}
 	a.handler = httpx.Chain(mux, append(middleware, a.middleware...)...)
