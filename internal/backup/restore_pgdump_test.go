@@ -2,6 +2,7 @@ package backup_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,25 +86,31 @@ func TestVerifyPgdumpOnlyRecordsAttemptedRestore(t *testing.T) {
 				}
 			}
 			if stage == "restore" {
-				vm.Expect("sh", "-ec").Return("backup_last_verify_timestamp_seconds 123\n", "", 0)
 				vm.Expect("mkdir", "-p", "/opt/todo/backups/metrics").Return("", "", 0)
 				vm.Expect("chmod", "0755", "/opt/todo/backups/metrics").Return("", "", 0)
-				vm.ExpectUpload(backup.MetricsPath("todo"))
+				vm.Expect("flock", "/opt/todo/backups/metrics/.lock").Return("", "", 0)
 			}
 			_, err := backup.Verify(context.Background(), backup.Options{Dir: dumpProject(t), Env: "staging", Remote: vm}, target)
 			if err == nil {
 				t.Fatal("expected failure")
 			}
 			vm.AssertDone(t)
+			var metrics []string
+			for _, call := range vm.Calls() {
+				if len(call.Argv) > 0 && call.Argv[0] == "flock" && call.Stdin != nil {
+					data, _ := io.ReadAll(call.Stdin)
+					metrics = append(metrics, string(data))
+				}
+			}
 			want := 0
 			if stage == "restore" {
 				want = 1
 			}
-			if len(vm.Uploads()) != want {
-				t.Fatalf("metrics uploads: %+v", vm.Uploads())
+			if len(metrics) != want {
+				t.Fatalf("metrics writes: %q", metrics)
 			}
-			if want == 1 && !strings.Contains(string(vm.Uploads()[0].Data), "backup_last_verify_ok 0\n") {
-				t.Fatal("missing failed verification metric")
+			if want == 1 && !strings.Contains(metrics[0], "backup_last_verify_ok 0\n") {
+				t.Fatalf("missing failed verification metric: %q", metrics[0])
 			}
 		})
 	}
