@@ -108,7 +108,9 @@ if [[ "${1:-}" == "--list" ]]; then
 fi
 
 echo "==> start the API on $api_url"
-(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" ./api.bin >"$work/logs/api.log" 2>&1) &
+# exec, so the recorded PID is the API itself and cleanup stops it (a subshell PID would leave
+# the API running).
+(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" exec ./api.bin >"$work/logs/api.log" 2>&1) &
 pids+=($!)
 echo "==> start the web app on $origin"
 PORT="$web_port" HOST=127.0.0.1 PUBLIC_ORIGIN="$origin" API_URL="$api_url" \
