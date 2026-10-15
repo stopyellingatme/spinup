@@ -304,3 +304,30 @@ for (const [value, want] of [['', null], ['true', true], ['false', false]]) {
 		t.Error("update does not pass original item to parse")
 	}
 }
+
+func TestEmbedRefusesResourcePages(t *testing.T) {
+	t.Parallel()
+	root := webApp(t)
+	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock.Answers["frontend_mode"] = "embed"
+	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	for _, apiOnly := range []bool{false, true} {
+		args := []string{}
+		if apiOnly {
+			args = append(args, "--api-only")
+		}
+		out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, args...)})
+		if apiOnly {
+			if err != nil || out == nil {
+				t.Fatalf("API-only resource: %v", err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "Try:") || !strings.Contains(err.Error(), "embed") {
+			t.Fatalf("resource pages: %v", err)
+		}
+	}
+}

@@ -1,0 +1,21 @@
+//go:build embedweb
+
+// Package webdist contains the static web application.
+package webdist
+
+import (
+	"embed"
+	"io/fs"
+)
+
+//go:embed all:dist
+var assets embed.FS
+
+// FS contains the web build, with index.html at its root.
+var FS = func() fs.FS {
+	files, err := fs.Sub(assets, "dist")
+	if err != nil {
+		panic(err)
+	}
+	return files
+}()

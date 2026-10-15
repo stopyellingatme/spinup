@@ -1,0 +1,58 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+# Put your own site directives in Caddyfile.d/*.caddy.
+#
+# Caddy runs in the base project (compose.edge.yml) and reads /etc/caddy, which is
+# /opt/todo/caddy on the VM. spinup deploy writes upstream.caddy there for the
+# live color and reloads Caddy (docs/adr/0003-deploy-strategy.md). upstream.caddy is a deploy
+# artifact: it is not in the repository, and each release directory keeps a copy for rollback.
+# A route imports it with two arguments, the service and its port:
+#
+#   reverse_proxy {
+#   	dynamic a {
+#   		name {args[0]}-green
+#   		port {args[1]}
+#   		refresh 1s
+#   	}
+#   	lb_policy round_robin
+#   	lb_try_duration 5s
+#   	lb_try_interval 50ms
+#   	transport http {
+#   		dial_timeout 250ms
+#   	}
+#   }
+{
+	# The admin API listens inside the container only.
+	admin localhost:2019
+	# Requests that the old config started have 10 s to finish after a reload.
+	# The drain of spinup deploy waits at most 10 s too.
+	grace_period 10s
+	# Collect HTTP metrics for each host. The monitoring stack scrapes them on port 2020.
+	metrics {
+		per_host
+	}
+}
+
+# The metrics endpoint. Port 2020 is not published: only the Docker networks reach it.
+:2020 {
+	metrics
+}
+
+# PUBLIC_HOST is the host of public_url, so Caddy gets and renews the certificate.
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	import Caddyfile.d/*.caddy
+
+	handle {
+		import upstream.caddy api 8080
+	}
+}

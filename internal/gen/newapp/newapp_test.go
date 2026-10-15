@@ -432,3 +432,11 @@ func TestCIWorkflowSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestEmbedRefusesAuth(t *testing.T) {
+	t.Parallel()
+	_, err := Generate(t.Context(), Options{Name: "demo", Dir: t.TempDir(), Answers: map[string]any{"module": "example.com/demo", "modules": "auth", "frontend_mode": "embed"}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "embed") || !strings.Contains(err.Error(), "Try:") {
+		t.Fatalf("Generate error = %v", err)
+	}
+}
