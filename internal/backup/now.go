@@ -36,21 +36,6 @@ type Options struct {
 	Runner runexec.Runner
 }
 
-// session holds a loaded project and its backend.
-type session struct {
-	app     string
-	env     project.Env
-	backend *PGBackRest
-	remote  remote.Runner
-	owned   bool
-}
-
-func (s *session) close() {
-	if s.owned {
-		_ = s.remote.Close(context.Background())
-	}
-}
-
 func writers(o Options) (io.Writer, io.Writer) {
 	out, errOut := o.Out, o.ErrOut
 	if out == nil {
@@ -60,52 +45,6 @@ func writers(o Options) (io.Writer, io.Writer) {
 		errOut = io.Discard
 	}
 	return out, errOut
-}
-
-// open loads the project, checks that it uses the backups module, and connects to the VM.
-func open(o Options) (*session, error) {
-	dir := o.Dir
-	if dir == "" {
-		dir = "."
-	}
-	root, err := project.FindRoot(dir)
-	if err != nil {
-		return nil, fmt.Errorf("find the spinup project: %w", err)
-	}
-	config, err := project.Load(root)
-	if err != nil {
-		return nil, fmt.Errorf("load the spinup project: %w\nTry: correct spinup.toml", err)
-	}
-	if o.Env == "" {
-		return nil, errors.New("select backup environment: --env is missing\nTry: pass --env <environment>")
-	}
-	env, err := config.ResolveEnv(o.Env)
-	if err != nil {
-		return nil, fmt.Errorf("select backup environment: %w", err)
-	}
-	data, err := ReadConfig(root)
-	if err != nil {
-		return nil, err
-	}
-	retention, err := Retention(config)
-	if err != nil {
-		return nil, err
-	}
-	_, errOut := writers(o)
-	s := &session{app: config.App.Name, env: env, remote: o.Remote}
-	if s.remote == nil {
-		host, err := remote.HostFromEnv(env)
-		if err != nil {
-			return nil, err
-		}
-		runner := o.Runner
-		if runner == nil {
-			runner = runexec.OSRunner{}
-		}
-		s.remote, s.owned = remote.New(host, runner, remote.Options{}), true
-	}
-	s.backend = &PGBackRest{App: config.App.Name, Remote: s.remote, Config: data, RetentionFull: retention, Progress: errOut}
-	return s, nil
 }
 
 // ReadConfig reads the rendered pgBackRest configuration of the project at root.
@@ -144,33 +83,33 @@ func Now(ctx context.Context, o Options) (Result, error) {
 	if _, err := ParseKind(string(kind)); err != nil {
 		return Result{}, err
 	}
-	s, err := open(o)
+	backend, s, err := Open(o)
 	if err != nil {
 		return Result{}, err
 	}
-	defer s.close()
+	defer s.Close()
 	out, errOut := writers(o)
-	result, err := s.backend.Backup(ctx, kind)
+	result, err := backend.Backup(ctx, kind)
 	if err != nil {
 		return Result{}, err
 	}
-	backupMetrics(ctx, s.remote, s.app, result, errOut)
+	backupMetrics(ctx, s.Remote, s.App, result, errOut)
 	if o.JSON {
 		return result, writeJSON(out, result)
 	}
-	_, err = fmt.Fprintf(out, "backup %s (%s) of %s: size %s, stored %s, took %s\n", result.Label, result.Kind, s.env.Name, HumanSize(result.Size), HumanSize(result.RepoSize), result.Duration.Round(time.Second))
+	_, err = fmt.Fprintf(out, "backup %s (%s) of %s: size %s, stored %s, took %s\n", result.Label, result.Kind, s.Environment.Name, HumanSize(result.Size), HumanSize(result.RepoSize), result.Duration.Round(time.Second))
 	return result, err
 }
 
 // List prints the backups of the environment, oldest first.
 func List(ctx context.Context, o Options) ([]Info, error) {
-	s, err := open(o)
+	backend, s, err := Open(o)
 	if err != nil {
 		return nil, err
 	}
-	defer s.close()
+	defer s.Close()
 	out, _ := writers(o)
-	backups, err := s.backend.List(ctx)
+	backups, err := backend.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +120,7 @@ func List(ctx context.Context, o Options) ([]Info, error) {
 		return backups, writeJSON(out, backups)
 	}
 	if len(backups) == 0 {
-		_, err = fmt.Fprintf(out, "no backups in %s\n", s.env.Name)
+		_, err = fmt.Fprintf(out, "no backups in %s\n", s.Environment.Name)
 		return backups, err
 	}
 	for _, b := range backups {
@@ -194,13 +133,13 @@ func List(ctx context.Context, o Options) ([]Info, error) {
 
 // ShowStatus prints the repository status of the environment.
 func ShowStatus(ctx context.Context, o Options) (Status, error) {
-	s, err := open(o)
+	backend, s, err := Open(o)
 	if err != nil {
 		return Status{}, err
 	}
-	defer s.close()
+	defer s.Close()
 	out, _ := writers(o)
-	status, err := s.backend.Info(ctx)
+	status, err := backend.Info(ctx)
 	if err != nil {
 		return Status{}, err
 	}
@@ -221,10 +160,18 @@ func ShowStatus(ctx context.Context, o Options) (Status, error) {
 		lines = append(lines, fmt.Sprintf("WAL archive: %s to %s", status.WALMin, status.WALMax))
 	}
 	if !status.Exists {
-		lines = append(lines, "Try: run spinup backup now --env "+s.env.Name+" to create the stanza")
+		lines = append(lines, "Try: run spinup backup now --env "+s.Environment.Name+" to create the stanza")
 	}
-	_, err = fmt.Fprintln(out, strings.Join(lines, "\n"))
-	return status, err
+	if _, err = fmt.Fprintln(out, strings.Join(lines, "\n")); err != nil {
+		return status, err
+	}
+	// The timers of spinup backup schedule and the backup metrics file (ADR 0011 §5).
+	// They are extra information, so a failure is a warning.
+	if err := ShowScheduleStatus(ctx, s.Remote, s.App, out); err != nil {
+		_, errOut := writers(o)
+		_, _ = fmt.Fprintf(errOut, "warning: %v\n", err)
+	}
+	return status, nil
 }
 
 func writeJSON(w io.Writer, v any) error {
