@@ -79,6 +79,10 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	if u.o.Major {
 		script.WriteString(shell(u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.services()...)...)...) + "\n")
 	}
+	if u.rollbackRefusal != "" {
+		script.Reset()
+		script.WriteString("#!/bin/sh\nset -eu\nprintf '%s\\n' " + remote.Quote(u.rollbackRefusal) + " >&2\nexit 1\n")
+	}
 	if err := u.vm.Upload(ctx, []byte(script.String()), dir+"/rollback.sh", 0700); err != nil {
 		return failure("save rollback script", err)
 	}

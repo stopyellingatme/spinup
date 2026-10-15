@@ -41,18 +41,19 @@ type Deps struct {
 }
 
 type upgrade struct {
-	o        Options
-	d        Deps
-	root     string
-	cfg      *project.Config
-	env      project.Env
-	vm       remote.Runner
-	rel      deploy.Release
-	dir      string
-	files    []string
-	live     container
-	current  version
-	recovery string
+	o               Options
+	d               Deps
+	root            string
+	cfg             *project.Config
+	env             project.Env
+	vm              remote.Runner
+	rel             deploy.Release
+	dir             string
+	files           []string
+	live            container
+	current         version
+	recovery        string
+	rollbackRefusal string
 }
 
 type container struct {
@@ -66,7 +67,11 @@ type container struct {
 }
 
 // Run upgrades PostgreSQL or removes the retained volume after a verified major upgrade.
-func Run(ctx context.Context, o Options, d Deps) (err error) {
+func Run(ctx context.Context, o Options, d Deps) error {
+	return run(ctx, o, d, nil)
+}
+
+func run(ctx context.Context, o Options, d Deps, strategy Strategy) (err error) {
 	if o.Out == nil {
 		o.Out = io.Discard
 	}
@@ -82,8 +87,13 @@ func Run(ctx context.Context, o Options, d Deps) (err error) {
 	u := &upgrade{o: o, d: d}
 	defer func() {
 		if err != nil && u.recovery != "" {
-			fmt.Fprintf(o.ErrOut, "Return to the old state on the VM:\n%s\n", u.recovery)
-			err = fmt.Errorf("%w\nTry: return to the old state with %s", err, u.recovery)
+			if strategy == nil {
+				fmt.Fprintf(o.ErrOut, "Return to the old state on the VM:\n%s\n", u.recovery)
+				err = fmt.Errorf("%w\nTry: return to the old state with %s", err, u.recovery)
+			} else {
+				fmt.Fprintf(o.ErrOut, "Recovery instructions:\n%s\n", u.recovery)
+				err = fmt.Errorf("%w\nTry: follow the recovery instructions with %s", err, u.recovery)
+			}
 		}
 	}()
 	u.root, err = project.FindRoot(o.Dir)
@@ -113,7 +123,11 @@ func Run(ctx context.Context, o Options, d Deps) (err error) {
 		}
 	}
 	if o.Plan {
-		u.plan()
+		if strategy != nil {
+			strategy.Plan(o.Out, o.Cleanup)
+		} else {
+			u.plan()
+		}
 		return nil
 	}
 	inside, err := maintain.InWindow(u.cfg.Maintenance.Window, d.Now())
@@ -125,11 +139,18 @@ func Run(ctx context.Context, o Options, d Deps) (err error) {
 	}
 	if o.Major {
 		if o.Cleanup {
-			fmt.Fprintln(o.Out, "Cleanup permanently removes the old database volume and its recovery path.")
+			if strategy == nil {
+				fmt.Fprintln(o.Out, "Cleanup permanently removes the old database volume and its recovery path.")
+			} else {
+				fmt.Fprintln(o.Out, "Cleanup permanently removes the old data directory. Never start the old cluster.")
+			}
 		} else {
 			fmt.Fprintln(o.Out, "The app will be down from stopping both colors until the smoke check passes.")
 		}
 		if !o.IKnow {
+			if strategy != nil {
+				return failure("confirm database operation", errors.New("--i-know is required to accept downtime or permanent database changes"))
+			}
 			return failure("confirm database operation", errors.New("--i-know is required to accept downtime or permanent volume removal"))
 		}
 	}
@@ -164,10 +185,16 @@ func Run(ctx context.Context, o Options, d Deps) (err error) {
 		cancel(nil)
 	}()
 	if o.Cleanup {
+		if strategy != nil {
+			return strategy.Cleanup(ctx, &Session{u})
+		}
 		return u.cleanup(ctx)
 	}
 	if err = u.inspect(ctx); err != nil {
 		return err
+	}
+	if strategy != nil {
+		return strategy.Execute(ctx, &Session{u})
 	}
 	if o.Major {
 		return u.major(ctx)
@@ -284,12 +311,18 @@ func (u *upgrade) sql(ctx context.Context, id, script string) ([]byte, error) {
 	return result.Stdout, nil
 }
 func (u *upgrade) backup(ctx context.Context, name string) (backup.Result, error) {
+	return u.backupAt(ctx, name, nil)
+}
+func (u *upgrade) backupAt(ctx context.Context, name string, config []byte) (backup.Result, error) {
 	if name == "" {
 		name = u.cfg.Backups.Backend
 	}
 	b, err := backup.NewBackend(name, backup.Env{App: u.cfg.App.Name, Environment: u.env, Config: u.cfg, Root: u.root, Remote: releaseRunner{Runner: u.vm, u: u}, Progress: u.o.ErrOut})
 	if err != nil {
 		return backup.Result{}, err
+	}
+	if p, ok := b.(*backup.PGBackRest); ok && config != nil {
+		p.Config = config
 	}
 	result, err := b.Backup(ctx, backup.Full)
 	if err != nil {
