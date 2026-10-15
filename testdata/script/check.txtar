@@ -1,0 +1,23 @@
+env SPINUP_KIT_REPLACE=
+exec spinup new app --api-only --no-git --module example.com/app --non-interactive
+cd app
+exec spinup check
+cp ../edited deploy/compose.dev.yml
+! exec spinup check
+stderr 'Application check failed'
+stdout 'spinup eject deploy/compose.dev.yml'
+exec spinup restore deploy/compose.dev.yml --force
+cp ../conflict api/cmd/api/main.go
+! exec spinup check
+stdout 'conflict markers'
+! exec spinup check --json
+stdout '"problems": \['
+stdout '"state": "conflict"'
+-- edited --
+edited
+-- conflict --
+<<<<<<< ours
+ours
+=======
+theirs
+>>>>>>> theirs

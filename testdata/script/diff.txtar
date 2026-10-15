@@ -1,0 +1,16 @@
+env SPINUP_KIT_REPLACE=
+exec spinup new app --api-only --no-git --module example.com/app --non-interactive
+cd app
+exec spinup diff
+! stdout .
+cp ../edited deploy/compose.dev.yml
+cp ../edited api/cmd/api/main.go
+exec spinup diff
+stdout '--- a/deploy/compose.dev.yml'
+stdout '--- a/api/cmd/api/main.go'
+stdout '\+edited'
+exec spinup diff --json
+stdout '"files": \['
+stdout '"state": "modified"'
+-- edited --
+edited
