@@ -1,0 +1,53 @@
+name = "base"
+description = "Common application configuration and development instructions."
+requires = []
+
+[[questions]]
+key = "app_name"
+prompt = "App name"
+type = "string"
+pattern = "^[a-z][a-z0-9-]{0,62}$"
+
+[[questions]]
+key = "module"
+prompt = "Go module path"
+type = "string"
+pattern = "^[a-z0-9][a-z0-9.-]*(/[A-Za-z0-9._~-]+)+$"
+
+[[questions]]
+key = "modules"
+prompt = "Modules, separated by commas"
+type = "string"
+default = "ci"
+
+[[questions]]
+key = "db_version"
+prompt = "PostgreSQL major version"
+type = "enum"
+choices = ["18", "17", "16"]
+default = "18"
+
+[[files]]
+path = "spinup.toml"
+source = "files/spinup.toml.tmpl"
+class = "scaffold"
+
+[[files]]
+path = ".gitattributes"
+source = "files/.gitattributes"
+class = "managed"
+
+[[files]]
+path = ".gitignore"
+source = "files/.gitignore"
+class = "scaffold"
+
+[[files]]
+path = ".env.example"
+source = "files/.env.example"
+class = "scaffold"
+
+[[files]]
+path = "README.md"
+source = "files/README.md.tmpl"
+class = "seed"
