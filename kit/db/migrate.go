@@ -38,6 +38,7 @@ type migrateConfig struct {
 	statementTimeout time.Duration
 	out              io.Writer
 	url              string
+	hooks            []Hook
 }
 
 // WithMigrationLockTimeout sets lock_timeout on migration connections (default 5s).
@@ -59,6 +60,21 @@ func WithOutput(w io.Writer) MigrateOption {
 // argument is empty. [MigrateCommand] uses it before DATABASE_URL.
 func WithDatabaseURL(url string) MigrateOption {
 	return func(c *migrateConfig) { c.url = url }
+}
+
+// Hook runs extra migration steps in the same `migrate` command, for
+// example the migrations of a job queue. [MigrateCommand] calls AfterUp
+// after the app migrations move up, and BeforeDown before they move down.
+// Both functions get the database URL. A nil function is skipped.
+type Hook struct {
+	AfterUp    func(ctx context.Context, url string) error
+	BeforeDown func(ctx context.Context, url string) error
+}
+
+// WithHook adds a migration hook to [MigrateCommand]. Give it more than once
+// to add more hooks. The hooks run in the order given.
+func WithHook(h Hook) MigrateOption {
+	return func(c *migrateConfig) { c.hooks = append(c.hooks, h) }
 }
 
 func newMigrateConfig(opts []MigrateOption) migrateConfig {
@@ -224,6 +240,96 @@ func (m *Migrator) Down(ctx context.Context) error {
 		return fmt.Errorf("db: roll back migration: %w", err)
 	}
 	m.printf("rolled back  %s\n", path.Base(res.Source.Path))
+	return nil
+}
+
+// Version returns the highest applied migration version, or 0 when no
+// migration is applied.
+func (m *Migrator) Version(ctx context.Context) (int64, error) {
+	if m.provider == nil {
+		return 0, nil
+	}
+	v, err := m.provider.GetDBVersion(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("db: read migration version: %w", err)
+	}
+	return v, nil
+}
+
+// Redo rolls back the most recent migration and applies it again. It writes
+// "rolled back  <file>" and "applied  <file>", or "migrate: nothing to redo".
+func (m *Migrator) Redo(ctx context.Context) error {
+	if m.provider == nil {
+		m.printf("migrate: nothing to redo\n")
+		return nil
+	}
+	res, err := m.provider.Down(ctx)
+	if errors.Is(err, goose.ErrNoNextVersion) {
+		m.printf("migrate: nothing to redo\n")
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("db: roll back migration: %w", err)
+	}
+	m.printf("rolled back  %s\n", path.Base(res.Source.Path))
+	res, err = m.provider.ApplyVersion(ctx, res.Source.Version, true)
+	if err != nil {
+		return fmt.Errorf("db: apply migration again: %w", err)
+	}
+	m.printf("applied  %s\n", path.Base(res.Source.Path))
+	return nil
+}
+
+// HasVersion reports whether a migration file has the version v.
+func (m *Migrator) HasVersion(v int64) bool {
+	if m.provider == nil {
+		return false
+	}
+	for _, s := range m.provider.ListSources() {
+		if s.Version == v {
+			return true
+		}
+	}
+	return false
+}
+
+// UpTo applies the pending migrations up to and including version v. It
+// writes one "applied  <file>" line for each migration it applies.
+func (m *Migrator) UpTo(ctx context.Context, v int64) error {
+	if m.provider == nil {
+		return nil
+	}
+	results, err := m.provider.UpTo(ctx, v)
+	var partial *goose.PartialError
+	if errors.As(err, &partial) {
+		results = partial.Applied
+	}
+	for _, r := range results {
+		m.printf("applied  %s\n", path.Base(r.Source.Path))
+	}
+	if err != nil {
+		return fmt.Errorf("db: apply migrations up to version %d: %w", v, err)
+	}
+	return nil
+}
+
+// DownTo rolls back the applied migrations above version v, newest first.
+// It writes one "rolled back  <file>" line for each migration.
+func (m *Migrator) DownTo(ctx context.Context, v int64) error {
+	if m.provider == nil {
+		return nil
+	}
+	results, err := m.provider.DownTo(ctx, v)
+	var partial *goose.PartialError
+	if errors.As(err, &partial) {
+		results = partial.Applied
+	}
+	for _, r := range results {
+		m.printf("rolled back  %s\n", path.Base(r.Source.Path))
+	}
+	if err != nil {
+		return fmt.Errorf("db: roll back migrations to version %d: %w", v, err)
+	}
 	return nil
 }
 
