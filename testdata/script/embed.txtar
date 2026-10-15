@@ -19,16 +19,45 @@ cd ..
 stderr 'cannot use auth in embed mode'
 stderr 'Try:'
 ! exists invalid
-cd embedded/web
+cd embedded
+env GOWORK=off
+exec spinup build --dry-run
+stdout 'pnpm --dir web install --frozen-lockfile'
+stdout 'pnpm --dir web build'
+stdout 'go build -tags embedweb'
+# Image previews need no Docker engine. Keep the local kit restriction.
+! exec spinup build --image --dry-run
+stderr 'local kit replace'
+cp api/go.mod api/go.mod.local
+exec sh $WORK/image-mod.sh
+exec spinup build --image --dry-run
+stdout '--build-context web=web'
+! stdout 'Dockerfile.web'
+# The optional Docker gate requires cached images and published kit dependencies.
+[env:SPINUP_EMBED_DOCKER] [exec:docker] exec spinup build --image
+# A fake Docker binary tests the CLI image path without an engine or network.
+mkdir $WORK/fakebin
+cp $WORK/docker.sh $WORK/fakebin/docker
+chmod 0755 $WORK/fakebin/docker
+env PATH=$WORK/fakebin:$PATH
+env SPINUP_DOCKER_ARGS=$WORK/docker.args
+exec spinup build --image
+grep '--build-context web=web' $WORK/docker.args
+stdout 'embedded-api:dev'
+! grep 'Dockerfile.web' $WORK/docker.args
+cp api/go.mod.local api/go.mod
+rm api/go.mod.local
+cd web
 exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_HOME/Library/pnpm/store
 exec pnpm check
 stdout '(?i)\b0 errors\b'
-exec pnpm build
-exists build/index.html ../api/internal/webdist/dist/index.html
-! exists build/index.js
-cd ../api
-env GOWORK=off
-exec go build -tags embedweb -o bin/api ./cmd/api
+cd ..
+# Keep every package manager invocation offline, including spinup build.
+env npm_config_offline=true
+exec spinup build
+exists web/build/index.html api/internal/webdist/dist/index.html api/bin/api
+! exists web/build/index.js
+cd api
 # The recorder verifies the actual embedded build without requiring a listening socket.
 # The SvelteKit SPA shell starts the app with an inline script that imports the hashed start entry.
 cp $WORK/spa_test.go internal/webdist/spa_test.go
@@ -53,6 +82,16 @@ exec sh $WORK/asset.sh
 grep 'Cache-Control: public, max-age=31536000, immutable' asset.headers
 kill -INT api
 wait api
+
+-- image-mod.sh --
+set -eu
+sed '/^replace github.com\/stopyellingatme\/spinup\/kit => /d' api/go.mod > api/go.mod.image
+mv api/go.mod.image api/go.mod
+
+-- docker.sh --
+#!/bin/sh
+set -eu
+printf '%s\n' "$*" > "$SPINUP_DOCKER_ARGS"
 
 -- asset.sh --
 set -eu
