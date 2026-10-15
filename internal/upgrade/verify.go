@@ -11,7 +11,17 @@ import (
 	"github.com/stopyellingatme/spinup/internal/exec"
 )
 
+// committedConflicts reports a step whose conflict markers were committed with
+// --commit-conflicts. Go tools cannot parse those files, so GoFix and Verify skip the step.
+func committedConflicts(s *Step) bool {
+	return s.Plan != nil && len(s.Plan.Conflicts()) > 0
+}
+
 func phaseGoFix(ctx context.Context, s *Step) (bool, error) {
+	if committedConflicts(s) {
+		_, _ = fmt.Fprintln(s.Out, "Skipped go fix: the step has committed conflict markers")
+		return false, nil
+	}
 	hasAPI, err := phaseHasAPI(s)
 	if err != nil || !hasAPI {
 		return false, err
@@ -27,6 +37,10 @@ func phaseGoFix(ctx context.Context, s *Step) (bool, error) {
 }
 
 func (h *phaseHooks) verify(ctx context.Context, s *Step) error {
+	if committedConflicts(s) {
+		_, _ = fmt.Fprintln(s.Out, "Skipped verify: the step has committed conflict markers")
+		return nil
+	}
 	owners := h.provenance(s)
 	var failures []string
 	hasAPI, err := phaseHasAPI(s)

@@ -186,3 +186,39 @@ func TestPhasesInstalled(t *testing.T) {
 		}
 	}
 }
+
+func TestDepsNeverLowersKit(t *testing.T) {
+	t.Parallel()
+	s := phaseStep(t)
+	s.To.Version = "0.0.1"
+	fake := s.Runner.(*exec.Fake)
+	fake.Expect("go", "mod", "edit", "-json").Return(`{"Require":[{"Path":"`+phaseKit+`","Version":"v0.1.0"}]}`, "", 0)
+	fake.Expect("go", "mod", "tidy")
+	if err := phaseDeps(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	api := filepath.Join(s.Worktree, "api")
+	assertPhaseCalls(t, fake, []string{api, api}, "go mod edit -json", "go mod tidy")
+	if s.Lock.Kit.Version != "" {
+		t.Fatalf("kit lock changed to %+v", s.Lock.Kit)
+	}
+}
+
+func TestGoFixAndVerifySkipCommittedConflicts(t *testing.T) {
+	t.Parallel()
+	s := phaseStep(t)
+	s.Plan = &Plan{Files: []FileDecision{{Path: "api/main.go", Action: ActionConflict}}}
+	var out bytes.Buffer
+	s.Out = &out
+	changed, err := phaseGoFix(context.Background(), s)
+	if err != nil || changed {
+		t.Fatalf("GoFix changed=%v err=%v", changed, err)
+	}
+	if err := (&phaseHooks{}).verify(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	s.Runner.(*exec.Fake).AssertDone(t)
+	if !strings.Contains(out.String(), "Skipped go fix") || !strings.Contains(out.String(), "Skipped verify") {
+		t.Fatalf("output=%q", out.String())
+	}
+}

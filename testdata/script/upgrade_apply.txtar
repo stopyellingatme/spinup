@@ -9,7 +9,8 @@ exec spinup upgrade --yes
 stdout 'git merge spinup/upgrade-0.0.1'
 ! exists .spinup/upgrade.json
 grep 'replace github.com/stopyellingatme/spinup/kit => ' .spinup/upgrade/0.0.1/api/go.mod
-grep 'github.com/stopyellingatme/spinup/kit v0.0.1' .spinup/upgrade/0.0.1/api/go.mod
+# The pin-only step never lowers the kit (v0.1.0 is newer than the 0.0.1 step).
+grep 'github.com/stopyellingatme/spinup/kit v0.1.0' .spinup/upgrade/0.0.1/api/go.mod
 grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
 grep 'upgraded application routes' .spinup/upgrade/0.0.1/api/internal/routes/routes.go
 grep 'const version = "dev"' .spinup/upgrade/0.0.1/api/cmd/api/main.go

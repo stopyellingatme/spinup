@@ -63,12 +63,16 @@ func phaseDeps(ctx context.Context, s *Step) error {
 	if err != nil {
 		return fmt.Errorf("select kit version: %w\nTry: choose a valid target template version", err)
 	}
-	if version.Pre == "" && requires[kitModule] != version.String() {
+	// Pin only: raise the kit to the step's version, never lower it (resolution 8).
+	raiseKit := version.Pre == ""
+	if raiseKit && requires[kitModule] != "" {
+		current, err := dependencyVersion(requires[kitModule])
+		raiseKit = err != nil || current.Compare(version) < 0
+	}
+	if raiseKit {
 		if err := requirePin(ctx, s, kitModule, requires[kitModule], version.String()); err != nil {
 			return err
 		}
-	}
-	if version.Pre == "" {
 		s.Lock.Kit.Module = kitModule
 		s.Lock.Kit.Version = version.String()
 	}

@@ -1,4 +1,6 @@
 # The plan leaves the main checkout clean.
+# The kit is not published yet, so the pin-only dependency step resolves it locally.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 mkversion 0.0.1 overlay
 env SPINUP_TEMPLATES_DIR=$WORK/templates
 exec spinup new demo --api-only --module example.com/demo --non-interactive
