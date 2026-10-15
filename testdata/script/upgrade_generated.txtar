@@ -1,0 +1,28 @@
+# An upgrade keeps generated files: the packs do not render them, and routes_gen.go
+# keeps the generator's version (generator-owned, ADR 0007 §1).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+exec spinup g resource todo title:string done:bool
+exec git add -A
+exec git commit -q -m 'add todos'
+exec spinup upgrade --yes --no-verify
+stdout 'git merge spinup/upgrade-0.0.1'
+exists .spinup/upgrade/0.0.1/api/db/queries/todos.sql
+exists .spinup/upgrade/0.0.1/api/internal/handlers/todos.go
+grep 'HandlerWithOptions' .spinup/upgrade/0.0.1/api/internal/routes/routes_gen.go
+grep '"template": "gen/resource"' .spinup/upgrade/0.0.1/spinup.lock
+grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
+exists .spinup/upgrade/0.0.1/upgrade-note.txt
+cd .spinup/upgrade/0.0.1/api
+exec go build ./...
+
+-- overlay/packs/base/files/upgrade-note.txt --
+A file that only the newer template version has.
+-- overlay/packs/base/pack.d/upgrade-note.toml --
+[[files]]
+path = "upgrade-note.txt"
+source = "files/upgrade-note.txt"
+class = "managed"
