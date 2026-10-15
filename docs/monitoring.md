@@ -214,8 +214,40 @@ In the profile `full`, it also holds the vendored Node Exporter Full, cAdvisor, 
 The folder Custom holds your own dashboards from `monitoring/grafana/dashboards/custom/`.
 
 - HTTP RED reads `http_server_request_duration_seconds`, the kit metric for API requests. It does not cover web requests.
-- Backups reads `backup_last_age_seconds`. Only the profile `full` includes panels for Postgres archiver metrics.
-  M7 adds the backup age producer and its recording rule. Until then, backup age panels show no data.
+- Backups shows the backup age, size, and verification results from the metrics file on the VM.
+  Both profiles include these panels. The profile `full` also includes panels for Postgres archiver metrics.
 - Deploys shows the Grafana annotations with the tag `deploy`.
 - Go runtime reads the kit runtime metrics (`go_goroutine_count`, `go_memory_used_bytes`, and the others). `telemetry.Setup` starts them.
 - Caddy reads the Caddy metrics on `caddy:2020`. The deploy Caddyfile serves them there, and it does not publish the port.
+
+## Backup metrics
+
+Alloy mounts `/opt/<app>/backups/metrics` as a directory with read-only access.
+Its Unix exporter enables only the `textfile` collector in both `lite` and `full`.
+Alloy scrapes the exporter every 30 seconds with `job="backups"`.
+It sends the samples to Prometheus through remote write.
+
+The CLI and the scheduled script update `backup.prom` with an atomic rename.
+Both writers hold `/opt/<app>/backups/metrics/.lock` through `flock` during each update.
+Each update preserves other metrics and their metadata.
+A failed metrics update prints a warning. It does not fail a successful backup.
+
+| Metric | Meaning |
+| --- | --- |
+| `backup_last_success_timestamp_seconds{kind}` | The completion time of the last successful backup of this kind. |
+| `backup_last_size_bytes{kind}` | The size of that backup in bytes. |
+| `backup_last_verify_timestamp_seconds` | The completion time of the last verification. |
+| `backup_last_verify_ok` | One for success. Zero for failure. |
+| `backup_last_verify_rto_seconds` | The measured duration of the verification. |
+
+The recording rule calculates `backup_last_age_seconds` from the newest success timestamp.
+`BackupStale` fires when this age exceeds 26 hours for 15 minutes.
+`BackupVerifyFailed` fires when the last verification failed.
+Before the first backup, the age metric has no sample.
+`BackupStale` also fires when no backup success metric exists for 15 minutes.
+This includes a missing metrics file and a VM that has never completed a backup.
+
+Scheduled verification checks the repository or the dump contents.
+Its duration measures that check. It does not measure a full restore.
+Use `spinup backup verify` for a full restore test.
+See [Backup schedule](commands/backup-schedule.md) for the systemd timers.

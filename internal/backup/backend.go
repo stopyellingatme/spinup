@@ -116,7 +116,3 @@ type Backend interface {
 
 // ErrNotImplemented marks a backend operation that a later milestone adds.
 var ErrNotImplemented = errors.New("not in this spinup version")
-
-func notInM5(operation string) error {
-	return fmt.Errorf("backup %s: %w (milestone M7 adds it)\nTry: use spinup backup now, list, or status", operation, ErrNotImplemented)
-}

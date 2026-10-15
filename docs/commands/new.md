@@ -12,6 +12,7 @@ $ ls
 README.md
 api
 deploy
+renovate.json
 spinup.lock
 spinup.toml
 ```

@@ -1,0 +1,13 @@
+# Managed by spinup.
+[Unit]
+Description=Backup full for todo
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+ExecStart=/opt/todo/backups/run.sh full
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=infinity

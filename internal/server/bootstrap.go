@@ -135,6 +135,16 @@ done`
 		layoutCheck += "[ -d " + remote.Quote(dir) + " ] && [ \"$(stat -c '%U:%G:%a' " + remote.Quote(dir) + ")\" = 'deploy:deploy:" + mode + "' ] || exit 1\n"
 		layoutApply += "install -d -o deploy -g deploy -m 0" + mode + " " + remote.Quote(dir) + "\n"
 	}
+	sudoers := backupSudoers(app)
+	sudoersPath := "/etc/sudoers.d/spinup-" + app
+	sudoersApply := `mkdir -p /etc/sudoers.d
+tmp=$(mktemp /etc/sudoers.d/.spinup.XXXXXX)
+trap 'rm -f "$tmp"' 0
+trap 'exit 1' HUP INT TERM
+` + "printf '%s' " + remote.Quote(sudoers) + ` > "$tmp"
+chmod 0440 "$tmp"
+visudo -cf "$tmp"
+` + `mv -f "$tmp" ` + remote.Quote(sudoersPath)
 	return []bootstrapStep{
 		{"packages", packageCheck(packages), "apt-get update\nDEBIAN_FRONTEND=noninteractive apt-get install -y " + packages},
 		{"deploy-user", "id deploy >/dev/null 2>&1 && [ \"$(getent passwd deploy | cut -d: -f6-7)\" = '/home/deploy:/bin/bash' ] && grep -Fqx -- " + remote.Quote(key) + " /home/deploy/.ssh/authorized_keys && [ \"$(stat -c '%U:%G:%a' /home/deploy/.ssh)\" = 'deploy:deploy:700' ] && [ \"$(stat -c '%U:%G:%a' /home/deploy/.ssh/authorized_keys)\" = 'deploy:deploy:600' ]", `if ! id deploy >/dev/null 2>&1; then useradd --create-home --shell /bin/bash deploy; fi
@@ -142,6 +152,7 @@ usermod --home /home/deploy --shell /bin/bash --lock deploy
 install -d -o deploy -g deploy -m 0700 /home/deploy/.ssh
 touch /home/deploy/.ssh/authorized_keys
 ` + "if ! grep -Fqx -- " + remote.Quote(key) + " /home/deploy/.ssh/authorized_keys; then printf '\\n%s\\n' " + remote.Quote(key) + " >> /home/deploy/.ssh/authorized_keys; fi\nchown deploy:deploy /home/deploy/.ssh/authorized_keys\nchmod 0600 /home/deploy/.ssh/authorized_keys"},
+		{"backup-sudo", fileCheck(sudoersPath, sudoers) + " && [ \"$(stat -c '%U:%G:%a' " + remote.Quote(sudoersPath) + ")\" = 'root:root:440' ] && visudo -cf " + remote.Quote(sudoersPath), sudoersApply},
 		{"sshd", sshEffective, sshApply},
 		{"firewall", firewallCheck, firewallSSHPorts + "ufw default deny incoming\nufw default allow outgoing\nfor p in $ssh_ports; do ufw allow \"$p/tcp\" || exit 1; done\nufw allow 80/tcp\nufw allow 443/tcp\nufw allow 443/udp\nufw --force enable"},
 		{"fail2ban", fileCheck("/etc/fail2ban/jail.d/sshd.local", jail) + " && systemctl is-enabled --quiet fail2ban && systemctl is-active --quiet fail2ban", "mkdir -p /etc/fail2ban/jail.d\n" + writeFile("/etc/fail2ban/jail.d/sshd.local", jail) + "systemctl enable --now fail2ban\nsystemctl restart fail2ban"},
@@ -213,3 +224,26 @@ for p in $ssh_ports; do
  [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || exit 1
 done
 `
+
+// backupSudoers permits only this app's backup units and fixed staging paths.
+func backupSudoers(app string) string {
+	commands := []string{"/usr/bin/systemctl daemon-reload"}
+	for _, kind := range []string{"full", "diff", "verify"} {
+		timer := "spinup-" + app + "-backup-" + kind + ".timer"
+		for _, action := range []string{"enable", "disable", "start", "stop"} {
+			commands = append(commands, "/usr/bin/systemctl "+action+" --now "+timer)
+		}
+		for _, ext := range []string{"service", "timer"} {
+			name := "spinup-" + app + "-backup-" + kind + "." + ext
+			commands = append(commands, "/usr/bin/install -m 0644 /opt/"+app+"/backups/"+name+" /etc/systemd/system/"+name)
+		}
+	}
+	// backup schedule --remove deletes the six unit files with one rm, in this order.
+	remove := []string{"/usr/bin/rm -f"}
+	for _, kind := range []string{"full", "diff", "verify"} {
+		unit := "/etc/systemd/system/spinup-" + app + "-backup-" + kind
+		remove = append(remove, unit+".timer", unit+".service")
+	}
+	commands = append(commands, strings.Join(remove, " "))
+	return "deploy ALL=(root) NOPASSWD: " + strings.Join(commands, ", ") + "\n"
+}

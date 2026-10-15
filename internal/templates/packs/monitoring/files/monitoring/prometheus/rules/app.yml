@@ -46,13 +46,23 @@ groups:
 
   - name: backups
     rules:
-      # The kit backup package reports the age of the newest backup (kit/backup), and the kit
-      # telemetry exports it as the gauge backup.last_age (unit s).
+      # Alloy reads the metrics file on the VM in both profiles.
+      - record: backup_last_age_seconds
+        expr: time() - max by (job) (backup_last_success_timestamp_seconds)
+
+      - alert: BackupVerifyFailed
+        expr: backup_last_verify_ok == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }}: the backup verification failed"
+          description: "Run spinup backup verify and inspect the backup repository."
+
       - alert: BackupStale
-        expr: max by (job) (backup_last_age_seconds) > 26 * 3600
+        expr: (max by (job) (backup_last_age_seconds) > 26 * 3600) or absent(backup_last_success_timestamp_seconds{job="backups"})
         for: 15m
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.job }}: the newest backup is older than 26 hours"
-          description: "The newest database backup is {{ $value | humanizeDuration }} old. Run spinup backup now and check spinup backup list."
+          summary: "{{ $labels.job }}: the backup is missing or older than 26 hours"
+          description: "No successful backup metric exists, or the newest backup is older than 26 hours. Run spinup backup now and check the timers."

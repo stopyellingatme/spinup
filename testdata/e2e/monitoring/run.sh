@@ -109,7 +109,7 @@ started=""
 
 compose() {
   DEPLOY_UID="$(id -u)" DEPLOY_GID="$(id -g)" PUBLIC_URL="${public_url:-}" \
-    BOOT_GRAFANA_PORT="$grafana_port" BOOT_SECRETS="$work/secrets" \
+    BOOT_GRAFANA_PORT="$grafana_port" BOOT_SECRETS="$work/secrets" BOOT_METRICS="$work/metrics" \
     docker compose -p "$project" ${compose_files[@]+"${compose_files[@]}"} "$@"
 }
 
@@ -166,7 +166,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-mkdir -p "$work/logs" "$work/http" "$work/secrets" "$work/caddy/Caddyfile.d"
+mkdir -p "$work/logs" "$work/http" "$work/secrets" "$work/metrics" "$work/caddy/Caddyfile.d"
 
 # Remove what an interrupted run left.
 remove_all
@@ -196,9 +196,22 @@ printf '%s' "$postgres_password" >"$work/secrets/POSTGRES_PASSWORD"
 chmod 0700 "$work/secrets"
 chmod 0600 "$work/secrets/"*
 
-# The only changes to the rendered file: the secret directory of the test, and the Grafana port.
+# The backup metrics file (ADR 0011 §4). On the VM, spinup backup and run.sh write it in
+# /opt/<app>/backups/metrics. Here a sample says the last full backup finished an hour ago.
+printf '# TYPE backup_last_success_timestamp_seconds gauge\nbackup_last_success_timestamp_seconds{kind="full"} %s\n' \
+  "$(($(date +%s) - 3600))" >"$work/metrics/backup.prom"
+chmod 0755 "$work/metrics"
+chmod 0644 "$work/metrics/backup.prom"
+
+# The only changes to the rendered file: the secret and backup-metrics directories of the
+# test, and the Grafana port.
 cat >"$work/boot.override.yml" <<'YAML'
 services:
+  alloy:
+    volumes: !override
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - ${BOOT_METRICS}:/var/lib/spinup/backup-metrics:ro
   grafana:
     ports: !override
       - "127.0.0.1:${BOOT_GRAFANA_PORT}:3000"
@@ -327,6 +340,18 @@ up_check() {
   api "$prom/query?query=up" "$work/http/up.json" && python3 "$check" up "$work/http/up.json" "${jobs[@]}"
 }
 poll "the up check" up_check
+
+echo "==> the backup metrics file reaches Prometheus (backup_last_age_seconds)"
+backup_age_check() {
+  api "$prom/query?query=$(urlencode 'max(backup_last_age_seconds)')" "$work/http/backup_age.json" &&
+    python3 -c 'import json, sys
+r = json.load(open(sys.argv[1]))["data"]["result"]
+assert r, "no backup_last_age_seconds yet"
+age = float(r[0]["value"][1])
+assert 3000 < age < 7200, f"backup_last_age_seconds = {age}, want about 3600"
+print(f"backup_last_age_seconds {age:.0f}")' "$work/http/backup_age.json"
+}
+poll "the backup age check" backup_age_check
 
 # post PATH JSON sends OTLP/HTTP JSON to Alloy from the app network, as the app does.
 post() {

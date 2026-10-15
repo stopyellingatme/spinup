@@ -75,6 +75,7 @@ func TestHook(t *testing.T) {
 		f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 		f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
 		f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+		expectMetrics(f)
 	}
 	for _, tt := range []struct {
 		name       string

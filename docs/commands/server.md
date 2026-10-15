@@ -36,6 +36,12 @@ $ spinup server bootstrap --env staging --ssh-key ~/.ssh/id_ed25519.pub --print-
 The public key defaults to `~/.ssh/id_ed25519.pub`.
 Bootstrap checks each step before it changes the host.
 A second bootstrap reports `ok` for steps that already meet their requirements.
+Bootstrap also installs `/etc/sudoers.d/spinup-<app>` with mode `0440`.
+It validates the staged file with `visudo -cf` before moving it into place.
+Cloud-init uses the same policy and validation.
+The policy permits backup units to use specific systemctl commands and fixed install paths.
+It does not grant a general shell through sudo.
+
 The `--plan` flag prints `would-change` or `ok` for each step.
 The global `--dry-run` flag also selects plan mode.
 Plan mode requires SSH and sudo access but changes no host settings.

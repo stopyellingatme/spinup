@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -34,12 +35,19 @@ func TestNow(t *testing.T) {
 			f.Expect(Command("todo", "stanza-create")...).Return("", "", 0)
 			f.Expect(Command("todo", "--type="+string(kind), "backup")...).Return("", "P00 INFO: backup command end\n", 0)
 			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			expectMetrics(f)
 			var out, errOut strings.Builder
 			_, err := Now(context.Background(), Options{Dir: dir, Env: "staging", Kind: tt.kind, JSON: tt.json, Out: &out, ErrOut: &errOut, Remote: f})
 			if err != nil {
 				t.Fatal(err)
 			}
 			f.AssertDone(t)
+			calls := f.Calls()
+			updates, err := io.ReadAll(calls[len(calls)-1].Stdin)
+			if err != nil || !strings.Contains(string(updates), `backup_last_success_timestamp_seconds{kind="diff"} 1792052634`) || !strings.Contains(string(updates), `backup_last_size_bytes{kind="diff"} 31403056`) {
+				t.Fatalf("backup metrics = %s, %v", updates, err)
+			}
+
 			if !strings.Contains(out.String(), tt.want) {
 				t.Fatalf("out = %q, want %q", out.String(), tt.want)
 			}
@@ -58,9 +66,12 @@ func TestListAndStatusCommands(t *testing.T) {
 	dir := newProject(t, true, "", nil)
 	f := &remote.Fake{}
 	for range 4 {
+		f.ExpectUpload(RemoteConfigPath("todo"))
 		f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	}
+	f.ExpectUpload(RemoteConfigPath("todo"))
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info_missing.json"), "", 0)
+	f.ExpectUpload(RemoteConfigPath("todo"))
 	f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info_missing.json"), "", 0)
 	ctx := context.Background()
 	run := func(json bool, fn func(Options) error) string {

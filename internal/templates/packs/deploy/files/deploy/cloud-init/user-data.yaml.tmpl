@@ -47,6 +47,11 @@ swap:
   maxsize: 2G
 
 write_files:
+  # Validate this staged policy before it becomes active.
+  - path: /run/spinup-[[ .app_name ]]-sudoers
+    permissions: "0440"
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl enable --now spinup-[[ .app_name ]]-backup-full.timer, /usr/bin/systemctl disable --now spinup-[[ .app_name ]]-backup-full.timer, /usr/bin/systemctl start --now spinup-[[ .app_name ]]-backup-full.timer, /usr/bin/systemctl stop --now spinup-[[ .app_name ]]-backup-full.timer, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-full.service /etc/systemd/system/spinup-[[ .app_name ]]-backup-full.service, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-full.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-full.timer, /usr/bin/systemctl enable --now spinup-[[ .app_name ]]-backup-diff.timer, /usr/bin/systemctl disable --now spinup-[[ .app_name ]]-backup-diff.timer, /usr/bin/systemctl start --now spinup-[[ .app_name ]]-backup-diff.timer, /usr/bin/systemctl stop --now spinup-[[ .app_name ]]-backup-diff.timer, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-diff.service /etc/systemd/system/spinup-[[ .app_name ]]-backup-diff.service, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-diff.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-diff.timer, /usr/bin/systemctl enable --now spinup-[[ .app_name ]]-backup-verify.timer, /usr/bin/systemctl disable --now spinup-[[ .app_name ]]-backup-verify.timer, /usr/bin/systemctl start --now spinup-[[ .app_name ]]-backup-verify.timer, /usr/bin/systemctl stop --now spinup-[[ .app_name ]]-backup-verify.timer, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-verify.service /etc/systemd/system/spinup-[[ .app_name ]]-backup-verify.service, /usr/bin/install -m 0644 /opt/[[ .app_name ]]/backups/spinup-[[ .app_name ]]-backup-verify.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-verify.timer, /usr/bin/rm -f /etc/systemd/system/spinup-[[ .app_name ]]-backup-full.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-full.service /etc/systemd/system/spinup-[[ .app_name ]]-backup-diff.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-diff.service /etc/systemd/system/spinup-[[ .app_name ]]-backup-verify.timer /etc/systemd/system/spinup-[[ .app_name ]]-backup-verify.service
   # Log rotation for every container (the Compose files set the same values).
   - path: /etc/docker/daemon.json
     permissions: "0644"
@@ -87,6 +92,7 @@ write_files:
       net.core.somaxconn = 4096
 
 runcmd:
+  - [sh, -ec, "visudo -cf /run/spinup-[[ .app_name ]]-sudoers && mv -f /run/spinup-[[ .app_name ]]-sudoers /etc/sudoers.d/spinup-[[ .app_name ]]"]
   - [usermod, -aG, docker, deploy]
   - [install, -d, -o, deploy, -g, deploy, -m, "0750", /opt/[[ .app_name ]], /opt/[[ .app_name ]]/releases, /opt/[[ .app_name ]]/backups, /opt/[[ .app_name ]]/data, /opt/[[ .app_name ]]/data/caddy, /opt/[[ .app_name ]]/data/caddy/data, /opt/[[ .app_name ]]/data/caddy/config, /opt/[[ .app_name ]]/caddy, /opt/[[ .app_name ]]/postgres]
   - [install, -d, -o, deploy, -g, deploy, -m, "0700", /opt/[[ .app_name ]]/secrets]
