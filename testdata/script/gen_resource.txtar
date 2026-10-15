@@ -1,0 +1,64 @@
+# g resource gives a CRUD API that builds offline. With a database, it also
+# migrates and passes its generated tests.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+
+# A dry run lists the plan and writes nothing.
+exec spinup g resource todo title:string done:bool --dry-run
+stdout '^create api/db/migrations/00002_create_todos\.sql \(seed\)$'
+stdout '^create api/internal/handlers/server\.go \(scaffold\)$'
+stdout '^update api/internal/routes/routes_gen\.go \(managed\)$'
+! exists api/db/migrations/00002_create_todos.sql
+! exists api/internal/handlers
+
+# The first resource rewrites the untouched routes_gen.go without --force.
+exec spinup g resource todo title:string done:bool
+stdout '^Created 8, updated 1 files$'
+stdout '^Next: spinup db migrate up$'
+exists api/db/migrations/00002_create_todos.sql api/db/queries/todos.sql api/openapi/paths/todos.yaml api/openapi/schemas/todo.yaml
+exists api/internal/handlers/server.go api/internal/handlers/todos.go api/internal/handlers/todos_test.go
+exists api/internal/store/todos.sql.go api/internal/gen/api.gen.go api/openapi/bundle.gen.yaml
+grep 'gen.HandlerWithOptions' api/internal/routes/routes_gen.go
+grep '"api/internal/routes/routes_gen.go"' spinup.lock
+grep '"template": "gen/resource"' spinup.lock
+
+# The same resource again needs --force.
+! exec spinup g resource todo title:string done:bool
+stderr 'the table todos already exists in api/db/migrations/00002_create_todos\.sql'
+stderr 'Try: pass --force'
+
+# The other generators.
+exec spinup g model tag name:string
+exists api/db/migrations/00003_create_tags.sql api/db/queries/tags.sql api/openapi/schemas/tag.yaml
+exec spinup g migration add_index
+stdout '^Next: edit api/db/migrations/00004_add_index\.sql$'
+grep '^-- \+goose Down$' api/db/migrations/00004_add_index.sql
+exec spinup g handler ping
+stdout 'mux.HandleFunc\("GET /api/ping", handlers.Ping\)'
+exists api/internal/handlers/ping.go api/internal/handlers/ping_test.go
+exec spinup db lint
+
+# Cover the single-field case and all required types through real handlers.
+exec spinup g resource author name:string
+exec spinup g resource post title:string details:text views:int total:bigint flag:bool score:float reqday:date reqat:time requid:uuid reqmeta:json reqprice:decimal 'status:enum:draft|published' author:ref:author note:string?
+
+# Everything builds offline: the post-steps use the module cache.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test -race -count=1 ./internal/handlers -run 'RejectsBadInput|RequiresFields'
+cd ..
+
+# The real round trip runs only with a database.
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00002_create_todos\.sql'
+[env:DATABASE_URL] cd api
+[env:DATABASE_URL] exec go test -count=1 ./...
+[env:DATABASE_URL] stdout '^ok  	example.com/todo/api/internal/handlers'
+
+# Roll back so that the next run starts from an empty database. The Down
+# sections drop the tables.
+[env:DATABASE_URL] cd ..
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] stdout 'rolled back  00002_create_todos\.sql'

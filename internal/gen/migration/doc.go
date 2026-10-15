@@ -1,4 +1,4 @@
-// Package migration generates an empty SQL migration.
-//
-// STUB from the M3 pre-seed commit. Unit M3.4 owns this file and replaces it.
+// Package migration generates an empty goose SQL migration
+// (`spinup g migration`). The file number is the highest number in
+// api/db/migrations plus one.
 package migration

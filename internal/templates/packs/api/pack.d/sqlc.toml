@@ -1,0 +1,17 @@
+# sqlc wiring for the generated API (ADR 0007 §3).
+# sqlc reads the migrations as its schema and writes package store to api/internal/store.
+
+[[files]]
+path = "api/sqlc.yaml"
+source = "files/api/sqlc.yaml.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/db/queries/.gitkeep"
+source = "files/api/db/queries/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "api/db/seeds/.gitkeep"
+source = "files/api/db/seeds/.gitkeep"
+class = "seed"

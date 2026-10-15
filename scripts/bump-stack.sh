@@ -78,7 +78,10 @@ echo "bump-stack: wrote tools.mod.tmpl and tools.sum"
 # --- go.mod (the API module) ---------------------------------------------------------------------
 # Modules that generated code imports but the base scaffold does not (ADR 0007 §6: the lockfiles
 # are a superset, so an app builds offline after any generator runs).
-app_extra=(github.com/oapi-codegen/runtime github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5)
+# Packages, not modules: a package in a pinned module gets the module's pin, and google/uuid
+# (used by runtime/types for format: uuid) comes in at the version the runtime requires.
+app_extra=(github.com/oapi-codegen/runtime github.com/oapi-codegen/runtime/types github.com/google/uuid
+  github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5)
 
 # add_app_extra <api dir> requires and imports every app_extra module, so tidy keeps them.
 add_app_extra() {
@@ -90,7 +93,9 @@ add_app_extra() {
     for m in "${app_extra[@]}"; do printf '\t_ "%s"\n' "$m"; done
     echo ")"
   } > "$1/internal/spinupdeps/deps.go"
-  for m in "${app_extra[@]}"; do (cd "$1" && go get "$m@$(pin go_modules "$m")"); done
+  for m in "${app_extra[@]}"; do
+    if v=$(pin go_modules "$m" 2>/dev/null); then (cd "$1" && go get "$m@$v"); fi
+  done
 }
 
 # Every module pack, so the app-mode render turns on all of them (ADR 0007 §6).

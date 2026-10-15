@@ -1,0 +1,109 @@
+# The db group on a generated app: migration names, guards, and the exact commands.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exists api/sqlc.yaml api/db/queries/.gitkeep api/db/seeds/.gitkeep
+
+# New migrations take the next number from the files on disk.
+exec spinup db new add_widgets
+stdout '^Created api/db/migrations/00002_add_widgets\.sql$'
+grep '^-- \+goose Up$' api/db/migrations/00002_add_widgets.sql
+grep '^-- \+goose Down$' api/db/migrations/00002_add_widgets.sql
+exec spinup db new add_gadgets
+stdout '^Created api/db/migrations/00003_add_gadgets\.sql$'
+! exec spinup db new add_widgets
+stderr 'already has the name add_widgets'
+stderr 'Try:'
+! exec spinup db new AddWidgets
+stderr 'not snake case'
+! exists api/db/migrations/00004_add_widgets.sql
+
+# Commands that can lose data need --i-know.
+! exec spinup db redo
+stderr 'Try: spinup db redo --i-know'
+! exec spinup db to 1 --dry-run
+stderr 'Try: spinup db to 1 --i-know'
+
+# Dry runs print the exact commands.
+exec spinup db status --dry-run
+cmp stdout ../want/status
+exec spinup db redo --i-know --dry-run
+cmp stdout ../want/redo
+exec spinup db to 1 --i-know --dry-run
+cmp stdout ../want/to
+exec spinup db psql --dry-run
+cmp stdout ../want/psql
+exec spinup db dump --dry-run
+cmp stdout ../want/dump
+! exists .spinup/dumps
+exec spinup db seed --dry-run
+stdout '^No seed files in api/db/seeds\.$'
+cp ../seed.sql api/db/seeds/01_widgets.sql
+exec spinup db seed --dry-run
+cmp stdout ../want/seed
+! exec spinup db reset --dry-run
+stderr 'Try: spinup db reset --yes'
+exec spinup db reset --dry-run --yes
+cmp stdout ../want/reset
+exec spinup db doctor --dry-run
+cmp stdout ../want/doctor
+
+# sqlc has nothing to do before the first query file.
+exec spinup db sqlc
+stdout '^Try: spinup g resource <name> <field:type>\.\.\.$'
+
+# The real migration commands run only with a database.
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] cmp stdout ../want/applied
+[env:DATABASE_URL] exec spinup db redo --i-know
+[env:DATABASE_URL] cmp stdout ../want/redo-run
+[env:DATABASE_URL] exec spinup db to 1 --i-know
+[env:DATABASE_URL] cmp stdout ../want/to-run
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] stdout '^rolled back  00001_init\.sql$'
+
+# Reset refuses a production environment, protected or not.
+exec sh -c 'cat ../production.toml >> spinup.toml'
+! exec spinup db reset --env production --yes
+stderr 'works only on the local development database'
+stderr 'Try:'
+! exec spinup db redo --i-know --dry-run
+stderr 'protected environment "production"'
+
+-- seed.sql --
+INSERT INTO widgets (name) VALUES ('first');
+-- production.toml --
+
+[env.production]
+host = "203.0.113.10"
+protected = true
+-- want/status --
+go run ./cmd/api migrate status
+-- want/redo --
+go run ./cmd/api migrate redo
+-- want/to --
+go run ./cmd/api migrate to 1
+-- want/psql --
+docker compose -f deploy/compose.dev.yml exec postgres psql -U app -d app
+-- want/dump --
+docker compose -f deploy/compose.dev.yml exec -T postgres pg_dump -U app -d app -Fc > .spinup/dumps/app.dump
+-- want/seed --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -v ON_ERROR_STOP=1 -f - < api/db/seeds/01_widgets.sql
+-- want/reset --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'
+go run ./cmd/api migrate up
+-- want/doctor --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -At -c 'SELECT current_setting('"'"'server_version_num'"'"')'
+go run ./cmd/api migrate status
+-- want/applied --
+applied  00001_init.sql
+applied  00002_add_widgets.sql
+applied  00003_add_gadgets.sql
+-- want/redo-run --
+rolled back  00003_add_gadgets.sql
+applied  00003_add_gadgets.sql
+-- want/to-run --
+rolled back  00003_add_gadgets.sql
+rolled back  00002_add_widgets.sql
