@@ -317,9 +317,8 @@ targets_check() {
 }
 poll "the Prometheus targets" targets_check
 
-# prometheus.exporter.self labels its target job="integrations/self". The job_name "alloy" of
-# its scrape applies only to targets without a job label.
-jobs=(prometheus integrations/self caddy loki grafana)
+# config.alloy relabels the self-exporter target (job="integrations/self") to job="alloy".
+jobs=(prometheus alloy caddy loki grafana)
 if [[ "$profile" == full ]]; then
   jobs+=(tempo node cadvisor postgres blackbox-exporter blackbox)
 fi

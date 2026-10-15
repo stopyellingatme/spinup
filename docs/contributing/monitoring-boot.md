@@ -35,11 +35,11 @@ The OTLP data goes from the Caddy container on the app network to `http://alloy:
 
 | Profile | Jobs with `up == 1` |
 | --- | --- |
-| `lite` | `prometheus`, `integrations/self` (Alloy), `caddy`, `loki`, `grafana` |
+| `lite` | `prometheus`, `alloy`, `caddy`, `loki`, `grafana` |
 | `full` | the `lite` jobs, plus `tempo`, `node`, `cadvisor`, `postgres`, `blackbox-exporter`, and `blackbox` |
 
-The Alloy self-scrape has the job label `integrations/self`.
-The component `prometheus.exporter.self` sets this label, so the `job_name = "alloy"` of its scrape has no effect.
+The component `prometheus.exporter.self` labels its target `job="integrations/self"`.
+`config.alloy` relabels it to `job="alloy"` before the scrape.
 
 ## The memory budget
 
