@@ -119,13 +119,23 @@ func (p *PGBackRest) Prepare(ctx context.Context) (bool, error) {
 
 // Backup prepares the repository, takes one backup, and returns the new backup.
 func (p *PGBackRest) Backup(ctx context.Context, kind Kind) (Result, error) {
+	return p.backup(ctx, kind, false)
+}
+
+// backup disables automatic expiration for the safety backup during an in-place restore.
+func (p *PGBackRest) backup(ctx context.Context, kind Kind, safety bool) (Result, error) {
 	if _, err := ParseKind(string(kind)); err != nil || kind == "" {
 		return Result{}, fmt.Errorf("invalid backup type %q\nTry: use full, diff, or incr", kind)
 	}
 	if _, err := p.Prepare(ctx); err != nil {
 		return Result{}, err
 	}
-	if _, err := p.run(ctx, "run pgBackRest "+string(kind)+" backup", "--type="+string(kind), "backup"); err != nil {
+	args := []string{"--type=" + string(kind)}
+	if safety {
+		args = append(args, "--no-expire-auto")
+	}
+	args = append(args, "backup")
+	if _, err := p.run(ctx, "run pgBackRest "+string(kind)+" backup", args...); err != nil {
 		return Result{}, err
 	}
 	backups, err := p.List(ctx)

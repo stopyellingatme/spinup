@@ -42,24 +42,14 @@ func (p *PGBackRest) resolveTarget(ctx context.Context, t Target) (Target, error
 	if err := validateTarget(t); err != nil {
 		return t, err
 	}
-	if t.Label != "" {
-		if !backupLabelPattern.MatchString(t.Label) {
-			return t, fmt.Errorf("select pgBackRest backup: invalid label %q\nTry: copy a label from spinup backup list", t.Label)
-		}
-		return t, nil
-	}
-	if !t.Time.IsZero() {
-		return t, nil
+	if t.Label != "" && !backupLabelPattern.MatchString(t.Label) {
+		return t, fmt.Errorf("select pgBackRest backup: invalid label %q\nTry: copy a label from spinup backup list", t.Label)
 	}
 	bs, err := p.List(ctx)
 	if err != nil {
 		return t, err
 	}
-	if len(bs) == 0 {
-		return t, fmt.Errorf("select pgBackRest backup: the repository is empty\nTry: run spinup backup now --env <env>")
-	}
-	t.Label = bs[len(bs)-1].Label
-	return t, nil
+	return listedTarget(bs, t, "pgBackRest")
 }
 
 func restoreArgs(app string, t Target) []string {
@@ -92,11 +82,11 @@ func (p *PGBackRest) remoteCommand(ctx context.Context, args ...string) ([]byte,
 }
 
 // Restore restores into a separate container or the stopped live volume.
-func (p *PGBackRest) Restore(ctx context.Context, t Target, into Into) error {
+func (p *PGBackRest) Restore(ctx context.Context, t Target, into Into) (err error) {
 	if into.New == into.InPlace {
 		return fmt.Errorf("select restore destination: choose exactly one destination\nTry: pass --into new or --into in-place")
 	}
-	t, err := p.resolveTarget(ctx, t)
+	t, err = p.resolveTarget(ctx, t)
 	if err != nil {
 		return err
 	}
@@ -104,7 +94,22 @@ func (p *PGBackRest) Restore(ctx context.Context, t Target, into Into) error {
 		_, err = p.restoreContainer(ctx, t, false)
 		return err
 	}
+	stopping, touched := false, false
+	defer func() {
+		if err == nil || !stopping {
+			return
+		}
+		if !touched {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			_, restartErr := p.remoteCommand(cleanup, baseCompose(p.App, "start", "--wait", "postgres")...)
+			err = errors.Join(err, restartErr)
+			return
+		}
+		err = fmt.Errorf("%w\npostgres is STOPPED or its state is unconfirmed. The database may be partially restored.\nTry: inspect the database before starting postgres with: %s", err, shellCommand(baseCompose(p.App, "start", "--wait", "postgres")))
+	}()
 	p.restoreProgress("Stopping postgres")
+	stopping = true
 	if _, err = p.remoteCommand(ctx, baseCompose(p.App, "stop", "postgres")...); err != nil {
 		return err
 	}
@@ -112,6 +117,7 @@ func (p *PGBackRest) Restore(ctx context.Context, t Target, into Into) error {
 	args := baseCompose(p.App, "run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "postgres", "-c", SecretLoader+`exec pgbackrest "$@"`, "pgbackrest")
 	args = append(args, restoreArgs(p.App, t)...)
 	args = append(args, "--delta", "restore")
+	touched = true // A lost SSH reply can hide a partial restore.
 	if _, err = p.remoteCommand(ctx, args...); err != nil {
 		return err
 	}

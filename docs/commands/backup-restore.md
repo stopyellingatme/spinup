@@ -11,10 +11,13 @@ It prints the label, the recovery time, and the result.
 It removes the container and its volume after success or failure.
 A verification failure returns exit code 1.
 Use `--json` for the result as JSON.
-Verification also records backup metrics on the VM.
+Verification records backup metrics after a restore attempt starts.
+Invalid targets and failures before the restore attempt preserve the previous verification metrics.
 
 Select a backup with `--label`.
 For pgBackRest, select a recovery time with `--time` in RFC 3339 format.
+The pgdump backend does not support point-in-time recovery.
+With pgdump, use a label or select the latest dump.
 Without these flags, the command selects the latest backup.
 The flags are mutually exclusive.
 
@@ -62,7 +65,9 @@ $ printf '\n[env.staging]\nhost = "127.0.0.1"\nuser = "deploy"\n' >> spinup.toml
 $ spinup backup restore --env staging --into in-place --plan
 Plan: Check --i-know, protected confirmation, and maintenance window
 Plan: Take the deploy lock
+Plan: Resolve and check the restore target
 Plan: Take a safety backup
+Plan: Re-check the restore target
 Plan: Stop api and web of both colors
 Plan: Stop postgres
 Plan: Restore the live database
@@ -79,13 +84,38 @@ Error: restore the live database: --i-know is required
 
 The command takes the deploy lock before any changes.
 A held lock returns exit code 5 with the deploy lock message.
+The command checks that the restore target exists before it takes the safety backup.
+For a recovery time, a backup must finish before that time.
 The command takes a full safety backup before it stops either color.
-Use `--no-safety-backup` to skip this backup.
+For pgBackRest, this backup uses `--no-expire-auto` to preserve the restore target.
+The command checks the target again before it stops any service.
+Use `--no-safety-backup` to skip the safety backup.
 
-The command stops the applications, restores PostgreSQL, and runs the migrations from the live release.
+The command stops the applications and restores the database.
+For pgBackRest, it stops PostgreSQL, restores the live volume, and starts PostgreSQL.
+It runs the migrations from the live release.
 It starts the live color and checks its health and version.
-If a step fails, the command prints the safety label and a recovery command.
 It releases the lock after success or failure.
+
+With pgdump, PostgreSQL continues to run during the restore.
+The backend restores the dump into `<db>_restore` and swaps the database names.
+It retains the previous database as `<db>_old_<label>`.
+This database continues to use disk space.
+After you check the application, run the printed `dropdb` command on the VM.
+Before you restore the same label again, inspect and remove its retained database.
+
+If a failure occurs after a stop, the command checks whether the live database could have changed.
+If the database remains untouched, the command attempts to restart PostgreSQL first, then the live color.
+If the database could have changed, the command keeps the applications stopped.
+If the live color already started, the command attempts to stop it again.
+The error states `api and web are STOPPED`, or reports an unconfirmed state if the stop fails.
+The error also reports the PostgreSQL state.
+
+A failed pgBackRest restore can leave PostgreSQL stopped with a partially restored database.
+Inspect the database before you start the services.
+The error includes the exact commands to start PostgreSQL and the live color on the VM.
+With a safety backup, the command prints its label and the exact command to restore it.
+With `--no-safety-backup`, the error still includes a `Try:` line and the commands to start the services.
 
 <!-- doctest: skip -->
 ```console

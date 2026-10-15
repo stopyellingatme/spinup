@@ -11,6 +11,7 @@ import (
 
 func expectRestoreContainer(t *testing.T, vm *remote.Fake, verify, fail bool) {
 	t.Helper()
+	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	purpose := "restore"
 	if verify {
 		purpose = "verify"
@@ -48,7 +49,7 @@ func TestPGBackRestVerifyCleanup(t *testing.T) {
 			}
 			vm.AssertDone(t)
 			calls := vm.Calls()
-			create := strings.Join(calls[2].Argv, " ")
+			create := strings.Join(calls[3].Argv, " ")
 			for _, want := range []string{"--network todo-backup", "todo-postgres:pinned", "dst=/run/secrets,readonly", "dst=/var/lib/pgbackrest,readonly", "archive_mode=off", "restore_command=", "--set=" + restoreLabel} {
 				if !strings.Contains(create, want) {
 					t.Errorf("create omitted %s: %s", want, create)
@@ -57,7 +58,7 @@ func TestPGBackRestVerifyCleanup(t *testing.T) {
 			if strings.Contains(create, "--publish") {
 				t.Fatal("verify published a port")
 			}
-			ready := strings.Join(calls[4].Argv, " ")
+			ready := strings.Join(calls[5].Argv, " ")
 			for _, want := range []string{"pg_isready", "pg_is_in_recovery()", "SELECT count(*) FROM goose_db_version"} {
 				if !strings.Contains(ready, want) {
 					t.Errorf("missing %s", want)
@@ -70,6 +71,7 @@ func TestPGBackRestVerifyCleanup(t *testing.T) {
 func TestPGBackRestCleanupAfterStartFailure(t *testing.T) {
 	t.Parallel()
 	vm := &remote.Fake{}
+	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	vm.Expect("docker", "ps", "-aq").Return("postgres-id", "", 0)
 	vm.Expect("docker", "inspect").Return(`{"Config":{"Image":"todo-postgres:pinned","User":"1000:1000","Env":["PGDATA=/var/lib/postgresql/data/pgdata"]},"Mounts":[{"Destination":"/var/lib/postgresql/data"}]}`, "", 0)
 	vm.Expect("docker", "create").Return("id", "", 0)
@@ -85,6 +87,7 @@ func TestPGBackRestCleanupAfterStartFailure(t *testing.T) {
 func TestPGBackRestRestoreCollisionPreservesExisting(t *testing.T) {
 	t.Parallel()
 	vm := &remote.Fake{}
+	vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 	vm.Expect("docker", "ps", "-aq").Return("postgres-id", "", 0)
 	vm.Expect("docker", "inspect").Return(`{"Config":{"Image":"image","User":"1000:1000","Env":["PGDATA=/var/lib/postgresql/18/docker"]},"Mounts":[{"Destination":"/var/lib/postgresql"}]}`, "", 0)
 	vm.Expect("docker", "create").Return("", "name already in use", 1)
@@ -93,7 +96,7 @@ func TestPGBackRestRestoreCollisionPreservesExisting(t *testing.T) {
 		t.Fatal("collision was lost")
 	}
 	vm.AssertDone(t)
-	if len(vm.Calls()) != 3 {
+	if len(vm.Calls()) != 4 {
 		t.Fatal("removed an existing container after collision")
 	}
 }
