@@ -13,11 +13,58 @@ import (
 	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
-type questionPrompt struct{ calls int }
+type questionPrompt struct {
+	calls    int
+	defaults []any
+}
 
 func (p *questionPrompt) Ask(_ context.Context, _ templates.Question, value any) (any, error) {
 	p.calls++
+	p.defaults = append(p.defaults, value)
 	return value, nil
+}
+
+func TestSelectMonitoringProfile(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, configured, locked, flag, want string
+		interactive                          bool
+	}{
+		{name: "existing full", configured: "full", want: "full"},
+		{name: "existing none", configured: "none", want: "none"},
+		{name: "prompt default", configured: "full", want: "full", interactive: true},
+		{name: "explicit flag", configured: "full", flag: "lite", want: "lite"},
+		{name: "missing profile", want: "lite"},
+		{name: "invalid profile", configured: "bad", want: "lite"},
+		{name: "stale locked answer", configured: "full", locked: "lite", want: "full"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := &project.Config{}
+			cfg.Monitoring.Profile = tc.configured
+			lock := manifest.New()
+			lock.Packs = []string{"base", "api", "ci", "deploy"}
+			lock.Answers = map[string]any{"app_name": "demo", "module": "example.com/demo", "modules": []string{"ci", "deploy"}, "db_version": "18"}
+			if tc.locked != "" {
+				lock.Answers["monitoring_profile"] = tc.locked
+			}
+			flags := map[string]any{}
+			if tc.flag != "" {
+				flags["monitoring_profile"] = tc.flag
+			}
+			prompt := &questionPrompt{}
+			got, err := Select(t.Context(), SelectOptions{Config: cfg, Lock: lock, FS: templates.Embedded(), Names: []string{"monitoring"}, Answers: flags, Interactive: tc.interactive, Prompter: prompt})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Answers["monitoring_profile"] != tc.want {
+				t.Fatalf("answers=%v", got.Answers)
+			}
+			if tc.interactive && (len(prompt.defaults) != 1 || prompt.defaults[0] != tc.want) {
+				t.Fatalf("prompt defaults=%v", prompt.defaults)
+			}
+		})
+	}
 }
 
 func TestSelect(t *testing.T) {

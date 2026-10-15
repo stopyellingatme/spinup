@@ -3,10 +3,12 @@ package pack
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
@@ -23,6 +25,125 @@ func manager(t *testing.T) *Manager {
 		t.Fatal(err)
 	}
 	return &Manager{Root: root, CacheDir: t.TempDir(), CLIVersion: "1.2.3", Trust: true, Out: &bytes.Buffer{}}
+}
+
+func TestHistoricalCacheIsolation(t *testing.T) {
+	t.Parallel()
+	for _, approvedOld := range []bool{false, true} {
+		t.Run(fmt.Sprintf("approved-old-%t", approvedOld), func(t *testing.T) {
+			t.Parallel()
+			a, b := manager(t), manager(t)
+			b.CacheDir = a.CacheDir
+			const source = "path:./plugins/foo"
+			for _, m := range []*Manager{a, b} {
+				if err := os.CopyFS(filepath.Join(m.Root, "plugins/foo"), os.DirFS(fixture(t))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := a.Add(t.Context(), source, ""); err != nil {
+				t.Fatal(err)
+			}
+			oldA, err := a.resolve(t.Context(), plugin.Options{Root: a.Root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			bSource := filepath.Join(b.Root, "plugins/foo")
+			if err := os.WriteFile(filepath.Join(bSource, "files/example.txt.tmpl"), []byte("project B\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			var oldHash string
+			if approvedOld {
+				if err := b.Add(t.Context(), source, ""); err != nil {
+					t.Fatal(err)
+				}
+				old, err := b.resolve(t.Context(), plugin.Options{Root: b.Root})
+				if err != nil {
+					t.Fatal(err)
+				}
+				oldHash = old[0].SHA256
+			}
+			replaceLine(t, bSource+"/plugin.toml", "version", "version = '2.0.0'")
+			if approvedOld {
+				if err := b.Update(t.Context(), "example", "2.0.0"); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := b.Add(t.Context(), source, ""); err != nil {
+				t.Fatal(err)
+			}
+			// A refresh must never replace B's previously approved tree.
+			if err := a.Verify(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			got, err := b.resolve(t.Context(), plugin.Options{Root: b.Root, Versions: map[string]string{"example": "1.0.0"}})
+			if !approvedOld {
+				if err == nil || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("unapproved OLD=%v error=%v", got, err)
+				}
+				return
+			}
+			if err != nil || len(got) != 1 || got[0].SHA256 != oldHash || got[0].SHA256 == oldA[0].SHA256 {
+				t.Fatalf("OLD=%v error=%v", got, err)
+			}
+		})
+	}
+}
+
+type fetchRunnerFunc func(context.Context, execx.Cmd) (execx.Result, error)
+
+func (f fetchRunnerFunc) Run(ctx context.Context, cmd execx.Cmd) (execx.Result, error) {
+	return f(ctx, cmd)
+}
+
+func TestGitFetchCancelsOversizedClone(t *testing.T) {
+	t.Parallel()
+	m := manager(t)
+	var temp string
+	m.Runner = fetchRunnerFunc(func(ctx context.Context, cmd execx.Cmd) (execx.Result, error) {
+		temp = cmd.Dir
+		f, err := os.Create(filepath.Join(cmd.Dir, "oversized-pack"))
+		if err != nil {
+			return execx.Result{}, err
+		}
+		err = f.Truncate(maxFetchBytes + 1)
+		closeErr := f.Close()
+		if err != nil {
+			return execx.Result{}, err
+		}
+		if closeErr != nil {
+			return execx.Result{}, closeErr
+		}
+		<-ctx.Done()
+		return execx.Result{}, ctx.Err()
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, err := m.fetch(ctx, "git:https://example.com/repo", "v1.0.0", "example")
+	if err == nil || !strings.Contains(err.Error(), "fetch exceeds") || !strings.Contains(err.Error(), "Try:") {
+		t.Fatalf("oversized clone=%v", err)
+	}
+	if _, err := os.Stat(temp); !os.IsNotExist(err) {
+		t.Fatalf("fetch directory remains: %v", err)
+	}
+}
+
+func TestGitFetchChecksCompletedClone(t *testing.T) {
+	t.Parallel()
+	m := manager(t)
+	m.Runner = fetchRunnerFunc(func(_ context.Context, cmd execx.Cmd) (execx.Result, error) {
+		f, err := os.Create(filepath.Join(cmd.Dir, "oversized-pack"))
+		if err != nil {
+			return execx.Result{}, err
+		}
+		truncateErr := f.Truncate(maxFetchBytes + 1)
+		closeErr := f.Close()
+		if truncateErr != nil {
+			return execx.Result{}, truncateErr
+		}
+		return execx.Result{}, closeErr
+	})
+	if _, err := m.fetch(t.Context(), "git:https://example.com/repo", "v1.0.0", "example"); err == nil || !strings.Contains(err.Error(), "fetch exceeds") {
+		t.Fatalf("completed oversized clone=%v", err)
+	}
 }
 
 func TestTrustLifecycle(t *testing.T) {
@@ -163,7 +284,11 @@ func TestVersionOverrideAndCacheTamper(t *testing.T) {
 	if _, err := m.resolve(t.Context(), plugin.Options{Root: m.Root, Offline: true}); err != nil {
 		t.Fatal(err)
 	}
-	dir, err := m.cacheDir("example", "v2.0.0")
+	lock, err := manifest.Load(filepath.Join(m.Root, "spinup.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := m.cacheDir("example", "v2.0.0", "path:"+root, lock.Plugins[0].SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}

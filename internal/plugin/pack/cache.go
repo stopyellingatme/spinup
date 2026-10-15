@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,18 +25,18 @@ func (m *Manager) cacheRoot() (string, error) {
 	}
 	return filepath.Join(dir, "spinup", "plugins"), nil
 }
-func (m *Manager) cacheDir(name, version string) (string, error) {
-	if !namePattern.MatchString(name) || !safeVersion(version) {
-		return "", problem("find plugin cache", fmt.Errorf("invalid name or version %q/%q", name, version))
+func (m *Manager) cacheDir(name, version, source, hash string) (string, error) {
+	if !namePattern.MatchString(name) || !safeVersion(version) || !token(source) || !validHash(hash) {
+		return "", problem("find plugin cache", fmt.Errorf("invalid cache identity for %q/%q", name, version))
 	}
 	root, err := m.cacheRoot()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, name, strings.TrimPrefix(version, "v")), nil
+	return filepath.Join(root, name, strings.TrimPrefix(version, "v"), fmt.Sprintf("%x", sha256.Sum256([]byte(source))), hash), nil
 }
-func (m *Manager) cached(name, version, source string) (tree, error) {
-	dir, err := m.cacheDir(name, version)
+func (m *Manager) cached(name, version, source, hash string) (tree, error) {
+	dir, err := m.cacheDir(name, version, source, hash)
 	if err != nil {
 		return tree{}, err
 	}
@@ -50,17 +51,20 @@ func (m *Manager) cached(name, version, source string) (tree, error) {
 	if approved.Source != source {
 		return tree{}, problem("read plugin cache", fmt.Errorf("cached source differs for %q", name))
 	}
+	if approved.SHA256 != hash {
+		return tree{}, problem("verify plugin cache", fmt.Errorf("receipt hash differs from project approval for %q", name))
+	}
 	tr, err := readTree(filepath.Join(dir, "tree"))
 	if err != nil {
 		return tree{}, err
 	}
-	if tr.hash() != approved.SHA256 {
+	if tr.hash() != hash {
 		return tree{}, problem("verify plugin cache", fmt.Errorf("cached hash differs for %q", name))
 	}
 	return tr, nil
 }
 func (m *Manager) cache(t tree, loaded plugin.Loaded) error {
-	dir, err := m.cacheDir(loaded.Meta.Name, loaded.Meta.Version)
+	dir, err := m.cacheDir(loaded.Meta.Name, loaded.Meta.Version, loaded.Source, loaded.SHA256)
 	if err != nil {
 		return err
 	}

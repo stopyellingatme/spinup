@@ -44,8 +44,19 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 	if !ok {
 		return meta, problem("validate spinup range", fmt.Errorf("CLI %s does not satisfy %q", cliVersion, meta.Spinup))
 	}
-	if _, err := loadPack(t.fs(), meta.Name); err != nil {
+	p, err := loadPack(t.fs(), meta.Name)
+	if err != nil {
 		return meta, err
+	}
+	for _, file := range p.Files {
+		if err := CheckOutputPath(file.Path); err != nil {
+			return meta, err
+		}
+		if file.RenamedFrom != "" {
+			if err := CheckOutputPath(file.RenamedFrom); err != nil {
+				return meta, err
+			}
+		}
 	}
 	names := map[string]bool{}
 	for _, g := range meta.Generators {
@@ -68,7 +79,11 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 			if err != nil {
 				return meta, err
 			}
-			if _, err := checkTemplatePath(file.Path, args); err != nil {
+			output, err := checkTemplatePath(file.Path, args)
+			if err != nil {
+				return meta, err
+			}
+			if err := CheckOutputPath(output); err != nil {
 				return meta, err
 			}
 			// Argument-dependent sources can only select a file during generation.
@@ -81,6 +96,28 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 		}
 	}
 	return meta, nil
+}
+
+// CheckOutputPath validates a portable plugin output path or renamed_from path.
+// It rejects .git segments anywhere, root .spinup and .github directories, and
+// root spinup.toml and spinup.lock files. Comparisons are case-insensitive.
+// Generator callers must check the final rendered path with this function,
+// because metadata validation uses sample arguments and cannot check user values.
+func CheckOutputPath(path string) error {
+	clean, err := vfs.CleanPath(path)
+	if err != nil || clean != path {
+		return problem("validate plugin output", fmt.Errorf("unsafe path %q", path))
+	}
+	parts := strings.Split(strings.ToLower(path), "/")
+	if parts[0] == ".spinup" || parts[0] == ".github" || (len(parts) == 1 && (parts[0] == "spinup.toml" || parts[0] == "spinup.lock")) {
+		return problem("validate plugin output", fmt.Errorf("protected path %q", path))
+	}
+	for _, part := range parts {
+		if part == ".git" {
+			return problem("validate plugin output", fmt.Errorf("protected path %q", path))
+		}
+	}
+	return nil
 }
 
 func checkTemplatePath(value string, args map[string]string) (string, error) {

@@ -153,6 +153,12 @@ func Select(ctx context.Context, o SelectOptions) (*Selection, error) {
 			answers[q.Key] = value
 			continue
 		}
+		// A fresh monitoring pack inherits the user's configuration preference.
+		// Replace stale lock answers too, but let an explicit flag take precedence.
+		if q.Key == "monitoring_profile" && slices.Contains(q.Choices, o.Config.Monitoring.Profile) {
+			q.Default = o.Config.Monitoring.Profile
+			delete(answers, q.Key)
+		}
 		if _, exists := answers[q.Key]; exists {
 			continue
 		}
