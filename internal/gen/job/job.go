@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -20,6 +19,8 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/modules"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
@@ -138,9 +139,9 @@ func splitWords(s string) ([]string, bool) {
 }
 
 func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
-	if in.Lock == nil || !slices.Contains(in.Lock.Packs, pack) {
+	if in.Lock == nil || !modules.Enabled(&project.Config{Modules: in.Lock.Packs}, pack) {
 		return nil, fmt.Errorf("cannot generate a job: the app has no jobs module (the jobs pack is not in spinup.lock)\n" +
-			"Try: add the jobs module: create the app with --modules ci,jobs (spinup module add arrives in a later version)")
+			"Try: spinup module add jobs")
 	}
 	if len(in.Args) != 1 {
 		return nil, fmt.Errorf("cannot generate a job: expected one job name, got %d arguments\nTry: spinup g job send_digest", len(in.Args))

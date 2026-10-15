@@ -98,7 +98,7 @@ func generator(t *testing.T) gen.Generator {
 func TestRefusesWithoutJobsPack(t *testing.T) {
 	t.Parallel()
 	_, err := generator(t).Run(context.Background(), gen.Input{Root: t.TempDir(), Lock: lock("base", "api", "ci"), Args: []string{"send_digest"}})
-	if err == nil || !strings.Contains(err.Error(), "Try: add the jobs module") || !strings.Contains(err.Error(), "--modules ci,jobs") {
+	if err == nil || !strings.Contains(err.Error(), "Try: spinup module add jobs") {
 		t.Fatalf("err = %v", err)
 	}
 }

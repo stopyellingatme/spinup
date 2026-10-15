@@ -3,9 +3,9 @@ package backup
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
@@ -44,7 +44,7 @@ func Open(o Options) (Backend, *Session, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("select backup environment: %w", err)
 	}
-	if !slices.Contains(config.Modules, "backups") {
+	if !modules.Enabled(config, "backups") {
 		return nil, nil, fmt.Errorf("back up the database: the project does not use the backups module\nTry: add the backups module to the project")
 	}
 	_, progress := writers(o)

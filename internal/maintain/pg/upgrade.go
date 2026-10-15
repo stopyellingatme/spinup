@@ -16,6 +16,8 @@ import (
 	"github.com/stopyellingatme/spinup/internal/deploy"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/maintain"
+	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
@@ -190,7 +192,8 @@ func (u *upgrade) color(args ...string) []string {
 	return deploy.ComposeArgv(u.cfg.App.Name+"-"+u.rel.Color, u.dir, []string{u.dir + "/compose.yml"}, args...)
 }
 func (u *upgrade) services() []string {
-	if slices.Contains(u.cfg.Modules, "web") {
+	lock, err := manifest.Load(filepath.Join(u.root, "spinup.lock"))
+	if err == nil && modules.WebEnabled(lock) {
 		return []string{"api", "web"}
 	}
 	return []string{"api"}

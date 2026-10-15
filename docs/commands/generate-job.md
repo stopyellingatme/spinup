@@ -107,7 +107,7 @@ $ spinup new plain --api-only --module example.com/plain --no-git --non-interact
 $ cd plain
 $ spinup g job send_digest
 Error: generator "job" failed: cannot generate a job: the app has no jobs module (the jobs pack is not in spinup.lock)
-  Try: add the jobs module: create the app with --modules ci,jobs (spinup module add arrives in a later version)
+  Try: spinup module add jobs
 [exit 1]
 ```
 
