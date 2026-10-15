@@ -91,6 +91,7 @@ app.d.ts
 app.html
 env.ts
 hooks.server.ts
+instrumentation.server.ts
 lib
 routes
 ```

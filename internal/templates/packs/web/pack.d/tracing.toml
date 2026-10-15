@@ -1,0 +1,8 @@
+# SvelteKit server tracing (ADR 0010 §4, unit M6.4). SvelteKit 3 builds src/instrumentation.server.ts
+# into the server output and runs it before the application code. It starts the OpenTelemetry SDK
+# only when OTEL_EXPORTER_OTLP_ENDPOINT is set. The app owns the file after the first render.
+
+[[files]]
+path = "web/src/instrumentation.server.ts"
+source = "files/web/src/instrumentation.server.ts"
+class = "scaffold"

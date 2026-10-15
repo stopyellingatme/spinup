@@ -23,7 +23,12 @@ export default defineConfig(({ mode }) => {
 			sveltekit({
 				adapter: adapter(),
 				paths: { origin },
-				csrf: { trustedOrigins: [origin] }
+				csrf: { trustedOrigins: [origin] },
+				// Spans for handle, load, and form actions. They go nowhere until
+				// src/instrumentation.server.ts starts the SDK (OTEL_EXPORTER_OTLP_ENDPOINT).
+				// SvelteKit 3 runs that file without an opt-in: experimental.instrumentation is gone.
+				// OTEL_TRACES_SAMPLER and OTEL_TRACES_SAMPLER_ARG set the sampling ratio at run time.
+				tracing: { server: true }
 			})
 		],
 		define: {
