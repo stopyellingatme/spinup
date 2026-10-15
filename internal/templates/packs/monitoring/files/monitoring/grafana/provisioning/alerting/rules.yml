@@ -1,0 +1,52 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# Prometheus evaluates every alert rule (monitoring/prometheus/rules/*.yml and
+# monitoring/alerts/*.yml). This one Grafana rule turns each firing Prometheus alert into a
+# Grafana alert with the same labels, so that Grafana sends the notifications
+# (grafana/entrypoint.sh writes the contact points and the notification policy). The stack
+# needs no Alertmanager.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: prometheus
+    folder: Stack
+    interval: 1m
+    rules:
+      - uid: spinup-prometheus-alerts
+        title: Prometheus alert
+        condition: B
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: A
+              # Grafana sets alertname to the rule title, so the query copies the Prometheus
+              # alert name to the label prometheus_alertname.
+              expr: label_join(ALERTS{alertstate="firing"}, "prometheus_alertname", "", "alertname")
+              instant: true
+              range: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "{{ index $labels \"prometheus_alertname\" }}{{ with index $labels \"job\" }} ({{ . }}){{ end }}{{ with index $labels \"instance\" }} on {{ . }}{{ end }}"
+          description: "Prometheus fires {{ index $labels \"prometheus_alertname\" }}. Read the rule in monitoring/prometheus/rules/ or monitoring/alerts/, and run spinup monitor alerts."
+        labels:
+          source: prometheus
+        isPaused: false

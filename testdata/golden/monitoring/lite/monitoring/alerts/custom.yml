@@ -1,0 +1,17 @@
+# Your own Prometheus alerting and recording rules. spinup never changes this file after
+# `spinup new`, and `spinup g alert` adds rules here. Prometheus loads every *.yml file in
+# monitoring/alerts/. Grafana sends the notifications for every firing alert.
+#
+# Example:
+#
+# groups:
+#   - name: custom
+#     rules:
+#       - alert: SignupsStopped
+#         expr: sum(rate(signups_total[1h])) == 0
+#         for: 2h
+#         labels:
+#           severity: warning
+#         annotations:
+#           summary: "No signups in 2 hours"
+groups: []

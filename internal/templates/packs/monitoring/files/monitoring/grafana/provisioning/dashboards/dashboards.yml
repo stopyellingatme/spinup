@@ -1,0 +1,34 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# Two dashboard folders. compose.monitoring.yml mounts monitoring/grafana/dashboards at
+# /etc/spinup/dashboards.
+#   Stack   stack/ and its subfolder stack/vendor/ (managed). Grafana reads subfolders, and it
+#           refuses changes made in the UI: spinup upgrade replaces these files.
+#   Custom  custom/ (seed). spinup never changes it after `spinup new`. `spinup monitor
+#           dashboards sync` exports the dashboards that you change in the UI to this folder.
+apiVersion: 1
+
+providers:
+  - name: stack
+    orgId: 1
+    folder: Stack
+    folderUid: spinup-stack
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/spinup/dashboards/stack
+      foldersFromFilesStructure: false
+
+  - name: custom
+    orgId: 1
+    folder: Custom
+    folderUid: spinup-custom
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/spinup/dashboards/custom
+      foldersFromFilesStructure: false

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -122,6 +123,22 @@ func TestQuestionsAndPrompt(t *testing.T) {
 	}
 	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version"}) {
 		t.Fatalf("prompt keys=%q", p.keys)
+	}
+}
+
+func TestModuleQuestionsOnlyForSelectedPacks(t *testing.T) {
+	t.Parallel()
+	p := &fakePrompter{answers: map[string]any{"modules": "deploy,monitoring", "monitoring_profile": "full"}}
+	o := Options{Name: "todo", Dir: t.TempDir(), Interactive: true, Answers: map[string]any{"module": "example.com/todo"}}
+	result, err := Generate(context.Background(), o, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(p.keys, "monitoring_profile") {
+		t.Fatalf("prompt keys=%q, want monitoring_profile", p.keys)
+	}
+	if got := result.Lock.Answers["monitoring_profile"]; got != "full" {
+		t.Fatalf("monitoring_profile=%v", got)
 	}
 }
 
@@ -327,5 +344,49 @@ func TestGenerateRecordsPacks(t *testing.T) {
 	}
 	if got := strings.Join(result.Lock.Packs, ","); got != "base,api,ci" {
 		t.Fatalf("lock packs = %q, want base,api,ci", got)
+	}
+}
+
+func TestGenerateDropsUnselectedAnswers(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name             string
+		apiOnly          bool
+		modules, dropped string
+		value            any
+	}{
+		{"monitoring", false, "ci,deploy", "monitoring_profile", "full"},
+		{"web", true, "ci,deploy", "shadcn_registry", "1.8.0"},
+		{"unknown", true, "ci", "unknown_answer", "ignored"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := Generate(context.Background(), Options{
+				Name: "todo", Dir: t.TempDir(), APIOnly: tc.apiOnly,
+				Answers: map[string]any{"module": "example.com/todo", "modules": tc.modules, tc.dropped: tc.value},
+			}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := result.Lock.Answers[tc.dropped]; ok {
+				t.Errorf("unselected answer retained: %s", tc.dropped)
+			}
+			for key, want := range map[string]any{"app_name": "todo", "module": "example.com/todo", "db_version": "18"} {
+				if result.Lock.Answers[key] != want {
+					t.Errorf("base answer %s = %v, want %v", key, result.Lock.Answers[key], want)
+				}
+			}
+			for _, file := range result.Plan.Files {
+				if file.Path == "spinup.toml" && strings.Contains(string(file.Data), `profile = "full"`) {
+					t.Error("unselected monitoring configuration rendered")
+				}
+				if file.Path == "deploy/compose.yml" && strings.Contains(string(file.Data), "OTEL_") {
+					t.Error("unselected monitoring environment rendered")
+				}
+				if tc.apiOnly && file.Path == "deploy/compose.yml" && strings.Contains(string(file.Data), "WEB_IMAGE") {
+					t.Error("unselected web service rendered")
+				}
+			}
+		})
 	}
 }

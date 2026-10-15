@@ -106,6 +106,7 @@ func (f *flow) plan(ctx context.Context) error {
 	}
 
 	f.planSecrets(w, cur)
+	f.planMonitoring()
 
 	files, err := f.releaseFiles()
 	if err != nil {

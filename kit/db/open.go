@@ -74,6 +74,7 @@ func Open(ctx context.Context, url string, opts ...Option) (*pgxpool.Pool, error
 	if oc.maxConns > 0 {
 		cfg.MaxConns = oc.maxConns
 	}
+	configureTelemetry(cfg)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, &userError{what: what, why: err.Error(), try: "check DATABASE_URL", err: err}

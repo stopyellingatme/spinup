@@ -10,5 +10,5 @@ name = [[ quote .app_name ]]
 module = [[ quote .module ]]
 
 [monitoring]
-# Use the small monitoring stack.
-profile = "lite"
+# Pick the monitoring stack: lite, full, or none.
+profile = [[ with index . "monitoring_profile" ]][[ quote . ]][[ else ]]"lite"[[ end ]]

@@ -28,6 +28,7 @@ type local struct {
 	secrets    map[string]string
 	web        bool
 	files      []releaseFile
+	monitoring monitoringStack
 	migrations []migration
 	origin     string // PUBLIC_ORIGIN
 	site       string // PUBLIC_HOST
@@ -67,6 +68,14 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	l := &local{root: root, app: config.App.Name, env: env}
 	if l.origin, l.site, err = publicOrigin(env.PublicURL, env.Host); err != nil {
 		return nil, preflightError(stripTry(err.Error()), "set public_url in [env."+env.Name+"] of spinup.toml")
+	}
+	if l.monitoring, err = loadMonitoring(root, config); err != nil {
+		return nil, err
+	}
+	if l.monitoring.skip == "" {
+		if _, err := l.monitoring.env("", "", env.PublicURL); err != nil {
+			return nil, err
+		}
 	}
 
 	// A clean tree makes the release reproducible from its git SHA.
@@ -121,7 +130,11 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	if l.secrets, err = d.Decrypt(ctx, root, env.Name); err != nil {
 		return nil, preflightError("the secrets of "+env.Name+" cannot be decrypted: "+stripTry(err.Error()), "run spinup secrets init --env "+env.Name+", or check the key in ~/.config/spinup/keys")
 	}
-	for _, name := range requiredSecrets {
+	need := slices.Clone(requiredSecrets)
+	if l.monitoring.skip == "" {
+		need = append(need, "GRAFANA_ADMIN_PASSWORD")
+	}
+	for _, name := range need {
 		if _, ok := l.secrets[name]; !ok {
 			return nil, preflightError("the secret "+name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name)
 		}

@@ -1,0 +1,373 @@
+[[- $full := eq .monitoring_profile "full" -]]
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The monitoring stack, profile [[ .monitoring_profile ]] (docs/monitoring.md). spinup deploy copies
+# monitoring/ to /opt/[[ .app_name ]]/monitoring and runs it as the Compose project
+# [[ .app_name ]]-monitoring, next to the base project [[ .app_name ]] (compose.edge.yml):
+#   docker compose -p [[ .app_name ]]-monitoring -f compose.monitoring.yml up -d
+#
+# Nothing here is published to the internet. Grafana listens on 127.0.0.1:3000 of the VM, and
+# `spinup monitor open` reaches it through an SSH tunnel. The app sends OTLP to
+# http://alloy:4318 on the [[ .app_name ]]-app network. No collector port is published.
+#
+# Config hashes in .env recreate only services whose mounted config changes.
+# spinup deploy sets these variables from spinup.toml and deploy/environments/<env>.toml:
+#   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM, who owns /opt/[[ .app_name ]]/secrets
+#   PUBLIC_URL               the public URL of the app[[ if $full ]]: the blackbox exporter probes it[[ end ]]
+#   ALERT_EMAIL_TO           [monitoring] alert_email: email notifications (needs SMTP_HOST)
+#   SMTP_HOST, SMTP_USER, SMTP_FROM   the SMTP relay for email notifications
+#   ALERT_NTFY_URL           [monitoring] ntfy_url: ntfy notifications
+#   HEARTBEAT_URL            [monitoring] heartbeat_url: the dead-man's switch
+#   PROMETHEUS_RETENTION     how long Prometheus keeps metrics (default 30d)
+#   PROMETHEUS_RETENTION_SIZE  the disk limit of Prometheus (default 5GB)
+[[- if $full ]]
+#   TEMPO_RETENTION          how long Tempo keeps traces (default 336h)
+[[- end ]]
+#
+# spinup deploy copies these secrets to /opt/[[ .app_name ]]/monitoring-secrets:
+# The directory has mode 0700. The files have mode 0600.
+#   GRAFANA_ADMIN_PASSWORD   required: the password of the Grafana admin user
+#   SLACK_WEBHOOK_URL        optional: Slack notifications
+#   SMTP_PASSWORD            optional: the SMTP relay password
+[[- if $full ]]
+#   POSTGRES_PASSWORD        the postgres-exporter logs in as the app user
+[[- end ]]
+name: [[ .app_name ]]-monitoring
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  alloy:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${ALLOY_CONFIG_HASH:-}
+    image: [[ image "alloy" ]]
+    user: "473:473"
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --disable-reporting
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    tmpfs:
+      - /tmp
+    networks:
+      # The app sends OTLP to alloy:4317 and alloy:4318 on this network. Alloy also scrapes
+      # Caddy here.
+      app: {}
+      monitoring: {}
+    healthcheck:
+      # The image has bash but no HTTP client.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_started
+[[- if $full ]]
+      tempo:
+        condition: service_healthy
+[[- end ]]
+
+  prometheus:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${PROMETHEUS_CONFIG_HASH:-}
+    image: [[ image "prometheus" ]]
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-5GB}
+      # Alloy writes every metric here.
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    networks:
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    stop_grace_period: 30s
+
+  loki:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${LOKI_CONFIG_HASH:-}
+    image: [[ image "loki" ]]
+    user: "10001:10001"
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    tmpfs:
+      - /tmp
+    networks:
+      monitoring: {}
+    # The Loki image has no shell and no HTTP client, so Compose cannot probe it. Alloy scrapes
+    # loki:3100/metrics, and the MonitoringTargetDown alert fires when Loki stops.
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    stop_grace_period: 30s
+[[- if $full ]]
+
+  tempo:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${TEMPO_CONFIG_HASH:-}
+    image: [[ image "tempo" ]]
+    user: "10001:10001"
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+      - -backend-scheduler.provider.work.compaction.block-retention=${TEMPO_RETENTION:-336h}
+      - -backend-worker.compaction.block-retention=${TEMPO_RETENTION:-336h}
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    tmpfs:
+      - /tmp
+    networks:
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "/tempo", "-health", "-health.url=http://127.0.0.1:3200/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    stop_grace_period: 30s
+[[- end ]]
+
+  grafana:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${GRAFANA_CONFIG_HASH:-}
+    image: [[ image "grafana" ]]
+    # The deploy user owns the secret files (mode 0600). The Grafana image runs as any user.
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    # entrypoint.sh reads the secrets, writes the contact points, and starts Grafana.
+    entrypoint: ["/bin/sh", "/etc/spinup/entrypoint.sh"]
+    ports:
+      # The VM only. `spinup monitor open` reaches it through an SSH tunnel.
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_PATHS_PROVISIONING: /tmp/provisioning
+      GF_LOG_MODE: console
+      GF_SERVER_ROOT_URL: http://localhost:3000/
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_SMTP_ENABLED: ${SMTP_HOST:+true}
+      GF_SMTP_HOST: ${SMTP_HOST:-}
+      GF_SMTP_USER: ${SMTP_USER:-}
+      GF_SMTP_FROM_ADDRESS: ${SMTP_FROM:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_NTFY_URL: ${ALERT_NTFY_URL:-}
+      HEARTBEAT_URL: ${HEARTBEAT_URL:-}
+    volumes:
+      - ./grafana/entrypoint.sh:/etc/spinup/entrypoint.sh:ro
+      - ./grafana/provisioning:/etc/spinup/provisioning:ro
+      - ./grafana/dashboards:/etc/spinup/dashboards:ro
+      - /opt/[[ .app_name ]]/monitoring-secrets:/run/secrets:ro
+      - grafana_data:/var/lib/grafana
+    tmpfs:
+      - /tmp
+    networks:
+      monitoring: {}
+      # Outbound access for notifications, and the published port.
+      egress: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_started
+[[- if $full ]]
+
+  node-exporter:
+    <<: *hardening
+    image: [[ image "node-exporter" ]]
+    user: "65534:65534"
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|run|sys|var/lib/docker/.+|var/lib/containerd/.+)($|/)
+    volumes:
+      # spinup:allow docker-socket The host root is the only source of disk-space metrics. The mount is read-only, and the exporter runs as nobody without the docker group, so it cannot open the socket.
+      - /:/host:ro,rslave
+    networks:
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9100/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  cadvisor:
+    <<: *hardening
+    image: [[ image "cadvisor" ]]
+    # cAdvisor runs as root without capabilities: it reads root-owned files under
+    # /var/lib/docker and the Docker socket as their owner. It needs no privileged mode.
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service
+      - --disable_metrics=advtcp,cpu_topology,cpuset,disk,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp
+    volumes:
+      # spinup:allow docker-socket cAdvisor reads container names and Compose labels from the Docker API. Without them, the container metrics and the restart-loop alert have no names.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  postgres-exporter:
+    <<: *hardening
+    image: [[ image "postgres-exporter" ]]
+    # The deploy user owns the secret files (mode 0600).
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    environment:
+      DATA_SOURCE_URI: postgres:5432/app?sslmode=disable
+      DATA_SOURCE_USER: app
+      DATA_SOURCE_PASS_FILE: /run/secrets/POSTGRES_PASSWORD
+    volumes:
+      - /opt/[[ .app_name ]]/monitoring-secrets:/run/secrets:ro
+    networks:
+      db: {}
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9187/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  blackbox-exporter:
+    <<: *hardening
+    labels:
+      spinup.config-hash: ${BLACKBOX_CONFIG_HASH:-}
+    image: [[ image "blackbox-exporter" ]]
+    user: "65534:65534"
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      # The app network has outbound access, so the exporter probes the public URL from outside
+      # the app containers.
+      app: {}
+      monitoring: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9115/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+[[- end ]]
+
+networks:
+  # The app network of compose.edge.yml: api, web, and Caddy.
+  app:
+    name: [[ .app_name ]]-app
+    external: true
+[[- if $full ]]
+  # The database network of compose.edge.yml: the postgres-exporter reaches Postgres here.
+  db:
+    name: [[ .app_name ]]-db
+    external: true
+[[- end ]]
+  # The monitoring services. No outbound access.
+  monitoring:
+    name: [[ .app_name ]]-monitoring
+    internal: true
+  # Grafana only: outbound access for notifications and the port on 127.0.0.1.
+  egress:
+    name: [[ .app_name ]]-monitoring-egress
+
+volumes:
+  alloy_data:
+  prometheus_data:
+  loki_data:
+[[- if $full ]]
+  tempo_data:
+[[- end ]]
+  grafana_data:

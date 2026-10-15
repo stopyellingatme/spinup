@@ -430,3 +430,36 @@ func TestMissingPostStepKeepsFiles(t *testing.T) {
 		t.Fatalf("lock=%+v", lock.Files)
 	}
 }
+
+func TestEditsUpdateSeedFile(t *testing.T) {
+	t.Parallel()
+	root := rootForTest(t)
+	put(t, root, "monitoring/alerts/custom.yml", "groups: []\n")
+	lockPath := filepath.Join(root, "spinup.lock")
+	lock, _ := manifest.Load(lockPath)
+	if err := lock.SetFile("monitoring/alerts/custom.yml", manifest.FileEntry{Class: manifest.Seed, Template: "monitoring/files/monitoring/alerts/custom.yml", Hash: manifest.Hash([]byte("groups: []\n")), Mode: "0644"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Save(lockPath); err != nil {
+		t.Fatal(err)
+	}
+	file := vfs.File{Path: "monitoring/alerts/custom.yml", Data: []byte("groups:\n  - name: custom\n"), Class: "seed"}
+	g := gen.Generator{Name: "alert", Run: func(context.Context, gen.Input) (*gen.Output, error) {
+		return &gen.Output{Plan: vfs.Plan{Files: []vfs.File{file}}, Edits: []string{file.Path}}, nil
+	}}
+	if _, err := Run(context.Background(), g, nil, nil, Options{Root: root}); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := manifest.Load(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry := lock.Files[file.Path]; entry.Template != "monitoring/files/monitoring/alerts/custom.yml" || entry.Class != manifest.Seed {
+		t.Fatalf("lock entry = %+v, want the pack template and the seed class", entry)
+	}
+	// Without Edits, the same update is a conflict.
+	file.Data = []byte("groups:\n  - name: other\n")
+	if _, err := Run(context.Background(), generator(file), nil, nil, Options{Root: root}); err == nil {
+		t.Fatal("updated a seed file without Edits or --force")
+	}
+}

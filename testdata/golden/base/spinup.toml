@@ -10,5 +10,5 @@ name = "todo"
 module = "example.com/todo"
 
 [monitoring]
-# Use the small monitoring stack.
+# Pick the monitoring stack: lite, full, or none.
 profile = "lite"

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -105,7 +106,7 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 		if action == "unchanged" {
 			continue
 		}
-		if change.Kind == vfs.Update && !o.Force && !generatorOwned(o.Root, file, lock) {
+		if change.Kind == vfs.Update && !o.Force && !generatorOwned(o.Root, file, lock) && !slices.Contains(output.Edits, file.Path) {
 			conflicts = append(conflicts, file.Path)
 		}
 		writes.Files = append(writes.Files, file)
@@ -138,7 +139,11 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 			if mode == 0 {
 				mode = 0644
 			}
-			if err := lock.SetFile(file.Path, manifest.FileEntry{Class: manifest.Class(file.Class), Template: "gen/" + g.Name, Hash: manifest.Hash(file.Data), Mode: fmt.Sprintf("%04o", mode)}); err != nil {
+			template := "gen/" + g.Name
+			if entry, ok := lock.Files[file.Path]; ok && slices.Contains(output.Edits, file.Path) {
+				template = entry.Template
+			}
+			if err := lock.SetFile(file.Path, manifest.FileEntry{Class: manifest.Class(file.Class), Template: template, Hash: manifest.Hash(file.Data), Mode: fmt.Sprintf("%04o", mode)}); err != nil {
 				return result, err
 			}
 		}

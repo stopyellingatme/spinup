@@ -7,6 +7,7 @@ import (
 	_ "github.com/exaring/otelpgx"
 	_ "go.opentelemetry.io/contrib/bridges/otelslog"
 	_ "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	_ "go.opentelemetry.io/contrib/instrumentation/runtime"
 	_ "go.opentelemetry.io/otel"
 	_ "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	_ "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"

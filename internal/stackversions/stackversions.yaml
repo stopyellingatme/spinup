@@ -45,6 +45,7 @@ go_modules:
   go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp: v0.23.0
   go.opentelemetry.io/contrib/bridges/otelslog: v0.21.0
   go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp: v0.72.0
+  go.opentelemetry.io/contrib/instrumentation/runtime: v0.72.0
   github.com/exaring/otelpgx: v0.13.0
 
 go_tools:   # generated apps install these through api/tools.mod (go tool -modfile=tools.mod)

@@ -27,6 +27,15 @@
 	# Requests that the old config started have 10 s to finish after a reload.
 	# The drain of spinup deploy waits at most 10 s too.
 	grace_period 10s
+	# Collect HTTP metrics for each host. The monitoring stack scrapes them on port 2020.
+	metrics {
+		per_host
+	}
+}
+
+# The metrics endpoint. Port 2020 is not published: only the Docker networks reach it.
+:2020 {
+	metrics
 }
 
 # PUBLIC_HOST is the host of public_url, so Caddy gets and renews the certificate.

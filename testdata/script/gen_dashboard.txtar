@@ -1,0 +1,54 @@
+# g dashboard and g alert write user-owned monitoring files. The generated dashboard parses,
+# and promtool accepts the generated alert rule.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+[!exec:promtool] skip 'promtool is required'
+exec spinup new demo --module example.com/demo --modules deploy,monitoring --no-git --non-interactive
+cd demo
+
+exec spinup g dashboard service-health --panel 'Request rate=sum(rate(http_server_request_duration_seconds_count[5m]))'
+stdout '^Created 1, updated 0 files$'
+exists monitoring/grafana/dashboards/custom/service-health.json
+exec go run $WORK/checkjson.go monitoring/grafana/dashboards/custom/service-health.json
+grep '"uid": "spinup-service-health"' monitoring/grafana/dashboards/custom/service-health.json
+grep '"uid": "prometheus"' monitoring/grafana/dashboards/custom/service-health.json
+
+# Invalid rules must leave both the seed file and the lock unchanged.
+cp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cp spinup.lock $WORK/lock-before.json
+! exec spinup g alert BadDuration --expr 'up == 0' --for banana
+stderr 'invalid --for duration'
+cmp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cmp spinup.lock $WORK/lock-before.json
+! exec spinup g alert BadExpression --expr 'up =='
+stderr 'validate monitoring/alerts/custom.yml before writing'
+cmp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cmp spinup.lock $WORK/lock-before.json
+
+exec spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) > 0' --for 5m --severity critical --summary 'Too many server errors'
+stdout '^Created 0, updated 1 files$'
+grep 'alert: HighErrors' monitoring/alerts/custom.yml
+grep 'severity: critical' monitoring/alerts/custom.yml
+exec promtool check rules monitoring/alerts/custom.yml
+! exec spinup g alert HighErrors --expr 'up == 0'
+stderr 'already exists'
+! exec spinup g dashboard Traffic
+stderr 'invalid dashboard name'
+
+-- checkjson.go --
+package main
+
+import (
+	"encoding/json"
+	"os"
+)
+
+func main() {
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		panic(err)
+	}
+	var value any
+	if err := json.Unmarshal(data, &value); err != nil {
+		panic(err)
+	}
+}

@@ -87,12 +87,12 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	if err != nil {
 		return nil, err
 	}
-	asked := packs
-	if o.APIOnly {
-		// An API-only app never selects the web pack, so it never asks or records its questions.
-		asked = slices.DeleteFunc(slices.Clone(packs), func(p *templates.Pack) bool { return p.Name == "web" })
-	}
-	questions, err := Questions(asked)
+	// Ask the core questions first. The modules answer selects the other packs, and only the
+	// selected packs ask their own questions. An API-only app never asks the web questions.
+	core := slices.DeleteFunc(slices.Clone(packs), func(p *templates.Pack) bool {
+		return p.Name != "base" && p.Name != "api" && (p.Name != "web" || o.APIOnly)
+	})
+	questions, err := Questions(core)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +104,24 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 	if err != nil {
 		return nil, err
 	}
+	questions, err = Questions(selected)
+	if err != nil {
+		return nil, err
+	}
+	more := o
+	// Keep only the selected packs' questions and the positional application name.
+	// The first completion retains module flags until pack selection is known.
+	more.Answers = map[string]any{"app_name": o.Name}
+	for _, q := range questions {
+		if value, ok := answers[q.Key]; ok {
+			more.Answers[q.Key] = value
+		}
+	}
+	answers, extra, err := completeAnswers(ctx, more, questions, prompter)
+	if err != nil {
+		return nil, err
+	}
+	warnings = append(warnings, extra...)
 	answers, err = render.ValidateAnswers(selected, answers)
 	if err != nil {
 		return nil, err
