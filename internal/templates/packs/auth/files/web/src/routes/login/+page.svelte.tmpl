@@ -68,6 +68,9 @@
 			</div>
 			<Button type="submit" disabled={pending}>Sign in</Button>
 		</form>
+[[- if has "mail" .modules ]]
+		<a href="/reset" class="mt-4 block text-sm hover:underline">Forgot password?</a>
+[[- end ]]
 	</Card.Content>
 	<Card.Footer class="text-sm">
 		<span class="text-muted-foreground">No account?</span>
