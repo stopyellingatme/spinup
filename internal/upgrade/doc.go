@@ -1,4 +1,4 @@
-// Package upgrade plans and runs template upgrades of a spinup app.
-//
-// STUB from the M2 pre-seed commit. Unit M2.2 owns this file and replaces it.
+// Package upgrade plans and coordinates template upgrades for generated projects.
+// BuildPlan reads files without changing them. NextLock records template content
+// independently of merged content so later upgrades preserve user edits.
 package upgrade
