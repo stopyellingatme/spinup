@@ -41,6 +41,9 @@ var sources embed.FS
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 
+// maxNameLength leaves room for the longest suffix ("-ready") in generator and check names.
+const maxNameLength = 63 - len("-ready")
+
 // Create writes a deterministic plugin project into an absent or empty directory.
 // DryRun validates the project without creating its destination.
 func Create(o Options) (string, error) {
@@ -55,6 +58,10 @@ func Create(o Options) (string, error) {
 	}
 	if o.Kind != "pack" && o.Kind != "exec" {
 		return "", failure(fmt.Errorf("invalid kind %q", o.Kind))
+	}
+	// Generator and check names add a suffix such as "-ready", and an identifier has at most 63 characters.
+	if len(o.Name) > maxNameLength {
+		return "", failure(fmt.Errorf("plugin name %q is longer than %d characters", o.Name, maxNameLength))
 	}
 	if o.Platform == "" {
 		o.Platform = runtime.GOOS + "-" + runtime.GOARCH

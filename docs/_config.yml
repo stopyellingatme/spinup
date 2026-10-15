@@ -3,3 +3,10 @@ description: Full-stack application generator and operations CLI
 theme: minima
 markdown: kramdown
 
+
+# Internal design records are not part of the published site.
+exclude:
+  - design
+  - adr
+  - policy
+  - contributing

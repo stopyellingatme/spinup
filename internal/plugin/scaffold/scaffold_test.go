@@ -40,6 +40,7 @@ func TestRejectInvalidOptions(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, kind string }{
 		{"../escape", "pack"}, {"Upper", "pack"}, {"", "pack"}, {"valid", "other"}, {"con", "pack"},
+		{strings.Repeat("a", 58), "exec"}, {strings.Repeat("a", 58), "pack"},
 	} {
 		t.Run(tc.name+tc.kind, func(t *testing.T) {
 			t.Parallel()

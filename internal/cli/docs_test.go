@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,9 @@ func TestDocsSiteIsCurrent(t *testing.T) {
 	pages := docsite.SitePages(root, matrix)
 	site := filepath.Join(repoRoot(t), "docs", "site")
 	if os.Getenv("SPINUP_GOLDEN_UPDATE") == "1" {
+		if err := pruneStalePages(site, pages); err != nil {
+			t.Fatal(err)
+		}
 		if err := writePages(site, pages); err != nil {
 			t.Fatal(err)
 		}
@@ -71,5 +75,46 @@ func repoRoot(t *testing.T) string {
 			t.Fatal("repository root was not found")
 		}
 		dir = next
+	}
+}
+
+// pruneStalePages removes generated pages that no longer have a command, so an update fixes an
+// "unexpected generated page" failure. The hand-written index.md stays.
+func pruneStalePages(root string, pages map[string][]byte) error {
+	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || filepath.Ext(path) != ".md" {
+			return err
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if _, ok := pages[relative]; ok || relative == "index.md" {
+			return nil
+		}
+		return os.Remove(path)
+	})
+}
+
+func TestPruneStalePages(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"index.md", "commands/old.md", "commands/kept.md"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pages := map[string][]byte{"commands/kept.md": []byte("x")}
+	if err := pruneStalePages(root, pages); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "commands", "old.md")); !os.IsNotExist(err) {
+		t.Fatalf("stale page remains: %v", err)
+	}
+	if ok, err := pagesMatch(root, pages); err != nil || !ok {
+		t.Fatalf("pagesMatch after prune = %v, %v", ok, err)
 	}
 }
