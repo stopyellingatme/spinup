@@ -268,7 +268,7 @@ func TestCIWorkflowRegressions(t *testing.T) {
 	if got := strings.Count(upgrade, "token: ${{ secrets.SPINUP_UPGRADE_TOKEN || github.token }}"); got != 2 {
 		t.Errorf("upgrade token used %d times, want checkout and create-pull-request", got)
 	}
-	for _, want := range []string{"SPINUP_UPGRADE_TOKEN: ${{ secrets.SPINUP_UPGRADE_TOKEN }}", `if [ -z "$SPINUP_UPGRADE_TOKEN" ]; then`, "cannot push workflow changes", "does not trigger pull_request workflows"} {
+	for _, want := range []string{"SPINUP_UPGRADE_TOKEN: ${{ secrets.SPINUP_UPGRADE_TOKEN }}", `if [ -z "${SPINUP_UPGRADE_TOKEN:-}" ]; then`, "cannot push workflow changes", "does not trigger pull_request workflows"} {
 		if !strings.Contains(upgrade, want) {
 			t.Errorf("upgrade PR body lacks fallback guidance: %s", want)
 		}
