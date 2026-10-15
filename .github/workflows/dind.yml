@@ -1,0 +1,49 @@
+name: DinD deploy suite
+
+# The Docker-in-Docker deploy suite (docs/contributing/dind.md): bootstrap, deploy, a failed
+# health check, rollback, lock contention, and the secret files on a containerized VM.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dind-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  dind:
+    name: dind (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api-only, full]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+      - name: Install sops and age
+        env:
+          SPINUP_TOOLS_DIR: ${{ runner.temp }}/spinup-tools
+          SPINUP_NO_UPDATE_CHECK: "1"
+        run: |
+          go run ./cmd/spinup tools install
+          echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
+      - name: Run the DinD deploy suite
+        env:
+          DIND_WEB: ${{ matrix.app == 'full' && '1' || '' }}
+        run: bash testdata/dind/run.sh

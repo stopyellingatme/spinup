@@ -1,0 +1,6 @@
+# sshd settings of the test VM: key login only, no root login.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AllowUsers deploy

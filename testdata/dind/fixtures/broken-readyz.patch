@@ -1,0 +1,11 @@
+--- a/api/cmd/api/main.go
++++ b/api/cmd/api/main.go
+@@ -32,6 +32,8 @@
+ 		app.WithConfig(cfg),
+ 		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
+ 		app.WithReadiness("db", pool.Ping),
++		// The dind suite overlay: readiness always fails, so the deploy must keep the old color.
++		app.WithReadiness("dind-broken", func(context.Context) error { return fmt.Errorf("broken by the dind overlay") }),
+ 		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
+ 		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
+ 	)

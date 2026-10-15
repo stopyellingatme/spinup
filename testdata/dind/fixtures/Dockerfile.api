@@ -1,0 +1,11 @@
+# The API image of the dind suite. run.sh compiles the API on the host and copies the binary in.
+# A generated app with a local kit replace cannot build in deploy/Dockerfile.api, because the
+# kit directory is outside the build context. BASE is the final FROM of deploy/Dockerfile.api,
+# so the image matches production: distroless, no shell, and the built-in healthcheck command.
+ARG BASE
+FROM ${BASE}
+ENV SPINUP_ENV=production
+COPY api /api
+USER nonroot
+EXPOSE 8080
+ENTRYPOINT ["/api"]
