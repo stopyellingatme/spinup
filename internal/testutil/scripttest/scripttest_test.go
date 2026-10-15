@@ -217,7 +217,7 @@ func scriptDatabase(env *testscript.Env, base string) (string, error) {
 	psql := func(sql string) error {
 		out, err := exec.CommandContext(context.Background(), "psql", base, "-v", "ON_ERROR_STOP=1", "-qc", sql).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("psql %q: %v\n%s\nTry: install the psql client, or unset DATABASE_URL", sql, err, out)
+			return fmt.Errorf("psql %q: %w\n%s\nTry: install the psql client, or unset DATABASE_URL", sql, err, out)
 		}
 		return nil
 	}
