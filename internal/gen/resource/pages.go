@@ -67,6 +67,13 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 	if err != nil || !web {
 		return vfs.Plan{}, nil, err
 	}
+	lock, err := manifest.Load(filepath.Join(spec.Root, "spinup.lock"))
+	if err != nil {
+		return vfs.Plan{}, nil, err
+	}
+	if lock.Answers["frontend_mode"] == "embed" {
+		return vfs.Plan{}, nil, fmt.Errorf("cannot generate resource pages in embed mode: the pages require SvelteKit form actions\nTry: pass --api-only, or use an app with --frontend-mode node")
+	}
 	data := newPageData(spec)
 	var plan vfs.Plan
 	for _, f := range pageFiles {

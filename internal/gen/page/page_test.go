@@ -137,3 +137,26 @@ func TestTitle(t *testing.T) {
 		}
 	}
 }
+
+func TestEmbedPage(t *testing.T) {
+	t.Parallel()
+	for _, server := range []bool{false, true} {
+		t.Run(map[bool]string{false: "client", true: "server"}[server], func(t *testing.T) {
+			t.Parallel()
+			lock := webLock()
+			lock.Answers["frontend_mode"] = "embed"
+			args := []string{}
+			if server {
+				args = append(args, "--server")
+			}
+			out, err := plan(t.Context(), gen.Input{Lock: lock, Args: []string{"about"}, Flags: flags(t, args...)})
+			if server {
+				if err == nil || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("server page: %v", err)
+				}
+			} else if err != nil || len(out.Plan.Files) != 1 {
+				t.Fatalf("client page: %v %v", out, err)
+			}
+		})
+	}
+}

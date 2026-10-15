@@ -1,4 +1,4 @@
-[[- $web := index . "shadcn_registry" -]]
+[[- $web := and (index . "shadcn_registry") (ne (index . "frontend_mode") "embed") -]]
 # Managed by spinup: `spinup upgrade` keeps this file current.
 # Put your own site directives in Caddyfile.d/*.caddy.
 #

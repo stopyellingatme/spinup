@@ -6,3 +6,4 @@
 path = "web/src/instrumentation.server.ts"
 source = "files/web/src/instrumentation.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"

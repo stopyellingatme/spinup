@@ -1,0 +1,12 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+# Build context is deploy/ (compose.edge.yml builds it):
+#   docker build -f deploy/Dockerfile.postgres deploy
+#
+# The official Postgres image already has the apt.postgresql.org repository. pgBackRest comes
+# from it at the version that spinup pins. The backups pack sets archive_mode and
+# archive_command in deploy/compose.backups.yml, an override of compose.edge.yml.
+FROM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+ARG PGBACKREST_VERSION=2.59.3
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}-*" \
+ && rm -rf /var/lib/apt/lists/*

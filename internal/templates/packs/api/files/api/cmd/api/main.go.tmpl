@@ -11,6 +11,9 @@ import (
 
  "[[ .module ]]/api/db/migrations"
  "[[ .module ]]/api/internal/routes"
+[[- if eq (index . "frontend_mode") "embed" ]]
+ "[[ .module ]]/api/internal/webdist"
+[[- end ]]
 [[- if has "mail" .modules ]]
  mailapp "[[ .module ]]/api/internal/mail"
 [[- end ]]
@@ -79,6 +82,9 @@ func run() (err error) {
   app.WithName([[ quote .app_name ]]),
   app.WithVersion(version),
   app.WithConfig(cfg),
+[[- if eq (index . "frontend_mode") "embed" ]]
+  app.WithSPA(webdist.FS),
+[[- end ]]
   app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 [[- if has "auth" .modules ]]
   app.WithMiddleware(authn.Middleware()),

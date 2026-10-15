@@ -91,6 +91,9 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if in.Flags != nil {
 		server, _ = in.Flags.GetBool("server")
 	}
+	if server && in.Lock.Answers["frontend_mode"] == "embed" {
+		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")
+	}
 	dir := "web/src/routes/" + strings.Join(segments, "/")
 	name := title(segments)
 	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server), Class: string(manifest.Scaffold)}}

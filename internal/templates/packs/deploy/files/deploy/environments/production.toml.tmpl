@@ -1,4 +1,4 @@
-[[- $web := index . "shadcn_registry" -]]
+[[- $web := and (index . "shadcn_registry") (ne (index . "frontend_mode") "embed") -]]
 # Deploy settings of the production environment. `spinup deploy --env production` reads this file.
 # The host, the SSH user, public_url, and the protected flag are in spinup.toml
 # under [env.production]. The secrets are in secrets/production.enc.yaml.
