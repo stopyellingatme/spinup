@@ -1,0 +1,48 @@
+# Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
+# monitoring/alerts/custom.yml.
+#
+# The app alerts. The kit sends the request metrics over OTLP (otelhttp):
+# http_server_request_duration_seconds, with one job label per service (<app>-api, <app>-web).
+groups:
+  - name: app
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+            /
+            sum by (job) (rate(http_server_request_duration_seconds_count[5m]))
+          ) > 0.05
+          and
+          sum by (job) (rate(http_server_request_duration_seconds_count[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }}: more than 5% of the requests fail"
+          description: "{{ $labels.job }} answered {{ $value | humanizePercentage }} of the requests with a 5xx status in the last 5 minutes."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (job, le) (rate(http_server_request_duration_seconds_bucket[5m]))) > 1
+          and
+          sum by (job) (rate(http_server_request_duration_seconds_count[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }}: the p95 latency is above 1 s"
+          description: "The 95th percentile of the request duration of {{ $labels.job }} is {{ $value | humanizeDuration }}."
+
+  - name: backups
+    rules:
+      # The kit backup package reports the age of the newest backup (kit/backup), and the kit
+      # telemetry exports it as the gauge backup.last_age (unit s).
+      - alert: BackupStale
+        expr: max by (job) (backup_last_age_seconds) > 26 * 3600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }}: the newest backup is older than 26 hours"
+          description: "The newest database backup is {{ $value | humanizeDuration }} old. Run spinup backup now and check spinup backup list."

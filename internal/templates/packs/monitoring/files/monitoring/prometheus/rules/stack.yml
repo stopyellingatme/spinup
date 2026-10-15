@@ -1,0 +1,26 @@
+# Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
+# monitoring/alerts/custom.yml.
+#
+# The alerts about the monitoring stack itself.
+groups:
+  - name: stack
+    rules:
+      # The dead-man's switch. It always fires. Grafana routes it (route=heartbeat) to the
+      # heartbeat contact point, which calls [monitoring] heartbeat_url every 5 minutes. When the
+      # VM, Prometheus, or Grafana stops, the calls stop, and the external service alerts you.
+      - alert: Heartbeat
+        expr: vector(1)
+        labels:
+          severity: none
+          route: heartbeat
+        annotations:
+          summary: "The monitoring stack is alive"
+
+      - alert: MonitoringTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }}: the scrape of {{ $labels.instance }} fails"
+          description: "Alloy cannot scrape {{ $labels.instance }} (job {{ $labels.job }}) for 5 minutes."

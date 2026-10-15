@@ -1,0 +1,29 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# The datasource UIDs are fixed (docs/adr/0010-m6-contracts.md §2): dashboards and alert rules
+# refer to prometheus, loki.
+apiVersion: 1
+
+prune: true
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 30s
+      prometheusType: Prometheus
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
