@@ -93,8 +93,12 @@ func TestMigrateCommandErrors(t *testing.T) {
 		opts []db.MigrateOption
 		want []string
 	}{
-		{"no subcommand", nil, nil, []string{"up, down, or status", "\nTry: "}},
-		{"unknown subcommand", []string{"sideways"}, nil, []string{`"sideways"`, "up, down, or status", "\nTry: "}},
+		{"no subcommand", nil, nil, []string{"up, down, status, redo, to, or version", "\nTry: "}},
+		{"unknown subcommand", []string{"sideways"}, nil, []string{`"sideways"`, "up, down, status, redo, to, or version", "\nTry: "}},
+		{"to without version", []string{"to"}, nil, []string{"exactly one version", "\nTry: migrate to 1"}},
+		{"to bad version", []string{"to", "x1"}, nil, []string{`"x1" is not a migration version`, "\nTry: "}},
+		{"to negative version", []string{"to", "-1"}, nil, []string{"is not a migration version", "\nTry: "}},
+		{"version with arguments", []string{"version", "2"}, nil, []string{"unexpected arguments", "\nTry: "}},
 		{"extra arguments", []string{"up", "now"}, nil, []string{"unexpected arguments", "\nTry: "}},
 		{
 			"bad URL",
