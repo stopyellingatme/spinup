@@ -18,7 +18,7 @@ stderr 'Try:'
 exec spinup new frontend --module example.com/frontend --no-git --non-interactive
 exists frontend/web/package.json
 ! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
-stderr 'available modules: ci, deploy, jobs'
+stderr 'available modules: backups, ci, deploy, jobs'
 ! exec spinup new needsweb --api-only --modules ci,auth --no-git --non-interactive
 stderr 'needs the web frontend'
 
