@@ -43,7 +43,7 @@ func migrationContext(s *Step) *migrate.Ctx {
 		// The lock already contains To when a verification failure resumes.
 		from = s.Plan.From
 	}
-	return &migrate.Ctx{Root: s.Worktree, From: from, To: s.To.Version, Answers: s.Answers, Lock: s.Lock, Runner: s.Runner}
+	return &migrate.Ctx{Root: s.Worktree, From: from, To: s.To.Version, Answers: s.Answers, Lock: s.Lock, Runner: s.Runner, Old: s.From, New: s.To}
 }
 
 func (h *phaseHooks) migrations(ctx context.Context, s *Step, stage migrate.Stage) error {
