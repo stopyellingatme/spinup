@@ -199,6 +199,9 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		if run, ok := a.commands[args[0]]; ok {
 			return run(ctx, args[1:])
 		}
+		if args[0] == "healthcheck" {
+			return a.healthcheck(ctx)
+		}
 		commands := strings.Join(sortedNames(a.commands), ", ")
 		if commands == "" {
 			commands = "(none)"
