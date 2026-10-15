@@ -66,6 +66,7 @@ func New(opts ...Option) *App {
 		}
 		a.logger = logx.New(os.Stderr, logx.Options{Level: level})
 	}
+	a.telemetryLogger()
 	mux := http.NewServeMux()
 	a.addRoute("GET /healthz")
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -96,7 +97,7 @@ func New(opts ...Option) *App {
 		a.addRoute("/_dev/")
 		middleware = append(middleware, dev.Middleware(), a.recordRoute())
 	}
-	a.handler = httpx.Chain(mux, append(middleware, a.middleware...)...)
+	a.handler = a.telemetryHandler(httpx.Chain(mux, append(middleware, a.middleware...)...), mux)
 	return a
 }
 
