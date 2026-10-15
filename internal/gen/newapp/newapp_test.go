@@ -121,7 +121,7 @@ func TestQuestionsAndPrompt(t *testing.T) {
 	if _, err := Generate(context.Background(), o, p); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version"}) {
+	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version", "ci_deploy_on_push"}) {
 		t.Fatalf("prompt keys=%q", p.keys)
 	}
 }
@@ -386,6 +386,48 @@ func TestGenerateDropsUnselectedAnswers(t *testing.T) {
 				if tc.apiOnly && file.Path == "deploy/compose.yml" && strings.Contains(string(file.Data), "WEB_IMAGE") {
 					t.Error("unselected web service rendered")
 				}
+			}
+		})
+	}
+}
+
+func TestCIWorkflowSelection(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, modules string
+		apiOnly       bool
+		wantCI, web   bool
+	}{
+		{"api", "ci", true, true, false},
+		{"web", "ci", false, true, true},
+		{"web without ci", "deploy", false, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := Generate(context.Background(), Options{
+				Name: "todo", Dir: t.TempDir(), APIOnly: tc.apiOnly,
+				Answers: map[string]any{"module": "example.com/todo", "modules": tc.modules},
+			}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ciJob, e2e bool
+			for _, file := range result.Plan.Files {
+				switch file.Path {
+				case ".github/workflows/ci.yml":
+					ciJob = true
+					if strings.Contains(string(file.Data), "\n  web:\n") != tc.web {
+						t.Error("CI web job does not match the selected web pack")
+					}
+				case ".github/workflows/e2e.yml":
+					e2e = true
+					if file.Class != "managed" || !strings.HasPrefix(file.Template, "web/") {
+						t.Errorf("e2e ownership: %+v", file)
+					}
+				}
+			}
+			if ciJob != tc.wantCI || e2e != (tc.wantCI && tc.web) {
+				t.Errorf("CI=%v, e2e=%v, want CI=%v, web=%v", ciJob, e2e, tc.wantCI, tc.web)
 			}
 		})
 	}
