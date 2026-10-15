@@ -1,0 +1,24 @@
+# spinup backup prune
+
+Apply backup retention and list the remaining backups
+
+## Use
+
+```text
+spinup backup prune [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `-C, --dir` | `` | run in this project directory |
+| `--dry-run` | `false` | show changes without writing |
+| `--env` | `` | target environment |
+| `--json` | `false` | write JSON output |
+| `--no-color` | `false` | turn off color |
+| `--non-interactive` | `false` | never prompt |
+| `--offline` | `false` | never download template versions |
+| `--plan` | `false` | preview retention without removing backups |
+| `--verbose` | `false` | write extra detail |
+| `-y, --yes` | `false` | answer yes to prompts |

@@ -1,0 +1,25 @@
+# spinup ci generate
+
+Render the locked ci pack
+
+## Use
+
+```text
+spinup ci generate [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--diff` | `false` | show unified diffs without writing |
+| `-C, --dir` | `` | run in this project directory |
+| `--dry-run` | `false` | show changes without writing |
+| `--env` | `` | target environment |
+| `--force` | `false` | overwrite workflows with user changes |
+| `--json` | `false` | write JSON output |
+| `--no-color` | `false` | turn off color |
+| `--non-interactive` | `false` | never prompt |
+| `--offline` | `false` | never download template versions |
+| `--verbose` | `false` | write extra detail |
+| `-y, --yes` | `false` | answer yes to prompts |
