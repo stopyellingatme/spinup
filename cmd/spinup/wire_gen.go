@@ -9,7 +9,16 @@ package main
 import (
 	// M1
 	_ "github.com/stopyellingatme/spinup/internal/doctor/composelint"
+
 	// M2
 	_ "github.com/stopyellingatme/spinup/internal/doctor/checks"
 	_ "github.com/stopyellingatme/spinup/internal/migrate"
+
+	// M3
+	_ "github.com/stopyellingatme/spinup/internal/gen/handler"
+	_ "github.com/stopyellingatme/spinup/internal/gen/job"
+	_ "github.com/stopyellingatme/spinup/internal/gen/migration"
+	_ "github.com/stopyellingatme/spinup/internal/gen/model"
+	_ "github.com/stopyellingatme/spinup/internal/gen/openapi"
+	_ "github.com/stopyellingatme/spinup/internal/gen/resource"
 )

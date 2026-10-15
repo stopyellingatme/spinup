@@ -29,6 +29,7 @@ go_modules:
 
   # kit and generated API
   github.com/oapi-codegen/oapi-codegen/v2: v2.8.0
+  github.com/oapi-codegen/runtime: v1.7.0       # the only runtime import of generated strict servers (no embedded spec, ADR 0007)
   github.com/jackc/pgx/v5: v5.11.0        # above the CVE-2026-41889 fix (5.9.2); pin explicitly, pgxstore wants 5.5.4
   github.com/pressly/goose/v3: v3.29.0
   github.com/riverqueue/river: v0.49.0

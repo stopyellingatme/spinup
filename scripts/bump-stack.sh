@@ -76,6 +76,25 @@ finish "$work/tools" "$out/tools.mod.tmpl" "$out/tools.sum"
 echo "bump-stack: wrote tools.mod.tmpl and tools.sum"
 
 # --- go.mod (the API module) ---------------------------------------------------------------------
+# Modules that generated code imports but the base scaffold does not (ADR 0007 §6: the lockfiles
+# are a superset, so an app builds offline after any generator runs).
+app_extra=(github.com/oapi-codegen/runtime github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5)
+
+# add_app_extra <api dir> requires and imports every app_extra module, so tidy keeps them.
+add_app_extra() {
+  mkdir -p "$1/internal/spinupdeps"
+  {
+    echo "package spinupdeps"
+    echo
+    echo "import ("
+    for m in "${app_extra[@]}"; do printf '\t_ "%s"\n' "$m"; done
+    echo ")"
+  } > "$1/internal/spinupdeps/deps.go"
+  for m in "${app_extra[@]}"; do (cd "$1" && go get "$m@$(pin go_modules "$m")"); done
+}
+
+# Every module pack, so the app-mode render turns on all of them (ADR 0007 §6).
+all_modules=$(cd "$root/internal/templates/packs" && ls -d */ | tr -d / | grep -vE '^(_.*|base|api|web)$' | paste -sd, -)
 case "$mode" in
   seed)
     app="$work/app"
@@ -92,6 +111,7 @@ case "$mode" in
         grep -h '^\s*_ "' "$root"/kit/internal/deps/deps_m*.go | grep -v "$kit_module"
         echo ")"
       } > internal/deps/deps.go
+      add_app_extra "$app"
       go mod tidy
     )
     ;;
@@ -102,7 +122,8 @@ case "$mode" in
       go build -o "$work/spinup" ./cmd/spinup
       cd "$work" && mkdir new && cd new
       SPINUP_KIT_REPLACE="$root/kit" "$work/spinup" new demo --api-only --module "${placeholder%/api}" \
-        --non-interactive --no-git
+        --modules "$all_modules" --non-interactive --no-git
+      add_app_extra "$app"
       cd "$app"
       go mod tidy
     )
