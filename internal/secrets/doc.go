@@ -1,4 +1,2 @@
-// Package secrets manages sops and age secrets per environment.
-//
-// STUB from the M5 pre-seed commit. Unit M5.3 owns this file and replaces it.
+// Package secrets manages environment secrets through sops and age-keygen.
 package secrets
