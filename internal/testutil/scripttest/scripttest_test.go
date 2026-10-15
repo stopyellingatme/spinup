@@ -1,6 +1,7 @@
 package scripttest
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -69,6 +70,14 @@ func TestScripts(t *testing.T) {
 	}
 	testscript.Run(t, testscript.Params{
 		Files: files,
+		// [env:NAME] is true when the environment variable NAME is set and not empty.
+		Condition: func(cond string) (bool, error) {
+			name, ok := strings.CutPrefix(cond, "env:")
+			if !ok || name == "" {
+				return false, fmt.Errorf("unknown condition %q\nTry: use [env:NAME] or a built-in condition", cond)
+			}
+			return os.Getenv(name) != "", nil
+		},
 		Setup: func(env *testscript.Env) error {
 			env.Setenv("GOCACHE", caches[0])
 			env.Setenv("GOMODCACHE", caches[1])

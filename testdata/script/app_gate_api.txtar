@@ -1,6 +1,5 @@
 # App gate: a generated API-only app builds, tests, migrates, and serves health checks.
-# testscript has no env condition, so an empty DATABASE_URL fails with a clear message.
-exec sh -c 'test -n "$DATABASE_URL" || { echo "DATABASE_URL is empty: export it to run this gate" >&2; exit 1; }'
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
 [!exec:curl] skip 'curl is required to poll the health endpoints'
 
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
@@ -14,8 +13,8 @@ exec go test ./...
 cd ..
 exec spinup db migrate up
 exec spinup db migrate status
-stdout '00001_init\.sql'
-! stdout 'Pending'
+stdout '^applied  00001_init\.sql$'
+! stdout '^pending'
 exec spinup db migrate up
 stdout 'migrate: no pending migrations'
 
