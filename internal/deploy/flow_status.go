@@ -171,6 +171,9 @@ func Unlock(ctx context.Context, o Options, d Deps, force bool) error {
 	if err != nil {
 		return err
 	}
+	if err := project.ConfirmProtected(env, "deploy unlock", o.Confirm); err != nil {
+		return err
+	}
 	vm, err := dial(ctx, o, d, env)
 	if err != nil {
 		return err

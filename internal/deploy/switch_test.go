@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
+	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
 func TestUpstreamColor(t *testing.T) {
@@ -186,4 +188,68 @@ func TestHostPort(t *testing.T) {
 	if hostPort("10.0.0.1", 80) != "10.0.0.1:80" || hostPort("fd00::1", 80) != "[fd00::1]:80" {
 		t.Fatal("hostPort")
 	}
+}
+
+func TestSwitchUnknownReloadPreservesBothColors(t *testing.T) {
+	t.Parallel()
+	for _, cause := range []error{context.Canceled, errors.New("SSH session dropped"), &runexec.ExitError{Code: 255}, &runexec.ExitError{Code: -1}} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			t.Parallel()
+			s := newSwitchFx()
+			s.start(string(UpstreamFile(Blue)))
+			s.ready()
+			s.vm.Expect(psArgv("todo-blue", "")...).Return("", "", 0)
+			s.vm.ExpectUpload(testRelDir+"/upstream.caddy").Return("", "", 0)
+			s.vm.ExpectUpload(testRoot+"/caddy/upstream.caddy").Return("", "", 0)
+			s.vm.Expect("docker", "exec", "caddy1", "caddy", "reload").Fail(cause)
+			fresh := &remote.Fake{}
+			s.o.Reconnect = func(ctx context.Context) (remote.Runner, error) {
+				if ctx.Err() != nil {
+					t.Errorf("inspection context canceled: %v", ctx.Err())
+				}
+				return fresh, nil
+			}
+			fresh.Expect("sh", "-c", readUpstreamScript).Return(string(UpstreamFile(Green)), "", 0)
+			fresh.Expect(psArgv("todo-blue", "")...).Return("old\n", "", 0)
+			fresh.Expect(psArgv("todo-green", "")...).Return("new\n", "", 0)
+			fresh.ExpectClose().Return("", "", 0)
+			err := Switch(context.Background(), s.vm, s.o)
+			if err == nil || !strings.Contains(err.Error(), "unknown") || !strings.Contains(err.Error(), "Try: spinup deploy status, then spinup deploy --resume") {
+				t.Errorf("error=%v", err)
+			}
+			for _, c := range s.vm.Calls() {
+				if strings.Contains(strings.Join(c.Argv, " "), " down ") {
+					t.Errorf("stopped a color after uncertain reload: %v", c.Argv)
+				}
+			}
+			s.vm.AssertDone(t)
+			fresh.AssertDone(t)
+			if len(s.vm.Uploads()) != 2 {
+				t.Error("rewrote the upstream after uncertain reload")
+			}
+		})
+	}
+}
+
+func TestSwitchUnknownReloadInspectionFailure(t *testing.T) {
+	t.Parallel()
+	s := newSwitchFx()
+	s.vm.ExpectClose().Return("", "", 0)
+	s.vm.Expect("sh", "-c", readUpstreamScript).Fail(errors.New("SSH unavailable"))
+	s.vm.Expect(psArgv("todo-blue", "")...).Fail(errors.New("SSH unavailable"))
+	s.vm.Expect(psArgv("todo-green", "")...).Fail(errors.New("SSH unavailable"))
+	switcher := &switcher{r: s.vm, o: s.o, root: testRoot}
+	switcher.defaults()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := switcher.reloadUnknown(ctx, context.Canceled)
+	if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "unknown") {
+		t.Fatalf("error=%v", err)
+	}
+	wrapped := deployError("switch", "staging", err)
+	var ue *ui.Error
+	if !errors.As(wrapped, &ue) || ue.Try != "spinup deploy status, then spinup deploy --resume" || !strings.Contains(wrapped.Error(), "unknown") {
+		t.Fatalf("wrapped error=%v", wrapped)
+	}
+	s.vm.AssertDone(t)
 }

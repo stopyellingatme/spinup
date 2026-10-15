@@ -43,6 +43,12 @@ func (f *flow) plan(ctx context.Context) error {
 	}
 	defer func() { _ = f.vm.Close(context.WithoutCancel(ctx)) }()
 
+	if f.o.Redeploy {
+		if err := f.selectRelease(ctx); err != nil {
+			return err
+		}
+	}
+
 	upstream, err := ReadUpstream(ctx, f.vm, f.l.app)
 	if err != nil {
 		return err

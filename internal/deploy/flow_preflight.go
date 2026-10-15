@@ -204,7 +204,7 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 
 // sameSHA reports whether a release ID belongs to the commit.
 func sameSHA(release, sha string) bool {
-	return ValidReleaseID(release) && strings.HasPrefix(sha, release[len(release)-12:])
+	return ValidReleaseID(release) && strings.HasPrefix(sha, strings.SplitN(release, "-r", 2)[0][17:])
 }
 
 // secretNames returns the sorted secret names.

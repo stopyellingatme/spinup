@@ -70,8 +70,16 @@ The deploy fails and writes the failure to the journal.
 Use `--no-auto-rollback` to keep the unhealthy color running for debugging.
 The old color stays live in both cases.
 
-If the Caddy reload fails, the deploy restores the previous `upstream.caddy`.
-Caddy keeps its old configuration after a failed reload.
+If Caddy reports a definite reload failure, the deploy restores the previous `upstream.caddy`.
+Caddy keeps its old configuration.
+
+If SSH fails or the command is canceled during reload, the loaded configuration is unknown.
+The deploy preserves both colors and reads the upstream file and running containers through a fresh connection.
+Run `spinup deploy status`.
+Run `spinup deploy --resume` after the status check.
+
+The deploy validates a staged Caddy tree before it installs the Caddyfile and snippets.
+If validation fails, the stable Caddy and Postgres files remain unchanged.
 
 The deploy never stops the color that serves traffic.
 
@@ -142,7 +150,9 @@ Last deploy: 20261015T080000Z-0123456789ab
 
 Add `--json` for a machine-readable report.
 
-The lock has a TTL of 30 minutes. The deploy refreshes it between steps.
+The lock has a TTL of 30 minutes.
+A heartbeat refreshes the lock every 10 minutes, including during long commands.
+If a refresh fails or another owner takes the lock, the deploy cancels its active command and stops.
 Another deploy can take an expired lock and prints a warning.
 If a deploy stopped and you are sure that it does not run, remove its lock:
 
@@ -160,6 +170,32 @@ $ spinup deploy unlock --force --env staging
 Removed the deploy lock of staging (held by alice for release 20261015T080000Z-0123456789ab)
 The journal is unchanged. Run spinup deploy --resume to continue the last deploy.
 ```
+
+A protected environment requires confirmation for `deploy unlock --force`.
+If you use a terminal, type the environment name.
+In CI, pass `--yes`.
+The `--force` flag does not bypass this guard.
+
+## Repeated release IDs
+
+The deploy refuses an ID that exists on the VM or in `releases.json`.
+Use `--resume` to continue an incomplete deploy.
+
+To deploy the same images again, add `--redeploy`:
+
+<!-- doctest: skip -->
+```console
+$ spinup deploy --env staging --skip-build --tag 20261015T080000Z-0123456789ab --redeploy
+...
+Uploading release 20261015T080000Z-0123456789ab-r1 (green color)
+...
+Deployed release 20261015T080000Z-0123456789ab-r1 to staging (green color)
+```
+
+The deploy selects the first unused `-r<N>` suffix while it holds the lock.
+It preserves the live release directory and its history entry.
+The new directory uses the original image references and the other color.
+A resume, rollback, or release listing accepts the suffixed ID.
 
 ## Images
 

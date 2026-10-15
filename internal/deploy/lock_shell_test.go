@@ -162,3 +162,27 @@ func TestLockShellExpiredFormattedMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLockRedeployIdentity(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	vm := localVM{root: t.TempDir()}
+	lock, err := AcquireLock(ctx, vm, "app", LockOptions{Release: testRelease, Now: func() time.Time { return testNow }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	redeploy := testRelease + "-r1"
+	if err := lock.refresh(ctx, redeploy); err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	info, err := ReadLock(ctx, vm, "app")
+	if err != nil || info.Release != redeploy {
+		t.Fatalf("redeploy lock = %#v, %v", info, err)
+	}
+	if err := lock.Release(ctx); err != nil {
+		t.Fatal(err)
+	}
+}

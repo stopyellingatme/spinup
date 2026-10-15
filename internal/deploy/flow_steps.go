@@ -57,7 +57,6 @@ type flow struct {
 	images   []Image
 	color    string
 	uid, gid string
-	refresh  time.Time
 }
 
 func (f *flow) root() string       { return "/opt/" + f.l.app }
@@ -87,11 +86,20 @@ func (f *flow) run(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	f.refresh = f.d.Now()
 	defer func() {
 		if rerr := f.lock.Release(context.WithoutCancel(ctx)); rerr != nil {
 			err = errors.Join(err, rerr)
 		}
+	}()
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	stopHeartbeat := f.heartbeat(ctx, cancel)
+	defer func() {
+		stopHeartbeat()
+		if cause := context.Cause(ctx); cause != nil {
+			err = errors.Join(err, cause)
+		}
+		cancel(nil)
 	}()
 
 	start := 0
@@ -114,7 +122,7 @@ func (f *flow) run(ctx context.Context) (err error) {
 		if slices.Index(Steps, s.name) < start {
 			continue
 		}
-		if err := f.keepLock(ctx); err != nil {
+		if err := ctx.Err(); err != nil {
 			return deployError(s.name, f.l.env.Name, err)
 		}
 		if err := f.journal.Start(ctx, s.name); err != nil {
@@ -123,10 +131,16 @@ func (f *flow) run(ctx context.Context) (err error) {
 		detail, serr := s.run(ctx)
 		if serr != nil {
 			derr := deployError(s.name, f.l.env.Name, serr)
+			if ctx.Err() != nil {
+				return derr
+			}
 			if jerr := f.journal.Fail(context.WithoutCancel(ctx), s.name, errors.New(redactString(serr.Error(), f.redact))); jerr != nil {
 				return errors.Join(derr, jerr)
 			}
 			return derr
+		}
+		if err := ctx.Err(); err != nil {
+			return deployError(s.name, f.l.env.Name, err)
 		}
 		if err := f.journal.Done(ctx, s.name, redactString(detail, f.redact)); err != nil {
 			return deployError(s.name, f.l.env.Name, err)
@@ -140,16 +154,33 @@ func redactString(s string, values []string) string {
 	return (&redactor{values: values}).redact(s)
 }
 
-// keepLock refreshes the lock when a third of its TTL has passed.
-func (f *flow) keepLock(ctx context.Context) error {
-	if f.d.Now().Sub(f.refresh) < f.o.LockTTL/3 {
-		return nil
-	}
-	if err := f.lock.Refresh(ctx); err != nil {
-		return err
-	}
-	f.refresh = f.d.Now()
-	return nil
+// heartbeat renews the lock independently of deploy steps. It stops all work on renewal failure.
+func (f *flow) heartbeat(ctx context.Context, cancel context.CancelCauseFunc) func() {
+	heartbeatCtx, stop := context.WithCancel(ctx)
+	done := make(chan struct{})
+	interval := max(f.o.LockTTL/3, time.Nanosecond)
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-heartbeatCtx.Done():
+				return
+			case <-ticker.C:
+				renewCtx, end := context.WithTimeout(heartbeatCtx, interval)
+				err := f.lock.Refresh(renewCtx)
+				end()
+				if err != nil {
+					if heartbeatCtx.Err() == nil {
+						cancel(fmt.Errorf("refresh deploy lock: %w", err))
+					}
+					return
+				}
+			}
+		}
+	}()
+	return func() { stop(); <-done }
 }
 
 // prepare chooses the release ID and builds the images (step 2). It runs before the lock.
@@ -298,8 +329,51 @@ func isNumber(s string) bool {
 // rotateJournalScript keeps the previous journal as deploy.state.prev.
 const rotateJournalScript = `if [ -e "$1" ]; then mv -f -- "$1" "$1.prev"; fi`
 
+// releaseExistsScript detects directories, files, and dangling links without changing them.
+const releaseExistsScript = `if [ -e "$1" ] || [ -L "$1" ]; then printf 'exists\n'; fi`
+
+// selectRelease rejects immutable release directories or chooses an unused redeploy suffix.
+// The deploy lock serializes selection. Image references keep the original build tag.
+func (f *flow) selectRelease(ctx context.Context) error {
+	history, err := ReadReleases(ctx, f.vm, f.l.app)
+	if err != nil {
+		return err
+	}
+	base := strings.SplitN(f.release, "-r", 2)[0]
+	for n := 0; ; n++ {
+		candidate := f.release
+		if n > 0 {
+			candidate = base + "-r" + strconv.Itoa(n)
+		}
+		exists := slices.ContainsFunc(history, func(r ReleaseEntry) bool { return r.Release == candidate })
+		if !exists {
+			result, err := f.cmd(ctx, false, "sh", "-c", releaseExistsScript, "spinup-release-exists", f.root()+"/releases/"+candidate)
+			if err != nil {
+				return fmt.Errorf("check release directory: %w\nTry: check the SSH connection", err)
+			}
+			exists = len(result.Stdout) != 0
+		}
+		if !exists {
+			f.release = candidate
+			return nil
+		}
+		if !f.o.Redeploy {
+			return &ui.Error{What: "Cannot deploy release " + candidate, Why: "the release already exists on the VM or in releases.json", Try: "run spinup deploy --resume for an incomplete deploy, or pass --redeploy for a new release directory"}
+		}
+	}
+}
+
 // begin starts the journal of a new release and records the local steps.
 func (f *flow) begin(ctx context.Context) error {
+	original := f.release
+	if err := f.selectRelease(ctx); err != nil {
+		return err
+	}
+	if f.lock != nil && f.release != original {
+		if err := f.lock.refresh(ctx, f.release); err != nil {
+			return err
+		}
+	}
 	entries, err := ReadJournal(ctx, f.vm, f.l.app)
 	if err != nil {
 		return err
@@ -486,25 +560,39 @@ func (u uploader) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, error
 	return u.vm.Run(ctx, remote.Cmd{Argv: append([]string{c.Name}, c.Args...), Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Timeout: c.Timeout, Redact: append(slices.Clone(u.redact), c.Redact...)})
 }
 
-// edgeSyncScript copies the Caddy and Postgres configuration of the release into the stable
-// directories. Caddyfile.next waits for validation. Directories are replaced as a whole, so a
-// file removed from the release is removed on the VM too.
+// edgeSyncScript stages a complete Caddy tree and Postgres configuration.
+// Stable files remain unchanged until validation succeeds.
 const edgeSyncScript = `set -eu
 root=$1
 rel=$2
 mkdir -p -- "$root/caddy" "$root/postgres" "$root/data/caddy/data" "$root/data/caddy/config"
-cp -- "$rel/Caddyfile" "$root/caddy/Caddyfile.next"
-sync_dir() {
-	rm -rf -- "$2.next"
-	if [ -d "$1" ]; then cp -R -- "$1" "$2.next"; else mkdir -- "$2.next"; fi
-	rm -rf -- "$2"
-	mv -- "$2.next" "$2"
+rm -rf -- "$root/caddy/.next" "$root/postgres/.next"
+mkdir -- "$root/caddy/.next" "$root/postgres/.next"
+cp -- "$rel/Caddyfile" "$root/caddy/.next/Caddyfile"
+stage_dir() {
+	if [ -d "$1" ]; then cp -R -- "$1" "$2"; else mkdir -- "$2"; fi
 }
-sync_dir "$rel/Caddyfile.d" "$root/caddy/Caddyfile.d"
-sync_dir "$rel/postgres/conf.d" "$root/postgres/conf.d"
+stage_dir "$rel/Caddyfile.d" "$root/caddy/.next/Caddyfile.d"
+stage_dir "$rel/postgres/conf.d" "$root/postgres/.next/conf.d"
+if [ -f "$root/caddy/upstream.caddy" ]; then
+	cp -- "$root/caddy/upstream.caddy" "$root/caddy/.next/upstream.caddy"
+else
+	printf 'respond "No release is live yet." 503\n' > "$root/caddy/.next/upstream.caddy"
+fi
 if [ -f "$rel/postgres/postgresql.conf" ]; then
-	cp -- "$rel/postgres/postgresql.conf" "$root/postgres/postgresql.conf.next"
-	mv -f -- "$root/postgres/postgresql.conf.next" "$root/postgres/postgresql.conf"
+	cp -- "$rel/postgres/postgresql.conf" "$root/postgres/.next/postgresql.conf"
+fi`
+
+// edgeInstallScript promotes only validated Caddy files and their matching snippets.
+const edgeInstallScript = `set -eu
+root=$1
+rm -rf -- "$root/caddy/Caddyfile.d"
+mv -- "$root/caddy/.next/Caddyfile.d" "$root/caddy/Caddyfile.d"
+mv -f -- "$root/caddy/.next/Caddyfile" "$root/caddy/Caddyfile"
+rm -rf -- "$root/postgres/conf.d"
+mv -- "$root/postgres/.next/conf.d" "$root/postgres/conf.d"
+if [ -f "$root/postgres/.next/postgresql.conf" ]; then
+	mv -f -- "$root/postgres/.next/postgresql.conf" "$root/postgres/postgresql.conf"
 fi`
 
 // edge syncs the Caddy and Postgres configuration and starts the base project (Caddy and Postgres).
@@ -528,17 +616,24 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if len(caddy) > 0 {
-		if _, err := f.cmd(ctx, true, "docker", "exec", caddy[0], "caddy", "validate", "--config", "/etc/caddy/Caddyfile.next", "--adapter", "caddyfile"); err != nil {
-			return "", fmt.Errorf("the new Caddyfile is not valid, and Caddy keeps the old one: %w\nTry: correct deploy/Caddyfile or deploy/Caddyfile.d, commit, and deploy again", brief(err))
-		}
-	}
-	if _, err := f.cmd(ctx, false, "mv", "-f", "--", root+"/caddy/Caddyfile.next", root+"/caddy/Caddyfile"); err != nil {
-		return "", fmt.Errorf("install the Caddyfile: %w", err)
-	}
 	files := make([]string, 0, 2)
 	for _, name := range edgeComposeFiles(f.l.files) {
 		files = append(files, dir+"/"+name)
+	}
+	validate := []string{"caddy", "validate", "--config", "/etc/caddy/.next/Caddyfile", "--adapter", "caddyfile"}
+	var argv []string
+	if len(caddy) > 0 {
+		argv = append([]string{"docker", "exec", caddy[0]}, validate...)
+	} else {
+		// A stopped Caddy still needs a valid disk configuration before its next start.
+		args := append([]string{"run", "--rm", "--no-deps", "-T", "--entrypoint", "caddy", "caddy"}, validate[1:]...)
+		argv = ComposeArgv(f.l.app, dir, files, args...)
+	}
+	if _, err := f.cmd(ctx, true, argv...); err != nil {
+		return "", fmt.Errorf("the new Caddyfile is not valid, and the stable configuration is unchanged: %w\nTry: correct deploy/Caddyfile or deploy/Caddyfile.d, commit, and deploy again", brief(err))
+	}
+	if _, err := f.cmd(ctx, false, "sh", "-c", edgeInstallScript, "spinup-edge-install", root); err != nil {
+		return "", fmt.Errorf("install the Caddyfile: %w", err)
 	}
 	fmt.Fprintln(f.out, "Starting Caddy and Postgres")
 	up := ComposeArgv(f.l.app, dir, files, "up", "-d", "--wait", "--wait-timeout", strconv.Itoa(seconds(f.o.HealthTimeout)))
@@ -565,6 +660,9 @@ func (f *flow) doSwitch(ctx context.Context) (string, error) {
 		App: f.l.app, ReleaseDir: f.releaseDir(), Color: f.color, Services: DefaultServices(f.l.web),
 		HealthTimeout: f.o.HealthTimeout, NoAutoRollback: f.o.NoAutoRollback, Redact: f.redact,
 		Out: f.out, Now: f.d.Now, Sleep: f.d.Sleep,
+		Reconnect: func(ctx context.Context) (remote.Runner, error) {
+			return f.d.Dial(ctx, f.l.env, f.o.AcceptNewHostKey)
+		},
 	})
 	if err != nil {
 		return "", err

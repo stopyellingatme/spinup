@@ -203,6 +203,11 @@ func (l *Lock) refreshPath() string {
 
 // Refresh extends this handle's lock without changing another deployment's owner record.
 func (l *Lock) Refresh(ctx context.Context) error {
+	return l.refresh(ctx, "")
+}
+
+// refresh can also name the selected redeploy directory in the owner record.
+func (l *Lock) refresh(ctx context.Context, release string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.released {
@@ -214,6 +219,9 @@ func (l *Lock) Refresh(ctx context.Context) error {
 	}
 	updated := l.Info
 	updated.Acquired = utcNow(l.now)
+	if release != "" {
+		updated.Release = release
+	}
 	data, err := json.Marshal(updated)
 	if err != nil {
 		return err
