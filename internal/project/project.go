@@ -58,6 +58,22 @@ type Config struct {
 	Monitoring      struct {
 		Profile      string
 		HeartbeatURL string `toml:"heartbeat_url"`
+		// AlertEmail receives Grafana email notifications.
+		AlertEmail string `toml:"alert_email"`
+		// SMTPHost identifies the SMTP relay address and port.
+		SMTPHost string `toml:"smtp_host"`
+		// SMTPUser identifies the SMTP relay user.
+		SMTPUser string `toml:"smtp_user"`
+		// SMTPFrom sets the sender of Grafana email notifications.
+		SMTPFrom string `toml:"smtp_from"`
+		// NtfyURL receives Grafana notifications through ntfy.
+		NtfyURL string `toml:"ntfy_url"`
+		// PrometheusRetention limits the age of stored metrics.
+		PrometheusRetention string `toml:"prometheus_retention"`
+		// PrometheusRetentionSize limits the disk space for stored metrics.
+		PrometheusRetentionSize string `toml:"prometheus_retention_size"`
+		// TempoRetention limits the age of stored traces.
+		TempoRetention string `toml:"tempo_retention"`
 	} `toml:"monitoring"`
 	Backups struct {
 		Retention string

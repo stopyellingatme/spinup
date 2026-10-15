@@ -107,6 +107,36 @@ func TestGoldenDeploy(t *testing.T) {
 	}
 }
 
+func TestGoldenDeployMonitoring(t *testing.T) {
+	t.Parallel()
+	testutil.GoldenSelected(t, "deploy")
+	for _, profile := range []string{"lite", "full", "none"} {
+		t.Run(profile, func(t *testing.T) {
+			t.Parallel()
+			fsys, err := renderDeploy(t, []string{"base", "api", "web", "deploy", "monitoring"}, map[string]any{
+				"app_name": "todo", "module": "example.com/todo", "modules": "ci,deploy,monitoring", "monitoring_profile": profile,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			compose := readDeployFile(t, fsys, "deploy/compose.yml")
+			want := 2
+			if profile == "none" {
+				want = 0
+			}
+			if got := strings.Count(compose, "OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318"); got != want {
+				t.Errorf("OTLP endpoints = %d, want %d", got, want)
+			}
+			for _, service := range []string{"api", "web"} {
+				if got := strings.Contains(compose, "OTEL_SERVICE_NAME: todo-"+service); got != (profile != "none") {
+					t.Errorf("service name %s present = %v", service, got)
+				}
+			}
+			checkDeployTree(t, fsys, true)
+		})
+	}
+}
+
 // checkDeployTree checks the contracts of ADR 0003 and ADR 0009 §6 that a golden diff does
 // not explain: the Compose security lint, the blue/green aliases, the routes, and the pins.
 func checkDeployTree(t *testing.T, fsys fs.FS, web bool) {

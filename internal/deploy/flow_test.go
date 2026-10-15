@@ -24,7 +24,7 @@ var allSteps = []string{
 	"preflight:done", "build:done",
 	"hooks:started", "hooks:done", "transport:started", "transport:done", "upload:started", "upload:done",
 	"edge:started", "edge:done", "migrate:started", "migrate:done", "switch:started", "switch:done",
-	"smoke:started", "smoke:done", "record:started", "record:done", "post:started", "post:done",
+	"smoke:started", "smoke:done", "record:started", "record:done", "monitoring:started", "monitoring:done", "post:started", "post:done",
 }
 
 // TestFlowSSHFirstDeploy runs a first deploy of an API-only app with the ssh transport.
@@ -71,8 +71,8 @@ func TestFlowSSHFirstDeploy(t *testing.T) {
 	x.journal(1)
 	x.expectRecord("", testRelease+"\n")
 	x.journal(1)
-	// post
-	x.journal(2)
+	// monitoring (skipped), then post
+	x.journal(4)
 	x.expectUnlockAndClose()
 
 	if err := x.run(); err != nil {
@@ -185,7 +185,7 @@ func TestFlowRegistrySecondDeploy(t *testing.T) {
 	x.ok("rm", "-rf", "--", testRoot+"/releases/"+pruned)
 	x.ok("docker", "image", "rm", "ghcr.io/acme/todo-api@sha256:old"+pruned)
 	x.journal(1)
-	x.journal(2)
+	x.journal(4)
 	x.expectUnlockAndClose()
 
 	if err := x.run(); err != nil {
@@ -329,7 +329,7 @@ func TestFlowResumeFromFailedStep(t *testing.T) {
 	x.journal(1)
 	x.expectRecord("", testRelease+"\n")
 	x.journal(1)
-	x.journal(2)
+	x.journal(4)
 	x.expectUnlockAndClose()
 
 	if err := x.run(); err != nil {
@@ -340,7 +340,7 @@ func TestFlowResumeFromFailedStep(t *testing.T) {
 	if len(x.built) != 0 || len(x.hookOpts) != 0 {
 		t.Fatalf("resume repeated done steps: build %v, hooks %v", x.built, x.hookOpts)
 	}
-	want := []string{"smoke:started", "smoke:done", "record:started", "record:done", "post:started", "post:done"}
+	want := []string{"smoke:started", "smoke:done", "record:started", "record:done", "monitoring:started", "monitoring:done", "post:started", "post:done"}
 	if got := x.journalEvents(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("journal = %v", got)
 	}
