@@ -155,3 +155,19 @@ func TestVersionRegisteredInMaintain(t *testing.T) {
 		t.Fatalf("c=%v err=%v", c, err)
 	}
 }
+
+func TestHelpHidesEmptyGroups(t *testing.T) {
+	t.Parallel()
+	code, out, _ := run(t, "--help")
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0", code)
+	}
+	if !strings.Contains(out, "\nMaintain\n") {
+		t.Errorf("help has no Maintain group:\n%s", out)
+	}
+	for _, empty := range []string{"\nDevelop\n", "\nData\n", "\nShip\n", "\nOperate\n"} {
+		if strings.Contains(out, empty) {
+			t.Errorf("help shows the empty group %q:\n%s", strings.TrimSpace(empty), out)
+		}
+	}
+}

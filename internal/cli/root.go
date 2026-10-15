@@ -112,19 +112,23 @@ func newRoot(app *App, in io.Reader, out, errOut io.Writer, entered *bool) *cobr
 	pf.BoolVar(&f.Verbose, "verbose", false, "write extra detail")
 	pf.BoolVar(&f.NoColor, "no-color", false, "turn off color")
 
-	for _, g := range groupOrder {
-		root.AddGroup(&cobra.Group{ID: string(g), Title: groupTitles[g]})
-	}
-
 	regMu.Lock()
 	regs := make([]registration, len(registry))
 	copy(regs, registry)
 	regMu.Unlock()
 	cmds := make([]*cobra.Command, 0, len(regs))
+	used := map[Group]bool{}
 	for _, r := range regs {
 		c := r.build(app)
 		c.GroupID = string(r.group)
 		cmds = append(cmds, c)
+		used[r.group] = true
+	}
+	// Add only the groups that have commands, so help shows no empty headings.
+	for _, g := range groupOrder {
+		if used[g] {
+			root.AddGroup(&cobra.Group{ID: string(g), Title: groupTitles[g]})
+		}
 	}
 	sort.SliceStable(cmds, func(i, j int) bool { return cmds[i].Name() < cmds[j].Name() })
 	root.AddCommand(cmds...)
