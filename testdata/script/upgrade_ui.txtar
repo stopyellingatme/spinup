@@ -50,6 +50,26 @@ exec spinup upgrade --continue --yes --no-verify
 grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
 cmp $WORK/original-button.svelte .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
 
+# An earlier plan conflict must preserve the UI choice across CLI processes.
+cd $WORK
+exec spinup new early --module example.com/early --non-interactive
+cd early
+exec sed 's/Package routes registers the application routes./Package routes registers my application routes./' api/internal/routes/routes.go
+cp stdout api/internal/routes/routes.go
+cp api/internal/routes/routes.go $WORK/resolved-routes.go
+exec git add .
+exec git commit -m 'Customize routes'
+exec sh -c 'spinup upgrade --ui --yes --no-verify; test $? -eq 3'
+stderr 'api/internal/routes/routes.go'
+grep '"ui": true' .spinup/upgrade.json
+cp $WORK/resolved-routes.go .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+exec spinup upgrade --continue --yes
+! stdout 'Skipped go fix'
+! stdout 'Registry 1.8.0 is available'
+grep 'upgraded-button' .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
+! exists .spinup/upgrade.json
+
 -- overlay/packs/web/pack.toml --
 name = "web"
 description = "SvelteKit 3 web app with Tailwind, shadcn-svelte, and a same-origin API client."
@@ -241,3 +261,25 @@ class = "managed"
 		{@render children?.()}
 	</button>
 {/if}
+
+-- overlay/packs/api/files/api/internal/routes/routes.go.tmpl --
+// Package routes registers the upgraded application routes.
+package routes
+
+import (
+ "net/http"
+
+ "github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Deps contains the dependencies for route handlers.
+type Deps struct {
+ DB *pgxpool.Pool
+}
+
+// Register adds generated routes and application routes to mux.
+func Register(mux *http.ServeMux, d Deps) {
+ registerGenerated(mux, d)
+
+ // Add your application routes here. Generators never edit this file.
+}
