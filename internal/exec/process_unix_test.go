@@ -33,8 +33,9 @@ func TestOSRunnerKillsGrandchildAfterParentExit(t *testing.T) {
 
 	result, err := (OSRunner{}).Run(context.Background(), Cmd{
 		Name:    "sh",
-		Args:    []string{"-c", "(sleep 1; echo survived) & echo hi"},
-		Timeout: 100 * time.Millisecond,
+		Args:    []string{"-c", "(sleep 3; echo survived) & echo hi"},
+		// Long enough for "echo hi" on a loaded machine, and well before the grandchild wakes.
+		Timeout: time.Second,
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Run() error = %v, want deadline exceeded", err)
