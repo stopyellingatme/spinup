@@ -1,0 +1,69 @@
+# Managed by spinup. Add extensions in a separate workflow file.
+name: Verify backups
+
+on:
+  schedule:
+    - cron: '31 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spinup-remote-${{ vars.SPINUP_ENVIRONMENT || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  backup-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ vars.SPINUP_ENVIRONMENT || 'staging' }}
+    env:
+      SPINUP_ENVIRONMENT: ${{ vars.SPINUP_ENVIRONMENT || 'staging' }}
+      SPINUP_APP: [[ quote .app_name ]]
+    steps:
+      - uses: [[ uses "actions/checkout" ]]
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-spinup
+      - name: Install the CI keys
+        shell: bash
+        env:
+          SPINUP_AGE_KEY: ${{ secrets.SPINUP_AGE_KEY }}
+          SPINUP_SSH_KEY: ${{ secrets.SPINUP_SSH_KEY }}
+          SPINUP_SSH_KNOWN_HOSTS: ${{ secrets.SPINUP_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          case "$SPINUP_ENVIRONMENT" in ''|*[!a-zA-Z0-9_-]*|[-_]*)
+            printf '%s\n' 'Cannot install keys: the environment name is invalid.' >&2
+            printf '%s\n' 'Try: use an environment name from spinup.toml.' >&2
+            exit 1
+            ;;
+          esac
+          if [ -z "$SPINUP_AGE_KEY" ] || [ -z "$SPINUP_SSH_KEY" ] || [ -z "$SPINUP_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' 'Cannot verify backups: a required environment secret is missing.' >&2
+            printf '%s\n' 'Try: configure SPINUP_AGE_KEY, SPINUP_SSH_KEY, and SPINUP_SSH_KNOWN_HOSTS.' >&2
+            exit 1
+          fi
+          umask 077
+          mkdir -p "$HOME/.config/spinup/keys" "$HOME/.ssh"
+          printf '%s\n' "$SPINUP_AGE_KEY" > "$HOME/.config/spinup/keys/$SPINUP_APP-$SPINUP_ENVIRONMENT.agekey"
+          printf '%s\n' "$SPINUP_SSH_KEY" > "$HOME/.ssh/spinup_ci"
+          printf '%s\n' "$SPINUP_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.config/spinup/keys/$SPINUP_APP-$SPINUP_ENVIRONMENT.agekey" "$HOME/.ssh/spinup_ci" "$HOME/.ssh/known_hosts"
+          printf 'Host *\n  IdentityFile ~/.ssh/spinup_ci\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  BatchMode yes\n' > "$RUNNER_TEMP/spinup-ssh.conf"
+          printf 'SPINUP_SSH_CONFIG=%s\n' "$RUNNER_TEMP/spinup-ssh.conf" >> "$GITHUB_ENV"
+      - name: Verify the latest backup
+        run: |
+          set -euo pipefail
+          export SPINUP_TOOLS_DIR="$RUNNER_TEMP/spinup/bin"
+          spinup tools install
+          spinup backup verify --env "$SPINUP_ENVIRONMENT"
+      - name: Remove the CI keys
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -d "$HOME/.config/spinup/keys" ]; then
+            find "$HOME/.config/spinup/keys" -maxdepth 1 -type f -name '*.agekey' -delete
+          fi
+          rm -f "$HOME/.ssh/spinup_ci" "$HOME/.ssh/known_hosts" "$RUNNER_TEMP/spinup-ssh.conf"

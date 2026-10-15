@@ -1,0 +1,66 @@
+# Managed by spinup. Add custom steps in a separate action.
+name: Set up spinup
+description: Install a checksum-verified spinup release on a Linux amd64 runner.
+inputs:
+  version:
+    description: Release version, latest, or empty to read cli_version from spinup.lock.
+    required: false
+    default: ""
+outputs:
+  version:
+    description: Installed release version without the v prefix.
+    value: ${{ steps.install.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        SPINUP_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        version="$SPINUP_VERSION"
+        if [[ -z "$version" ]]; then
+          version="$(jq -r '.cli_version // empty' spinup.lock)"
+        fi
+        if [[ "$version" == latest ]]; then
+          version="$(curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/stopyellingatme/spinup/releases/latest | jq -er '.tag_name')"
+        fi
+        version="${version#v}"
+        case "$version" in
+          dev|0.0.0-dev|*-alpha.*)
+            printf '%s\n' 'Cannot install a local development version of spinup in CI.' >&2
+            printf '%s\n' 'Try: generate or upgrade the app with a published spinup release.' >&2
+            exit 1
+            ;;
+        esac
+        if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+          printf '%s\n' 'Cannot install spinup: the release version is missing or invalid.' >&2
+          printf '%s\n' 'Try: supply a published version or repair cli_version in spinup.lock.' >&2
+          exit 1
+        fi
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != X64 ]]; then
+          printf '%s\n' 'Cannot install spinup: this action requires Linux amd64.' >&2
+          printf '%s\n' 'Try: use an ubuntu-latest runner.' >&2
+          exit 1
+        fi
+        work="$(mktemp -d "$RUNNER_TEMP/spinup-download.XXXXXX")"
+        trap 'rm -rf "$work"' EXIT
+        archive="spinup_${version}_linux_amd64.tar.gz"
+        base="https://github.com/stopyellingatme/spinup/releases/download/v${version}"
+        cd "$work"
+        curl --fail --silent --show-error --location "$base/$archive" --output "$archive"
+        curl --fail --silent --show-error --location "$base/checksums.txt" --output checksums.txt
+        # Require this archive explicitly. An unrelated checksum must not authorize extraction.
+        awk -v name="$archive" '$2 == name || $2 == "*" name { print; found = 1 } END { if (!found) exit 1 }' \
+          checksums.txt > selected-checksums.txt
+        sha256sum --check --ignore-missing selected-checksums.txt
+        tar -xzf "$archive" spinup
+        mkdir -p "$RUNNER_TEMP/spinup/bin"
+        install -m 0755 spinup "$RUNNER_TEMP/spinup/bin/spinup"
+        printf '%s\n' "$RUNNER_TEMP/spinup/bin" >> "$GITHUB_PATH"
+        printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"

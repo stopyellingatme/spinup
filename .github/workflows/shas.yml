@@ -1,0 +1,84 @@
+name: Verify action tag commits
+
+on:
+  schedule:
+    - cron: '37 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+      - name: Resolve tags and compare pinned commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/shas.go" <<'GO'
+          package main
+          import (
+            "encoding/json"
+            "fmt"
+            "net/http"
+            "net/url"
+            "os"
+            "sort"
+            "time"
+            "go.yaml.in/yaml/v3"
+          )
+          type object struct { Type string `json:"type"`; SHA string `json:"sha"` }
+          var client = &http.Client{Timeout: 30*time.Second}
+          func fetch(path string, target any) error {
+            req, err := http.NewRequest(http.MethodGet, "https://api.github.com/"+path, nil)
+            if err != nil { return err }
+            req.Header.Set("Authorization", "Bearer "+os.Getenv("GH_TOKEN"))
+            req.Header.Set("Accept", "application/vnd.github+json")
+            req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+            resp, err := client.Do(req)
+            if err != nil { return err }
+            defer resp.Body.Close()
+            if resp.StatusCode != http.StatusOK { return fmt.Errorf("%s: HTTP %d", path, resp.StatusCode) }
+            return json.NewDecoder(resp.Body).Decode(target)
+          }
+          func resolve(repo, tag string) (string, error) {
+            var ref struct { Object object `json:"object"` }
+            if err := fetch("repos/"+repo+"/git/ref/tags/"+url.PathEscape(tag), &ref); err != nil { return "", err }
+            obj := ref.Object
+            for depth := 0; obj.Type == "tag" && depth < 16; depth++ {
+              if err := fetch("repos/"+repo+"/git/tags/"+obj.SHA, &ref); err != nil { return "", err }
+              obj = ref.Object
+            }
+            if obj.Type != "commit" { return "", fmt.Errorf("%s@%s did not resolve to a commit", repo, tag) }
+            return obj.SHA, nil
+          }
+          func main() {
+            data, err := os.ReadFile("internal/stackversions/stackversions.yaml")
+            if err != nil { panic(err) }
+            var pins struct { Actions map[string]struct { Tag, SHA string } `yaml:"actions"` }
+            if err := yaml.Unmarshal(data, &pins); err != nil { panic(err) }
+            names := make([]string, 0, len(pins.Actions))
+            for name := range pins.Actions { names = append(names, name) }
+            sort.Strings(names)
+            failed := len(names) == 0
+            for _, name := range names {
+              pin := pins.Actions[name]
+              actual, err := resolve(name, pin.Tag)
+              if err != nil || actual != pin.SHA {
+                failed = true
+                fmt.Fprintf(os.Stderr, "%s@%s: pinned %s, tag commit %s, error %v\n", name, pin.Tag, pin.SHA, actual, err)
+              } else { fmt.Printf("%s@%s: %s OK\n", name, pin.Tag, actual) }
+            }
+            if failed { os.Exit(1) }
+          }
+          GO
+          go run "$RUNNER_TEMP/shas.go"

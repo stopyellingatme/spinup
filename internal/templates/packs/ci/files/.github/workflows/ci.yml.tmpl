@@ -45,7 +45,62 @@ jobs:
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
-      - run: go mod verify
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test -race ./...
+      - run: |
+          set -euo pipefail
+          go mod verify
+          go build ./...
+          go vet ./...
+          go test -race ./...
+[[- if index . "shadcn_registry" ]]
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: web
+    steps:
+      - uses: [[ uses "actions/checkout" ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses "actions/setup-node" ]]
+        with:
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+      - uses: [[ uses "pnpm/action-setup" ]]
+        with:
+          package_json_file: web/package.json
+      - run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm check
+          # A new app has no unit tests. Playwright runs in its own workflow.
+          pnpm test --passWithNoTests
+[[- end ]]
+
+  spinup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: [[ uses "actions/checkout" ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses "actions/setup-go" ]]
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+[[- if index . "shadcn_registry" ]]
+      - uses: [[ uses "actions/setup-node" ]]
+        with:
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+      - uses: [[ uses "pnpm/action-setup" ]]
+        with:
+          package_json_file: web/package.json
+[[- end ]]
+      - uses: ./.github/actions/setup-spinup
+      - run: |
+          set -euo pipefail
+          cp .env.example .env
+          chmod 0600 .env
+          spinup check --allow-behind
+          spinup doctor

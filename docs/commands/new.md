@@ -80,7 +80,9 @@ $ spinup new shop --module example.com/shop --no-git --non-interactive
 ...
 $ ls shop/web
 components.json
+e2e
 package.json
+playwright.config.ts
 pnpm-lock.yaml
 pnpm-workspace.yaml
 src

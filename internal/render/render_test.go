@@ -82,7 +82,7 @@ func TestRenderErrors(t *testing.T) {
 		{name: "syntax", body: `[[ invalid ]]`, failure: "parse"},
 		{name: "indent negative", body: `[[ indent -1 "text" ]]`, failure: "negative"},
 		{name: "join type", body: `[[ join "," "text" ]]`, failure: "[]string"},
-		{name: "has type", body: `[[ has "x" "text" ]]`, failure: "[]string"},
+		{name: "has type", body: `[[ has "x" "text" ]]`, failure: "want a list"},
 		{name: "go format", body: `package broken func`, output: "bad.go", failure: "format"},
 		{name: "path traversal", body: "text", output: `[[ .unsafe ]]`, failure: "path"},
 		{name: "path missing", body: "text", output: `[[ .missing ]]`, failure: "missing"},

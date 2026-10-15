@@ -1,0 +1,45 @@
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --modules ci --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup ci verify
+exec spinup ci verify --json
+stdout '"findings":\[\]'
+cp spinup.lock $WORK/lock.before
+exec spinup ci generate --dry-run
+stdout 'unchanged .github/workflows/ci.yml'
+cmp spinup.lock $WORK/lock.before
+exec spinup ci generate
+cmp spinup.lock $WORK/lock.before
+
+# A user edit fails verification and refuses regeneration without --force.
+cp $WORK/unpinned.yml .github/workflows/ci.yml
+! exec spinup ci verify
+stdout '40-character SHA'
+! exec spinup ci generate
+stderr 'Try:.*--force'
+exec spinup ci generate --diff --force
+stdout 'actions/checkout@v4'
+cmp .github/workflows/ci.yml $WORK/unpinned.yml
+exec spinup ci generate --force
+exec spinup ci verify
+cmp spinup.lock $WORK/lock.before
+
+# Later user edits still conflict after regeneration.
+cp $WORK/unpinned.yml .github/workflows/ci.yml
+! exec spinup ci generate
+stderr 'Try:.*--force'
+exec spinup ci generate --force
+exec spinup ci verify --json
+stdout '"findings":\[\]'
+
+-- unpinned.yml --
+name: Unpinned
+on: push
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4

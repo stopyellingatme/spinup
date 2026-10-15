@@ -122,3 +122,8 @@ wait_for "$origin/healthz" "the web app"
 
 echo "==> run Playwright"
 E2E_BASE_URL="$origin" pnpm exec playwright test --config e2e/playwright.config.ts "$@"
+
+# The generated app's own smoke test (web/playwright.config.ts, web/e2e/smoke.spec.ts), the
+# suite that its e2e.yml runs in CI. Its config reads PUBLIC_ORIGIN.
+echo "==> run the app's own Playwright smoke test"
+PUBLIC_ORIGIN="$origin" pnpm exec playwright test e2e/smoke.spec.ts

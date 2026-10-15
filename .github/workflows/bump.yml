@@ -1,0 +1,90 @@
+name: Report stack updates
+
+on:
+  schedule:
+    - cron: '17 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      # bump-stack.sh writes pack sources and has no read-only mode.
+      - name: Report available Go and npm updates
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/report.go" <<'GO'
+          package main
+          import (
+            "encoding/json"
+            "fmt"
+            "os"
+            "os/exec"
+            "sort"
+            "strings"
+            "go.yaml.in/yaml/v3"
+          )
+          func main() {
+            if err := report(); err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+          }
+          func report() error {
+            data, err := os.ReadFile("internal/stackversions/stackversions.yaml")
+            if err != nil { return err }
+            var pins struct {
+              Go map[string]string `yaml:"go_modules"`
+              NPM map[string]string `yaml:"npm"`
+            }
+            if err := yaml.Unmarshal(data, &pins); err != nil { return err }
+            out, err := os.OpenFile(os.Getenv("GITHUB_STEP_SUMMARY"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+            if err != nil { return err }
+            defer out.Close()
+            fmt.Fprintln(out, "# Available stack updates\n\n| Package | Pinned | Available |\n|---|---|---|")
+            failed := false
+            for _, ecosystem := range []string{"go", "npm"} {
+              versions := pins.Go
+              if ecosystem == "npm" { versions = pins.NPM }
+              names := make([]string, 0, len(versions))
+              for name := range versions { names = append(names, name) }
+              sort.Strings(names)
+              for _, name := range names {
+                pinned := versions[name]
+                var cmd *exec.Cmd
+                if ecosystem == "go" {
+                  cmd = exec.Command("go", "list", "-m", "-u", "-json", name+"@"+pinned)
+                  cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=auto", "GOPROXY=https://proxy.golang.org,direct", "GOFLAGS=")
+                } else { cmd = exec.Command("npm", "view", name, "version", "--json") }
+                result, err := cmd.Output()
+                available := ""
+                if err == nil && ecosystem == "go" {
+                  var m struct { Version string; Update *struct { Version string } }
+                  err = json.Unmarshal(result, &m)
+                  available = m.Version
+                  if m.Update != nil { available = m.Update.Version }
+                } else if err == nil { err = json.Unmarshal(result, &available) }
+                if err != nil {
+                  failed = true
+                  available = "query failed (see job log)"
+                  fmt.Fprintf(os.Stderr, "%s %s: %v\n", ecosystem, name, err)
+                }
+                available = strings.ReplaceAll(strings.ReplaceAll(available, "|", "&#124;"), "\n", " ")
+                fmt.Fprintf(out, "| `%s` | `%s` | %s |\n", name, pinned, available)
+              }
+            }
+            if failed { return fmt.Errorf("one or more registry queries failed") }
+            return nil
+          }
+          GO
+          go run "$RUNNER_TEMP/report.go"

@@ -24,7 +24,7 @@ func functions(stack *stackversions.Stack) template.FuncMap {
 		"join":    func(separator string, values []string) string { return strings.Join(values, separator) },
 		"indent":  indent,
 		"default": defaultValue,
-		"has":     func(value string, values []string) bool { return slices.Contains(values, value) },
+		"has":     has,
 		"image": func(key string) (string, error) {
 			if stack == nil {
 				return "", fmt.Errorf("image %q: stack versions are missing", key)
@@ -145,4 +145,23 @@ func defaultValue(fallback, value any) any {
 		}
 	}
 	return value
+}
+
+// has reports whether values contains value. Answers decoded from spinup.lock hold lists as
+// []any, and validated answers hold []string, so both are accepted.
+func has(value string, values any) (bool, error) {
+	switch list := values.(type) {
+	case nil:
+		return false, nil
+	case []string:
+		return slices.Contains(list, value), nil
+	case []any:
+		for _, item := range list {
+			if item == value {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	return false, fmt.Errorf("has %q: want a list, got %T", value, values)
 }
