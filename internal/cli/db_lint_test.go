@@ -42,6 +42,17 @@ func TestDBLintNamedFile(t *testing.T) {
 	}
 }
 
+func TestDBLintNamedFileFlagsIndexOnEarlierTable(t *testing.T) {
+	t.Parallel()
+	root := lintProject(t)
+	writeLintMigration(t, root, "00001_create.sql", "CREATE TABLE todos (id int);")
+	path := writeLintMigration(t, root, "00002_index.sql", "CREATE INDEX todos_id_idx ON todos (id);")
+	code, out, errOut := runInDir(t, root, "db", "lint", path)
+	if code != ui.ExitError || !strings.Contains(out, "index-not-concurrent") || !strings.Contains(errOut, "Try:") {
+		t.Fatalf("code=%d out=%q stderr=%q", code, out, errOut)
+	}
+}
+
 func lintProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
