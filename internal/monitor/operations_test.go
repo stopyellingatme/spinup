@@ -224,15 +224,20 @@ func TestTunnelArguments(t *testing.T) {
 
 func TestAuthenticatedFailure(t *testing.T) {
 	t.Parallel()
-	f := &remote.Fake{}
-	f.Expect("docker", "ps").Return("abc123", "", 0)
-	f.Expect("sh", "-c").Fail(errors.New("password-must-not-appear"))
-	c := client{vm: f, app: "todo"}
-	_, err := c.api(context.Background(), "grafana", "GET", "/api/search", nil)
-	if err == nil || strings.Contains(err.Error(), "password-must-not-appear") {
-		t.Fatal(err)
+	for _, service := range []string{"grafana", "loki", "tempo"} {
+		t.Run(service, func(t *testing.T) {
+			t.Parallel()
+			f := &remote.Fake{}
+			f.Expect("docker", "ps").Return("abc123", "", 0)
+			f.Expect("sh", "-c").Fail(errors.New("password-must-not-appear"))
+			c := client{vm: f, app: "todo"}
+			_, err := c.api(context.Background(), service, "GET", "/api/search", nil)
+			if err == nil || strings.Contains(err.Error(), "password-must-not-appear") {
+				t.Fatal(err)
+			}
+			f.AssertDone(t)
+		})
 	}
-	f.AssertDone(t)
 }
 
 func TestRunProject(t *testing.T) {
@@ -324,7 +329,7 @@ func TestSpanTree(t *testing.T) {
 	t.Parallel()
 	f := &remote.Fake{}
 	f.Expect("docker", "ps").Return("abc123", "", 0)
-	f.Expect("docker", "exec").Return(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"api"}}]},"scopeSpans":[{"spans":[{"spanId":"child","parentSpanId":"parent","name":"query","startTimeUnixNano":"1000000","endTimeUnixNano":"2000000"},{"spanId":"parent","name":"GET /","startTimeUnixNano":"0","endTimeUnixNano":"3000000"}]}]}]}`, "", 0)
+	f.Expect("sh", "-c").Return(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"api"}}]},"scopeSpans":[{"spans":[{"spanId":"child","parentSpanId":"parent","name":"query","startTimeUnixNano":"1000000","endTimeUnixNano":"2000000"},{"spanId":"parent","name":"GET /","startTimeUnixNano":"0","endTimeUnixNano":"3000000"}]}]}]}`, "", 0)
 	var out bytes.Buffer
 	c := client{vm: f, app: "todo", profile: "full", out: &out}
 	if err := c.trace(context.Background(), strings.Repeat("a", 32)); err != nil {
@@ -343,11 +348,7 @@ func TestMalformedResponses(t *testing.T) {
 			t.Parallel()
 			f := &remote.Fake{}
 			f.Expect("docker", "ps").Return("abc123", "", 0)
-			if action == "logs" || action == "trace" {
-				f.Expect("docker", "exec").Return("not JSON", "", 0)
-			} else {
-				f.Expect("sh", "-c").Return("not JSON", "", 0)
-			}
+			f.Expect("sh", "-c").Return("not JSON", "", 0)
 			var out bytes.Buffer
 			c := client{vm: f, app: "todo", profile: "full", root: t.TempDir(), out: &out, now: func() time.Time { return time.Unix(1, 0) }}
 			err := c.run(context.Background(), Options{Action: action, TraceID: strings.Repeat("a", 32), Matcher: "alertname=Down", For: "1h"})

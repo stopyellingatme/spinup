@@ -4,11 +4,14 @@ package alert
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"go.yaml.in/yaml/v3"
@@ -36,7 +39,7 @@ func flags(fs *pflag.FlagSet) {
 	fs.String("summary", "", "short alert summary")
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 1 {
 		return nil, fmt.Errorf("expected one alert name\nTry: spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) > 0'")
 	}
@@ -90,7 +93,10 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		Next:  []string{"spinup monitor alerts"},
 		Edits: []string{customRulesPath},
 	}
-	if _, err := exec.LookPath("promtool"); err == nil {
+	if tool, err := exec.LookPath("promtool"); err == nil {
+		if err := validateRules(ctx, tool, data); err != nil {
+			return nil, err
+		}
 		out.Commands = []gen.Command{{Dir: ".", Argv: []string{"promtool", "check", "rules", customRulesPath}}}
 	} else {
 		out.Next = append(out.Next, "promtool is unavailable; skipped alert validation")
@@ -109,8 +115,8 @@ func inputRule(fs *pflag.FlagSet) (*yaml.Node, error) {
 	forValue, _ := fs.GetString("for")
 	severity, _ := fs.GetString("severity")
 	summary, _ := fs.GetString("summary")
-	if strings.TrimSpace(forValue) == "" {
-		return nil, fmt.Errorf("--for must not be empty\nTry: pass --for 5m")
+	if !validDuration(forValue) {
+		return nil, fmt.Errorf("invalid --for duration %q: use a Prometheus duration\nTry: pass --for 5m", forValue)
 	}
 	if severity != "warning" && severity != "critical" {
 		return nil, fmt.Errorf("invalid severity %q: use warning or critical\nTry: pass --severity warning", severity)
@@ -123,6 +129,49 @@ func inputRule(fs *pflag.FlagSet) (*yaml.Node, error) {
 		"labels":      mapping(map[string]*yaml.Node{"severity": scalar(severity)}),
 		"annotations": mapping(map[string]*yaml.Node{"summary": scalar(summary)}),
 	}), nil
+}
+
+// Prometheus durations use integer units, from largest to smallest, at most once.
+var durationPattern = regexp.MustCompile(`^(?:([0-9]+)y)?(?:([0-9]+)w)?(?:([0-9]+)d)?(?:([0-9]+)h)?(?:([0-9]+)m)?(?:([0-9]+)s)?(?:([0-9]+)ms)?$`)
+
+func validDuration(value string) bool {
+	if value == "0" {
+		return true
+	}
+	parts := durationPattern.FindStringSubmatch(value)
+	if value == "" || parts == nil {
+		return false
+	}
+	units := [...]time.Duration{365 * 24 * time.Hour, 7 * 24 * time.Hour, 24 * time.Hour, time.Hour, time.Minute, time.Second, time.Millisecond}
+	var total uint64
+	for i, part := range parts[1:] {
+		if part == "" {
+			continue
+		}
+		n, err := strconv.ParseUint(part, 10, 64)
+		unit := uint64(units[i])
+		if err != nil || n > (math.MaxInt64-total)/unit {
+			return false
+		}
+		total += n * unit
+	}
+	return true
+}
+
+func validateRules(ctx context.Context, tool string, data []byte) error {
+	dir, err := os.MkdirTemp("", "spinup-alert-*")
+	if err != nil {
+		return fmt.Errorf("create temporary alert validation directory: %w\nTry: check the temporary directory permissions", err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	path := filepath.Join(dir, "custom.yml")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("write temporary alert rules: %w\nTry: check the temporary directory permissions", err)
+	}
+	if _, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: tool, Args: []string{"check", "rules", path}, Timeout: 30 * time.Second}); err != nil {
+		return fmt.Errorf("validate %s before writing: %w\nTry: correct --expr, --for, or the existing alert rules", customRulesPath, err)
+	}
+	return nil
 }
 
 func ensureGroups(doc *yaml.Node) (*yaml.Node, error) {

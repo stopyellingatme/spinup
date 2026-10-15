@@ -47,12 +47,13 @@ $ spinup monitor trace --env production 0123456789abcdef0123456789abcdef
 ```
 
 `status` reports the profile, container health, and volume sizes.
-`logs` prints up to 1000 lines with timestamps, in time order.
+`logs` selects the newest 1000 lines within the interval and prints them with timestamps, in time order.
 The default interval is one hour.
 `--query` replaces the `--service` filter with a LogQL query.
 The `--service` filter uses the `service_name` label.
 `trace` prints a span tree with each service, span name, and duration.
 Traces require the `full` profile.
+Both commands query the datasources through Grafana in the Grafana container.
 
 <!-- doctest: skip -->
 ```console

@@ -12,6 +12,18 @@ exec go run $WORK/checkjson.go monitoring/grafana/dashboards/custom/service-heal
 grep '"uid": "spinup-service-health"' monitoring/grafana/dashboards/custom/service-health.json
 grep '"uid": "prometheus"' monitoring/grafana/dashboards/custom/service-health.json
 
+# Invalid rules must leave both the seed file and the lock unchanged.
+cp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cp spinup.lock $WORK/lock-before.json
+! exec spinup g alert BadDuration --expr 'up == 0' --for banana
+stderr 'invalid --for duration'
+cmp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cmp spinup.lock $WORK/lock-before.json
+! exec spinup g alert BadExpression --expr 'up =='
+stderr 'validate monitoring/alerts/custom.yml before writing'
+cmp monitoring/alerts/custom.yml $WORK/custom-before.yml
+cmp spinup.lock $WORK/lock-before.json
+
 exec spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) > 0' --for 5m --severity critical --summary 'Too many server errors'
 stdout '^Created 0, updated 1 files$'
 grep 'alert: HighErrors' monitoring/alerts/custom.yml
