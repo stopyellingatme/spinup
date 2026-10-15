@@ -1,0 +1,19 @@
+Todo:
+  type: object
+  required: [id, title, done]
+  properties:
+    id:
+      type: integer
+      format: int64
+    title:
+      type: string
+    done:
+      type: boolean
+CreateTodo:
+  type: object
+  required: [title]
+  properties:
+    title:
+      type: string
+    done:
+      type: boolean
