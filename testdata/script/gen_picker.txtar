@@ -1,0 +1,12 @@
+# The picker never prompts without a terminal. Kinds depend on linked generators.
+! exec spinup g
+stdout 'Available generators:'
+stderr 'Try: spinup g <kind> --help'
+
+exec spinup g --help
+stdout 'Generate application files'
+stdout 'generate'
+
+! exec spinup g nope
+stderr 'nope'
+stderr 'Try:'
