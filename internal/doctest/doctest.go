@@ -321,7 +321,8 @@ func commandEnv(env Env, home string) []string {
 	if inherited := os.Getenv("PATH"); inherited != "" {
 		path += string(os.PathListSeparator) + inherited
 	}
-	return append(values, "PATH="+path, "HOME="+home, "SPINUP_NO_UPDATE_CHECK=1", "NO_COLOR=1")
+	// LC_ALL=C keeps sort order and messages the same on every machine.
+	return append(values, "PATH="+path, "HOME="+home, "SPINUP_NO_UPDATE_CHECK=1", "NO_COLOR=1", "LC_ALL=C")
 }
 
 func cdDirectory(command, current string) (string, bool) {

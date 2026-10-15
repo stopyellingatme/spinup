@@ -34,7 +34,7 @@ The M1 units run in parallel. These decisions fix the contracts between them.
 - A line that starts with `$ ` is a command. The lines after it, up to the next command, are the expected output (stdout and stderr together).
 - A line `...` in the expected output matches zero or more lines. Trailing spaces are ignored.
 - A command runs with `bash -c` in the current directory of the page. A command of the exact form `cd <dir>` changes that directory for the later commands on the same page.
-- Each page starts in a new temporary directory. `spinup` (built from the repository) is on `PATH`. `HOME` is the temporary directory. `SPINUP_NO_UPDATE_CHECK=1` and `NO_COLOR=1` are set.
+- Each page starts in a new temporary directory. `spinup` (built from the repository) is on `PATH`. `HOME` is the temporary directory. `SPINUP_NO_UPDATE_CHECK=1`, `NO_COLOR=1`, and `LC_ALL=C` are set.
 - A command must exit 0, unless the last expected line is `[exit N]`. Then it must exit N.
 - `<!-- doctest: skip -->` on the line before a block skips the block.
 - `<!-- doctest: requires-env NAME -->` on the line before a block skips the block when the environment variable `NAME` is empty.
