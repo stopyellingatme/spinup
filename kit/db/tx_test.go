@@ -3,7 +3,9 @@ package db_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -75,6 +77,84 @@ func TestInTx(t *testing.T) {
 			// The pool must have no connection stuck in a transaction.
 			if st := pool.Stat(); st.AcquiredConns() != 0 {
 				t.Errorf("acquired connections = %d, want 0", st.AcquiredConns())
+			}
+		})
+	}
+}
+
+func TestInTxGoexit(t *testing.T) {
+	t.Parallel()
+	for _, canceled := range []bool{false, true} {
+		name := "active context"
+		if canceled {
+			name = "canceled context"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			pool := testkit.DB(t)
+			if _, err := pool.Exec(ctx, "CREATE TABLE items (id int PRIMARY KEY)"); err != nil {
+				t.Fatal(err)
+			}
+			transactions := make(chan pgx.Tx, 1)
+			// Release a leaked transaction so a regression cannot block testkit cleanup.
+			t.Cleanup(func() {
+				select {
+				case tx := <-transactions:
+					cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 3*time.Second)
+					defer cleanupCancel()
+					_ = tx.Rollback(cleanupCtx)
+				default:
+				}
+			})
+			txCtx, txCancel := context.WithCancel(ctx)
+			defer txCancel()
+			exited := make(chan struct{})
+			returned := make(chan error, 1)
+			go func() {
+				defer close(exited)
+				returned <- db.InTx(txCtx, pool, func(tx pgx.Tx) error {
+					transactions <- tx
+					if _, err := tx.Exec(txCtx, "INSERT INTO items VALUES (1)"); err != nil {
+						return err
+					}
+					if canceled {
+						txCancel()
+					}
+					runtime.Goexit()
+					return nil
+				})
+			}()
+			select {
+			case <-exited:
+			case <-ctx.Done():
+				t.Fatal("transaction goroutine did not exit")
+			}
+			select {
+			case err := <-returned:
+				t.Fatalf("InTx returned instead of exiting: %v", err)
+			default:
+			}
+			connString := pool.Config().ConnString()
+			closed := make(chan struct{})
+			go func() { pool.Close(); close(closed) }()
+			select {
+			case <-closed:
+			case <-time.After(3 * time.Second):
+				t.Fatal("pool.Close blocked after runtime.Goexit")
+			}
+			conn, err := pgx.Connect(ctx, connString)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+			var count int
+			if err := conn.QueryRow(ctx, "SELECT count(*) FROM items").Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatalf("rows after runtime.Goexit = %d, want 0", count)
 			}
 		})
 	}

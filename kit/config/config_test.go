@@ -148,3 +148,47 @@ func TestSecretNewline(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadEnvironmentOverridesDotenvSecret(t *testing.T) {
+	// Environment and working directory are process-wide.
+	for _, tc := range []struct {
+		name       string
+		shellKey   string
+		shellValue string
+		dotenv     string
+		want       string
+	}{
+		{"shell file overrides dotenv value", "SPINUP_TEST_SECRET_FILE", "secret", "SPINUP_TEST_SECRET=dotenv", "from-file"},
+		{"shell value overrides dotenv file", "SPINUP_TEST_SECRET", "from-shell", "SPINUP_TEST_SECRET_FILE=missing", "from-shell"},
+		{"shell value overrides dotenv value", "SPINUP_TEST_SECRET", "from-shell", "SPINUP_TEST_SECRET=dotenv", "from-shell"},
+		{"shell file overrides dotenv file", "SPINUP_TEST_SECRET_FILE", "secret", "SPINUP_TEST_SECRET_FILE=missing", "from-file"},
+		{"empty shell value overrides dotenv file", "SPINUP_TEST_SECRET", "", "SPINUP_TEST_SECRET_FILE=missing", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			t.Setenv("SPINUP_ENV", "dev")
+			for _, key := range []string{"SPINUP_TEST_SECRET", "SPINUP_TEST_SECRET_FILE"} {
+				t.Setenv(key, "")
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv(tc.shellKey, tc.shellValue)
+			if err := os.WriteFile("secret", []byte("from-file\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(".env", []byte(tc.dotenv+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var dst struct {
+				Secret string `env:"SPINUP_TEST_SECRET"`
+			}
+			if err := Load(&dst); err != nil {
+				t.Fatal(err)
+			}
+			if dst.Secret != tc.want {
+				t.Fatalf("Secret = %q, want %q", dst.Secret, tc.want)
+			}
+		})
+	}
+}

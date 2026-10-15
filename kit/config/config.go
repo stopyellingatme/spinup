@@ -32,8 +32,8 @@ type Base struct {
 func (b Base) Behavior(v int) bool { return b.BehaviorVersion >= v }
 
 // Load fills dst from the environment. In development, it also reads ./.env,
-// or ../.env when ./.env is absent. Existing environment variables take precedence.
-// Load does not modify the process environment.
+// or ../.env when ./.env is absent. If the environment sets X or X_FILE,
+// Load ignores both forms in .env. Load does not modify the process environment.
 func Load(dst any) error {
 	values := map[string]string{}
 	if env := os.Getenv("SPINUP_ENV"); env == "" || env == "dev" {
@@ -46,6 +46,14 @@ func Load(dst any) error {
 	return LoadFrom(dst, func(key string) (string, bool) {
 		if value, ok := os.LookupEnv(key); ok {
 			return value, true
+		}
+		// The environment takes precedence across both forms of a setting.
+		other := key + "_FILE"
+		if strings.HasSuffix(key, "_FILE") {
+			other = strings.TrimSuffix(key, "_FILE")
+		}
+		if _, ok := os.LookupEnv(other); ok {
+			return "", false
 		}
 		value, ok := values[key]
 		return value, ok

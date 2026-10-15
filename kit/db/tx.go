@@ -10,28 +10,32 @@ import (
 )
 
 // InTx runs fn in a transaction. It commits when fn returns nil. It rolls back
-// when fn returns an error or panics. After a panic it rolls back and then
-// panics again with the same value.
-func InTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+// when fn returns an error, panics, or calls runtime.Goexit.
+// After a panic, it rolls back and panics again with the same value.
+func InTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) (err error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("db: begin transaction: %w", err)
 	}
+	committed := false
 	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(context.WithoutCancel(ctx))
+		p := recover()
+		if !committed {
+			rbErr := tx.Rollback(context.WithoutCancel(ctx))
+			if rbErr != nil && !errors.Is(rbErr, pgx.ErrTxClosed) {
+				err = errors.Join(err, fmt.Errorf("db: roll back transaction: %w", rbErr))
+			}
+		}
+		if p != nil {
 			panic(p)
 		}
 	}()
 	if err := fn(tx); err != nil {
-		rbErr := tx.Rollback(context.WithoutCancel(ctx))
-		if rbErr != nil && !errors.Is(rbErr, pgx.ErrTxClosed) {
-			return errors.Join(err, fmt.Errorf("db: roll back transaction: %w", rbErr))
-		}
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("db: commit transaction: %w", err)
 	}
+	committed = true
 	return nil
 }
