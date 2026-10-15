@@ -181,7 +181,11 @@ func (w *WALG) inPlace(ctx context.Context, b backup.Info, t backup.Target) (err
 		return err
 	}
 	// Keep the previous data. Refuse another replacement until the operator removes it.
-	script := SecretLoader + `[ ! -e "$PGDATA.spinup-before-restore" ] && [ ! -L "$PGDATA" ]
+	script := SecretLoader + `if [ -e "$PGDATA.spinup-before-restore" ] || [ -L "$PGDATA.spinup-before-restore" ] || [ -L "$PGDATA" ]; then
+ echo 'WAL-G restore refused: retained data already exists or PGDATA is a symbolic link.' >&2
+ echo 'Try: inspect PGDATA and the retained data before another in-place restore.' >&2
+ exit 1
+fi
 mv "$PGDATA" "$PGDATA.spinup-before-restore"
 mkdir -m 0700 "$PGDATA"
 ` + recoveryScript

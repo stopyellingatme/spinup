@@ -44,9 +44,12 @@ const initScript = pathGuard + `user=$0
 old=$1; new=$2; shift 2
 check_path "$old"
 check_path "$new"
+check_path "$new.spinup-upgrade"
 test -f "/pg/$old/PG_VERSION"
 test ! -e "/pg/$new"
 mkdir -p "/pg/${new%/*}"
+# Reserve ownership outside PGDATA, which initdb requires to be empty.
+(set -C; : > "/pg/$new.spinup-upgrade")
 mkdir -m 0700 "/pg/$new"
 chown "$user" "/pg/${new%/*}" "/pg/$new"
 exec gosu "$user" "$@"`

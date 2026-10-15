@@ -133,7 +133,14 @@ func TestUpgradeOrderAndFailures(t *testing.T) {
 			check := f.Expect("docker", "run", "--rm")
 			if stage == "check" {
 				check.Fail(errors.New("extension missing"))
+				f.Expect("docker", "run", "--rm")           // remove the owned target directory
+				f.Expect("docker", "compose", "-p", "demo") // restart postgres
+				f.Expect("cat", release+"/release.json").Return(`{"color":"blue"}`, "", 0)
+				f.Expect("docker", "compose", "-p", "demo-blue") // restart live color
+				f.Expect("docker", "rm", "demo-pg-recovery-17-11")
+				f.Expect("sh", "-ec") // release recovery directory
 			} else {
+				f.ExpectUpload(op + "/rollback.sh") // refuse recovery only at the link boundary
 				link := f.Expect("docker", "run", "--rm")
 				if stage == "link" {
 					link.Fail(errors.New("link failed"))
@@ -147,15 +154,22 @@ func TestUpgradeOrderAndFailures(t *testing.T) {
 				urls = append(urls, url)
 				return 200, []byte(`{"version":"abcdef123456"}`), nil
 			}})
-			if stage == "success" {
+			switch stage {
+			case "success":
 				if err != nil {
 					t.Fatal(err)
 				}
 				if !slices.Equal(urls, []string{"https://example.com/healthz", "https://example.com/ready", "https://example.com/version"}) {
 					t.Fatal(urls)
 				}
-			} else if err == nil || !strings.Contains(err.Error(), "spinup backup restore") || !strings.Contains(err.Error(), "--into new") {
-				t.Fatalf("got %v", err)
+			case "check":
+				if err == nil || !strings.Contains(err.Error(), "extension missing") || !strings.Contains(err.Error(), "Try:") || !strings.Contains(out.String(), "Restarted the original PostgreSQL cluster and the live color") || strings.Contains(out.String(), "Never start the old cluster") || strings.Contains(out.String(), "Recovery instructions:") {
+					t.Fatalf("got %v, output %s", err, out)
+				}
+			default:
+				if err == nil || !strings.Contains(err.Error(), "spinup backup restore") || !strings.Contains(err.Error(), "--into new") {
+					t.Fatalf("got %v", err)
+				}
 			}
 			f.AssertDone(t)
 			var checks, links int
@@ -170,25 +184,18 @@ func TestUpgradeOrderAndFailures(t *testing.T) {
 						t.Fatal(c.Argv)
 					}
 				}
-				if stage == "check" && (slices.Contains(c.Argv, "build") && slices.Contains(c.Argv, "postgres") || slices.Contains(c.Argv, "rm")) {
+				if stage == "check" && (slices.Contains(c.Argv, "build") && slices.Contains(c.Argv, "postgres") || slices.Contains(c.Argv, "rm") && slices.Contains(c.Argv, "old-pg")) {
 					t.Fatal("check failure changed the service", c.Argv)
 				}
 			}
 			if checks != 1 || (stage == "check" && links != 0) || (stage != "check" && links != 1) {
 				t.Fatalf("checks %d links %d", checks, links)
 			}
+			var rollback []byte
 			for _, u := range f.Uploads() {
 				switch u.Path {
 				case op + "/rollback.sh":
-					script := filepath.Join(t.TempDir(), "rollback.sh")
-					if err = os.WriteFile(script, u.Data, 0700); err != nil {
-						t.Fatal(err)
-					}
-					// The guard executes before any VM command, even if a new server has started.
-					r, e := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "/bin/sh", Args: []string{script}, Env: []string{"PATH=/nonexistent"}})
-					if e == nil || !bytes.Contains(r.Stderr, []byte("Never start the old cluster")) || !bytes.Contains(r.Stderr, []byte("--label")) {
-						t.Fatalf("recovery ran: %s, %v", r.Stderr, e)
-					}
+					rollback = u.Data
 				case release + "/compose.edge.yml":
 					var doc map[string]any
 					if err = yaml.Unmarshal(u.Data, &doc); err != nil {
@@ -204,7 +211,21 @@ func TestUpgradeOrderAndFailures(t *testing.T) {
 					}
 				}
 			}
-			if stage != "success" && !strings.Contains(out.String(), "Never start the old cluster") {
+			if stage == "check" {
+				if bytes.Contains(rollback, []byte("Never start the old cluster")) {
+					t.Fatalf("early recovery refuses a safe restart: %s", rollback)
+				}
+			} else {
+				script := filepath.Join(t.TempDir(), "rollback.sh")
+				if err = os.WriteFile(script, rollback, 0700); err != nil {
+					t.Fatal(err)
+				}
+				r, e := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "/bin/sh", Args: []string{script}, Env: []string{"PATH=/nonexistent"}})
+				if e == nil || !bytes.Contains(r.Stderr, []byte("Never start the old cluster")) || !bytes.Contains(r.Stderr, []byte("--label")) {
+					t.Fatalf("recovery ran: %s, %v", r.Stderr, e)
+				}
+			}
+			if stage != "success" && stage != "check" && !strings.Contains(out.String(), "Never start the old cluster") {
 				t.Fatal(out.String())
 			}
 		})
@@ -261,7 +282,7 @@ func TestRefusalsAndPlan(t *testing.T) {
 
 func TestCleanup(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"success", "incomplete", "overlap", "wrong active", "missing repository"} {
+	for _, name := range []string{"success", "incomplete", "overlap", "wrong active", "missing repository", "archive exists"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			o, f, _ := fixture(t)
@@ -291,8 +312,13 @@ func TestCleanup(t *testing.T) {
 					}
 					write(t, o.Dir, "deploy/compose.edge.yml", "services:\n  postgres:\n    environment:\n      PGDATA: /var/lib/postgresql/18/docker\nvolumes:\n  postgres_data:\n    external: true\n    name: demo_postgres_data\n")
 				}
-				if name == "success" {
+				switch name {
+				case "success":
+					f.Expect("sh", "-ec") // refuse an existing archive before deleting old data
 					f.Expect("docker", "run", "--rm")
+					f.Expect("sh", "-ec") // archive recovery files
+				case "archive exists":
+					f.Expect("sh", "-ec").Fail(errors.New("recovery archive already exists"))
 				}
 			}
 			f.Expect("sh", "-c")
@@ -301,6 +327,27 @@ func TestCleanup(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				// Execute the generated data cleanup against a temporary volume.
+				root := t.TempDir()
+				write(t, root, "pgdata/global/pg_control.spinup-disabled", "old")
+				write(t, root, "18/docker/PG_VERSION", "18")
+				write(t, root, "18/docker.spinup-upgrade", "")
+				for _, c := range f.Calls() {
+					if len(c.Argv) < 2 || c.Argv[0] != "docker" || c.Argv[1] != "run" {
+						continue
+					}
+					script := c.Argv[slices.Index(c.Argv, userScript)+3]
+					script = strings.NewReplacer("/pg/", root+"/", "current=/pg", "current="+root).Replace(script)
+					if _, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "/bin/sh", Args: []string{"-ec", script, "1000:1000", "pgdata", "18/docker"}}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := os.Lstat(filepath.Join(root, "pgdata")); !os.IsNotExist(err) {
+					t.Fatalf("old directory remains: %v", err)
+				}
+				if got, err := os.ReadFile(filepath.Join(root, "18/docker/PG_VERSION")); err != nil || string(got) != "18" {
+					t.Fatalf("active cluster changed: %q %v", got, err)
+				}
 			} else if err == nil {
 				t.Fatal("unsafe cleanup succeeded")
 			}
@@ -308,6 +355,40 @@ func TestCleanup(t *testing.T) {
 				if slices.Contains(c.Argv, "volume") || slices.Contains(c.Argv, "start") {
 					t.Fatal("cleanup touched the volume or old server", c.Argv)
 				}
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+
+func TestCheckRecoveryFailureRetainsInstructions(t *testing.T) {
+	t.Parallel()
+	for _, stage := range []string{"target cleanup", "postgres restart", "live restart"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Parallel()
+			o, f, out := fixture(t)
+			lock(f)
+			inspect(f, "17.11", "/var/lib/postgresql/data/pgdata")
+			beforeCheck(f, "demo-pg-upgrade:17-18")
+			f.Expect("docker", "run", "--rm").Fail(errors.New("extension missing"))
+			cleanup := f.Expect("docker", "run", "--rm")
+			if stage == "target cleanup" {
+				cleanup.Fail(errors.New("unsafe target path"))
+			}
+			start := f.Expect("docker", "compose", "-p", "demo")
+			if stage == "postgres restart" {
+				start.Fail(errors.New("postgres unavailable"))
+			} else {
+				f.Expect("cat", release+"/release.json").Return(`{"color":"green"}`, "", 0)
+				live := f.Expect("docker", "compose", "-p", "demo-green")
+				if stage == "live restart" {
+					live.Fail(errors.New("app unavailable"))
+				}
+			}
+			f.Expect("sh", "-c")
+			err := Run(context.Background(), o, pg.Deps{Remote: f})
+			if err == nil || !strings.Contains(err.Error(), "extension missing") || !strings.Contains(err.Error(), "Recovery before pg_upgrade --link failed") || !strings.Contains(out.String(), "Recovery instructions:") || strings.Contains(out.String(), "Never start the old cluster") {
+				t.Fatalf("got %v, output %s", err, out)
 			}
 			f.AssertDone(t)
 		})
@@ -343,6 +424,7 @@ func TestUpgradeTo17UsesSameVolume(t *testing.T) {
 	inspect(f, "16.15", "/var/lib/postgresql/data/pgdata")
 	beforeCheck(f, "demo-pg-upgrade:16-17")
 	f.Expect("docker", "run", "--rm") // check
+	f.ExpectUpload(op + "/rollback.sh")
 	f.Expect("docker", "run", "--rm") // link
 	afterLink(f, false)
 	f.Expect("sh", "-c")

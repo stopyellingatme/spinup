@@ -76,6 +76,8 @@ An in-place restore uses the existing confirmation, maintenance window, safety b
 It retains the previous data at `$PGDATA.spinup-before-restore`.
 Inspect that directory before removing it.
 A later in-place restore refuses to replace an existing retained directory.
+The refusal preserves both the live data and the retained data.
+The restore also refuses symbolic links at either path.
 
 The scheduled script supports WAL-G backup and restore verification.
 It writes the same atomic metrics file as the other backends.
