@@ -34,12 +34,18 @@ func TestNow(t *testing.T) {
 			f.Expect(Command("todo", "stanza-create")...).Return("", "", 0)
 			f.Expect(Command("todo", "--type="+string(kind), "backup")...).Return("", "P00 INFO: backup command end\n", 0)
 			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			expectMetrics(f)
 			var out, errOut strings.Builder
 			_, err := Now(context.Background(), Options{Dir: dir, Env: "staging", Kind: tt.kind, JSON: tt.json, Out: &out, ErrOut: &errOut, Remote: f})
 			if err != nil {
 				t.Fatal(err)
 			}
 			f.AssertDone(t)
+			uploads := f.Uploads()
+			if len(uploads) != 2 || !strings.Contains(string(uploads[1].Data), `backup_last_success_timestamp_seconds{kind="diff"} 1792052634`) || !strings.Contains(string(uploads[1].Data), `backup_last_size_bytes{kind="diff"} 31403056`) {
+				t.Fatalf("backup metrics = %+v", uploads)
+			}
+
 			if !strings.Contains(out.String(), tt.want) {
 				t.Fatalf("out = %q, want %q", out.String(), tt.want)
 			}
