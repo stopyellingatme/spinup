@@ -26,6 +26,7 @@ Read these before you change anything:
 - The M3 contracts (generators, post-steps, the OpenAPI and sqlc layout, migrations, jobs) are in `docs/adr/0007-m3-contracts.md`.
 - The M4 contracts (pnpm through corepack, the web layout, session and auth API, client generation, the dev loop) are in `docs/adr/0008-m4-contracts.md`.
 - The M5 contracts (ssh access, the VM layout, the deploy lock and journal, hooks, image transport, secrets, production Compose, the test VM) are in `docs/adr/0009-m5-contracts.md`.
+- The M6 contracts (telemetry configuration, the monitoring pack and profiles, monitor commands, web tracing) are in `docs/adr/0010-m6-contracts.md`.
 
 ## Commands
 
@@ -84,7 +85,7 @@ Only the main loop writes these files. A unit never edits them:
 - `CLAUDE.md`, `docs/design/plan.md`
 - the M2 contract files: `internal/templates/source.go`, `internal/merge/contract.go`, `internal/upgrade/contract.go`, `internal/migrate/contract.go` (see `docs/adr/0006-m2-contracts.md`)
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
-- the web pack fragments `pack.d/deps.toml` and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), and `scripts/bin/`
+- the web pack fragments `pack.d/deps.toml` and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
 

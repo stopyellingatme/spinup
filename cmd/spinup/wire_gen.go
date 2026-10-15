@@ -33,4 +33,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/backup"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/plainsecrets"
 	_ "github.com/stopyellingatme/spinup/internal/server"
+
+	// M6
+	_ "github.com/stopyellingatme/spinup/internal/gen/alert"
+	_ "github.com/stopyellingatme/spinup/internal/gen/dashboard"
+	_ "github.com/stopyellingatme/spinup/internal/monitor"
 )

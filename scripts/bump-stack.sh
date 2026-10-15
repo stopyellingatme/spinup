@@ -82,7 +82,12 @@ echo "bump-stack: wrote tools.mod.tmpl and tools.sum"
 # (used by runtime/types for format: uuid) comes in at the version the runtime requires.
 app_extra=(github.com/oapi-codegen/runtime github.com/oapi-codegen/runtime/types github.com/google/uuid
   github.com/riverqueue/river github.com/riverqueue/river/riverdriver/riverpgxv5
-  github.com/alexedwards/scs/v2 github.com/alexedwards/scs/pgxstore golang.org/x/crypto/argon2)
+  github.com/alexedwards/scs/v2 github.com/alexedwards/scs/pgxstore golang.org/x/crypto/argon2
+  go.opentelemetry.io/otel go.opentelemetry.io/otel/sdk/trace go.opentelemetry.io/otel/sdk/metric
+  go.opentelemetry.io/otel/sdk/log go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+  go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
+  go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp go.opentelemetry.io/contrib/bridges/otelslog
+  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp github.com/exaring/otelpgx)
 
 # add_app_extra <api dir> requires and imports every app_extra module, so tidy keeps them.
 add_app_extra() {
@@ -127,7 +132,7 @@ case "$mode" in
       cd "$root"
       go build -o "$work/spinup" ./cmd/spinup
       cd "$work" && mkdir new && cd new
-      SPINUP_KIT_REPLACE="$root/kit" "$work/spinup" new demo --api-only --module "${placeholder%/api}" \
+      SPINUP_KIT_REPLACE="$root/kit" "$work/spinup" new demo --module "${placeholder%/api}" \
         --modules "$all_modules" --non-interactive --no-git
       add_app_extra "$app"
       cd "$app"

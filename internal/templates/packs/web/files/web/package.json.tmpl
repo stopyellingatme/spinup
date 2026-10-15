@@ -21,6 +21,11 @@
     "gen:client": "openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
+    "@opentelemetry/api": "[[ npm "@opentelemetry/api" ]]",
+    "@opentelemetry/exporter-trace-otlp-http": "[[ npm "@opentelemetry/exporter-trace-otlp-http" ]]",
+    "@opentelemetry/instrumentation-undici": "[[ npm "@opentelemetry/instrumentation-undici" ]]",
+    "@opentelemetry/sdk-node": "[[ npm "@opentelemetry/sdk-node" ]]",
+    "import-in-the-middle": "[[ npm "import-in-the-middle" ]]",
     "openapi-fetch": "[[ npm "openapi-fetch" ]]"
   },
   "devDependencies": {
