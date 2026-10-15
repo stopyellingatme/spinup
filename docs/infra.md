@@ -63,12 +63,12 @@ Run `spinup infra plan --env staging` to inspect the proposed resources.
 Run `spinup infra apply --env staging` to create them.
 With no terminal, pass `--yes` to approve the apply operation.
 
-Spinup initializes OpenTofu with `-input=false` when the selected environment has no backend metadata.
+Spinup initializes OpenTofu with `-input=false` before each infrastructure operation.
 Each environment uses `terraform.<name>.tfstate` and `.terraform/<name>/` within `deploy/infra/tofu/`.
 The local backend uses the default workspace.
 
 Preserve the state files and their backups outside version control.
-To initialize again after a template upgrade, remove only `.terraform/<name>/` and repeat the command.
+Spinup refreshes provider and OpenTofu metadata during each operation.
 
 Select the correct variable values before each operation in an environment.
 Local variable files apply to every environment.

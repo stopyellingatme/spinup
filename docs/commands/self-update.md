@@ -8,6 +8,7 @@ This includes `dev` builds and versions with `-alpha.`.
 
 Use `spinup self-update --check` to check without installing.
 Use `spinup version --check` to check for a newer stable release.
+The checks work with Homebrew and development binaries.
 Use `--json` for a structured result.
 Use `--dry-run` to check without installing.
 
@@ -39,6 +40,7 @@ If the directory is not writable, use permissions that permit replacement or rei
 
 If Homebrew manages the binary, the updater prints `brew upgrade --cask spinup`.
 Run that command to update the cask.
+The updater does not replace Homebrew or development binaries.
 
 The CLI checks for releases at most once per 24 hours during terminal use.
 It stores the timestamp at `<user-cache>/spinup/update-check`.

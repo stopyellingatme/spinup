@@ -145,6 +145,7 @@ func (u Updater) resolve(ctx context.Context, o Options) (release, error) {
 		return release{}, failure(err)
 	}
 	var chosen release
+	var chosenVersion compat.Version
 	for _, r := range releases {
 		v, err := compat.ParseVersion(r.Tag)
 		if err != nil || r.Draft {
@@ -156,8 +157,9 @@ func (u Updater) resolve(ctx context.Context, o Options) (release, error) {
 		if o.Version != "" && strings.TrimPrefix(r.Tag, "v") != strings.TrimPrefix(o.Version, "v") {
 			continue
 		}
-		if chosen.Tag == "" || r.Published.After(chosen.Published) {
+		if chosen.Tag == "" || v.Compare(chosenVersion) > 0 || (v.Compare(chosenVersion) == 0 && r.Published.After(chosen.Published)) {
 			chosen = r
+			chosenVersion = v
 		}
 	}
 	if chosen.Tag == "" {
@@ -198,6 +200,13 @@ func Homebrew(path string) bool {
 // Update verifies a release and atomically replaces the executable, unless Check is set.
 func (u Updater) Update(ctx context.Context, o Options) (Result, error) {
 	u = u.defaults()
+	if o.Check {
+		r, err := u.resolve(ctx, o)
+		if err != nil {
+			return Result{}, err
+		}
+		return resultFor(o.Current, r), nil
+	}
 	path := u.Executable
 	var err error
 	if path == "" {
@@ -221,7 +230,7 @@ func (u Updater) Update(ctx context.Context, o Options) (Result, error) {
 		return Result{}, err
 	}
 	result := resultFor(o.Current, r)
-	if o.Check || (!result.Available && o.Version == "") {
+	if !result.Available && o.Version == "" {
 		return result, nil
 	}
 	ext := "tar.gz"

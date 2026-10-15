@@ -3,6 +3,8 @@ package selfupdate
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"sync/atomic"
 	"testing"
@@ -64,6 +66,33 @@ func TestNoticeFailure(t *testing.T) {
 	}
 	if count.Load() != 1 {
 		t.Fatalf("requests=%d", count.Load())
+	}
+}
+
+func TestNoticeReplacesStaleLock(t *testing.T) {
+	t.Parallel()
+	var count atomic.Int32
+	srv := newTestHTTP(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		count.Add(1)
+		_, _ = w.Write([]byte(`[{"tag_name":"v1.2.0"}]`))
+	}))
+	defer srv.Close()
+	cache := t.TempDir()
+	lock := filepath.Join(cache, "spinup", "update-check.lock")
+	if err := os.MkdirAll(lock, 0700); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 15, 10, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(lock, now.Add(-2*time.Minute), now.Add(-2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	got := (Updater{APIBase: srv.URL, Client: srv.Client()}).Notice(context.Background(), NoticeOptions{Current: "1.0.0", TTY: true, CacheDir: cache, Now: now})
+	if got == "" {
+		t.Fatal("missing notice")
+	}
+	if count.Load() != 1 {
+		t.Fatalf("requests = %d, want 1", count.Load())
 	}
 }
 
