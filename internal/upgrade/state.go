@@ -65,7 +65,7 @@ func (s *runState) validate(root string) error {
 		return invalid()
 	}
 	switch s.Status {
-	case "step", "conflicts", "gofix", "after", "lock", "verify":
+	case "step", "conflicts", "gofix", "after", "after-conflicts", "lock", "verify":
 	default:
 		return invalid()
 	}

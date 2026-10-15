@@ -68,8 +68,11 @@ func TestUIComponents(t *testing.T) {
 			}
 			s := &Step{From: uiVersion("0.1.0", "1.7.0", old), To: uiVersion("0.2.0", "1.8.0", next), Worktree: root, Lock: lock, Answers: clonePlanAnswers(lock.Answers), Plan: &Plan{}, Out: out}
 			err := runUI(context.Background(), s, tc.enabled, NewMerger(exec.OSRunner{}))
-			if (err != nil) != tc.conflict {
+			if err != nil {
 				t.Fatalf("error: %v", err)
+			}
+			if (len(s.Conflicts) > 0) != tc.conflict {
+				t.Fatalf("conflicts: %v, want conflict %v", s.Conflicts, tc.conflict)
 			}
 			data, readErr := os.ReadFile(filepath.Join(root, uiButton))
 			if tc.deleted {

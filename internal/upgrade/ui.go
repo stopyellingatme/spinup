@@ -44,7 +44,11 @@ func init() {
 			flags.Lookup("ui").NoOptDefVal = "true"
 		},
 		Run: func(ctx context.Context, s *Step) error {
-			return runUI(ctx, s, uiEnabled.Load(), NewMerger(s.Runner))
+			merger := s.Merger
+			if merger == nil {
+				merger = NewMerger(s.Runner)
+			}
+			return runUI(ctx, s, uiEnabled.Load(), merger)
 		},
 	})
 }
@@ -144,8 +148,8 @@ func runUI(ctx context.Context, s *Step, enabled bool, merger merge.Merger) erro
 	slices.SortFunc(s.Plan.Files, func(a, b FileDecision) int { return strings.Compare(a.Path, b.Path) })
 	s.Lock.Answers["shadcn_registry"] = registry
 	s.Answers["shadcn_registry"] = registry
-	if conflicts := updates.Conflicts(); len(conflicts) > 0 && !s.Options.CommitConflicts {
-		return conflictError(s.Worktree, conflicts)
-	}
+	// The state machine stops on these like plan conflicts (exit 3), and --continue
+	// resumes at the lock commit.
+	s.Conflicts = append(s.Conflicts, updates.Conflicts()...)
 	return nil
 }

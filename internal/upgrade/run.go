@@ -178,7 +178,7 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 	if err := r.checkWorktree(ctx, state); err != nil {
 		return err
 	}
-	if state.Status == "conflicts" {
+	if state.Status == "conflicts" || state.Status == "after-conflicts" {
 		paths, err := unresolved(state.Worktree, state.Conflicts)
 		if err != nil {
 			return err
@@ -199,6 +199,11 @@ func (r *Runner) Continue(ctx context.Context, o Options) error {
 		}
 		state.Conflicts = nil
 		state.Status = "gofix"
+	}
+	if state.Status == "after-conflicts" {
+		// The lock commit includes the resolved files.
+		state.Conflicts = nil
+		state.Status = "lock"
 	}
 	if err := saveState(r.Root, state); err != nil {
 		return err
@@ -298,7 +303,7 @@ func (r *Runner) step(ctx context.Context, state *runState) (*Step, error) {
 	if err != nil && !errors.Is(err, templates.ErrVersionUnavailable) {
 		return nil, err
 	}
-	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: clonePlanAnswers(state.Lock.Answers), Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out}, nil
+	return &Step{From: from, To: to, Worktree: state.Worktree, Lock: state.Lock, Answers: clonePlanAnswers(state.Lock.Answers), Plan: state.Plan, Options: state.Options, Runner: r.Exec, Out: r.Out, Merger: r.Merger}, nil
 }
 
 func (r *Runner) resume(ctx context.Context, state *runState) error {
@@ -383,8 +388,21 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 					}
 				}
 			}
-			state.Status = "lock"
 			state.Lock = step.Lock
+			if len(step.Conflicts) > 0 && !step.Options.CommitConflicts {
+				// Markers added after planning (by an extension) stop the step like plan
+				// conflicts; --continue resumes at the lock commit, which includes them.
+				state.Conflicts = slices.Compact(slices.Sorted(slices.Values(step.Conflicts)))
+				state.Status = "after-conflicts"
+				if err := saveState(r.Root, state); err != nil {
+					return err
+				}
+				return conflictError(state.Worktree, state.Conflicts)
+			}
+			state.CommittedConflicts = append(state.CommittedConflicts, step.Conflicts...)
+			slices.Sort(state.CommittedConflicts)
+			state.CommittedConflicts = slices.Compact(state.CommittedConflicts)
+			state.Status = "lock"
 			if err := saveState(r.Root, state); err != nil {
 				return err
 			}
