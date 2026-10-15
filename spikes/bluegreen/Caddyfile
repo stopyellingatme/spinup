@@ -1,0 +1,12 @@
+# The spike's Caddy config. run.sh bind-mounts this directory at /etc/caddy
+# and rewrites upstream.caddy to switch the live color.
+{
+	admin localhost:2019
+	auto_https off
+	# Old connections from the previous config get this long to finish after a reload.
+	grace_period 10s
+}
+
+:8080 {
+	import /etc/caddy/upstream.caddy
+}

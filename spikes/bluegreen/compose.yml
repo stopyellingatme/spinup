@@ -1,0 +1,26 @@
+# One color of the app. run.sh starts it as Compose project bg-blue or bg-green
+# (blue/green), or as bg-roll (the rolling fallback).
+#   BG_TAG    image tag: blue or green
+#   BG_ALIAS  network alias on bg-net: app-blue, app-green, or app-roll
+services:
+  app:
+    image: bg-app:${BG_TAG:?}
+    pull_policy: never
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "/app", "-health"]
+      interval: 2s
+      timeout: 1s
+      retries: 3
+      start_period: 10s
+      start_interval: 250ms
+    networks:
+      bg-net:
+        aliases: ["${BG_ALIAS:?}"]
+
+networks:
+  bg-net:
+    external: true
