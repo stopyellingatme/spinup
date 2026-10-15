@@ -116,14 +116,16 @@ func TestRestoreInPlace(t *testing.T) {
 			vm.Expect("cat", "/opt/todo/current/release.json").Return(string(data), "", 0)
 			vm.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
-			vm.Expect(Command("todo", "--type=full", "backup")...).Return("", "", 0)
+			vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return("", "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0) // Re-check before stopping.
 			for _, color := range []string{deploy.Blue, deploy.Green} {
 				for _, service := range []string{"api", "web"} {
 					vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color, "--filter", "label=com.docker.compose.service="+service).Return(color+"-"+service, "", 0)
 					vm.Expect("docker", "stop", color+"-"+service).Return("", "", 0)
 				}
 			}
+			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			vm.Expect(baseCompose("todo", "stop", "postgres")...).Return("", "", 0)
 			restore := vm.Expect(baseCompose("todo", "run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "postgres")...)
 			if fail {

@@ -60,11 +60,17 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 			fmt.Fprintln(out, "Plan: restore into a new container at 127.0.0.1:5433")
 			return nil
 		}
-		steps := []string{"Check --i-know, protected confirmation, and maintenance window", "Take the deploy lock"}
+		steps := []string{"Check --i-know, protected confirmation, and maintenance window", "Take the deploy lock", "Resolve and check the restore target"}
 		if !o.NoSafetyBackup {
 			steps = append(steps, "Take a safety backup")
 		}
-		steps = append(steps, "Stop api and web of both colors", "Stop postgres", "Restore the live database", "Start postgres", "Run migrate with the live release", "Start the live color", "Run the deploy smoke checks", "Release the deploy lock")
+		steps = append(steps, "Re-check the restore target", "Stop api and web of both colors")
+		if s.Config.Backups.Backend == "pgdump" {
+			steps = append(steps, "Restore into a staging database while postgres runs", "Rename the databases and retain the old database", "Print the dropdb command for the old database")
+		} else {
+			steps = append(steps, "Stop postgres", "Restore the live database", "Start postgres")
+		}
+		steps = append(steps, "Run migrate with the live release", "Start the live color", "Run the deploy smoke checks", "Release the deploy lock")
 		for _, step := range steps {
 			fmt.Fprintln(out, "Plan: "+step)
 		}
@@ -124,17 +130,14 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 			err = fmt.Errorf("%w\nSafety backup: %s\nTry: %s", err, safety, command)
 		}
 	}()
-	// Freeze the latest target before the safety backup creates a newer backup.
-	target := o.Target
-	if target.Label == "" && target.Time.IsZero() {
-		bs, listErr := backend.List(ctx)
-		if listErr != nil {
-			return listErr
-		}
-		if len(bs) == 0 {
-			return fmt.Errorf("select restore target: the repository is empty\nTry: take a backup first")
-		}
-		target.Label = bs[len(bs)-1].Label
+	backend, state, err := observeRestore(s)
+	if err != nil {
+		return err
+	}
+	// Resolve every target before a safety backup or any service stop.
+	target, err := checkRestoreTarget(ctx, backend, s.Config.Backups.Backend, o.Target)
+	if err != nil {
+		return err
 	}
 	rel, err := readLiveRelease(ctx, s)
 	if err != nil {
@@ -145,13 +148,30 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 	}
 	if !o.NoSafetyBackup {
 		fmt.Fprintln(out, "Taking a safety backup")
-		result, backupErr := backend.Backup(ctx, Full)
+		var result Result
+		var backupErr error
+		if p, ok := backend.(*PGBackRest); ok {
+			result, backupErr = p.backup(ctx, Full, true)
+		} else {
+			result, backupErr = backend.Backup(ctx, Full)
+		}
 		if backupErr != nil {
 			return backupErr
 		}
 		safety = result.Label
 		fmt.Fprintf(out, "Safety backup: %s\n", safety)
 	}
+	// A backend can apply retention while taking the safety backup. Never stop
+	// services unless the frozen target remains available afterwards.
+	if _, err = checkRestoreTarget(ctx, backend, s.Config.Backups.Backend, target); err != nil {
+		return err
+	}
+	stopping, starting := false, false
+	defer func() {
+		if err != nil && stopping {
+			err = restoreRecovery(ctx, s, rel, state, starting, err)
+		}
+	}()
 	fmt.Fprintln(out, "Stopping api and web of both colors")
 	for _, color := range []string{deploy.Blue, deploy.Green} {
 		for _, service := range []string{"api", "web"} {
@@ -160,6 +180,7 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 				return restoreFailure("find "+color+" "+service, runErr)
 			}
 			if ids := strings.Fields(string(result.Stdout)); len(ids) > 0 {
+				stopping = true
 				if _, runErr = s.Remote.Run(ctx, remote.Cmd{Argv: append([]string{"docker", "stop"}, ids...)}); runErr != nil {
 					return restoreFailure("stop "+color+" "+service, runErr)
 				}
@@ -167,6 +188,10 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		}
 	}
 	fmt.Fprintln(out, "Restoring the live database")
+	stopping = true // The backend can stop postgres even when no app container ran.
+	if state.backend != "pgbackrest" && state.backend != "pgdump" {
+		state.touched = true // An unknown backend cannot prove that restarting is safe.
+	}
 	if err = backend.Restore(ctx, target, Into{InPlace: true}); err != nil {
 		return err
 	}
@@ -182,6 +207,7 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		services = append(services, "web")
 	}
 	args = deploy.ComposeArgv(s.App+"-"+rel.Color, dir, []string{dir + "/compose.yml"}, append([]string{"up", "-d", "--no-deps", "--wait"}, services...)...)
+	starting = true
 	if _, err = s.Remote.Run(ctx, remote.Cmd{Argv: args, Stdout: errOut, Stderr: errOut}); err != nil {
 		return restoreFailure("start the live color", err)
 	}
