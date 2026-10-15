@@ -94,14 +94,8 @@ func (a *App) ready(w http.ResponseWriter, r *http.Request) {
 		checks[name] = "ok"
 		if err != nil {
 			status, result = http.StatusServiceUnavailable, "fail"
-			message := strings.Join(strings.Fields(err.Error()), " ")
-			if message == "" {
-				message = "check failed"
-			}
-			if len([]rune(message)) > 200 {
-				message = string([]rune(message)[:200])
-			}
-			checks[name] = message
+			checks[name] = "fail"
+			a.logger.WarnContext(r.Context(), "readiness check failed", "check", name, "request_id", httpx.RequestIDFrom(r.Context()), "error", err)
 		}
 	}
 	_ = httpx.WriteJSON(w, status, struct {
@@ -154,10 +148,7 @@ func sortedNames[V any](values map[string]V) []string {
 func (a *App) Run(ctx context.Context, args []string) error {
 	if len(args) > 0 {
 		if run, ok := a.commands[args[0]]; ok {
-			if err := run(ctx, args[1:]); err != nil {
-				return fmt.Errorf("command %q failed: %w\nTry: check the command arguments and configuration", args[0], err)
-			}
-			return nil
+			return run(ctx, args[1:])
 		}
 		commands := strings.Join(sortedNames(a.commands), ", ")
 		if commands == "" {

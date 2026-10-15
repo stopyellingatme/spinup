@@ -58,7 +58,9 @@ func TestReadiness(t *testing.T) {
 		t.Run(map[bool]string{false: "ok", true: "fail"}[fail], func(t *testing.T) {
 			t.Parallel()
 			var order []string
-			a := New(WithLogger(discardLogger()), WithReadiness("zeta", func(ctx context.Context) error {
+			var logs bytes.Buffer
+			checkErr := errors.New("database unavailable: user=private-user database=private-db host=private-host port=5432 " + strings.Repeat("details", 40))
+			a := New(WithLogger(slog.New(slog.NewJSONHandler(&logs, nil))), WithReadiness("zeta", func(ctx context.Context) error {
 				order = append(order, "zeta")
 				deadline, ok := ctx.Deadline()
 				if !ok || time.Until(deadline) > 2*time.Second {
@@ -68,7 +70,7 @@ func TestReadiness(t *testing.T) {
 			}), WithReadiness("alpha", func(context.Context) error {
 				order = append(order, "alpha")
 				if fail {
-					return errors.New("database unavailable")
+					return checkErr
 				}
 				return nil
 			}))
@@ -86,8 +88,40 @@ func TestReadiness(t *testing.T) {
 			if w.Code != status || strings.Join(order, ",") != "alpha,zeta" {
 				t.Fatalf("%d %v", w.Code, order)
 			}
-			if fail && !strings.Contains(w.Body.String(), "database unavailable") {
-				t.Fatal(w.Body)
+			var body struct {
+				Status string            `json:"status"`
+				Checks map[string]string `json:"checks"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			want := "ok"
+			if fail {
+				want = "fail"
+			}
+			if body.Status != want || !reflect.DeepEqual(body.Checks, map[string]string{"alpha": want, "zeta": "ok"}) {
+				t.Fatalf("readiness response = %s", w.Body)
+			}
+			warnings := 0
+			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				var record map[string]any
+				if err := json.Unmarshal([]byte(line), &record); err != nil {
+					t.Fatal(err)
+				}
+				if record["level"] != "WARN" {
+					continue
+				}
+				warnings++
+				if record["check"] != "alpha" || record["error"] != checkErr.Error() || record["request_id"] != w.Header().Get("X-Request-ID") {
+					t.Fatalf("readiness warning = %v", record)
+				}
+			}
+			wantWarnings := 0
+			if fail {
+				wantWarnings = 1
+			}
+			if warnings != wantWarnings {
+				t.Fatalf("warnings = %d, want %d", warnings, wantWarnings)
 			}
 		})
 	}
@@ -222,7 +256,7 @@ func TestReadinessTimeout(t *testing.T) {
 	a := New(WithLogger(discardLogger()), WithReadiness("slow", func(context.Context) error { defer close(returned); <-release; return nil }))
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/readyz", nil))
-	if w.Code != 503 || !strings.Contains(w.Body.String(), "context deadline exceeded") {
+	if w.Code != 503 || !strings.Contains(w.Body.String(), `"slow":"fail"`) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	select {
@@ -277,5 +311,22 @@ func TestShutdownHooks(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("shutdown timed out")
+	}
+}
+
+func TestCommandErrorUnchanged(t *testing.T) {
+	t.Parallel()
+	for _, message := range []string{"command failed", "command failed: invalid argument\nTry: use migrate up"} {
+		t.Run(message, func(t *testing.T) {
+			t.Parallel()
+			commandErr := errors.New(message)
+			a := New(WithLogger(discardLogger()), WithCommand("migrate", func(context.Context, []string) error {
+				return commandErr
+			}))
+			err := a.Run(t.Context(), []string{"migrate", "up"})
+			if !errors.Is(err, commandErr) || err.Error() != message {
+				t.Fatalf("Run error = %v, want unchanged error %q", err, message)
+			}
+		})
 	}
 }
