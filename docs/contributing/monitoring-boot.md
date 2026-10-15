@@ -25,6 +25,7 @@ Then it does these checks:
 | Grafana answers | `GET 127.0.0.1:<port>/api/health` returns `"database": "ok"`. |
 | Prometheus has its targets up | Every target in `/api/v1/targets` is `up`. Prometheus scrapes only itself. |
 | Alloy scrapes the stack | The query `up` returns 1 for each job that Alloy scrapes (see the table below). |
+| Backup metrics reach Prometheus | A sample `backup.prom` says the last full backup finished one hour ago. Alloy reads it with its textfile collector, and the recording rule `backup_last_age_seconds` returns about 3600. |
 | Logs reach Loki | A log line with a random marker goes to Alloy over OTLP/HTTP. Loki returns it. |
 | Traces reach Tempo (`full`) | A span with a random trace ID goes to Alloy. Tempo returns the trace. |
 | Memory | The total memory of the services in `docker stats` stays under the budget. |
@@ -83,6 +84,7 @@ A run takes 1 to 2 minutes on a laptop (lite 73 s, full 104 s).
 The test changes only these values, with the file `boot.override.yml` in the work directory:
 
 - The secrets come from the work directory, not from `/opt/<app>/secrets`. Grafana and the postgres-exporter run as the current user (`DEPLOY_UID`, `DEPLOY_GID`).
+- The backup metrics directory comes from the work directory (`BOOT_METRICS`), not from `/opt/<app>/backups/metrics`, which Docker Desktop cannot share.
 - The Grafana port is `BOOT_GRAFANA_PORT`.
 - On Docker Desktop, node-exporter mounts `/` without `rslave`. The root mount of the Docker Desktop VM is private, so `rslave` fails there. A Linux host keeps the rendered mount.
 
