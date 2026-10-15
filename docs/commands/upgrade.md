@@ -52,3 +52,33 @@ Use `--offline` to prevent template downloads.
 After success, run the printed `git merge spinup/upgrade-<target>` command.
 Then remove the worktree with `git worktree remove <worktree>`.
 The upgrade branch remains available for inspection.
+
+## What an upgrade changes
+
+The upgrade runs codemods before and after the template changes.
+Each codemod prints its ID and description.
+The lock records completed codemods to prevent repeated changes.
+
+If `SPINUP_KIT_REPLACE` is set, the upgrade restores the local kit replacement in `api/go.mod`.
+The upgrade increases direct Go requirements only when the target stack pins a higher version.
+The upgrade does not request higher versions for other Go requirements.
+For a release target, the kit requirement uses `v<target>`.
+For a prerelease target, the kit requirement keeps its version.
+The managed `api/tools.mod` file receives its pins through the template changes.
+
+The upgrade runs `go mod tidy` with the user's environment.
+This command can need network access for modules missing from the cache.
+The upgrade then runs `go fix ./...` in `api/`.
+Changes from `go fix` receive a separate commit.
+
+Verification runs `go build ./...`, `go vet ./...`, and `go test ./...` in `api/`.
+It then runs every local doctor check against the worktree.
+The error lists all failures and includes the last codemod ID for a file when available.
+Verification failures retain the commits for inspection and repair.
+After repairs, run `spinup upgrade --continue --yes` to repeat verification.
+
+```console
+$ spinup upgrade --help
+Upgrade app templates in a separate Git worktree
+...
+```
