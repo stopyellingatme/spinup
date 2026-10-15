@@ -1,0 +1,88 @@
+# Upgrade a local app and verify it without downloads.
+[!exec:go] skip 'go is missing'
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+exec spinup upgrade --yes
+stdout 'git merge spinup/upgrade-0.0.1'
+! exists .spinup/upgrade.json
+grep 'replace github.com/stopyellingatme/spinup/kit => ' .spinup/upgrade/0.0.1/api/go.mod
+# The pin-only step never lowers the kit (v0.1.0 is newer than the 0.0.1 step).
+grep 'github.com/stopyellingatme/spinup/kit v0.1.0' .spinup/upgrade/0.0.1/api/go.mod
+grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
+grep 'upgraded application routes' .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+grep 'const version = "dev"' .spinup/upgrade/0.0.1/api/cmd/api/main.go
+exec git log spinup/upgrade-0.0.1 --format=%s
+stdout 'spinup upgrade 0.0.0-dev -> 0.0.1'
+stdout 'spinup upgrade: lock 0.0.1'
+exec git status --porcelain
+! stdout .
+cd .spinup/upgrade/0.0.1/api
+exec go build ./...
+exec git status --porcelain
+! stdout .
+
+-- overlay/packs/api/files/api/internal/routes/routes.go.tmpl --
+// Package routes registers the upgraded application routes.
+package routes
+
+import (
+ "net/http"
+
+ "github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Deps contains the dependencies for route handlers.
+type Deps struct {
+ DB *pgxpool.Pool
+}
+
+// Register adds generated routes and application routes to mux.
+func Register(mux *http.ServeMux, d Deps) {
+ registerGenerated(mux, d)
+
+ // Add your application routes here. Generators never edit this file.
+}
+
+-- overlay/packs/api/files/api/cmd/api/main.go.tmpl --
+package main
+
+import (
+ "context"
+ "fmt"
+ "net/http"
+ "os"
+
+ "[[ .module ]]/api/db/migrations"
+ "[[ .module ]]/api/internal/routes"
+ "github.com/stopyellingatme/spinup/kit/app"
+ "github.com/stopyellingatme/spinup/kit/config"
+ "github.com/stopyellingatme/spinup/kit/db"
+)
+
+const version = "dev"
+
+func main() {
+ var cfg config.Base
+ if err := config.Load(&cfg); err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+ pool, err := db.Open(context.Background(), cfg.DatabaseURL)
+ if err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+ a := app.New(
+  app.WithName([[ quote .app_name ]]),
+  app.WithVersion(version),
+  app.WithConfig(cfg),
+  app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
+  app.WithReadiness("db", pool.Ping),
+  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
+  app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
+ )
+ app.Main(a)
+}

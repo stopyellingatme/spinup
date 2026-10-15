@@ -1,4 +1,4 @@
-// Package checks registers the local doctor checks.
-//
-// STUB from the M2 pre-seed commit. Unit M2.5 owns this file and replaces it.
+// Package checks registers the first local doctor checks.
+// Context.Deps supplies "cli_version" as a string and "runner" as an exec.Runner.
+// Project checks skip when Context.Root is empty. Non-quick checks skip in quick mode.
 package checks

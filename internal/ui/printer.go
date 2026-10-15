@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 )
@@ -97,6 +98,14 @@ func (p *Printer) RenderError(err error) {
 	if errors.As(err, &ue) {
 		what, why, try = ue.What, ue.Why, ue.Try
 	}
+	// Wrapped errors can carry several "Try:" lines. Show one: the Error's own Try,
+	// else the outermost embedded one (the layer with the most context).
+	var embedded []string
+	what, embedded = stripTry(what, embedded)
+	why, embedded = stripTry(why, embedded)
+	if try == "" && len(embedded) > 0 {
+		try = embedded[len(embedded)-1]
+	}
 	if p.opts.JSON {
 		b, merr := json.Marshal(struct {
 			Error jsonError `json:"error"`
@@ -151,4 +160,20 @@ func isTerminal(v any) bool {
 		return false
 	}
 	return term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptors fit in int
+}
+
+// stripTry removes the lines that start with "Try:" from text and appends their hints to tries.
+func stripTry(text string, tries []string) (string, []string) {
+	if !strings.Contains(text, "Try:") {
+		return text, tries
+	}
+	var kept []string
+	for _, line := range strings.Split(text, "\n") {
+		if hint, ok := strings.CutPrefix(strings.TrimSpace(line), "Try:"); ok {
+			tries = append(tries, strings.TrimSpace(hint))
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.TrimRight(strings.Join(kept, "\n"), "\n "), tries
 }

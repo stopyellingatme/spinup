@@ -1,0 +1,163 @@
+{
+  "answers": {
+    "app_name": "corpus",
+    "db_version": "18",
+    "module": "example.com/corpus",
+    "modules": [
+      "ci"
+    ]
+  },
+  "applied_migrations": [],
+  "behavior_version": 1,
+  "cli_version": "dev",
+  "files": {
+    ".env.example": {
+      "class": "scaffold",
+      "hash": "sha256:4687cd5c3aa3ac13fcc34de52c2da247daea3fdc6c78d9713b6810057d3b4ef8",
+      "mode": "0644",
+      "template": "base/files/.env.example"
+    },
+    ".gitattributes": {
+      "class": "managed",
+      "hash": "sha256:07dff92dce1448aaad127c249c0b66a779ac4c5fb47235efebffb3be49374e20",
+      "mode": "0644",
+      "template": "base/files/.gitattributes"
+    },
+    ".github/workflows/ci.yml": {
+      "class": "managed",
+      "hash": "sha256:9b9925e41d8480a899724d33247a92665acac6a0b39a98238800ca469fda17c1",
+      "mode": "0644",
+      "template": "ci/files/.github/workflows/ci.yml.tmpl"
+    },
+    ".gitignore": {
+      "class": "scaffold",
+      "hash": "sha256:9849083a9c93aa533734856e92b79625cbbcebf2ff0b27708241257edf16f043",
+      "mode": "0644",
+      "template": "base/files/.gitignore"
+    },
+    "README.md": {
+      "class": "seed",
+      "hash": "sha256:b31b1f608ae137c51e6bb6d0bfda35d1765da977edfc98bf97b583a92ec26692",
+      "mode": "0644",
+      "template": "base/files/README.md.tmpl"
+    },
+    "api/cmd/api/main.go": {
+      "class": "scaffold",
+      "hash": "sha256:f7ea114110e11e5281e0eef01f812a7c3bc353aa3f0e815ce10a1471d1d23a13",
+      "mode": "0644",
+      "template": "api/files/api/cmd/api/main.go.tmpl"
+    },
+    "api/db/migrations/00001_init.sql": {
+      "class": "seed",
+      "hash": "sha256:2bac9dbdcb93b85937f8ce0dd55157fb7da8297c6aa01eda1c83858206741b86",
+      "mode": "0644",
+      "template": "api/files/api/db/migrations/00001_init.sql"
+    },
+    "api/db/migrations/embed.go": {
+      "class": "managed",
+      "hash": "sha256:c6835b686b2b17e872833a33491dae60af169e8a87ea70b18071c0ba920965c4",
+      "mode": "0644",
+      "template": "api/files/api/db/migrations/embed.go.tmpl"
+    },
+    "api/go.mod": {
+      "class": "scaffold",
+      "hash": "sha256:27fb4e047b33882befb9b663b7b0c705284305f2b9a01322dd6a704c3d30cf1d",
+      "mode": "0644",
+      "template": "api/files/api/go.mod.tmpl"
+    },
+    "api/go.sum": {
+      "class": "scaffold",
+      "hash": "sha256:91707d5c43fb8d23e5b3df6dad02ade6925bb6bd293030fbf726cc281d0dc9f4",
+      "mode": "0644",
+      "template": "api/files/api/go.sum"
+    },
+    "api/internal/routes/routes.go": {
+      "class": "scaffold",
+      "hash": "sha256:8bb2a22547d075d4cb9a073e50b816e957fd1d44ef4a03a084fd10a2fb7134c4",
+      "mode": "0644",
+      "template": "api/files/api/internal/routes/routes.go.tmpl"
+    },
+    "api/internal/routes/routes_gen.go": {
+      "class": "managed",
+      "hash": "sha256:9802154852744e5f3f79f2576f89921832b0503d9a017b46bb18eea1384f01b9",
+      "mode": "0644",
+      "template": "api/files/api/internal/routes/routes_gen.go.tmpl"
+    },
+    "api/internal/routes/routes_test.go": {
+      "class": "scaffold",
+      "hash": "sha256:ab771d5fad18dbedd62034799e024d4c10b8e5fad1888bf10c4774eb4be729b2",
+      "mode": "0644",
+      "template": "api/files/api/internal/routes/routes_test.go.tmpl"
+    },
+    "api/openapi/paths/.gitkeep": {
+      "class": "seed",
+      "hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0644",
+      "template": "api/files/api/openapi/paths/.gitkeep"
+    },
+    "api/tools.mod": {
+      "class": "managed",
+      "hash": "sha256:1f4d5661c0becd8528e079f97a787723f552173ad46a7ecff4c4326e63aab4a4",
+      "mode": "0644",
+      "template": "api/files/api/tools.mod.tmpl"
+    },
+    "api/tools.sum": {
+      "class": "managed",
+      "hash": "sha256:337710fd9bd62e77cbe0fcd9ac76307774ec96ebd56b5a29e2fb1d41b015c998",
+      "mode": "0644",
+      "template": "api/files/api/tools.sum"
+    },
+    "deploy/Dockerfile.api": {
+      "class": "managed",
+      "hash": "sha256:d65071d4b939f36cfb61c83aec2f0f1b037f14c8f4738bd24f6b52c226da24d9",
+      "mode": "0644",
+      "template": "api/files/deploy/Dockerfile.api.tmpl"
+    },
+    "deploy/compose.dev.yml": {
+      "class": "managed",
+      "hash": "sha256:f45b446a910affd04ce519570112f587c9332a2fb820e3b1e11ef0f589be5950",
+      "mode": "0644",
+      "template": "api/files/deploy/compose.dev.yml.tmpl"
+    },
+    "spinup.toml": {
+      "class": "scaffold",
+      "hash": "sha256:0e7072e517a95b18fb3a66115f79dda6ffd40d5b255cc169ca0d8a0808d635b0",
+      "mode": "0644",
+      "template": "base/files/spinup.toml.tmpl"
+    }
+  },
+  "formatter_go": "go1.27.2",
+  "kit": {
+    "module": "github.com/stopyellingatme/spinup/kit",
+    "version": "v0.1.0"
+  },
+  "min_cli": "0.0.0-dev",
+  "orphans": [],
+  "plugins": [],
+  "schema": 1,
+  "stack_versions": {
+    "alloy": "grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f",
+    "blackbox-exporter": "prom/blackbox-exporter:v0.29.0@sha256:9613f2884689b6fad9f1939f6a3b0388c93a022cfaededb19545b329b5c83dea",
+    "caddy": "caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+    "cadvisor": "ghcr.io/google/cadvisor:v0.60.6@sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a",
+    "distroless-static": "gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab",
+    "docker-dind": "docker:29.9.0-dind@sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c2218643d03ccfddc65995470",
+    "golang": "golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d",
+    "grafana": "grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f",
+    "loki": "grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193",
+    "mailpit": "axllent/mailpit:v1.31.5@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea",
+    "node": "node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
+    "node-exporter": "prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0",
+    "otel-lgtm": "grafana/otel-lgtm:0.36.0@sha256:57c04cbd8e7022f32bb84c4ac005d79baf8b08e2c5be44facf11f5f1f9944ba2",
+    "postgres": "postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+    "postgres-16": "postgres:16.15@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+    "postgres-17": "postgres:17.11@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3",
+    "postgres-exporter": "prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e",
+    "prometheus": "prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e",
+    "seaweedfs": "chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+    "tempo": "grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd",
+    "trivy": "aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa"
+  },
+  "template_version": "0.0.0-dev",
+  "tombstones": []
+}

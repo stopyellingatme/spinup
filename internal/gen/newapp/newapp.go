@@ -16,6 +16,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/render"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
 	"github.com/stopyellingatme/spinup/internal/templates"
+	"github.com/stopyellingatme/spinup/internal/templates/store"
 	"github.com/stopyellingatme/spinup/internal/ui"
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
@@ -118,7 +119,7 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 		return nil, err
 	}
 	stack := stackversions.MustLoad()
-	version := templateVersion(o.Version)
+	version := store.CurrentVersion(o.Version)
 	plan, err := render.Render(render.Input{Packs: selected, Answers: answers, Stack: stack, TemplateVersion: version})
 	if err != nil {
 		return nil, err

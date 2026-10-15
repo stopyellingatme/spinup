@@ -1,0 +1,10 @@
+# document
+root = true # root
+[app] # table
+name  = 'old' # name
+items = [
+ # array
+ 'a', # element
+] # items
+[other]
+keep = 1 # keep
