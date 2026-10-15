@@ -9,6 +9,9 @@ import (
  "[[ .module ]]/api/db/migrations"
  "[[ .module ]]/api/internal/routes"
  "github.com/stopyellingatme/spinup/kit/app"
+[[- if has "auth" .modules ]]
+ "github.com/stopyellingatme/spinup/kit/auth"
+[[- end ]]
  "github.com/stopyellingatme/spinup/kit/config"
  "github.com/stopyellingatme/spinup/kit/db"
 [[- if has "jobs" .modules ]]
@@ -29,17 +32,39 @@ func main() {
   fmt.Fprintln(os.Stderr, err)
   os.Exit(1)
  }
+[[- if has "auth" .modules ]]
+ // The web app posts its form actions from PUBLIC_ORIGIN, so the CSRF check trusts it.
+ var web struct {
+  PublicOrigin string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
+ }
+ if err := config.Load(&web); err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+ authn, err := auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))
+ if err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+[[- end ]]
  a := app.New(
   app.WithName([[ quote .app_name ]]),
   app.WithVersion(version),
   app.WithConfig(cfg),
   app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
+[[- if has "auth" .modules ]]
+  app.WithMiddleware(authn.Middleware()),
+  app.WithRoutes(authn.Routes),
+[[- end ]]
   app.WithReadiness("db", pool.Ping),
   app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),
 [[- if has "jobs" .modules ]]
   app.WithCommand("jobs-migrate", jobs.MigrateCommand(jobs.WithMigrateDatabaseURL(cfg.DatabaseURL))),
 [[- end ]]
   app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
+[[- if has "auth" .modules ]]
+  app.WithShutdown(authn.Close),
+[[- end ]]
  )
  app.Main(a)
 }
