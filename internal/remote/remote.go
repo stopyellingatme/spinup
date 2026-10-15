@@ -23,12 +23,10 @@ type Host struct {
 	Port                int
 }
 
-// HostFromEnv validates the destination and supplies the default SSH port.
+// HostFromEnv validates the destination. A zero port leaves the port to the SSH config
+// (which defaults to 22), so a Port line in ~/.ssh/config or SPINUP_SSH_CONFIG wins.
 func HostFromEnv(env project.Env) (Host, error) {
 	h := Host{Name: env.Name, Address: env.Host, User: env.User, Port: env.Port}
-	if h.Port == 0 {
-		h.Port = 22
-	}
 	return h, validateHost(h)
 }
 
@@ -74,9 +72,6 @@ type sshRunner struct {
 
 // New creates a system SSH runner. Initialization errors are returned by its methods.
 func New(h Host, r runexec.Runner, o Options) Runner {
-	if h.Port == 0 {
-		h.Port = 22
-	}
 	s := &sshRunner{runner: r, err: validateHost(h), destination: h.Address}
 	if h.User != "" {
 		s.destination = h.User + "@" + h.Address
@@ -107,7 +102,11 @@ func New(h Host, r runexec.Runner, o Options) Runner {
 	if s.err = os.Chmod(dir, 0700); s.err != nil {
 		return s
 	}
-	s.args = []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + control, "-o", "ControlPersist=60s", "-p", strconv.Itoa(h.Port), "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"}
+	s.args = []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + control, "-o", "ControlPersist=60s"}
+	if h.Port != 0 {
+		s.args = append(s.args, "-p", strconv.Itoa(h.Port))
+	}
+	s.args = append(s.args, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
 	if o.AcceptNewHostKey {
 		s.args = append(s.args, "-o", "StrictHostKeyChecking=accept-new")
 	}

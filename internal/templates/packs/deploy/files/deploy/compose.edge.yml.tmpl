@@ -41,6 +41,9 @@ services:
       net.ipv4.ip_unprivileged_port_start: 0
     read_only: true
     cap_drop: [ALL]
+    # The caddy binary carries the cap_net_bind_service file capability. Without it in the
+    # bounding set, exec fails with "operation not permitted".
+    cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
     tmpfs:
       - /tmp
@@ -55,7 +58,8 @@ services:
     networks:
       app: {}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:2019/config/"]
+      # 127.0.0.1, not localhost: busybox wget tries ::1 first, and the admin API listens on IPv4.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 10s
       timeout: 3s
       retries: 3

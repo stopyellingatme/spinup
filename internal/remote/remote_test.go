@@ -23,7 +23,7 @@ func TestHostFromEnv(t *testing.T) {
 		want Host
 		bad  bool
 	}{
-		{name: "defaults", env: project.Env{Name: "stage", Host: "vm"}, want: Host{Name: "stage", Address: "vm", Port: 22}},
+		{name: "defaults", env: project.Env{Name: "stage", Host: "vm"}, want: Host{Name: "stage", Address: "vm"}},
 		{name: "explicit", env: project.Env{Host: "::1", User: "deploy", Port: 2222}, want: Host{Address: "::1", User: "deploy", Port: 2222}},
 		{name: "missing", bad: true}, {name: "option", env: project.Env{Host: "-oProxyCommand=bad"}, bad: true},
 		{name: "port", env: project.Env{Host: "vm", Port: 65536}, bad: true},

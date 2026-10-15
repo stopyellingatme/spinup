@@ -5,7 +5,7 @@
 
 # After the switch, spinup deploy requests each path on public_url and expects a 2xx answer.
 # It always checks /healthz and /version too.
-smoke_urls = ["/"]
+[[ if index . "shadcn_registry" ]]smoke_urls = ["/"][[ else ]]smoke_urls = [] # an API-only app has no page at /[[ end ]]
 
 # The number of containers of each service in a color. During a switch, both colors run,
 # so the VM needs memory for two sets.
