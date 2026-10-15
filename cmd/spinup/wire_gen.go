@@ -28,4 +28,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/gen/client"
 	_ "github.com/stopyellingatme/spinup/internal/gen/component"
 	_ "github.com/stopyellingatme/spinup/internal/gen/page"
+
+	// M5
+	_ "github.com/stopyellingatme/spinup/internal/backup"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/plainsecrets"
+	_ "github.com/stopyellingatme/spinup/internal/server"
 )

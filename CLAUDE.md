@@ -25,6 +25,7 @@ Read these before you change anything:
 - The M2 contracts (upgrade engine types, lock schema 2, template versions and archives, the upgrade worktree) are in `docs/adr/0006-m2-contracts.md`.
 - The M3 contracts (generators, post-steps, the OpenAPI and sqlc layout, migrations, jobs) are in `docs/adr/0007-m3-contracts.md`.
 - The M4 contracts (pnpm through corepack, the web layout, session and auth API, client generation, the dev loop) are in `docs/adr/0008-m4-contracts.md`.
+- The M5 contracts (ssh access, the VM layout, the deploy lock and journal, hooks, image transport, secrets, production Compose, the test VM) are in `docs/adr/0009-m5-contracts.md`.
 
 ## Commands
 

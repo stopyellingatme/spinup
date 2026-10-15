@@ -35,6 +35,9 @@ type Env struct {
 	PublicURL string `toml:"public_url"`
 	Protected bool
 	Port      int
+	// Transport moves images to the host: "ssh" (default, docker save | docker load) or
+	// "registry" (push, then pull by digest). See ADR 0009 §4.
+	Transport string
 }
 
 // Plugin defines a configured plugin.
@@ -144,6 +147,9 @@ func (c *Config) Validate() error {
 	for _, name := range envNames {
 		if !envNamePattern.MatchString(name) {
 			problems = append(problems, fmt.Errorf("environment name %q must match %s", name, envNamePattern.String()))
+		}
+		if t := c.Envs[name].Transport; t != "" && t != "ssh" && t != "registry" {
+			problems = append(problems, fmt.Errorf("environment %q: transport %q must be ssh or registry", name, t))
 		}
 	}
 	if c.DefaultEnv != "" {

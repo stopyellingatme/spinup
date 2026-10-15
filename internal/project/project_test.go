@@ -181,3 +181,22 @@ func TestConfirmProtected(t *testing.T) {
 		})
 	}
 }
+
+func TestEnvTransport(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		transport string
+		ok        bool
+	}{{"", true}, {"ssh", true}, {"registry", true}, {"ftp", false}} {
+		c, err := Parse([]byte("[app]\nname = \"demo\"\nmodule = \"example.com/demo\"\n\n[env.prod]\nhost = \"vm\"\ntransport = \"" + tc.transport + "\"\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Envs["prod"].Transport != tc.transport {
+			t.Fatalf("transport = %q", c.Envs["prod"].Transport)
+		}
+		if err := c.Validate(); (err == nil) != tc.ok {
+			t.Fatalf("transport %q: Validate() = %v", tc.transport, err)
+		}
+	}
+}
