@@ -88,7 +88,8 @@ app_extra=(github.com/oapi-codegen/runtime github.com/oapi-codegen/runtime/types
   go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
   go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp go.opentelemetry.io/contrib/bridges/otelslog
   go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
-  go.opentelemetry.io/contrib/instrumentation/runtime github.com/exaring/otelpgx)
+  go.opentelemetry.io/contrib/instrumentation/runtime github.com/exaring/otelpgx
+  github.com/wneessen/go-mail github.com/coreos/go-oidc/v3/oidc golang.org/x/oauth2)
 
 # add_app_extra <api dir> requires and imports every app_extra module, so tidy keeps them.
 add_app_extra() {

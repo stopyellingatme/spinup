@@ -29,6 +29,7 @@ Read these before you change anything:
 - The M6 contracts (telemetry configuration, the monitoring pack and profiles, monitor commands, web tracing) are in `docs/adr/0010-m6-contracts.md`.
 - The M7 contracts (backup configuration, backends, in-place restore, backup metrics, the schedule, maintenance, the remote doctor, test storage) are in `docs/adr/0011-m7-contracts.md`.
 - The M8 contracts (release assets, versions and signing, installing spinup, generated workflows, `spinup ci`) are in `docs/adr/0012-m8-contracts.md`.
+- The M9 contracts (modules, mail and password reset, OIDC, pack plugins) are in `docs/adr/0013-m9-contracts.md`.
 
 ## Commands
 
@@ -88,6 +89,7 @@ Only the main loop writes these files. A unit never edits them:
 - the M2 contract files: `internal/templates/source.go`, `internal/merge/contract.go`, `internal/upgrade/contract.go`, `internal/migrate/contract.go` (see `docs/adr/0006-m2-contracts.md`)
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
 - the M7 contract files `internal/backup/registry.go` and `internal/maintain/window.go` (see `docs/adr/0011-m7-contracts.md`)
+- the M9 contract file `internal/plugin/contract.go` (see `docs/adr/0013-m9-contracts.md`)
 - the web pack fragments `pack.d/deps.toml` and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.

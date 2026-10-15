@@ -44,4 +44,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/remote"
 	_ "github.com/stopyellingatme/spinup/internal/maintain"
 	_ "github.com/stopyellingatme/spinup/internal/maintain/pg"
+
+	// M9
+	_ "github.com/stopyellingatme/spinup/internal/gen/mailer"
+	_ "github.com/stopyellingatme/spinup/internal/plugin/pack"
+	_ "github.com/stopyellingatme/spinup/internal/plugin/render"
 )
