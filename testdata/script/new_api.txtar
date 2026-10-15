@@ -1,7 +1,7 @@
 # Compose the default public packs and write a validated lock.
 env SPINUP_KIT_REPLACE=
 exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
-stdout 'Created todo \([0-9]+ files\) from packs base, api, ci'
+stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, deploy'
 stdout 'Next:'
 stdout '  spinup dev'
 exists todo/spinup.lock todo/spinup.toml todo/api/go.mod
@@ -18,7 +18,7 @@ stderr 'Try:'
 exec spinup new frontend --module example.com/frontend --no-git --non-interactive
 exists frontend/web/package.json
 ! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
-stderr 'available modules: ci, jobs'
+stderr 'available modules: ci, deploy, jobs'
 ! exec spinup new needsweb --api-only --modules ci,auth --no-git --non-interactive
 stderr 'needs the web frontend'
 

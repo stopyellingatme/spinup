@@ -1,7 +1,7 @@
 # Select the kit behavior defaults.
 behavior_version = 1
 # Enable these optional modules.
-modules = [ "ci" ]
+modules = [ "ci", "deploy" ]
 
 [app]
 # Name the application.

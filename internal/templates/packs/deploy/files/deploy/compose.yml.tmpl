@@ -1,0 +1,130 @@
+[[- $web := index . "shadcn_registry" -]]
+# Managed by spinup: `spinup upgrade` keeps this file current.
+# Put your own services in compose.override.yml.
+#
+# The color project of a blue/green release (docs/adr/0003-deploy-strategy.md).
+# spinup deploy runs this file as the Compose project [[ .app_name ]]-blue or [[ .app_name ]]-green.
+# Caddy and Postgres live in compose.edge.yml, so a color switch never restarts them.
+#
+# spinup deploy sets these variables:
+#   SPINUP_COLOR    blue or green
+#   API_IMAGE       [[ .app_name ]]-api:<release-id>[[ if $web ]]
+#   WEB_IMAGE       [[ .app_name ]]-web:<release-id>[[ end ]]
+#   PUBLIC_ORIGIN   public_url of the environment in spinup.toml
+#   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM, which owns /opt/[[ .app_name ]]/secrets
+#   API_REPLICAS, API_CPUS, API_MEMORY[[ if $web ]], WEB_REPLICAS, WEB_CPUS, WEB_MEMORY[[ end ]]
+#                   from deploy/environments/<env>.toml
+name: [[ .app_name ]]-${SPINUP_COLOR:?spinup deploy sets SPINUP_COLOR to blue or green}
+
+include:
+  - compose.override.yml
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  api:
+    image: ${API_IMAGE:?spinup deploy sets API_IMAGE} # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      SPINUP_ENV: production
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
+      DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+    volumes:
+      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+    networks:
+      app:
+        # Caddy and the web service reach this color as api-<color>. The plain name `api`
+        # resolves to both colors during a switch, so never use it on the shared network.
+        aliases:
+          - api-${SPINUP_COLOR}
+      db: {}
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: ${API_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: "${API_CPUS:-1.0}"
+          memory: ${API_MEMORY:-512m}
+    stop_grace_period: 20s
+    restart: unless-stopped
+    logging: *logging
+[[- if $web ]]
+
+  web:
+    image: ${WEB_IMAGE:?spinup deploy sets WEB_IMAGE} # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    user: node
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      # The API of the same color. The build bakes PUBLIC_ORIGIN into the image (ADR 0002 rule 2).
+      API_URL: http://api-${SPINUP_COLOR}:8080
+    networks:
+      app:
+        aliases:
+          - web-${SPINUP_COLOR}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: ${WEB_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: "${WEB_CPUS:-1.0}"
+          memory: ${WEB_MEMORY:-512m}
+    stop_grace_period: 25s
+    restart: unless-stopped
+    logging: *logging
+[[- end ]]
+
+  # One-shot: spinup deploy runs the migrations of the new release before it starts the color:
+  #   docker compose -p [[ .app_name ]]-<color> --profile migrate run --rm migrate
+  # It exits when the migrations are done, so it has no health check.
+  migrate:
+    image: ${API_IMAGE:?spinup deploy sets API_IMAGE} # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    command: ["migrate", "up"]
+    profiles: [migrate]
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      SPINUP_ENV: production
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
+      DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+    volumes:
+      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+    networks:
+      db: {}
+    restart: "no"
+    logging: *logging
+
+# compose.edge.yml creates both networks. The color projects join them.
+networks:
+  app:
+    name: [[ .app_name ]]-app
+    external: true
+  db:
+    name: [[ .app_name ]]-db
+    external: true
