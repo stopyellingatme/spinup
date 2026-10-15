@@ -306,18 +306,25 @@ func (h *oidcHandler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	var claims struct {
 		Email    string `json:"email"`
-		Verified bool   `json:"email_verified"`
+		Verified any    `json:"email_verified"`
 	}
 	if err := id.Claims(&claims); err != nil {
 		oidcInvalid(w, r)
 		return
 	}
+	var verified bool
+	switch value := claims.Verified.(type) {
+	case bool:
+		verified = value
+	case string:
+		verified = value == "true"
+	}
 	email, valid := normalizeEmail(claims.Email)
-	if !valid || !claims.Verified {
+	if !valid || !verified {
 		oidcInvalid(w, r)
 		return
 	}
-	user, err := h.user(ctx, p.name, id.Subject, email, claims.Verified)
+	user, err := h.user(ctx, p.name, id.Subject, email, verified)
 	if err != nil {
 		h.auth.internalError(w, r, "link the OIDC identity", err)
 		return
