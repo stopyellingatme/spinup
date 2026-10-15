@@ -279,10 +279,13 @@ The M8 pre-seed adds ADR 0012 (release assets, signing, the installer, the gener
 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| M9.1 | Module metadata registry. Pack paths stay the same. | `T ./internal/modules/...` | `internal/modules/` | – |
+| M9.1 | Module registry, `module list`, and `module add` (through the upgrade engine) | `T ./internal/modules/...`, then `S module_add` | `internal/modules/`, `internal/cli/module.go`, `internal/upgrade/module*.go` | – |
 | M9.2 | Kit `mail`, the `mail` pack, `g mailer`, and password reset through an auth `pack.d` fragment | `T ./kit/mail/... ./internal/gen/mailer/...`, then `G mail` | `kit/mail/`, `packs/mail/`, `packs/auth/pack.d/reset.toml` with its templates, `internal/gen/mailer/`, `testdata/golden/mail/` | – |
-| M9.3 | OIDC in kit `auth` | `T ./kit/auth/ -run OIDC` | `kit/auth/oidc*.go`, `packs/auth/pack.d/oidc.toml` with its templates | – |
-| M9.4 | Tier-1 pack plugins: `plugin add/remove/list/verify/info/update`, the allowlist, lock checksums, the plugin matrix test, and the policy doc | `S plugin`, then `T ./internal/upgrade/ -run MatrixPlugin` | `internal/plugin/pack/`, `internal/cli/plugin.go`, `internal/upgrade/matrix_plugin_test.go`, `testdata/script/plugin.txtar`, `docs/policy/plugins.md` | M9.1 |
+| M9.3 | OIDC in kit `auth` | `T ./kit/auth/ -run OIDC` | `kit/auth/oidc*.go`, `packs/auth/pack.d/oidc.toml` with its templates | M9.2 |
+| M9.4 | Tier-1 pack plugins: fetch, hash, allowlist, lock, and `plugin add/remove/list/verify/info/update` | `T ./internal/plugin/...`, then `S plugin` | `internal/plugin/pack/`, `internal/cli/plugin.go`, `testdata/script/plugin.txtar`, `testdata/plugins/`, `docs/policy/plugins.md` | – |
+| M9.5 | Plugin packs in `new`, render, `upgrade`, and declarative generators; the plugin matrix test | `T ./internal/upgrade/ -run MatrixPlugin`, then `S plugin_render` | `internal/plugin/render/`, the upgrade source and plan files, `internal/upgrade/matrix_plugin_test.go`, `testdata/script/plugin_render.txtar` | M9.1, M9.4 |
+
+The M9 pre-seed adds ADR 0013, the plugin contract `internal/plugin/contract.go`, go-mail, go-oidc, and oauth2 in the kit and the app lockfiles, and stub packages.
 
 #### M10 — Deferred full-depth items (last, and the core does not depend on them)
 
