@@ -16,7 +16,10 @@ import (
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
-type approval struct{ Source, SHA256 string }
+type approval struct {
+	Source, SHA256 string
+	Exec           bool
+}
 
 func validHash(s string) bool {
 	if len(s) != 64 {
@@ -41,13 +44,13 @@ func readAllowlist(root string, missingOK bool) (map[string]approval, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) != 3 || !namePattern.MatchString(fields[0]) || !validHash(fields[2]) {
+		if (len(fields) != 3 && (len(fields) != 4 || fields[3] != "exec")) || !namePattern.MatchString(fields[0]) || !validHash(fields[2]) {
 			return nil, problem("read plugin allowlist", fmt.Errorf("invalid line %d", i+1))
 		}
 		if _, exists := result[fields[0]]; exists {
 			return nil, problem("read plugin allowlist", fmt.Errorf("duplicate plugin %q", fields[0]))
 		}
-		result[fields[0]] = approval{Source: fields[1], SHA256: fields[2]}
+		result[fields[0]] = approval{Source: fields[1], SHA256: fields[2], Exec: len(fields) == 4}
 	}
 	return result, nil
 }
@@ -60,7 +63,11 @@ func allowBytes(entries map[string]approval) []byte {
 	var out strings.Builder
 	for _, name := range names {
 		entry := entries[name]
-		fmt.Fprintf(&out, "%s %s %s\n", name, entry.Source, entry.SHA256)
+		marker := ""
+		if entry.Exec {
+			marker = " exec"
+		}
+		fmt.Fprintf(&out, "%s %s %s%s\n", name, entry.Source, entry.SHA256, marker)
 	}
 	return []byte(out.String())
 }
@@ -206,7 +213,11 @@ func (m *Manager) writeRecords(cfg *project.Config, lock *manifest.Lock, decl pr
 	}
 	delete(allow, decl.Name)
 	if loaded != nil {
-		allow[decl.Name] = approval{Source: decl.Source, SHA256: loaded.SHA256}
+		cfg, err := ReadExec(loaded.FS)
+		if err != nil {
+			return err
+		}
+		allow[decl.Name] = approval{Source: decl.Source, SHA256: loaded.SHA256, Exec: cfg.Kind == "exec"}
 	}
 	var plan vfs.Plan
 	for _, file := range []vfs.File{{Path: project.ConfigFile, Data: data, Mode: 0644}, {Path: plugin.AllowlistFile, Data: allowBytes(allow), Mode: 0644}, {Path: historyFile, Data: history, Mode: 0644}} {

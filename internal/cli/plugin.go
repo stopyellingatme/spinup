@@ -34,26 +34,30 @@ func newPlugin(app *App) *cobra.Command {
 		}
 		return &pack.Manager{Root: root, CLIVersion: Version, Offline: app.Flags.Offline, Trust: trust, Interactive: app.UI.Interactive(), DryRun: app.Flags.DryRun, In: c.InOrStdin(), Out: c.OutOrStdout()}, nil
 	}
-	var addVersion, updateVersion string
+	var addVersion, updateVersion, addTrustExec, updateTrustExec string
 	var addTrust, updateTrust bool
 	add := &cobra.Command{Use: "add <source>", Short: "Inspect and trust a plugin without rendering files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, addTrust)
 		if err != nil {
 			return err
 		}
+		m.TrustExec = addTrustExec
 		return m.Add(c.Context(), args[0], addVersion)
 	}}
 	add.Flags().StringVar(&addVersion, "version", "", "fixed git tag or path plugin version")
 	add.Flags().BoolVar(&addTrust, "trust", false, "trust the displayed plugin source and hash")
+	add.Flags().StringVar(&addTrustExec, "trust-exec", "", "trust execution of the named plugin with your user privileges")
 	update := &cobra.Command{Use: "update <name>", Short: "Inspect and trust a plugin version", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, updateTrust)
 		if err != nil {
 			return err
 		}
+		m.TrustExec = updateTrustExec
 		return m.Update(c.Context(), args[0], updateVersion)
 	}}
 	update.Flags().StringVar(&updateVersion, "version", "", "new fixed git tag or path plugin version")
 	update.Flags().BoolVar(&updateTrust, "trust", false, "trust the displayed plugin source and hash")
+	update.Flags().StringVar(&updateTrustExec, "trust-exec", "", "trust execution of the named plugin with your user privileges")
 	remove := &cobra.Command{Use: "remove <name>", Short: "Remove plugin records and retain rendered files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, false)
 		if err != nil {
