@@ -1,0 +1,64 @@
+name: Monitoring boot
+
+# The monitoring stack boot test (docs/contributing/monitoring-boot.md). It boots each profile
+# of the monitoring pack next to a stand-in app. It fails when a service is unhealthy, when the
+# logs or traces do not arrive, or when the stack uses more memory than its budget.
+on:
+  pull_request:
+    paths:
+      - "internal/templates/packs/monitoring/**"
+      - "internal/templates/packs/deploy/files/deploy/Caddyfile.tmpl"
+      - "internal/stackversions/stackversions.yaml"
+      - "testdata/e2e/monitoring/**"
+      - ".github/workflows/monitoring.yml"
+  push:
+    branches: [main]
+    paths:
+      - "internal/templates/packs/monitoring/**"
+      - "internal/templates/packs/deploy/files/deploy/Caddyfile.tmpl"
+      - "internal/stackversions/stackversions.yaml"
+      - "testdata/e2e/monitoring/**"
+      - ".github/workflows/monitoring.yml"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitoring-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  boot:
+    name: boot (${{ matrix.profile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [lite, full]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+      - name: Boot the ${{ matrix.profile }} profile
+        env:
+          BOOT_LOG_DIR: ${{ runner.temp }}/monitoring-boot
+        run: bash testdata/e2e/monitoring/run.sh "${{ matrix.profile }}"
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: monitoring-boot-${{ matrix.profile }}
+          path: ${{ runner.temp }}/monitoring-boot
+          if-no-files-found: ignore
+          retention-days: 7
