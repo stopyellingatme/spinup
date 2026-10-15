@@ -73,6 +73,7 @@ class = "scaffold"
 
 [[files]]
 path = "web/src/lib/api/client.ts"
+when = "api_client != 'heyapi'"
 source = "files/web/src/lib/api/client.ts"
 class = "scaffold"
 

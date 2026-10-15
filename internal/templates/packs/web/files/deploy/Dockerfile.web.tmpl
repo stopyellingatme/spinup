@@ -1,19 +1,33 @@
 # Managed by spinup. Build context is web/:
 #   docker build -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=https://app.example.com web
 FROM [[ image "node" ]] AS build
+[[- if eq (index . "package_manager") "bun" ]]
+RUN npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
+[[- end ]]
 WORKDIR /app
+[[- if eq (index . "package_manager") "bun" ]]
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts
+[[- else ]]
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
+[[- end ]]
 COPY . .
 # adapter-node does not read ORIGIN at run time: the build bakes the public origin into
 # paths.origin, the CSRF check, and handleFetch.
 ARG PUBLIC_ORIGIN=http://localhost:3000
 ENV PUBLIC_ORIGIN=${PUBLIC_ORIGIN}
 # --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.
+[[- if eq (index . "package_manager") "bun" ]]
+RUN bunx --no-install svelte-kit sync && bun run build \
+ && rm -rf node_modules && bun install --production --frozen-lockfile --ignore-scripts
+[[- else ]]
 RUN pnpm exec svelte-kit sync && pnpm build \
  && rm -rf node_modules && pnpm install --prod --frozen-lockfile --ignore-scripts --offline
+[[- end ]]
 
 FROM [[ image "node" ]]
 WORKDIR /app

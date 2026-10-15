@@ -22,6 +22,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 // Options controls the local development stack.
@@ -144,10 +145,10 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	}
 	processes := []Process{{Name: "api", Dir: filepath.Join(root, "api"), Cmd: exec.Cmd{Name: "go", Args: apiArgs, Env: apiEnv}, Restart: true}}
 	if hasWeb {
-		processes = append(processes, Process{Name: "web", Dir: root, Cmd: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "dev", "--port", strconv.Itoa(ports.Web.Port), "--strictPort"}, Env: []string{
-			"API_URL=http://localhost:" + strconv.Itoa(ports.API.Port),
-			"PUBLIC_ORIGIN=http://localhost:" + strconv.Itoa(ports.Web.Port),
-		}}, Restart: true})
+		tool := webtool.FromLock(lock)
+		cmd := tool.InWeb(root, tool.Run("dev", "--port", strconv.Itoa(ports.Web.Port), "--strictPort"))
+		cmd.Env = []string{"API_URL=http://localhost:" + strconv.Itoa(ports.API.Port), "PUBLIC_ORIGIN=http://localhost:" + strconv.Itoa(ports.Web.Port)}
+		processes = append(processes, Process{Name: "web", Dir: cmd.Dir, Cmd: cmd, Restart: true})
 	}
 	watchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()

@@ -136,3 +136,86 @@ func write(t *testing.T, root, path, data string) {
 		t.Fatal(err)
 	}
 }
+
+type variantRunner struct {
+	fake exec.Fake
+}
+
+func (r *variantRunner) Run(ctx context.Context, c exec.Cmd) (exec.Result, error) {
+	result, err := r.fake.Run(ctx, c)
+	if err != nil {
+		return result, err
+	}
+	output := c.Args[len(c.Args)-1]
+	if strings.Contains(c.String(), "openapi-typescript") {
+		err = os.WriteFile(output, []byte("schema\n"), 0600)
+	} else {
+		err = os.MkdirAll(filepath.Join(output, "nested"), 0700)
+		if err == nil {
+			err = os.WriteFile(filepath.Join(output, "nested/client.ts"), []byte("fresh\n"), 0600)
+		}
+	}
+	return result, err
+}
+
+func TestHeyAPIDrift(t *testing.T) {
+	t.Parallel()
+	for _, pm := range []string{"pnpm", "bun"} {
+		for _, difference := range []string{"none", "nested", "schema", "extra", "missing"} {
+			t.Run(pm+"/"+difference, func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				lock := manifest.New()
+				lock.Packs = []string{"web"}
+				lock.Answers = map[string]any{"package_manager": pm, "api_client": "heyapi"}
+				if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+					t.Fatal(err)
+				}
+				write(t, root, "api/openapi/bundle.gen.yaml", "bundle")
+				if err := os.MkdirAll(filepath.Join(root, "web/node_modules"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				clientData, schemaData := "fresh\r\n", "schema\r\n"
+				if difference == "nested" {
+					clientData = "stale"
+				}
+				if difference == "schema" {
+					schemaData = "stale"
+				}
+				if difference != "missing" {
+					write(t, root, "web/src/lib/api/client/nested/client.ts", clientData)
+				}
+				write(t, root, "web/src/lib/api/schema.d.ts", schemaData)
+				if difference == "extra" {
+					write(t, root, "web/src/lib/api/client/obsolete.ts", "stale")
+				}
+				runner := &variantRunner{}
+				name, prefix := "pnpm", []string{"--dir", "web", "exec"}
+				if pm == "bun" {
+					name = "bunx"
+					prefix = []string{"--no-install"}
+				}
+				runner.fake.Expect(name, append(append([]string{}, prefix...), "openapi-ts")...)
+				runner.fake.Expect(name, append(append([]string{}, prefix...), "openapi-typescript")...)
+				got := runCheck(t.Context(), &doctor.Context{Root: root, Deps: map[string]any{"runner": runner}})
+				want := doctor.Warn
+				if difference == "none" {
+					want = doctor.OK
+				}
+				if got.Status != want {
+					t.Fatalf("result = %+v, want %s", got, want)
+				}
+				runner.fake.AssertDone(t)
+				for _, call := range runner.fake.Calls() {
+					output := call.Args[len(call.Args)-1]
+					if !filepath.IsAbs(output) {
+						t.Fatalf("output is relative: %s", output)
+					}
+					if _, err := os.Stat(output); !os.IsNotExist(err) {
+						t.Fatalf("temporary output remains: %v", err)
+					}
+				}
+			})
+		}
+	}
+}

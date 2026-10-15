@@ -67,15 +67,28 @@ jobs:
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+[[- if eq (index . "package_manager") "bun" ]]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+[[- end ]]
       - run: |
           set -euo pipefail
+[[- if eq (index . "package_manager") "bun" ]]
+          bun install --frozen-lockfile
+          bun run check
+          # A new app has no unit tests. Playwright runs in its own workflow.
+          bun run test --passWithNoTests
+[[- else ]]
           pnpm install --frozen-lockfile
           pnpm check
           # A new app has no unit tests. Playwright runs in its own workflow.
           pnpm test --passWithNoTests
+[[- end ]]
 [[- end ]]
 
   spinup:
@@ -93,9 +106,15 @@ jobs:
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+[[- if eq (index . "package_manager") "bun" ]]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm "bun" ]]
+[[- else ]]
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+[[- end ]]
 [[- end ]]
       - uses: ./.github/actions/setup-spinup
       - run: |
