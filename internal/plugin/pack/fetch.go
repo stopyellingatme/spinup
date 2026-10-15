@@ -38,7 +38,11 @@ func (m *Manager) fetch(ctx context.Context, source, version, name string) (tree
 			return tree{}, problem("fetch plugin", fmt.Errorf("path source is empty"))
 		}
 		if !filepath.IsAbs(local) {
-			local = filepath.Join(m.Root, local)
+			root := m.PathRoot
+			if root == "" {
+				root = m.Root
+			}
+			local = filepath.Join(root, local)
 		}
 		return readTree(filepath.Clean(local))
 	}

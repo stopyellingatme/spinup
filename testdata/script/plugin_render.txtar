@@ -37,7 +37,7 @@ stdout 'Hello, Ada!'
 ! exists greetings/Ada.txt
 exec spinup generate greeting Ada
 grep 'Hello, Ada!' greetings/Ada.txt
-grep 'plugin/example/gen/greeting' spinup.lock
+grep 'plugin/example/@gen/greeting' spinup.lock
 cp ../user-greeting greetings/Ada.txt
 ! exec spinup generate greeting Ada
 stderr '--force'
@@ -61,7 +61,7 @@ grep 'Plugin version two.' example.txt
 grep '"version": "2.0.0"' spinup.lock
 grep 'User extension.' example.txt
 grep 'Hello, Ada!' greetings/Ada.txt
-grep 'plugin/example/gen/greeting' spinup.lock
+grep 'plugin/example/@gen/greeting' spinup.lock
 
 # New apps can select plugins directly. Missing consent leaves no target directory.
 cd $WORK
@@ -72,6 +72,15 @@ exec spinup new direct --api-only --modules '' --plugin path:$SPINUP_REPO/testda
 exists direct/example.txt
 exists direct/.spinup/plugins.allow
 exists direct/.spinup/plugins.history
+exec spinup --dir direct diff example.txt
+cp user-content direct/example.txt
+exec spinup --dir direct diff example.txt
+stdout 'User extension.'
+exec spinup --dir direct restore example.txt --force
+grep 'This file came from the example plugin.' direct/example.txt
+exec spinup --dir direct eject example.txt
+exec spinup --dir direct restore example.txt
+grep 'plugin/example/files/example.txt.tmpl' direct/spinup.lock
 exec spinup --dir direct generate greeting Grace
 grep 'Hello, Grace!' direct/greetings/Grace.txt
 cd direct
@@ -88,6 +97,57 @@ rm .spinup/plugins.allow
 stderr 'allowlist'
 stderr 'Try:'
 ! exists greetings/Denied.txt
+
+# Pack files under gen/ upgrade normally. Completed defaults survive an update.
+cd $WORK
+exec cp -R $SPINUP_REPO/testdata/plugins/defaults defaults
+exec spinup new gaps --api-only --modules '' --non-interactive
+cd gaps
+cp ../legacy-ignore .gitignore
+exec spinup plugin add path:../defaults --trust
+stdout 'Try:'
+stdout '!.spinup/plugins.allow'
+stdout '!.spinup/plugins.history'
+cp ../records-ignore .gitignore
+exec git add -A
+exec git commit -m 'Trust defaults'
+exec spinup upgrade --to 0.0.0-dev --yes --no-verify
+exec git merge spinup/upgrade-0.0.0-dev
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec git branch -D spinup/upgrade-0.0.0-dev
+grep '"defaults_word": "one"' spinup.lock
+grep 'plugin/defaults/gen/gp.txt' spinup.lock
+cp ../defaults-version2 ../defaults/plugin.toml
+cp ../defaults-pack2 ../defaults/pack.toml
+cp ../two ../defaults/gen/gp.txt
+cp ../legacy-ignore .gitignore
+exec git rm --cached .spinup/plugins.allow .spinup/plugins.history
+exec spinup plugin update defaults --version 2.0.0 --trust
+stdout 'Try:'
+stdout '!.spinup/plugins.allow'
+cp ../records-ignore .gitignore
+exec git add -A
+exec git commit -m 'Update defaults'
+exec spinup upgrade --to 0.0.0-dev --yes --no-verify
+exec git merge spinup/upgrade-0.0.0-dev
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec git branch -D spinup/upgrade-0.0.0-dev
+grep '^two$' gp.txt
+grep '^one$' answer.txt
+cp ../user-greeting answer.txt
+exec spinup plugin remove defaults
+stdout 'next upgrade deletes unmodified'
+stdout 'orphans'
+exec git add -A
+exec git commit -m 'Remove defaults with an edit'
+exec spinup upgrade --to 0.0.0-dev --yes --no-verify
+exec git merge spinup/upgrade-0.0.0-dev
+! exists gp.txt
+grep 'User greeting.' answer.txt
+grep 'answer.txt' spinup.lock
+! exec spinup plugin add path:$SPINUP_REPO/testdata/plugins/missing-default --trust
+stderr 'default is required'
+stderr 'Try:'
 
 -- tools/go --
 #!/bin/sh
@@ -144,3 +204,35 @@ args = ["Name"]
 path = "greetings/{{.Name}}.txt"
 source = "files/greeting.txt.tmpl"
 class = "scaffold"
+
+-- legacy-ignore --
+.spinup/
+-- records-ignore --
+.spinup/*
+!.spinup/plugins.allow
+!.spinup/plugins.history
+-- two --
+two
+-- defaults-version2 --
+name = "defaults"
+version = "2.0.0"
+api = 1
+spinup = ">=0.0.0"
+description = "Changed default and gen source."
+-- defaults-pack2 --
+name = "defaults"
+
+[[questions]]
+key = "defaults_word"
+type = "string"
+default = "two"
+
+[[files]]
+path = "gp.txt"
+source = "gen/gp.txt"
+class = "managed"
+
+[[files]]
+path = "answer.txt"
+source = "gen/answer.txt.tmpl"
+class = "managed"

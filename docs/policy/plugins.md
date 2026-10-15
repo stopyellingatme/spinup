@@ -67,3 +67,14 @@ Released builds must satisfy the range.
 Tier-2 executable plugins are outside this milestone.
 Tier-2 plugins run with the full privileges of the user.
 They need a committed allowlist and explicit trust.
+
+Plugin questions require defaults because upgrades cannot prompt for plugin answers.
+Upgrades record completed defaults as answers in the lock.
+Later changes to defaults retain those recorded answers.
+The `@gen/` source directory is reserved for generator ownership records.
+Ordinary pack sources can use `gen/`.
+
+New apps store local sources relative to the app directory.
+Move the source directories with the app, preserving their relative locations.
+The approval records use the same relative source as the declaration.
+If Git ignores either record, add and update print the required `.gitignore` changes.

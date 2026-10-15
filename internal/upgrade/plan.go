@@ -173,7 +173,7 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		switch {
 		case slices.Contains(in.Lock.Tombstones, name):
 			d.Action, d.Reason = ActionKeep, "tombstone"
-		case tracked && generatorTemplate(entry.Template):
+		case tracked && generatorTemplate(entry.Template) && !renderedPackTemplate(older, name, entry.Template):
 			// A generator wrote this file last (ADR 0007 §1). Templates never re-render or
 			// delete it; for a pack file such as routes_gen.go the generator's version wins.
 			d.Class, d.Template = entry.Class, entry.Template
@@ -352,12 +352,17 @@ func mergePlanFile(ctx context.Context, merger merge.Merger, d FileDecision, bas
 	return d, nil
 }
 
-// generatorTemplate recognizes the ownership namespace, not source directories
-// named gen inside a plugin pack.
+// renderedPackTemplate disambiguates legacy generator IDs from gen/ pack sources.
+func renderedPackTemplate(older vfs.Plan, name, template string) bool {
+	file, ok := older.Get(name)
+	return ok && file.Template == template
+}
+
+// generatorTemplate accepts the reserved namespace and legacy generator IDs.
 func generatorTemplate(name string) bool {
 	if strings.HasPrefix(name, "gen/") {
 		return true
 	}
 	parts := strings.SplitN(name, "/", 4)
-	return len(parts) == 4 && parts[0] == "plugin" && parts[2] == "gen"
+	return len(parts) == 4 && parts[0] == "plugin" && (parts[2] == "@gen" || parts[2] == "gen")
 }

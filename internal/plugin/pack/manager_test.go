@@ -440,14 +440,15 @@ func TestGitFetchWithFakeRunner(t *testing.T) {
 	if err := m.Add(t.Context(), "git:https://example.com/repo", "v1.0.0"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.calls) != 3 {
+	if len(runner.calls) != 4 {
 		t.Fatal(runner.calls)
 	}
+	// Add also checks whether Git ignores the trust records.
 	// Resolution uses the approved cache. Verify fetches again.
 	if _, err := m.resolve(t.Context(), plugin.Options{Root: m.Root}); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.calls) != 3 {
+	if len(runner.calls) != 4 {
 		t.Fatal("resolution fetched despite its cache")
 	}
 }

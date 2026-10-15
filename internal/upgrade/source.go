@@ -106,6 +106,26 @@ func renderRenamePath(source string, answers map[string]any) (string, error) {
 	return name, nil
 }
 
+// LockedPacks builds the core and plugin selection for the project's rendered lock.
+// Historical plugins use approved history and cached bytes, including removed plugins.
+func LockedPacks(ctx context.Context, root string, lock *manifest.Lock, core *templates.Version) (PackSet, error) {
+	historical, err := pack.ResolveLocked(ctx, plugin.Options{Root: root, Offline: true}, lock.Plugins)
+	if err != nil {
+		return PackSet{}, err
+	}
+	if core == nil {
+		if len(historical) == 0 {
+			return PackSet{}, nil
+		}
+		return PackSet{}, fmt.Errorf("load locked plugin packs: template version is unavailable\nTry: restore the old template version before upgrading")
+	}
+	v, names, err := pluginrender.Overlay(core, lock.Packs, historical)
+	if err != nil {
+		return PackSet{}, err
+	}
+	return PackSet{FS: v.Packs, Names: names}, nil
+}
+
 // pluginPacks loads OLD from the rendered lock and NEW from current approvals.
 // It uses the project's source paths, even when planning in a temporary directory.
 func (r *Runner) pluginPacks(ctx context.Context, lock *manifest.Lock, old, newer *templates.Version, target PackSet, offline bool) (PackSet, PackSet, error) {
@@ -113,20 +133,9 @@ func (r *Runner) pluginPacks(ctx context.Context, lock *manifest.Lock, old, newe
 	if err != nil {
 		return PackSet{}, PackSet{}, err
 	}
-	historical, err := pack.ResolveLocked(ctx, plugin.Options{Root: r.Root, Offline: true, Out: r.Out}, lock.Plugins)
+	oldSet, err := LockedPacks(ctx, r.Root, lock, old)
 	if err != nil {
 		return PackSet{}, PackSet{}, err
-	}
-	oldSet := PackSet{}
-	if len(historical) > 0 {
-		if old == nil {
-			return PackSet{}, PackSet{}, fmt.Errorf("load OLD plugin packs: template version is unavailable\nTry: restore the old template version before upgrading")
-		}
-		v, names, err := pluginrender.Overlay(old, lock.Packs, historical)
-		if err != nil {
-			return PackSet{}, PackSet{}, err
-		}
-		oldSet = PackSet{FS: v.Packs, Names: names}
 	}
 	_, names := target.resolve(newer, lock.Packs)
 	names = slices.Clone(names)

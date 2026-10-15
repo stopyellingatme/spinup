@@ -20,6 +20,8 @@ import (
 type Manager struct {
 	// Root is the project directory.
 	Root string
+	// PathRoot resolves local sources while staging a new project. Empty uses Root.
+	PathRoot string
 	// CacheDir overrides the user cache directory for tests or isolated callers.
 	CacheDir string
 	// CLIVersion is the build version used to check the spinup range.
@@ -154,7 +156,7 @@ func (m *Manager) Add(ctx context.Context, source, version string) error {
 	if err != nil {
 		return problem("write plugin next step", err)
 	}
-	return nil
+	return m.warnIgnoredRecords(ctx)
 }
 
 // Update validates a new version and replaces its declaration and trust records.
@@ -204,12 +206,13 @@ func (m *Manager) Update(ctx context.Context, name, version string) error {
 		if err != nil {
 			return problem("write plugin next step", err)
 		}
-		return nil
+		return m.warnIgnoredRecords(ctx)
 	}
 	return problem("update plugin", fmt.Errorf("plugin %q is not declared", name))
 }
 
-// Remove deletes the declaration and trust records, retaining rendered files.
+// Remove deletes the declaration and current approval without changing rendered files.
+// The next upgrade deletes unmodified pack files and preserves edited files as orphans.
 func (m *Manager) Remove(_ context.Context, name string) error {
 	cfg, lock, err := m.state()
 	if err != nil {
@@ -229,12 +232,12 @@ func (m *Manager) Remove(_ context.Context, name string) error {
 		if err := m.writeRecords(cfg, lock, decl, nil); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(m.output(), "Removed plugin %s. Retained files:\n", name); err != nil {
+		if _, err := fmt.Fprintf(m.output(), "Removed plugin %s. The next upgrade deletes unmodified pack files and preserves edited files as orphans.\nRetained files until the next upgrade (review with spinup upgrade --plan):\n", name); err != nil {
 			return problem("write plugin removal", err)
 		}
 		for _, path := range owned {
 			if _, err := fmt.Fprintln(m.output(), "  "+path); err != nil {
-				return problem("write retained plugin files", err)
+				return problem("write affected plugin files", err)
 			}
 		}
 		return nil
@@ -300,6 +303,23 @@ func (m *Manager) Verify(ctx context.Context) error {
 		if _, err := fmt.Fprintf(m.output(), "Verified %s %s %s\n", loaded.Meta.Name, loaded.Meta.Version, loaded.SHA256); err != nil {
 			return problem("write plugin verification", err)
 		}
+	}
+	return nil
+}
+
+// warnIgnoredRecords reports legacy ignore rules without requiring a Git repository.
+func (m *Manager) warnIgnoredRecords(ctx context.Context) error {
+	runner := m.Runner
+	if runner == nil {
+		runner = execx.OSRunner{}
+	}
+	result, _ := runner.Run(ctx, execx.Cmd{Name: "git", Args: []string{"check-ignore", "--", plugin.AllowlistFile, ".spinup/plugins.history"}, Dir: m.Root})
+	if len(result.Stdout) == 0 {
+		return nil
+	}
+	_, err := fmt.Fprintln(m.output(), "Warning: Git ignores plugin trust records.\nTry: replace .spinup/ in .gitignore with these lines:\n.spinup/*\n!.spinup/plugins.allow\n!.spinup/plugins.history")
+	if err != nil {
+		return problem("write ignored plugin records warning", err)
 	}
 	return nil
 }

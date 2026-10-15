@@ -1,0 +1,16 @@
+name = "defaults"
+
+[[questions]]
+key = "defaults_word"
+type = "string"
+default = "one"
+
+[[files]]
+path = "gp.txt"
+source = "gen/gp.txt"
+class = "managed"
+
+[[files]]
+path = "answer.txt"
+source = "gen/answer.txt.tmpl"
+class = "managed"

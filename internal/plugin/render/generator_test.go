@@ -50,7 +50,7 @@ func TestDeclarativeGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lock.Files["greetings/Ada.txt"]; got.Template != "plugin/example/gen/greeting" || got.Hash != manifest.Hash([]byte("Hello, Ada!\n")) {
+	if got := lock.Files["greetings/Ada.txt"]; got.Template != "plugin/example/@gen/greeting" || got.Hash != manifest.Hash([]byte("Hello, Ada!\n")) {
 		t.Fatalf("entry=%+v", got)
 	}
 	if err := os.WriteFile(filepath.Join(root, "greetings/Ada.txt"), []byte("user edit\n"), 0644); err != nil {
