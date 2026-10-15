@@ -216,14 +216,14 @@ func TestListAndInfo(t *testing.T) {
 	}
 }
 
-func TestNotInM5(t *testing.T) {
+func TestRestoreOperationsRequireRemote(t *testing.T) {
 	t.Parallel()
 	b := &PGBackRest{App: "todo"}
 	ctx := context.Background()
 	_, verifyErr := b.Verify(ctx, Target{})
 	for name, err := range map[string]error{"verify": verifyErr, "restore": b.Restore(ctx, Target{}, Into{New: true}), "expire": b.Expire(ctx)} {
-		if !errors.Is(err, ErrNotImplemented) || !strings.Contains(err.Error(), "Try:") {
-			t.Errorf("%s: err = %v", name, err)
+		if err == nil || !strings.Contains(err.Error(), "Try:") {
+			t.Errorf("%s: %v", name, err)
 		}
 	}
 }

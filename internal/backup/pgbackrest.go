@@ -47,6 +47,20 @@ type PGBackRest struct {
 	Progress io.Writer
 }
 
+func init() {
+	RegisterBackend("pgbackrest", func(e Env) (Backend, error) {
+		data, err := ReadConfig(e.Root)
+		if err != nil {
+			return nil, err
+		}
+		retention, err := Retention(e.Config)
+		if err != nil {
+			return nil, err
+		}
+		return &PGBackRest{App: e.App, Remote: e.Remote, Config: data, RetentionFull: retention, Progress: e.Progress}, nil
+	})
+}
+
 var _ Backend = (*PGBackRest)(nil)
 
 // RemoteConfigPath returns the VM path of the pgBackRest configuration.
@@ -168,18 +182,6 @@ func (p *PGBackRest) Info(ctx context.Context) (Status, error) {
 	}
 	return ParseInfo(p.App, out)
 }
-
-// Verify is not in M5. Milestone M7 adds it.
-func (p *PGBackRest) Verify(context.Context, Target) (VerifyResult, error) {
-	return VerifyResult{}, notInM5("verify")
-}
-
-// Restore is not in M5. Milestone M7 adds it.
-func (p *PGBackRest) Restore(context.Context, Target, Into) error { return notInM5("restore") }
-
-// Expire is not in M5. Milestone M7 adds it. Each backup already expires old backups with
-// the retention of pgbackrest.conf.
-func (p *PGBackRest) Expire(context.Context) error { return notInM5("expire") }
 
 type infoJSON struct {
 	Name   string `json:"name"`
