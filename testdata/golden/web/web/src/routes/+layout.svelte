@@ -14,7 +14,12 @@
 		<nav class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
 			<a href="/" class="font-semibold">todo</a>
 			{#if data.user}
-				<span class="text-muted-foreground text-sm" data-testid="user-email">{data.user.email}</span>
+				<div class="flex items-center gap-3">
+					<a href="/account" class="text-muted-foreground text-sm hover:underline" data-testid="user-email">{data.user.email}</a>
+					<form method="POST" action="/logout">
+						<button type="submit" class="text-sm font-medium hover:underline">Sign out</button>
+					</form>
+				</div>
 			{:else}
 				<a href="/login" class="text-sm font-medium hover:underline">Sign in</a>
 			{/if}

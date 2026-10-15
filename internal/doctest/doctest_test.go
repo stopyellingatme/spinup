@@ -144,15 +144,12 @@ func TestDocs(t *testing.T) {
 		"GOMODCACHE=" + caches[1],
 		"SPINUP_KIT_REPLACE=" + filepath.Join(root, "kit"),
 	}
-	// Pages run with their own HOME: pin the corepack cache and the pnpm store too.
-	if home, err := os.UserHomeDir(); err == nil && os.Getenv("COREPACK_HOME") == "" {
-		vars = append(vars, "COREPACK_HOME="+filepath.Join(home, ".cache", "node", "corepack"))
-	}
-	if dir, err := os.UserCacheDir(); err == nil && os.Getenv("npm_config_cache_dir") == "" {
-		vars = append(vars, "npm_config_cache_dir="+filepath.Join(dir, "pnpm"))
-	}
-	if store, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "pnpm", Args: []string{"store", "path"}, Dir: root}); err == nil {
-		vars = append(vars, "npm_config_store_dir="+strings.TrimSpace(string(store.Stdout)))
+	// Pages run with their own HOME: pnpm (scripts/bin/pnpm) and corepack use the real one.
+	if home, err := os.UserHomeDir(); err == nil {
+		vars = append(vars, "SPINUP_PNPM_HOME="+home)
+		if os.Getenv("COREPACK_HOME") == "" {
+			vars = append(vars, "COREPACK_HOME="+filepath.Join(home, ".cache", "node", "corepack"))
+		}
 	}
 	if value := os.Getenv("DATABASE_URL"); value != "" {
 		vars = append(vars, "DATABASE_URL="+value)

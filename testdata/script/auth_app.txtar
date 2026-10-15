@@ -33,7 +33,7 @@ cd ..
 # An API-only app cannot take the auth module: the pages need the web app.
 cd $WORK
 ! exec spinup new apionly --api-only --module example.com/apionly --modules auth --no-git --non-interactive
-stderr 'requires missing pack "web"'
+stderr 'needs the web frontend'
 stderr 'Try: '
 ! exists apionly
 cd todo

@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
@@ -110,6 +112,14 @@ func TestScripts(t *testing.T) {
 					env.Setenv(key, value)
 				}
 			}
+			// Scripts that migrate must not share a database: give each one its own.
+			if base := os.Getenv("DATABASE_URL"); base != "" {
+				url, err := scriptDatabase(env, base)
+				if err != nil {
+					return err
+				}
+				env.Setenv("DATABASE_URL", url)
+			}
 			// SPINUP_REPO lets app-gate scripts point SPINUP_KIT_REPLACE at $SPINUP_REPO/kit.
 			env.Setenv("SPINUP_REPO", root)
 			env.Setenv("PATH", binDir+string(os.PathListSeparator)+env.Getenv("PATH"))
@@ -177,30 +187,44 @@ func makeVersion(root, dir, version, overlay string) error {
 	})
 }
 
-// nodeCaches returns COREPACK_HOME and npm_config_store_dir for the real user, so scripts that
-// run with their own HOME still reach the corepack pnpm download and the pnpm store.
+// nodeCaches returns the variables that let pnpm (scripts/bin/pnpm) and corepack use the real
+// user's home, store, and caches while the script has its own HOME.
 func nodeCaches() map[string]string {
 	caches := map[string]string{}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return caches
 	}
+	caches["SPINUP_PNPM_HOME"] = home
 	if value := os.Getenv("COREPACK_HOME"); value != "" {
 		caches["COREPACK_HOME"] = value
 	} else {
 		caches["COREPACK_HOME"] = filepath.Join(home, ".cache", "node", "corepack")
 	}
-	// pnpm keeps its package metadata in cache-dir (default <home>/Library/Caches/pnpm on macOS,
-	// <home>/.cache/pnpm elsewhere); offline installs need it too.
-	if value := os.Getenv("npm_config_cache_dir"); value != "" {
-		caches["npm_config_cache_dir"] = value
-	} else if dir, err := os.UserCacheDir(); err == nil {
-		caches["npm_config_cache_dir"] = filepath.Join(dir, "pnpm")
-	}
-	if value := os.Getenv("npm_config_store_dir"); value != "" {
-		caches["npm_config_store_dir"] = value
-	} else if out, err := exec.CommandContext(context.Background(), "pnpm", "store", "path").Output(); err == nil {
-		caches["npm_config_store_dir"] = strings.TrimSpace(string(out))
-	}
 	return caches
+}
+
+var scriptDatabases atomic.Int64
+
+// scriptDatabase creates a new, empty database next to the one in base (with psql) and returns
+// its URL. The database is dropped when the script ends.
+func scriptDatabase(env *testscript.Env, base string) (string, error) {
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", fmt.Errorf("parse DATABASE_URL: %w\nTry: export a postgres:// URL", err)
+	}
+	name := fmt.Sprintf("spinup_script_%d_%d", os.Getpid(), scriptDatabases.Add(1))
+	psql := func(sql string) error {
+		out, err := exec.CommandContext(context.Background(), "psql", base, "-v", "ON_ERROR_STOP=1", "-qc", sql).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("psql %q: %v\n%s\nTry: install the psql client, or unset DATABASE_URL", sql, err, out)
+		}
+		return nil
+	}
+	if err := psql("CREATE DATABASE " + name); err != nil {
+		return "", err
+	}
+	env.Defer(func() { _ = psql("DROP DATABASE IF EXISTS " + name + " WITH (FORCE)") })
+	u.Path = "/" + name
+	return u.String(), nil
 }

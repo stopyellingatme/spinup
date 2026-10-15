@@ -29,8 +29,8 @@ An API-only app fails with an error:
 
 ```console
 $ spinup new apionly --api-only --module example.com/apionly --modules auth --no-git --non-interactive
-Error: pack "auth" requires missing pack "web"
-  Try: select the required module with --modules
+Error: module "auth" needs the web frontend, and --api-only leaves it out
+  Try: drop --api-only, or remove auth from --modules
 [exit 1]
 ```
 

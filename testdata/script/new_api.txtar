@@ -20,7 +20,9 @@ stderr 'Try:'
 exec spinup new frontend --module example.com/frontend --no-git --non-interactive
 exists frontend/web/package.json
 ! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
-stderr 'available modules: ci'
+stderr 'available modules: ci, jobs'
+! exec spinup new needsweb --api-only --modules ci,auth --no-git --non-interactive
+stderr 'needs the web frontend'
 
 # Preview creates no directory. JSON has the machine-readable result fields.
 exec spinup new preview --api-only --module example.com/preview --no-git --non-interactive --dry-run

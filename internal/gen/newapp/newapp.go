@@ -188,7 +188,8 @@ func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) 
 	var modules []string
 	for _, p := range packs {
 		available[p.Name] = p
-		if p.Name != "base" && p.Name != "api" && p.Name != "web" {
+		// An API-only app cannot take a module that needs the web frontend (such as auth).
+		if p.Name != "base" && p.Name != "api" && p.Name != "web" && (!apiOnly || !slices.Contains(p.Requires, "web")) {
 			modules = append(modules, p.Name)
 		}
 	}
@@ -214,6 +215,9 @@ func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) 
 	}
 	for _, name := range values {
 		p, ok := available[name]
+		if ok && apiOnly && slices.Contains(p.Requires, "web") {
+			return nil, fmt.Errorf("module %q needs the web frontend, and --api-only leaves it out\nTry: drop --api-only, or remove %s from --modules", name, name)
+		}
 		if !ok || name == "base" || name == "api" || name == "web" {
 			return nil, fmt.Errorf("unknown module %q, available modules: %s\nTry: pass --modules %s", name, strings.Join(modules, ", "), strings.Join(modules, ","))
 		}
