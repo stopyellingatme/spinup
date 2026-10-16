@@ -50,12 +50,18 @@ func migrationSQL(spec Spec) []byte {
 	b.WriteString("-- +goose Up\n")
 	fmt.Fprintf(&b, "CREATE TABLE %s (\n", table)
 	b.WriteString("    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n")
+	if spec.Owned {
+		b.WriteString("    user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n")
+	}
 	for _, f := range spec.Fields {
 		fmt.Fprintf(&b, "    %s %s,\n", f.Column(), sqlType(f))
 	}
 	b.WriteString("    created_at timestamptz NOT NULL DEFAULT now(),\n")
 	b.WriteString("    updated_at timestamptz NOT NULL DEFAULT now()\n")
 	b.WriteString(");\n")
+	if spec.Owned {
+		fmt.Fprintf(&b, "CREATE INDEX %s_user_id_id_idx ON %s (user_id, id);\n", table, table)
+	}
 	for _, f := range spec.Fields {
 		if f.Type.Ref != "" {
 			fmt.Fprintf(&b, "CREATE INDEX %s_%s_idx ON %s (%s);\n", table, f.Column(), table, f.Column())
@@ -70,6 +76,9 @@ func migrationSQL(spec Spec) []byte {
 func queriesSQL(spec Spec) []byte {
 	table := spec.Name.Table()
 	columns := []string{"id"}
+	if spec.Owned {
+		columns = append(columns, "user_id")
+	}
 	var writable, placeholders, sets []string
 	for i, f := range spec.Fields {
 		columns = append(columns, f.Column())
@@ -77,25 +86,36 @@ func queriesSQL(spec Spec) []byte {
 		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
 		sets = append(sets, fmt.Sprintf("%s = $%d", f.Column(), i+2))
 	}
+	if spec.Owned {
+		writable = append(writable, "user_id")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", len(spec.Fields)+1))
+	}
 	columns = append(columns, "created_at", "updated_at")
 	all := strings.Join(columns, ", ")
 	singular, plural := spec.Name.Pascal(), spec.Name.PluralPascal()
 
+	listFilter, countFilter, idFilter, updateFilter := "", "", "", ""
+	if spec.Owned {
+		listFilter = "WHERE user_id = sqlc.arg(user_id)\n"
+		countFilter = " WHERE user_id = $1"
+		idFilter = " AND user_id = $2"
+		updateFilter = fmt.Sprintf(" AND user_id = $%d", len(spec.Fields)+2)
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "-- Queries for the %s table. sqlc turns them into Go code in api/internal/store.\n", table)
 	b.WriteString("-- Run `spinup db sqlc` after you change this file or a migration.\n\n")
 	fmt.Fprintf(&b, "-- name: List%s :many\n", plural)
-	fmt.Fprintf(&b, "SELECT %s\nFROM %s\nORDER BY id\nLIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);\n\n", all, table)
+	fmt.Fprintf(&b, "SELECT %s\nFROM %s\n%sORDER BY id\nLIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);\n\n", all, table, listFilter)
 	fmt.Fprintf(&b, "-- name: Count%s :one\n", plural)
-	fmt.Fprintf(&b, "SELECT count(*) FROM %s;\n\n", table)
+	fmt.Fprintf(&b, "SELECT count(*) FROM %s%s;\n\n", table, countFilter)
 	fmt.Fprintf(&b, "-- name: Get%s :one\n", singular)
-	fmt.Fprintf(&b, "SELECT %s\nFROM %s\nWHERE id = $1;\n\n", all, table)
+	fmt.Fprintf(&b, "SELECT %s\nFROM %s\nWHERE id = $1%s;\n\n", all, table, idFilter)
 	fmt.Fprintf(&b, "-- name: Create%s :one\n", singular)
 	fmt.Fprintf(&b, "INSERT INTO %s (%s)\nVALUES (%s)\nRETURNING %s;\n\n", table, strings.Join(writable, ", "), strings.Join(placeholders, ", "), all)
 	fmt.Fprintf(&b, "-- name: Update%s :one\n", singular)
-	fmt.Fprintf(&b, "UPDATE %s\nSET %s, updated_at = now()\nWHERE id = $1\nRETURNING %s;\n\n", table, strings.Join(sets, ", "), all)
+	fmt.Fprintf(&b, "UPDATE %s\nSET %s, updated_at = now()\nWHERE id = $1%s\nRETURNING %s;\n\n", table, strings.Join(sets, ", "), updateFilter, all)
 	fmt.Fprintf(&b, "-- name: Delete%s :execrows\n", singular)
-	fmt.Fprintf(&b, "DELETE FROM %s\nWHERE id = $1;\n", table)
+	fmt.Fprintf(&b, "DELETE FROM %s\nWHERE id = $1%s;\n", table, idFilter)
 	return []byte(b.String())
 }
 

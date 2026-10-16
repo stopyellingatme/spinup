@@ -75,25 +75,39 @@ create api/internal/handlers/validation.go (scaffold)
 update api/internal/routes/routes_gen.go (managed)
 create api/openapi/paths/todos.yaml (scaffold)
 create api/openapi/schemas/todo.yaml (scaffold)
+update web/src/lib/nav.gen.ts (managed)
 create web/src/routes/todos/+page.server.ts (scaffold)
 create web/src/routes/todos/+page.svelte (scaffold)
 create web/src/routes/todos/[id]/+page.server.ts (scaffold)
 create web/src/routes/todos/[id]/+page.svelte (scaffold)
+create web/src/routes/todos/[id]/edit/+page.server.ts (scaffold)
+create web/src/routes/todos/[id]/edit/+page.svelte (scaffold)
 create web/src/routes/todos/fields.svelte (scaffold)
-create web/src/routes/todos/form.ts (scaffold)
 create web/src/routes/todos/new/+page.server.ts (scaffold)
 create web/src/routes/todos/new/+page.svelte (scaffold)
+create web/src/routes/todos/schema.ts (scaffold)
 ```
 
 The route directory uses the plural name in kebab case, such as `web/src/routes/line-items`.
 
 | File | Contents |
 | --- | --- |
-| `+page.server.ts`, `+page.svelte` | The list: the first 50 items in a table, with links and a "New" button |
-| `new/+page.server.ts`, `new/+page.svelte` | The create form. Its action posts JSON and goes to the new item. |
-| `[id]/+page.server.ts`, `[id]/+page.svelte` | One item in an edit form, with the actions `update` and `delete`. An unknown id gives a 404 page. |
+| `+page.server.ts`, `+page.svelte` | The list: 20 items per page in a table, with pagination. The title is the link to the read view. Each row has a menu (View, Edit, Delete) and an inline checkbox for the first `bool` field that is not null. |
+| `[id]/+page.server.ts`, `[id]/+page.svelte` | The read view of one item, with Edit and Delete buttons. Delete asks for a confirmation in a dialog. An unknown id gives a 404 page. |
+| `[id]/edit/+page.server.ts`, `[id]/edit/+page.svelte` | The edit form. A save goes back to the read view. |
+| `new/+page.server.ts`, `new/+page.svelte` | The create form. A create goes to the read view of the new item. |
 | `fields.svelte` | The inputs of the fields. The create and edit forms share them. |
-| `form.ts` | The conversion between the form values and the JSON body, and the map of API errors to the inputs |
+| `schema.ts` | The zod schema of the form, the conversion between the form values and the JSON body, and the helpers that format values |
+
+The forms use superforms with the zod schema in `schema.ts`.
+The server checks the values, and each error shows next to its input with `aria-invalid` and `aria-describedby`.
+A create, a save, and a delete show a toast after the redirect.
+The redirect carries a flag (`?created=1`, `?saved=1`, or `?deleted=1`), and the page removes the flag from the address bar.
+
+The generator also rebuilds `web/src/lib/nav.gen.ts`.
+This managed file lists one link for each resource, and the sidebar of the app shell shows the links.
+It also sets `home`, the first page that a signed-in user sees.
+When the app has the `auth` module, each user sees only the items that the user owns.
 
 The pages call the Go API with the typed client in `web/src/lib/api/client.ts`.
 After the write, the `client` post-step regenerates `web/src/lib/api/schema.d.ts`, so the pages type-check.
@@ -116,6 +130,7 @@ Each field type gets one input:
 
 An empty input of a nullable field sends `null`.
 If the API returns 422, the form shows each field error next to its input.
+The API reference of the app is at `/api/docs` in dev mode, and in production when `SPINUP_API_DOCS` is true.
 
 ## External commands
 

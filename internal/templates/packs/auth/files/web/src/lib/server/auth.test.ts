@@ -1,7 +1,14 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
-import type { Cookies } from '@sveltejs/kit';
-import { describe, expect, it } from 'vitest';
-import { forwardSessionCookie, postAuth } from './auth.js';
+import type { Action, Cookies, ServerLoad } from '@sveltejs/kit';
+import { describe, expect, it, vi } from 'vitest';
+import { home } from '#lib/nav.gen.js';
+import { actions as loginActions, load as loginLoad } from '../../routes/login/+page.server.js';
+import { actions as registerActions, load as registerLoad } from '../../routes/register/+page.server.js';
+import { actions as logoutActions } from '../../routes/logout/+page.server.js';
+import { forwardSessionCookie, postAuth, requireUser, safeRedirect } from './auth.js';
+
+// Exercise a resource home instead of the empty app's root.
+vi.mock('#lib/nav.gen.js', () => ({ home: '/workspace' }));
 
 type Call = [op: 'set' | 'delete', name: string, value: string | undefined, options: object];
 
@@ -120,4 +127,94 @@ describe('postAuth', () => {
 		}) as unknown as typeof globalThis.fetch;
 		expect(await postAuth(down, cookies, '/api/auth/logout')).toMatchObject({ ok: false, status: 503 });
 	});
+});
+
+describe('safeRedirect', () => {
+	it.each([
+		['/todos', '/todos'],
+		['/todos?page=2', '/todos?page=2'],
+		['//evil.com', '/home'],
+		['/\\evil.com', '/home'],
+		['https://evil.com', '/home'],
+		['javascript:alert(1)', '/home'],
+		['', '/home'],
+		[null, '/home'],
+		['/%2fevil.com', '/home'],
+		['/%5cevil.com', '/home'],
+		['/todos\n', '/home'],
+		['/todos%0d%0aLocation:evil', '/home'],
+		['/%zz', '/home']
+	])('validates %j', (target, expected) => {
+		expect(safeRedirect(target, '/home')).toBe(expected);
+	});
+});
+
+describe('requireUser', () => {
+	it('preserves the protected path and query when redirecting to login', () => {
+		try {
+			requireUser({ user: null }, new URL('https://app.example.com/todos?page=2'));
+			throw new Error('Expected a redirect');
+		} catch (error) {
+			expect(error).toMatchObject({ status: 303, location: '/login?redirectTo=%2Ftodos%3Fpage%3D2' });
+		}
+	});
+
+	it('returns the signed-in user', () => {
+		const user = { id: 1, email: 'ada@example.com' };
+		expect(requireUser({ user }, new URL('https://app.example.com/account'))).toBe(user);
+	});
+});
+
+describe.each([
+	['login', loginLoad as ServerLoad, loginActions.default as Action],
+	['register', registerLoad as ServerLoad, registerActions.default as Action]
+] as const)('%s redirects', (route, load, submit) => {
+	it.each(['/todos?page=2', '//evil.com', null])('validates the destination %j after success', async (target) => {
+		const url = new URL(`https://app.example.com/${route}`);
+		if (target !== null) url.searchParams.set('redirectTo', target);
+		const { cookies } = fakeCookies();
+		const event = {
+			url,
+			cookies,
+			fetch: async () => response(200),
+			request: new Request(url, {
+				method: 'POST',
+				body: new URLSearchParams({ email: 'ada@example.com', password: 'correct horse battery' })
+			})
+		} as unknown as Parameters<typeof submit>[0];
+		await expect(submit(event)).rejects.toMatchObject({
+			status: 303,
+			location: target === '/todos?page=2' ? target : home
+		});
+	});
+
+	it('sends signed-in users to home', () => {
+		const event = {
+			locals: { user: { id: 1, email: 'ada@example.com' } },
+			url: new URL(`https://app.example.com/${route}?redirectTo=/todos`)
+		} as Parameters<typeof load>[0];
+		try {
+			load(event);
+			throw new Error('Expected a redirect');
+		} catch (error) {
+			expect(error).toMatchObject({ status: 303, location: home });
+		}
+	});
+
+	it.each(['/todos?page=2', '//evil.com', null])('supplies a safe destination %j to the page', async (target) => {
+		const url = new URL(`https://app.example.com/${route}`);
+		if (target !== null) url.searchParams.set('redirectTo', target);
+		const event = { locals: { user: null }, url } as Parameters<typeof load>[0];
+		expect(await load(event)).toEqual({ redirectTo: target === '/todos?page=2' ? target : home });
+	});
+});
+
+it('redirects to login after logout', async () => {
+	const { cookies } = fakeCookies();
+	const event = {
+		cookies,
+		fetch: async () => response(204),
+		url: new URL('https://app.example.com/logout')
+	} as unknown as Parameters<typeof logoutActions.default>[0];
+	await expect(logoutActions.default(event)).rejects.toMatchObject({ status: 303, location: '/login' });
 });

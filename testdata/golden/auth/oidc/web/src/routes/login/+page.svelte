@@ -7,8 +7,9 @@
 	import type { PageProps } from './$types';
 	import OidcButtons from '#lib/components/OidcButtons.svelte';
 
-	let { form }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	let pending = $state(false);
+	const redirectQuery = $derived('?redirectTo=' + encodeURIComponent(data.redirectTo));
 </script>
 
 <svelte:head>
@@ -23,6 +24,7 @@
 	<Card.Content>
 		<form
 			method="POST"
+			action={`/login${redirectQuery}`}
 			class="grid gap-4"
 			use:enhance={() => {
 				pending = true;
@@ -69,10 +71,10 @@
 			</div>
 			<Button type="submit" disabled={pending}>Sign in</Button>
 		</form>
-		<OidcButtons />
+		<OidcButtons next={data.redirectTo} />
 	</Card.Content>
 	<Card.Footer class="text-sm">
 		<span class="text-muted-foreground">No account?</span>
-		<a href="/register" class="ml-1 font-medium hover:underline">Create one</a>
+		<a href={`/register${redirectQuery}`} class="ml-1 font-medium hover:underline">Create one</a>
 	</Card.Footer>
 </Card.Root>

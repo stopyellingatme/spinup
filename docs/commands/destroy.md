@@ -21,6 +21,11 @@ Model destruction removes the queries and schemas.
 Handler destruction removes the handler and its test.
 The command removes lock entries only for deleted files.
 
+For an app with the web pack, resource destruction also removes the pages of the resource.
+These are the list, the read view, the edit page, the create page, `fields.svelte`, and `schema.ts` in `web/src/routes/<plural>/`.
+The command then rebuilds `web/src/lib/nav.gen.ts`, so the sidebar link of the resource goes away.
+If you changed a page, the command keeps it and prints a `Try:` line.
+
 Migrations remain on disk and in the lock.
 The `Next:` line suggests `spinup db new drop_<plural>` for resources and models.
 Review that migration before applying it.

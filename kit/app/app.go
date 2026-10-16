@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stopyellingatme/spinup/kit/apidocs"
 	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/devtools"
 	"github.com/stopyellingatme/spinup/kit/httpx"
@@ -27,6 +29,8 @@ import (
 // Construct an App with New. Handler supports concurrent requests.
 // Call Run once for the server lifecycle.
 type App struct {
+	apiDocs         bool
+	apiSpec         fs.FS
 	name            string
 	version         string
 	addr            string
@@ -88,8 +92,19 @@ func New(opts ...Option) *App {
 		routes(mux)
 	}
 	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders()}
+	docsMounted := a.apiDocs && (a.config.Env == "dev" || a.config.APIDocs)
+	if docsMounted {
+		opts := apidocs.Options{Spec: a.apiSpec}
+		if a.config.Env == "dev" {
+			opts.Dir = "openapi"
+		}
+		apidocs.Mount(mux, opts)
+		for _, pattern := range []string{"GET /api/openapi.yaml", "GET /api/docs", "GET /api/docs/scalar.js", "GET /api/docs/boot.js"} {
+			a.addRoute(pattern)
+		}
+	}
 	if a.config.Env == "dev" {
-		dev := devtools.New(devtools.Options{Name: a.name, Version: a.version, Config: a.config, Routes: a.devRoutes, Migrations: a.migrationStatus})
+		dev := devtools.New(devtools.Options{APIDocs: docsMounted, Name: a.name, Version: a.version, Config: a.config, Routes: a.devRoutes, Migrations: a.migrationStatus})
 		handler := dev.Handler()
 		mux.Handle("/_dev", handler)
 		mux.Handle("/_dev/", handler)

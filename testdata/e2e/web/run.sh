@@ -5,7 +5,7 @@
 # Set E2E_ONLINE=1 to install packages from the network (CI). The default is the offline store.
 # Set E2E_INSTALL_BROWSER=1 to install the Chromium browser for Playwright (needs the network).
 # Set E2E_KEEP=1 to keep the work directory.
-# Needs: DATABASE_URL (an empty, disposable database), Go, Node 24, pnpm, and python3.
+# Needs: DATABASE_URL (a disposable database; run.sh empties its public schema when psql exists), Go, Node 24, pnpm, and python3.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,8 +76,15 @@ DATABASE_URL=$DATABASE_URL
 PUBLIC_ORIGIN=$origin
 ENV
 
+# The test database must be empty, or a table from an earlier run would hide a migration change.
+if command -v psql >/dev/null 2>&1; then
+  echo "==> reset the test database"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q \
+    -c 'DROP SCHEMA public CASCADE' -c 'CREATE SCHEMA public' >"$work/logs/reset.log" 2>&1
+fi
+
 echo "==> generate the todo resource and migrate"
-"$work/spinup" g resource todo title:string done:bool >"$work/logs/resource.log" 2>&1
+"$work/spinup" g resource todo title:string done:bool 'due:date?' >"$work/logs/resource.log" 2>&1
 "$work/spinup" db migrate up >"$work/logs/migrate.log" 2>&1
 
 echo "==> build the API"
@@ -110,7 +117,7 @@ fi
 echo "==> start the API on $api_url"
 # exec, so the recorded PID is the API itself and cleanup stops it (a subshell PID would leave
 # the API running).
-(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" exec ./api.bin >"$work/logs/api.log" 2>&1) &
+(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" SPINUP_API_DOCS=true exec ./api.bin >"$work/logs/api.log" 2>&1) &
 pids+=($!)
 echo "==> start the web app on $origin"
 PORT="$web_port" HOST=127.0.0.1 PUBLIC_ORIGIN="$origin" API_URL="$api_url" \
@@ -121,7 +128,8 @@ wait_for "$api_url/healthz" "the API"
 wait_for "$origin/healthz" "the web app"
 
 echo "==> run Playwright"
-E2E_BASE_URL="$origin" pnpm exec playwright test --config e2e/playwright.config.ts "$@"
+# In production a reverse proxy sends /api to the Go API. Here the tests call the API directly.
+E2E_BASE_URL="$origin" E2E_API_URL="$api_url" pnpm exec playwright test --config e2e/playwright.config.ts "$@"
 
 # The generated app's own smoke test (web/playwright.config.ts, web/e2e/smoke.spec.ts), the
 # suite that its e2e.yml runs in CI. Its config reads PUBLIC_ORIGIN.

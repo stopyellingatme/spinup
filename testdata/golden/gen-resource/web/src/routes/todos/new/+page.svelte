@@ -1,31 +1,56 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { untrack } from 'svelte';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import { superForm } from 'sveltekit-superforms';
+	import PageHeader from '#lib/components/app/page-header.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import Fields from '../fields.svelte';
 	import type { PageProps } from './$types';
 
-	let { data, form }: PageProps = $props();
+	let { data }: PageProps = $props();
+
+	// superForm reads the first form data once. Later page data reaches it through the page store.
+	// The server checks the values with the schema, and the errors show at the inputs.
+	const form = superForm(untrack(() => data.form));
+	const { enhance, message, submitting } = form;
 </script>
 
 <svelte:head>
 	<title>New todo</title>
 </svelte:head>
 
-<Card.Root class="mx-auto max-w-xl">
-	<Card.Header>
-		<Card.Title>New todo</Card.Title>
-	</Card.Header>
-	<Card.Content>
-		<form method="POST" use:enhance class="grid gap-4">
-			{#if form?.message}
-				<p class="text-destructive text-sm" role="alert">{form.message}</p>
-			{/if}
-			<Fields values={form?.values ?? data.values} errors={form?.errors} />
-			<div class="flex gap-2">
-				<Button type="submit">Create</Button>
-				<Button href="/todos" variant="outline">Cancel</Button>
-			</div>
-		</form>
-	</Card.Content>
-</Card.Root>
+<div class="max-w-2xl">
+	<a
+		href="/todos"
+		class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+	>
+		<ArrowLeftIcon aria-hidden="true" class="size-4" />
+		Todos
+	</a>
+
+	<PageHeader title="New todo" description="Fill in the fields, then create the todo." />
+
+	<Card.Root>
+		<Card.Content>
+			<form method="POST" use:enhance novalidate class="grid gap-6">
+				{#if $message}
+					<div role="alert" class="border-destructive/50 text-destructive flex items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						<p>{$message}</p>
+					</div>
+				{/if}
+				<Fields {form} />
+				<div class="flex flex-wrap gap-2">
+					<Button type="submit" disabled={$submitting}>
+						{#if $submitting}<LoaderCircleIcon aria-hidden="true" class="animate-spin" />{/if}
+						Create todo
+					</Button>
+					<Button href="/todos" variant="outline">Cancel</Button>
+				</div>
+			</form>
+		</Card.Content>
+	</Card.Root>
+</div>

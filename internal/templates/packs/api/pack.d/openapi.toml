@@ -4,6 +4,11 @@ source = "files/api/openapi/openapi.yaml.tmpl"
 class = "scaffold"
 
 [[files]]
+path = "api/openapi/embed.go"
+source = "files/api/openapi/embed.go.tmpl"
+class = "managed"
+
+[[files]]
 path = "api/openapi/schemas/.gitkeep"
 source = "files/api/openapi/schemas/.gitkeep"
 class = "seed"

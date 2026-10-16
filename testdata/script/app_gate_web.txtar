@@ -22,7 +22,9 @@ grep '"status":\s*"ok"' health.json
 exec curl -sS -o home.html -w '%{http_code}' -H 'Cookie: session=gate' http://127.0.0.1:38427/
 stdout '^200$'
 grep 'Welcome to gateweb' home.html
-grep 'Sign in' home.html
+# Without the auth module the shell has no sign-in link (ADR 0015 §3), and it links to the API reference.
+! grep 'Sign in' home.html
+grep 'href="/api/docs"' home.html
 # adapter-node shuts down cleanly on SIGINT.
 kill -INT web
 wait web

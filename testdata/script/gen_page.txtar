@@ -1,5 +1,6 @@
 # g page and g component in a web app, then g resource with its SvelteKit pages: the pages
-# install offline, type-check against the regenerated client types, and build.
+# install offline, type-check against the regenerated client types, and build. An app with the
+# auth module gets guarded pages that also type-check and build.
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new demo --module example.com/demo --no-git --non-interactive
 cd demo
@@ -29,7 +30,11 @@ stdout '^run pnpm dlx shadcn-svelte@1\.7\.0 add dialog --yes --no-deps-install \
 exec spinup g resource todo title:string done:bool 'due:date?' --dry-run
 stdout '^create web/src/routes/todos/\+page\.svelte \(scaffold\)$'
 stdout '^create web/src/routes/todos/\[id\]/\+page\.server\.ts \(scaffold\)$'
+stdout '^create web/src/routes/todos/\[id\]/edit/\+page\.svelte \(scaffold\)$'
 stdout '^create web/src/routes/todos/new/\+page\.svelte \(scaffold\)$'
+stdout '^create web/src/routes/todos/schema\.ts \(scaffold\)$'
+stdout '^update web/src/lib/nav\.gen\.ts \(managed\)$'
+! stdout 'form\.ts'
 ! exists web/src/routes/todos
 
 # The client post-step needs pnpm and the installed packages.
@@ -38,17 +43,40 @@ stdout '^create web/src/routes/todos/new/\+page\.svelte \(scaffold\)$'
 exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
 
 exec spinup g resource todo title:string done:bool 'due:date?'
-stdout '^Created 16, updated 1 files$'
+stdout '^Created 18, updated 2 files$'
 exists web/src/routes/todos/+page.svelte web/src/routes/todos/+page.server.ts
 exists web/src/routes/todos/new/+page.svelte web/src/routes/todos/new/+page.server.ts
 exists web/src/routes/todos/[id]/+page.svelte web/src/routes/todos/[id]/+page.server.ts
-exists web/src/routes/todos/form.ts web/src/routes/todos/fields.svelte
+exists web/src/routes/todos/[id]/edit/+page.svelte web/src/routes/todos/[id]/edit/+page.server.ts
+exists web/src/routes/todos/schema.ts web/src/routes/todos/fields.svelte
+! exists web/src/routes/todos/form.ts
+! grep 'requireUser' web/src/routes/todos/+page.server.ts
 grep '"/api/todos/\{id\}": \{' web/src/lib/api/schema.d.ts
-grep '"web/src/routes/todos/form.ts": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+grep '"web/src/routes/todos/schema.ts": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+grep '\{ href: ''/todos'', label: ''Todos'' \}' web/src/lib/nav.gen.ts
 
 cd web
 exec sh $WORK/pnpm.sh check
 stdout '(?i)\b0 errors\b'
+stdout '(?i)\b0 warnings\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.js
+
+# With the auth module, every load and action of the pages requires a signed-in user.
+cd $WORK
+exec spinup new authdemo --module example.com/authdemo --modules auth --no-git --non-interactive
+cd authdemo
+exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+exec spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high'
+grep 'import \{ requireUser \} from ''#lib/server/auth.js'';' web/src/routes/todos/+page.server.ts
+grep 'requireUser\(locals, url\);' web/src/routes/todos/[id]/edit/+page.server.ts
+exec spinup g page settings/profile --server
+grep 'requireUser\(locals, url\);' web/src/routes/settings/profile/+page.server.ts
+grep '<PageHeader title=\{data.title\} />' web/src/routes/settings/profile/+page.svelte
+cd web
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+stdout '(?i)\b0 warnings\b'
 exec sh $WORK/pnpm.sh build
 exists build/index.js
 

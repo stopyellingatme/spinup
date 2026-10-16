@@ -11,6 +11,7 @@ import (
 
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/routes"
+	"example.com/todo/api/openapi"
 	"github.com/stopyellingatme/spinup/kit/app"
 	"github.com/stopyellingatme/spinup/kit/auth"
 	"github.com/stopyellingatme/spinup/kit/config"
@@ -62,6 +63,7 @@ func run() (err error) {
 		app.WithName("todo"),
 		app.WithVersion(version),
 		app.WithConfig(cfg),
+		app.WithAPIDocs(openapi.FS),
 		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 		app.WithMiddleware(authn.Middleware()),
 		app.WithRoutes(authn.Routes),

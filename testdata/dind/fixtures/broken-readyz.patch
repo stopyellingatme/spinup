@@ -1,7 +1,7 @@
 --- a/api/cmd/api/main.go
 +++ b/api/cmd/api/main.go
-@@ -32,6 +32,8 @@
- 		app.WithConfig(cfg),
+@@ -33,6 +33,8 @@
+ 		app.WithAPIDocs(openapi.FS),
  		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
  		app.WithReadiness("db", pool.Ping),
 +		// The dind suite overlay: readiness always fails, so the deploy must keep the old color.

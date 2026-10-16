@@ -6,8 +6,9 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import type { PageProps } from './$types';
 
-	let { form }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	let pending = $state(false);
+	const redirectQuery = $derived('?redirectTo=' + encodeURIComponent(data.redirectTo));
 </script>
 
 <svelte:head>
@@ -22,6 +23,7 @@
 	<Card.Content>
 		<form
 			method="POST"
+			action={`/login${redirectQuery}`}
 			class="grid gap-4"
 			use:enhance={() => {
 				pending = true;
@@ -71,6 +73,6 @@
 	</Card.Content>
 	<Card.Footer class="text-sm">
 		<span class="text-muted-foreground">No account?</span>
-		<a href="/register" class="ml-1 font-medium hover:underline">Create one</a>
+		<a href={`/register${redirectQuery}`} class="ml-1 font-medium hover:underline">Create one</a>
 	</Card.Footer>
 </Card.Root>

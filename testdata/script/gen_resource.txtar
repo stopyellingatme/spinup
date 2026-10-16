@@ -62,3 +62,28 @@ cd ..
 [env:DATABASE_URL] cd ..
 [env:DATABASE_URL] exec spinup db to 0 --i-know
 [env:DATABASE_URL] stdout 'rolled back  00002_create_todos\.sql'
+
+
+# Reserved names protect the API reference for both spec consumers.
+cd $WORK/todo
+! exec spinup g resource doc title:string
+stderr 'Try: choose another name, for example document'
+! exec spinup g model openapi title:string
+stderr 'Try: choose another name, for example document'
+! exec spinup g resource global title:string --shared
+stderr 'Try: drop --shared'
+
+# Auth resources require a user and isolate each user's rows.
+cd $WORK
+exec spinup new owned --modules auth --module example.com/owned --no-git --non-interactive
+cd owned
+exec spinup g resource note title:string --api-only
+exec spinup g resource bulletin title:string --shared --api-only
+exec spinup g resource entry title:string note:ref:note count:int total:bigint done:bool score:float price:decimal day:date at:time uid:uuid meta:json 'state:enum:draft|published' optional:string? --api-only
+grep 'user_id bigint NOT NULL REFERENCES users' api/db/migrations/00003_create_notes.sql
+! grep 'user_id' api/db/migrations/00004_create_bulletins.sql
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test -race ./internal/handlers -run 'RequiresUser|RejectsBadInput|RequiresFields'
+[env:DATABASE_URL] exec go test ./...

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ func init() {
 		Flags: func(fs *pflag.FlagSet) {
 			fs.Bool("api-only", false, "skip the parts that other packs register, such as web pages")
 			fs.Bool("no-tests", false, "skip the handler test file")
+			fs.Bool("shared", false, "share rows between signed-in users (requires auth)")
 		},
 		Run: run,
 	})
@@ -42,6 +44,10 @@ type Spec struct {
 	Name fields.Name
 	// Fields are the writable fields, in argument order.
 	Fields []fields.Field
+	// Owned reports whether each row belongs to its signed-in user.
+	Owned bool
+	// Shared reports whether auth protects a table shared by all signed-in users.
+	Shared bool
 }
 
 // Part plans extra files for each resource, such as web pages.
@@ -137,6 +143,9 @@ func ParseSpec(root string, args []string, usage string) (Spec, error) {
 	if err != nil {
 		return Spec{}, err
 	}
+	if reservedResourceName(name) {
+		return Spec{}, fmt.Errorf("resource name %q is reserved for the API reference\nTry: choose another name, for example document", args[0])
+	}
 	fs, err := fields.Parse(args[1:])
 	if err != nil {
 		return Spec{}, err
@@ -230,6 +239,22 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	if err != nil {
 		return nil, err
 	}
+	authenticated, err := hasAuth(in.Root)
+	if err != nil {
+		return nil, err
+	}
+	spec.Shared = Bool(in.Flags, "shared")
+	if spec.Shared && !authenticated {
+		return nil, fmt.Errorf("cannot generate a shared resource without the auth module\nTry: drop --shared")
+	}
+	spec.Owned = authenticated && !spec.Shared
+	if spec.Owned {
+		for _, f := range spec.Fields {
+			if f.Column() == "user_id" {
+				return nil, fmt.Errorf("field %q conflicts with the resource owner column\nTry: choose another field name", f.Column())
+			}
+		}
+	}
 	plan, err := PlanModel(spec, Bool(in.Flags, "force"))
 	if err != nil {
 		return nil, err
@@ -242,6 +267,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		return nil, fmt.Errorf("%w\nTry: report this generator bug", err)
 	}
 	steps := []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostGofmt}
+	pagesRan := false
 	if !Bool(in.Flags, "api-only") {
 		for _, p := range parts {
 			partPlan, partSteps, err := p.Plan(ctx, spec)
@@ -252,6 +278,12 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 				return nil, fmt.Errorf("resource part %q: %w", p.Name, err)
 			}
 			steps = append(steps, partSteps...)
+			pagesRan = pagesRan || p.Name == "pages"
+		}
+	}
+	if pagesRan {
+		if plan, err = PlanNav(in.Root, plan, nil); err != nil {
+			return nil, err
 		}
 	}
 	return &gen.Output{
@@ -273,7 +305,7 @@ func planAPI(spec Spec, tests bool) (vfs.Plan, error) {
 	if err != nil {
 		return vfs.Plan{}, err
 	}
-	routes, err := withModule(routesGenGo, module)
+	routes, err := routesGo(module, spec.Owned || spec.Shared)
 	if err != nil {
 		return vfs.Plan{}, err
 	}
@@ -314,4 +346,16 @@ func planAPI(spec Spec, tests bool) (vfs.Plan, error) {
 		}
 	}
 	return plan, nil
+}
+
+// hasAuth reports whether the lock lists the auth module.
+func hasAuth(root string) (bool, error) {
+	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read spinup.lock: %w\nTry: restore a valid spinup.lock", err)
+	}
+	return slices.Contains(lock.Packs, "auth"), nil
 }

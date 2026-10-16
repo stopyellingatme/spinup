@@ -1,11 +1,15 @@
 // Package page is the `spinup g page <route>` generator. It writes
 // web/src/routes/<route>/+page.svelte, and with --server also +page.server.ts
-// with a load function. The app needs the web pack.
+// with a load function. The app needs the web pack. In an app with the auth
+// module, the load function requires a signed-in user (ADR 0015 §5).
 package page
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -95,11 +99,16 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if server && in.Lock.Answers["frontend_mode"] == "embed" {
 		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")
 	}
+	header, err := hasPageHeader(in.Root)
+	if err != nil {
+		return nil, err
+	}
 	dir := "web/src/routes/" + strings.Join(segments, "/")
 	name := title(segments)
-	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server), Class: string(manifest.Scaffold)}}
+	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server, header), Class: string(manifest.Scaffold)}}
 	if server {
-		files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name), Class: string(manifest.Scaffold)})
+		auth := slices.Contains(in.Lock.Packs, "auth")
+		files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name, auth), Class: string(manifest.Scaffold)})
 	}
 	var p vfs.Plan
 	for _, f := range files {
@@ -110,42 +119,69 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	return &gen.Output{Plan: p, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
 }
 
-func pageSvelte(dir, name string, server bool) []byte {
-	var b strings.Builder
-	heading := name
-	edit := "<code>" + dir + "/+page.svelte</code>"
-	if server {
-		heading = "{data.title}"
-		edit += " and <code>+page.server.ts</code>"
-		b.WriteString(`<script lang="ts">
-	import type { PageProps } from './$types';
+// pageHeaderPath is the page header component of the web pack. Apps made
+// before M12 lack it, and their pages use a plain heading.
+const pageHeaderPath = "web/src/lib/components/app/page-header.svelte"
 
-	let { data }: PageProps = $props();
-</script>
-
-`)
+func hasPageHeader(root string) (bool, error) {
+	_, err := os.Stat(filepath.Join(root, filepath.FromSlash(pageHeaderPath)))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
 	}
-	fmt.Fprintf(&b, `<svelte:head>
-	<title>%s</title>
-</svelte:head>
+	if err != nil {
+		return false, fmt.Errorf("check %s: %w\nTry: check the file permissions", pageHeaderPath, err)
+	}
+	return true, nil
+}
 
-<h1 class="text-2xl font-semibold">%s</h1>
-<p class="text-muted-foreground mt-2 text-sm">
-	Edit %s to change this page.
-</p>
-`, name, heading, edit)
+// pageSvelte returns the page. With a page header component, the page uses
+// it. Otherwise the page has a plain heading.
+func pageSvelte(dir, name string, server, header bool) []byte {
+	var b strings.Builder
+	edit := "<code>" + dir + "/+page.svelte</code>"
+	heading := name
+	if server {
+		edit += " and <code>+page.server.ts</code>"
+		heading = "{data.title}"
+	}
+	if server || header {
+		b.WriteString("<script lang=\"ts\">\n")
+		if header {
+			b.WriteString("\timport PageHeader from '#lib/components/app/page-header.svelte';\n")
+		}
+		if server {
+			b.WriteString("\timport type { PageProps } from './$types';\n\n\tlet { data }: PageProps = $props();\n")
+		}
+		b.WriteString("</script>\n\n")
+	}
+	fmt.Fprintf(&b, "<svelte:head>\n\t<title>%s</title>\n</svelte:head>\n\n", name)
+	switch {
+	case header && server:
+		b.WriteString("<PageHeader title={data.title} />\n")
+	case header:
+		fmt.Fprintf(&b, "<PageHeader title=\"%s\" />\n", name)
+	default:
+		fmt.Fprintf(&b, "<h1 class=\"mb-2 text-2xl font-semibold\">%s</h1>\n", heading)
+	}
+	fmt.Fprintf(&b, "<p class=\"text-muted-foreground text-sm\">\n\tEdit %s to change this page.\n</p>\n", edit)
 	return []byte(b.String())
 }
 
-func pageServerTS(name string) []byte {
-	return []byte(`import type { PageServerLoad } from './$types';
+func pageServerTS(name string, auth bool) []byte {
+	imports, args, guard := "", "", ""
+	if auth {
+		imports = "import { requireUser } from '#lib/server/auth.js';\n"
+		args = "{ locals, url }"
+		guard = "\trequireUser(locals, url);\n"
+	}
+	return []byte(imports + `import type { PageServerLoad } from './$types';
 
 // load runs on the server for each request of this page. To read from the Go API, use the
 // typed client with the fetch of the load function:
 //
 //     const { data } = await api.GET('/api/...', { fetch, baseUrl: __PUBLIC_ORIGIN__ });
-export const load: PageServerLoad = () => {
-	return { title: '` + name + `' };
+export const load: PageServerLoad = (` + args + `) => {
+` + guard + `	return { title: '` + name + `' };
 };
 `)
 }
