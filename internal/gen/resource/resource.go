@@ -267,6 +267,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		return nil, fmt.Errorf("%w\nTry: report this generator bug", err)
 	}
 	steps := []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostGofmt}
+	pagesRan := false
 	if !Bool(in.Flags, "api-only") {
 		for _, p := range parts {
 			partPlan, partSteps, err := p.Plan(ctx, spec)
@@ -277,6 +278,12 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 				return nil, fmt.Errorf("resource part %q: %w", p.Name, err)
 			}
 			steps = append(steps, partSteps...)
+			pagesRan = pagesRan || p.Name == "pages"
+		}
+	}
+	if pagesRan {
+		if plan, err = PlanNav(in.Root, plan, nil); err != nil {
+			return nil, err
 		}
 	}
 	return &gen.Output{
