@@ -47,7 +47,8 @@ go tool -modfile=tools.mod oapi-codegen -config oapi-codegen.yaml openapi/bundle
 ```
 
 The configuration generates models, a standard HTTP server, and a strict server interface in `api/internal/gen/api.gen.go`.
-It retains unused schemas and does not embed the specification.
+It retains unused schemas and does not embed the specification in generated Go code.
+The application embeds the bundle file for the [API reference](../api-docs.md).
 The generated application requires the oapi-codegen runtime package.
 
 Commit the bundle and generated Go code.

@@ -1,5 +1,5 @@
 # Compose the default public packs and write a validated lock.
-env SPINUP_KIT_REPLACE=
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, deploy'
 stdout 'Next:'
@@ -49,3 +49,6 @@ exec spinup db migrate up --dry-run
 stdout '^go run ./cmd/api migrate up'
 exec spinup build --dry-run
 stdout '^go build -trimpath -ldflags .*-X main.version=dev.* -o bin/api ./cmd/api'
+exists api/openapi/embed.go
+cd api
+exec go build ./...

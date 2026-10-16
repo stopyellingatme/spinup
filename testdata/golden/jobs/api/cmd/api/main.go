@@ -11,6 +11,7 @@ import (
 
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/routes"
+	"example.com/todo/api/openapi"
 	"github.com/stopyellingatme/spinup/kit/app"
 	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/db"
@@ -51,6 +52,7 @@ func run() (err error) {
 		app.WithName("todo"),
 		app.WithVersion(version),
 		app.WithConfig(cfg),
+		app.WithAPIDocs(openapi.FS),
 		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 		app.WithReadiness("db", pool.Ping),
 		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL), db.WithHook(jobs.MigrationHook()))),
