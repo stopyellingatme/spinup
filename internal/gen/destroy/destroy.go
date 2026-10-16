@@ -106,6 +106,13 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 			return nil, err
 		}
 	}
+	if o.Kind == "resource" {
+		navPlan, err := resource.PlanNav(o.Root, result.Files, result.Files.Paths())
+		if err != nil {
+			return nil, err
+		}
+		result.Files = navPlan
+	}
 	result.Files = result.Files.Sorted()
 	return result, nil
 }
@@ -149,8 +156,11 @@ func Run(ctx context.Context, o Options, runner exec.Runner) error {
 	}
 	for _, file := range plan.Files.Files {
 		action := "remove"
+		if !file.Delete {
+			action = "update"
+		}
 		if o.DryRun {
-			action = "would remove"
+			action = "would " + action
 		}
 		if _, err := fmt.Fprintf(o.Out, "%s %s\n", action, file.Path); err != nil {
 			return destroyError(err)
@@ -169,7 +179,17 @@ func Run(ctx context.Context, o Options, runner exec.Runner) error {
 			return err
 		}
 		for _, file := range plan.Files.Files {
-			delete(lock.Files, file.Path)
+			if file.Delete {
+				delete(lock.Files, file.Path)
+				continue
+			}
+			mode := file.Mode.Perm()
+			if mode == 0 {
+				mode = 0o644
+			}
+			if err := lock.SetFile(file.Path, manifest.FileEntry{Class: manifest.Class(file.Class), Template: "gen/resource", Hash: manifest.Hash(file.Data), Mode: fmt.Sprintf("%04o", mode)}); err != nil {
+				return err
+			}
 		}
 		if err := lock.Save(lockPath); err != nil {
 			return err

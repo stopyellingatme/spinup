@@ -136,6 +136,48 @@ func TestBuildKinds(t *testing.T) {
 	}
 }
 
+func TestBuildRebuildsNav(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	name, err := fields.ParseName("todo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := manifest.New()
+	lock.Packs = []string{"base", "api", "web"}
+	write := func(path, data string, class manifest.Class, template string) {
+		t.Helper()
+		filename := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filename, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		lock.Files[path] = manifest.FileEntry{Class: class, Template: template, Hash: manifest.Hash([]byte(data)), Mode: "0644"}
+	}
+	for _, path := range resource.Paths(name) {
+		write(path, "generated\n", manifest.Scaffold, "gen/resource")
+	}
+	write("web/src/routes/posts/+page.svelte", "<h1 />\n", manifest.Scaffold, "gen/resource")
+	write("web/src/routes/posts/schema.ts", "export {};\n", manifest.Scaffold, "gen/resource")
+	write("web/src/lib/nav.gen.ts", "old\n", manifest.Managed, "web/files/web/src/lib/nav.gen.ts")
+	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Build(context.Background(), Options{Root: root, Kind: "resource", Name: "todo"}, lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nav, ok := plan.Files.Get("web/src/lib/nav.gen.ts")
+	if !ok || nav.Class != string(manifest.Managed) {
+		t.Fatalf("navigation file = %#v, present = %v", nav, ok)
+	}
+	if got := string(nav.Data); !strings.Contains(got, "href: '/posts'") || strings.Contains(got, "href: '/todos'") {
+		t.Fatalf("navigation = %s", got)
+	}
+}
+
 func TestPostSteps(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
