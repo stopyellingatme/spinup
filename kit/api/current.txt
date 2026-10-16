@@ -37,6 +37,7 @@ kit/auth field ResetData.URL string
 kit/auth field User.Email string
 kit/auth field User.ID int64
 kit/auth func New(*pgxpool.Pool, ...Option) (*Auth, error)
+kit/auth func Required(http.Handler) http.Handler
 kit/auth func UserFrom(context.Context) (User, bool)
 kit/auth func WithIdleTimeout(time.Duration) Option
 kit/auth func WithLifetime(time.Duration) Option
@@ -48,6 +49,7 @@ kit/auth func WithResetTemplates(fs.FS) ResetOption
 kit/auth func WithResetURL(string) ResetOption
 kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
+kit/auth func WithUser(context.Context, User) context.Context
 kit/auth ptrmethod Auth.Close(context.Context) error
 kit/auth ptrmethod Auth.Middleware() httpx.Middleware
 kit/auth ptrmethod Auth.RequireUser(http.Handler) http.Handler
@@ -58,6 +60,7 @@ kit/auth type Option func(*options)
 kit/auth type ResetData struct
 kit/auth type ResetOption func(*resetOptions)
 kit/auth type User struct
+kit/auth/authtest func As(http.Handler, int64) http.Handler
 kit/backup const Path = "/_deploy/backup"
 kit/backup field Response.Error string
 kit/backup field Response.LastBackupAgeSeconds *float64
