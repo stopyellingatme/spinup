@@ -14,6 +14,8 @@ import (
 type Base struct {
 	// Env selects the application environment. The default is production.
 	Env string `env:"SPINUP_ENV" default:"production"`
+	// APIDocs enables the API reference outside development. The default is false.
+	APIDocs bool `env:"SPINUP_API_DOCS"`
 	// Port selects the HTTP listen port.
 	Port int `env:"PORT" default:"8080"`
 	// DatabaseURL contains the PostgreSQL connection string.

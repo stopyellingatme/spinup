@@ -23,7 +23,7 @@ The guard does not cover these paths:
 
 - `kit/internal/...` is private code.
 - `kit/x/...` is unstable by policy.
-- `kit/devtools` is dev-only. It serves the `/_dev` page and the kit compiles it out unless `SPINUP_ENV=dev`.
+- `kit/devtools` serves the `/_dev` page. `kit/app` mounts it at run time only when `SPINUP_ENV=dev`.
 
 A line has the form `<package> <kind> <name><signature>`.
 The kinds are `func`, `method`, `ptrmethod`, `type`, `field`, `imethod`, `const`, and `var`.

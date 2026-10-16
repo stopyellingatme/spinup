@@ -29,6 +29,8 @@ type Migration struct {
 
 // Options configures a Devtools instance.
 type Options struct {
+	// APIDocs shows a link to the mounted API reference.
+	APIDocs    bool
 	Name       string
 	Version    string
 	Config     any
@@ -52,6 +54,7 @@ type request struct {
 	RequestID  string `json:"request_id"`
 }
 type pageData struct {
+	APIDocs       bool
 	Name, Version string
 	Config        []configValue
 	Routes        []Route
@@ -75,7 +78,7 @@ func (d *Devtools) Handler() http.Handler {
 			_ = json.NewEncoder(w).Encode(d.snapshot())
 		case "/_dev", "/_dev/":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			data := pageData{Name: d.o.Name, Version: d.o.Version, Config: configValues(d.o.Config), Requests: d.snapshot()}
+			data := pageData{APIDocs: d.o.APIDocs, Name: d.o.Name, Version: d.o.Version, Config: configValues(d.o.Config), Requests: d.snapshot()}
 			if d.o.Routes != nil {
 				data.Routes = d.o.Routes()
 			}
@@ -239,4 +242,4 @@ func maskURL(value string) string {
 	return parsed.Scheme + "://" + username + ":****@" + parsed.Host + parsed.RequestURI()
 }
 
-var pageTemplate = template.Must(template.New("devtools").Parse(`<!doctype html><html><head><meta charset="utf-8"><title>Development</title><style>body{font:14px system-ui;margin:2rem;color:#222}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #ccc;padding:.4rem;text-align:left}th{background:#f3f3f3}code{white-space:pre-wrap}</style></head><body><h1>Development</h1><p><code>{{.Name}} {{.Version}}</code></p><h2>Routes</h2><table><tr><th>Pattern</th></tr>{{range .Routes}}<tr><td><code>{{.Pattern}}</code></td></tr>{{end}}</table><h2>Configuration</h2><table><tr><th>Name</th><th>Value</th></tr>{{range .Config}}<tr><td>{{.Name}}</td><td><code>{{.Value}}</code></td></tr>{{end}}</table><h2>Requests</h2><p><a href="/_dev/requests.json">JSON</a></p><table><tr><th>Method</th><th>Path</th><th>Status</th><th>Duration ms</th><th>Request ID</th></tr>{{range .Requests}}<tr><td>{{.Method}}</td><td>{{.Path}}</td><td>{{.Status}}</td><td>{{.DurationMS}}</td><td>{{.RequestID}}</td></tr>{{end}}</table><h2>Pending migrations</h2>{{if .Migration}}<p>{{.Migration}}</p>{{else}}<table><tr><th>Name</th><th>Applied</th></tr>{{range .Migrations}}{{if not .Applied}}<tr><td>{{.Name}}</td><td>{{.Applied}}</td></tr>{{end}}{{end}}</table>{{end}}</body></html>`))
+var pageTemplate = template.Must(template.New("devtools").Parse(`<!doctype html><html><head><meta charset="utf-8"><title>Development</title><style>body{font:14px system-ui;margin:2rem;color:#222}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #ccc;padding:.4rem;text-align:left}th{background:#f3f3f3}code{white-space:pre-wrap}</style></head><body><h1>Development</h1><p><code>{{.Name}} {{.Version}}</code></p>{{if .APIDocs}}<p><a href="/api/docs">API reference</a></p>{{end}}<h2>Routes</h2><table><tr><th>Pattern</th></tr>{{range .Routes}}<tr><td><code>{{.Pattern}}</code></td></tr>{{end}}</table><h2>Configuration</h2><table><tr><th>Name</th><th>Value</th></tr>{{range .Config}}<tr><td>{{.Name}}</td><td><code>{{.Value}}</code></td></tr>{{end}}</table><h2>Requests</h2><p><a href="/_dev/requests.json">JSON</a></p><table><tr><th>Method</th><th>Path</th><th>Status</th><th>Duration ms</th><th>Request ID</th></tr>{{range .Requests}}<tr><td>{{.Method}}</td><td>{{.Path}}</td><td>{{.Status}}</td><td>{{.DurationMS}}</td><td>{{.RequestID}}</td></tr>{{end}}</table><h2>Pending migrations</h2>{{if .Migration}}<p>{{.Migration}}</p>{{else}}<table><tr><th>Name</th><th>Applied</th></tr>{{range .Migrations}}{{if not .Applied}}<tr><td>{{.Name}}</td><td>{{.Applied}}</td></tr>{{end}}{{end}}</table>{{end}}</body></html>`))

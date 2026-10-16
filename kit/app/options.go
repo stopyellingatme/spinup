@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -54,3 +55,9 @@ func WithShutdown(hook func(ctx context.Context) error) Option {
 
 // WithAddr overrides the listen address. An empty address uses the configured port.
 func WithAddr(addr string) Option { return func(a *App) { a.addr = addr } }
+
+// WithAPIDocs provides the embedded OpenAPI document and enables reference mounting.
+// The reference mounts in development, or when config.Base.APIDocs is true.
+func WithAPIDocs(spec fs.FS) Option {
+	return func(a *App) { a.apiDocs = true; a.apiSpec = spec }
+}
