@@ -4,7 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 // Signing out needs a POST from a form. A GET (a link or an image) cannot sign anyone out.
 export const load: PageServerLoad = () => {
-	redirect(303, '/');
+	redirect(303, '/login');
 };
 
 export const actions = {
@@ -20,6 +20,6 @@ export const actions = {
 				secure: url.protocol === 'https:'
 			});
 		}
-		redirect(303, '/');
+		redirect(303, '/login');
 	}
 } satisfies Actions;

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
+	let { next }: { next: string } = $props();
+
 	type Provider = { name: string; label: string };
 	let providers = $state<Provider[]>([]);
 	let failed = $state(false);
@@ -24,7 +26,7 @@
 		{#each providers as provider (provider.name)}
 			<a
 				class="rounded-md border px-4 py-2 text-center text-sm font-medium hover:bg-muted focus-visible:outline-2"
-				href={`/api/auth/oidc/${encodeURIComponent(provider.name)}/start`}
+				href={`/api/auth/oidc/${encodeURIComponent(provider.name)}/start?next=${encodeURIComponent(next)}`}
 			>
 				Sign in with {provider.label}
 			</a>

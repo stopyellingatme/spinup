@@ -46,7 +46,7 @@ func TestOIDCModuleCombinations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if strings.Contains(string(page), "<OidcButtons />") != enabled {
+				if strings.Contains(string(page), "<OidcButtons next={data.redirectTo} />") != enabled {
 					t.Fatal("OIDC answer did not control login buttons")
 				}
 			})
