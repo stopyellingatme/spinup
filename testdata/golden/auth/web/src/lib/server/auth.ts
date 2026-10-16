@@ -1,6 +1,28 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 // Form actions call the Go auth endpoints with this helper (kit auth, ADR 0008 §3).
-import type { Cookies } from '@sveltejs/kit';
+import { redirect, type Cookies } from '@sveltejs/kit';
+
+/** Require a signed-in user, or redirect to login with the current path and query. */
+export function requireUser(locals: App.Locals, url: URL): App.Locals['user'] {
+	if (!locals.user) redirect(303, '/login?redirectTo=' + encodeURIComponent(url.pathname + url.search));
+	return locals.user;
+}
+
+/** Return a same-site path, or fallback. Validate raw and decoded paths like kit auth OIDC. */
+export function safeRedirect(target: string | null, fallback: string): string {
+	if (!target) return fallback;
+	try {
+		const path = decodeURIComponent(target.split(/[?#]/, 1)[0]);
+		for (const value of [target, path]) {
+			if (!value.startsWith('/') || value.startsWith('//') || /[\\\r\n\0\t]/.test(value)) {
+				return fallback;
+			}
+		}
+	} catch {
+		return fallback;
+	}
+	return target;
+}
 
 /** The name of the Go session cookie. */
 export const SESSION_COOKIE = 'session';

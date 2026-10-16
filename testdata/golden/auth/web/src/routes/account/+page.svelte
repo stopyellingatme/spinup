@@ -18,7 +18,7 @@
 	</Card.Header>
 	<Card.Content>
 		<p class="text-sm">
-			Email: <span class="font-medium" data-testid="account-email">{data.user.email}</span>
+			Email: <span class="font-medium" data-testid="account-email">{data.user?.email}</span>
 		</p>
 	</Card.Content>
 	<Card.Footer>
