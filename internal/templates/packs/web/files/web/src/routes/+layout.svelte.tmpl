@@ -1,31 +1,68 @@
 <script lang="ts">
 	import '../app.css';
+	import { page } from '$app/state';
+	import AppSidebar from '#lib/components/app/app-sidebar.svelte';
+	import TopBar from '#lib/components/app/top-bar.svelte';
+[[- if has "auth" .modules ]]
+	import UserMenu from '#lib/components/app/user-menu.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+[[- end ]]
+	import { Toaster } from '#lib/components/ui/sonner/index.js';
+	import { nav } from '#lib/nav.gen.js';
 	import type { LayoutProps } from './$types';
-
+[[ if has "auth" .modules ]]
 	let { data, children }: LayoutProps = $props();
+
+	// Signed-out visitors get no sidebar. The sign-in pages stay centered.
+	const shell = $derived(data.user !== null);
+[[- else ]]
+	let { children }: LayoutProps = $props();
+
+	const shell = true;
+[[- end ]]
 </script>
 
 <svelte:head>
 	<title>[[ .app_name ]]</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col">
-	<header class="border-b">
-		<nav class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-			<a href="/" class="font-semibold">[[ .app_name ]]</a>
+<a
+	href="#main"
+	class="bg-background focus-visible:ring-ring sr-only z-50 rounded-md px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus-visible:ring-2"
+>
+	Skip to content
+</a>
+
+<div class="flex min-h-svh flex-col">
+[[- if has "auth" .modules ]]
+	<TopBar appName="[[ .app_name ]]" items={nav} pathname={page.url.pathname} menu={shell}>
+		{#snippet actions()}
 			{#if data.user}
-				<div class="flex items-center gap-3">
-					<a href="/account" class="text-muted-foreground text-sm hover:underline" data-testid="user-email">{data.user.email}</a>
-					<form method="POST" action="/logout">
-						<button type="submit" class="text-sm font-medium hover:underline">Sign out</button>
-					</form>
-				</div>
+				<UserMenu email={data.user.email} />
 			{:else}
-				<a href="/login" class="text-sm font-medium hover:underline">Sign in</a>
+				<Button href="/login" variant="ghost" size="sm">Sign in</Button>
 			{/if}
-		</nav>
-	</header>
-	<main class="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-		{@render children()}
-	</main>
+		{/snippet}
+	</TopBar>
+[[- else ]]
+	<TopBar appName="[[ .app_name ]]" items={nav} pathname={page.url.pathname} menu={shell} />
+[[- end ]]
+	<div class="flex flex-1">
+		{#if shell}
+			<aside class="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 border-r md:block">
+				<AppSidebar items={nav} pathname={page.url.pathname} class="sticky top-14 h-[calc(100svh-3.5rem)]" />
+			</aside>
+		{/if}
+		<main
+			id="main"
+			tabindex="-1"
+			class={['min-w-0 flex-1 outline-none', !shell && 'flex flex-col items-center justify-center']}
+		>
+			<div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+				{@render children()}
+			</div>
+		</main>
+	</div>
 </div>
+
+<Toaster richColors closeButton />

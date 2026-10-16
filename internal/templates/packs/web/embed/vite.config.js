@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
 			})
 		],
 		test: {
+			// A fresh app has no test files. Do not fail on that.
+			passWithNoTests: true,
 			exclude: ['e2e/**', ...configDefaults.exclude]
 		},
 		define: {
