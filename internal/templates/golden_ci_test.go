@@ -312,8 +312,8 @@ func TestGoldenCIWebScaffold(t *testing.T) {
 					locator string
 					count   int
 				}{
-					{"banner.getByRole('link', { name: 'Sign in', exact: true })", 2},
-					{"banner.getByRole('button', { name: 'Sign out', exact: true })", 2},
+					{"banner.getByRole('link', { name: 'Sign in', exact: true })", 1},
+					{"page.getByRole('menuitem', { name: 'Sign out', exact: true })", 1},
 					{"banner.getByTestId('user-email')", 3},
 					{"main.getByLabel('Email', { exact: true })", 2},
 					{"main.getByLabel('Password', { exact: true })", 2},
