@@ -2,9 +2,11 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -14,15 +16,29 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/testutil"
+	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
 // webApp writes a new app with the web pack, and a lock that lists its packs.
 func webApp(t *testing.T) string {
 	t.Helper()
+	return renderApp(t, []string{"base", "api", "web"}, nil)
+}
+
+// authApp writes a new app with the web pack and the auth module.
+func authApp(t *testing.T) string {
+	t.Helper()
+	return renderApp(t, []string{"base", "api", "web", "auth"}, []string{"auth"})
+}
+
+func renderApp(t *testing.T, packs, modules []string) string {
+	t.Helper()
 	dir := t.TempDir()
-	packs := []string{"base", "api", "web"}
-	app := testutil.RenderPack(t, packs, map[string]any{"app_name": "todo", "module": "example.com/todo"})
-	if err := os.CopyFS(dir, app); err != nil {
+	answers := map[string]any{"app_name": "todo", "module": "example.com/todo"}
+	if modules != nil {
+		answers["modules"] = modules
+	}
+	if err := os.CopyFS(dir, testutil.RenderPack(t, packs, answers)); err != nil {
 		t.Fatalf("write app: %v", err)
 	}
 	writeLock(t, dir, packs)
@@ -43,10 +59,36 @@ var todoPages = []string{
 	"web/src/routes/todos/+page.svelte",
 	"web/src/routes/todos/[id]/+page.server.ts",
 	"web/src/routes/todos/[id]/+page.svelte",
+	"web/src/routes/todos/[id]/edit/+page.server.ts",
+	"web/src/routes/todos/[id]/edit/+page.svelte",
 	"web/src/routes/todos/fields.svelte",
-	"web/src/routes/todos/form.ts",
 	"web/src/routes/todos/new/+page.server.ts",
 	"web/src/routes/todos/new/+page.svelte",
+	"web/src/routes/todos/schema.ts",
+}
+
+// planTodo plans the pages of a todo with args as its fields.
+func planTodo(t *testing.T, root string, args ...string) vfs.Plan {
+	t.Helper()
+	spec, err := ParseSpec(root, append([]string{"todo"}, args...), "resource")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, _, err := planPages(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+// file returns the text of a planned page file of the todos.
+func file(t *testing.T, plan vfs.Plan, name string) string {
+	t.Helper()
+	f, ok := plan.Get("web/src/routes/todos/" + name)
+	if !ok {
+		t.Fatalf("plan has no %s: %v", name, plan.Paths())
+	}
+	return string(f.Data)
 }
 
 func TestPagesPart(t *testing.T) {
@@ -61,6 +103,9 @@ func TestPagesPart(t *testing.T) {
 		if !ok || f.Class != string(manifest.Scaffold) {
 			t.Errorf("plan has %s: %v (class %q), want a scaffold file", p, ok, f.Class)
 		}
+	}
+	if _, ok := out.Plan.Get("web/src/routes/todos/form.ts"); ok {
+		t.Error("plan has form.ts, which schema.ts replaces")
 	}
 	if !slices.Contains(out.PostSteps, gen.PostClient) {
 		t.Fatalf("post-steps %v, want the client post-step", out.PostSteps)
@@ -106,8 +151,77 @@ func TestPagesNeedTheWebPack(t *testing.T) {
 	}
 }
 
-// TestPageInputs checks the input, the form conversion, and the list cell of
-// every field type.
+// TestPagesOldApp checks that an app without the M12 web pack files gets an
+// error that names each missing file and package.
+func TestPagesOldApp(t *testing.T) {
+	t.Parallel()
+	const try = "\nTry: spinup upgrade (it adds the new web pack files), then run the generator again"
+	tests := []struct {
+		name   string
+		change func(t *testing.T, root string)
+		want   []string
+	}{
+		{"component", func(t *testing.T, root string) {
+			if err := os.RemoveAll(filepath.Join(root, "web/src/lib/components/ui/table")); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"web/src/lib/components/ui/table/"}},
+		{"field", func(t *testing.T, root string) {
+			if err := os.Remove(filepath.Join(root, "web/src/lib/components/app/field.svelte")); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"web/src/lib/components/app/field.svelte"}},
+		{"packages", func(t *testing.T, root string) {
+			path := filepath.Join(root, "web/package.json")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var pkg map[string]any
+			if err := json.Unmarshal(data, &pkg); err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"dependencies", "devDependencies"} {
+				deps, _ := pkg[key].(map[string]any)
+				delete(deps, "zod")
+				delete(deps, "svelte-sonner")
+			}
+			data, err = json.Marshal(pkg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, data, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"the npm package zod", "the npm package svelte-sonner"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := webApp(t)
+			tc.change(t, root)
+			out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t)})
+			if err == nil {
+				t.Fatalf("planned pages for an old app: %v", out.Plan.Paths())
+			}
+			if !strings.HasSuffix(err.Error(), try) {
+				t.Errorf("error %q does not end with %q", err, try)
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("error %q does not name %q", err, w)
+				}
+			}
+			// --api-only needs none of these files.
+			if _, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, "--api-only")}); err != nil {
+				t.Fatalf("--api-only: %v", err)
+			}
+		})
+	}
+}
+
+// TestPageInputs checks the input, the schema, the conversions, and the list
+// cell of every field type.
 func TestPageInputs(t *testing.T) {
 	t.Parallel()
 	root := webApp(t)
@@ -116,50 +230,43 @@ func TestPageInputs(t *testing.T) {
 	tests := []struct {
 		arg    string
 		fields []string // in fields.svelte
-		form   []string // in form.ts
-		list   string   // in +page.svelte
+		schema []string // in schema.ts
+		list   string   // in +page.svelte, or empty when the list does not show the field
 	}{
-		{"title:string", []string{`<Input id="title" name="title" type="text" value={values.title} required`}, []string{"title: string;", "title: values.title", "title: text(form, 'title')"}, "{item.title}"},
-		{"body:text?", []string{`<textarea id="body" name="body" rows="4" value={values.body} class={control} aria-invalid`}, []string{"body: optional(values.body)", "body: item.body ?? ''"}, "{item.body ?? ''}"},
-		{"done:bool", []string{`<input id="done" name="done" type="checkbox" checked={values.done}`}, []string{"done: boolean;", "done: form.get('done') === 'on'", "done: false"}, "{item.done ? 'Yes' : 'No'}"},
-		{"flag:bool?", []string{`<select id="flag" name="flag" class={control}`, `<option value="" selected={values.flag === ''}>Unset</option>`, `<option value="true"`, `<option value="false"`}, []string{"flag: item.flag === null ? '' : String(item.flag)", "flag: values.flag === '' ? null : values.flag === 'true'"}, "{item.flag === null ? '' : item.flag ? 'Yes' : 'No'}"},
-		{"rank:int", []string{`type="number" value={values.rank} step="1" required`}, []string{"rank: integer(values.rank, 'rank', errors)", "rank: String(item.rank)"}, "{item.rank}"},
-		{"size:bigint?", []string{`type="number" value={values.size} step="1" aria-invalid`}, []string{"size: values.size.trim() === '' ? null : integer(values.size, 'size', errors)", "size: item.size === null ? '' : String(item.size)"}, "{item.size ?? ''}"},
-		{"ratio:float", []string{`type="number" value={values.ratio} step="any"`}, []string{"ratio: number(values.ratio, 'ratio', errors)", "function number("}, "{item.ratio}"},
-		{"price:decimal", []string{`type="text" value={values.price} inputmode="decimal"`}, []string{"price: values.price"}, "{item.price}"},
-		{"at:time", []string{`type="datetime-local" value={values.at}`, "UTC"}, []string{"at: time(values.at, 'at', errors, original?.at)", "at: localTime(item.at)", "function localTime("}, "{item.at}"},
-		{"due:date?", []string{`type="date" value={values.due}`}, []string{"due: optional(values.due)", "due: item.due ?? ''"}, "{item.due ?? ''}"},
-		{"key:uuid", []string{`type="text" value={values.key} required`}, []string{"key: values.key"}, "{item.key}"},
-		{"data:json", []string{`<textarea id="data" name="data" rows="4" value={values.data} class={[control, 'font-mono']}`}, []string{"data: object(values.data, 'data', errors)", "data: '{}'", "JSON.stringify(item.data, null, 2)"}, "{JSON.stringify(item.data)}"},
-		{"owner:ref:person", []string{`<Label for="owner_id">Owner ID</Label>`, `<Input id="owner_id" name="owner_id" type="number" value={values.owner_id} step="1" required`}, []string{"owner_id: integer(values.owner_id, 'owner_id', errors)"}, "{item.owner_id}"},
-		{"state:enum:draft|in_review", []string{`<select id="state" name="state" class={control} required`, `<option value="in_review" selected={values.state === 'in_review'}>in review</option>`}, []string{"state: values.state as Input['state']", "state: 'draft'"}, "{item.state}"},
-		{"kind:enum:a|b?", []string{`<option value="" selected={values.kind === ''}>None</option>`}, []string{"kind: (values.kind === '' ? null : values.kind) as Input['kind']", "kind: ''"}, "{item.kind ?? ''}"},
+		{"name:string", []string{`<Field label="Name" name="name" errors={$errors.name}>`, `<Input {...props} bind:value={$values.name} required />`}, []string{"name: z.string().trim().min(1, 'Name is required.')", "name: item.name", "name: values.name"}, "{itemTitle(item)}"},
+		{"body:text?", []string{`<textarea {...props} rows="4" bind:value={$values.body} class={[control, 'min-h-24']}></textarea>`}, []string{"body: z.string().trim()", "body: item.body ?? ''", "body: values.body === '' ? null : values.body"}, ""},
+		{"done:bool", []string{`<Checkbox {...props} bind:checked={$values.done} />`}, []string{"done: z.boolean()", "done: item.done", "done: values.done"}, `<Checkbox`},
+		{"flag:bool?", []string{`<select {...props} bind:value={$values.flag} class={[control, 'h-8']}>`, `<option value="">Not set</option>`, `<option value="true">Yes</option>`, `<option value="false">No</option>`}, []string{"flag: z.enum(['', 'true', 'false']", "flag: item.flag === null ? '' : item.flag ? 'true' : 'false'", "flag: values.flag === '' ? null : values.flag === 'true'"}, "{#if item.flag === null}—{:else if item.flag}<CheckIcon"},
+		{"rank:int", []string{`<Input {...props} type="number" step="1" bind:value={$values.rank} required />`}, []string{"rank: z.number({ error: 'Enter a whole number.' }).int('Enter a whole number.')", "rank: item.rank", "rank: values.rank"}, "{item.rank}"},
+		{"size:bigint?", []string{`<Input {...props} type="number" step="1" bind:value={$values.size} />`}, []string{".int('Enter a whole number.').nullable()", "size: item.size"}, "{item.size ?? '—'}"},
+		{"ratio:float", []string{`type="number" step="any" bind:value={$values.ratio} required`}, []string{"ratio: z.number({ error: 'Enter a number.' })"}, "{item.ratio}"},
+		{"price:decimal", []string{`<Input {...props} inputmode="decimal" bind:value={$values.price} required />`}, []string{`price: z.string().trim().regex(/^-?\d+(\.\d+)?$/`, "price: values.price"}, "{item.price}"},
+		{"at:time", []string{`<Field label="At" name="at" errors={$errors.at} description="In UTC.">`, `type="datetime-local" step="1" bind:value={$values.at} required`}, []string{"at: localTime(item.at)", "at: time(values.at, original?.at)", "function localTime(", "export function toBody(values: Values, original?: Item): Input"}, "{formatTime(item.at)}"},
+		{"due:date?", []string{`<Input {...props} type="date" bind:value={$values.due} />`}, []string{`due: z.string().trim().regex(/^(\d{4}-\d{2}-\d{2})?$/, 'Enter a date.')`, "due: item.due ?? ''", "due: values.due === '' ? null : values.due", "timeZone: 'UTC'"}, "{item.due ? formatDate(item.due) : '—'}"},
+		{"key:uuid", []string{`<Input {...props} autocomplete="off" spellcheck="false" bind:value={$values.key} required />`}, []string{"key: values.key", "/i, 'Enter a UUID"}, "{item.key}"},
+		{"data:json", []string{`<textarea {...props} rows="6" spellcheck="false" bind:value={$values.data} class={[control, 'min-h-24 font-mono']} required></textarea>`}, []string{"data: z.string().refine(isObject,", ".default('{}')", "data: JSON.stringify(item.data, null, 2)", "data: JSON.parse(values.data) as Record<string, unknown>", "function isObject("}, ""},
+		{"owner:ref:person", []string{`<Field label="Owner ID" name="owner_id" errors={$errors.owner_id}>`, `<Input {...props} type="number" step="1" bind:value={$values.owner_id} required />`}, []string{"owner_id: z.number("}, "{item.owner_id}"},
+		{"state:enum:draft|in_review", []string{`<select {...props} bind:value={$values.state} class={[control, 'h-8']} required>`, "{#each Object.entries(stateLabels) as [value, label] (value)}"}, []string{"state: z.enum(['draft', 'in_review'], { error: 'Choose the state.' })", "export const stateLabels: Record<NonNullable<Item['state']>, string> = {\n\tdraft: 'Draft',\n\tin_review: 'In review'\n};"}, `<Badge variant="secondary">{stateLabels[item.state]}</Badge>`},
+		{"kind:enum:a|b?", []string{`<option value="">None</option>`}, []string{"kind: z.enum(['', 'a', 'b']", "kind: item.kind ?? ''", "kind: values.kind === '' ? null : values.kind"}, "{#if item.kind}<Badge"},
+		{"tier:enum:1st|2nd", nil, []string{"\t'1st': '1st',\n\t'2nd': '2nd'\n"}, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.arg, func(t *testing.T) {
 			t.Parallel()
-			spec, err := ParseSpec(root, []string{"todo", tc.arg}, "resource")
-			if err != nil {
-				t.Fatal(err)
-			}
-			plan, _, err := planPages(context.Background(), spec)
-			if err != nil {
-				t.Fatal(err)
-			}
-			check := func(path string, want ...string) {
-				f, ok := plan.Get(path)
-				if !ok {
-					t.Fatalf("plan has no %s", path)
-				}
+			plan := planTodo(t, root, tc.arg)
+			check := func(name string, want ...string) {
+				data := file(t, plan, name)
 				for _, w := range want {
-					if !strings.Contains(string(f.Data), w) {
-						t.Errorf("%s does not contain %q:\n%s", path, w, f.Data)
+					if !strings.Contains(data, w) {
+						t.Errorf("%s does not contain %q:\n%s", name, w, data)
 					}
 				}
 			}
-			check("web/src/routes/todos/fields.svelte", tc.fields...)
-			check("web/src/routes/todos/form.ts", tc.form...)
-			check("web/src/routes/todos/+page.svelte", tc.list)
+			check("fields.svelte", tc.fields...)
+			check("schema.ts", tc.schema...)
+			if tc.list != "" {
+				check("+page.svelte", tc.list)
+			}
 		})
 	}
 }
@@ -167,23 +274,123 @@ func TestPageInputs(t *testing.T) {
 func TestPagesHelpersOnlyWhenUsed(t *testing.T) {
 	t.Parallel()
 	root := webApp(t)
-	spec, err := ParseSpec(root, []string{"todo", "title:string", "done:bool"}, "resource")
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan, _, err := planPages(context.Background(), spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	form, _ := plan.Get("web/src/routes/todos/form.ts")
-	for _, helper := range []string{"function optional(", "function integer(", "function number(", "function time(", "function object("} {
-		if strings.Contains(string(form.Data), helper) {
-			t.Errorf("form.ts has the unused %s", helper)
+	plan := planTodo(t, root, "title:string", "done:bool")
+	schema := file(t, plan, "schema.ts")
+	for _, helper := range []string{"function localTime(", "function time(", "function isObject(", "function formatDate(", "Labels"} {
+		if strings.Contains(schema, helper) {
+			t.Errorf("schema.ts has the unused %s", helper)
 		}
 	}
-	fieldsFile, _ := plan.Get("web/src/routes/todos/fields.svelte")
-	if strings.Contains(string(fieldsFile.Data), "const control") {
+	if fields := file(t, plan, "fields.svelte"); strings.Contains(fields, "const control") {
 		t.Error("fields.svelte has the unused control class")
+	}
+	list := file(t, plan, "+page.svelte")
+	for _, unused := range []string{"CheckIcon", "Badge", "formatDate"} {
+		if strings.Contains(list, unused) {
+			t.Errorf("the list has the unused %s", unused)
+		}
+	}
+}
+
+// TestPageList checks the list: the title link, the inline toggle of the first
+// non-null bool, the row menu, the pagination, and the delete dialog.
+func TestPageList(t *testing.T) {
+	t.Parallel()
+	root := webApp(t)
+	plan := planTodo(t, root, "flag:bool?", "rank:int", "done:bool", "title:string", "other:bool", "label:string")
+	list, server := file(t, plan, "+page.svelte"), file(t, plan, "+page.server.ts")
+	for _, want := range []string{
+		`<a href="/todos/{item.id}" class="font-medium underline-offset-4 hover:underline">`,
+		`<Table.Head>Title</Table.Head>`,
+		`action="?/toggle"`,
+		`<input type="hidden" name="value" value={String(!item.done)} />`,
+		`checked={pending[item.id] ?? item.done}`,
+		`await update({ reset: false, navigate: false });`,
+		`<Table.Head>Other</Table.Head>`,
+		`<Table.Head>Label</Table.Head>`,
+		`<a {...props} href="/todos/{item.id}/edit">`,
+		`onSelect={() => confirmDelete(item)}`,
+		`<AlertDialog.Root bind:open={confirming}>`,
+		`action="?/delete&page={data.page}"`,
+		`{#if data.total > data.perPage}`,
+		"`?page=${n}`",
+		`toast.success('Todo deleted.');`,
+		`<Button href="/todos/new">`,
+		`<h2 class="font-medium">No todos yet</h2>`,
+	} {
+		if !strings.Contains(list, want) {
+			t.Errorf("the list does not contain %q", want)
+		}
+	}
+	if strings.Contains(list, `<Table.Head>Done</Table.Head>`) || strings.Contains(list, "String(!item.other)") {
+		t.Error("the list shows the toggle as a column, or toggles the second bool")
+	}
+	for _, want := range []string{
+		"const perPage = 20;",
+		"params: { query: { limit: perPage, offset: (page - 1) * perPage } }",
+		"body: { ...toBody(fromItem(item)), done: form.get('value') === 'true' }",
+		"redirect(303, page > 1 ? `/todos?page=${page}&deleted=1` : '/todos?deleted=1');",
+	} {
+		if !strings.Contains(server, want) {
+			t.Errorf("the list server does not contain %q", want)
+		}
+	}
+
+	// Without a string field, the link names the item by its id. Without a non-null bool, no toggle.
+	plan = planTodo(t, root, "rank:int", "flag:bool?")
+	list, server, schema := file(t, plan, "+page.svelte"), file(t, plan, "+page.server.ts"), file(t, plan, "schema.ts")
+	if !strings.Contains(schema, "return `Todo ${item.id}`;") || !strings.Contains(list, "<Table.Head>Todo</Table.Head>") {
+		t.Errorf("no id title:\n%s", schema)
+	}
+	if strings.Contains(list, "toggle") || strings.Contains(server, "toggle") || strings.Contains(list, "Checkbox") {
+		t.Error("a resource without a non-null bool has a toggle")
+	}
+}
+
+// TestPagesAuth checks the guards: with the auth module, every load and action
+// starts with requireUser. Without it, no file imports the auth helpers.
+func TestPagesAuth(t *testing.T) {
+	t.Parallel()
+	head := regexp.MustCompile(`(?m)^(export const load: PageServerLoad = async \(.*\) => \{|\t(default|toggle|delete): async \(.*\) => \{)\n(.*)$`)
+	for _, auth := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no auth", true: "auth"}[auth], func(t *testing.T) {
+			t.Parallel()
+			root := webApp(t)
+			if auth {
+				root = authApp(t)
+			}
+			out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			heads := 0
+			for _, path := range todoPages {
+				f, _ := out.Plan.Get(path)
+				data := string(f.Data)
+				if !auth {
+					if strings.Contains(data, "server/auth") || strings.Contains(data, "requireUser") {
+						t.Errorf("%s uses the auth helpers in an app without auth", path)
+					}
+					continue
+				}
+				if !strings.HasSuffix(path, ".server.ts") {
+					continue
+				}
+				if !strings.Contains(data, "import { requireUser } from '#lib/server/auth.js';") {
+					t.Errorf("%s does not import requireUser", path)
+				}
+				for _, m := range head.FindAllStringSubmatch(data, -1) {
+					heads++
+					if strings.TrimSpace(m[3]) != "requireUser(locals, url);" {
+						t.Errorf("%s: %q starts with %q, want requireUser", path, m[1], m[3])
+					}
+				}
+			}
+			// Loads: list, read, edit, new. Actions: toggle, delete (list), delete (read), edit, new.
+			if auth && heads != 9 {
+				t.Errorf("found %d loads and actions, want 9", heads)
+			}
+		})
 	}
 }
 
@@ -221,12 +428,15 @@ func TestPageNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, want := range map[string]string{
-		"web/src/routes/line-items/+page.server.ts":      "api.GET('/api/line_items', {",
-		"web/src/routes/line-items/+page.svelte":         `<Button href="/line-items/new">New line item</Button>`,
-		"web/src/routes/line-items/[id]/+page.server.ts": "redirect(303, '/line-items');",
-		"web/src/routes/line-items/[id]/+page.svelte":    "<Card.Title>Line item {data.item.id}</Card.Title>",
-		"web/src/routes/line-items/form.ts":              "components['schemas']['LineItemInput']",
-		"web/src/routes/line-items/new/+page.server.ts":  "redirect(303, '/line-items/' + data.id);",
+		"web/src/routes/line-items/+page.server.ts":           "api.GET('/api/line_items', {",
+		"web/src/routes/line-items/+page.svelte":              "New line item",
+		"web/src/routes/line-items/[id]/+page.server.ts":      "redirect(303, '/line-items?deleted=1');",
+		"web/src/routes/line-items/[id]/+page.svelte":         `<Button href="/line-items/{item.id}/edit" variant="outline">`,
+		"web/src/routes/line-items/[id]/edit/+page.server.ts": "redirect(303, `/line-items/${data.id}?saved=1`);",
+		"web/src/routes/line-items/[id]/edit/+page.svelte":    `<PageHeader title="Edit line item"`,
+		"web/src/routes/line-items/schema.ts":                 "components['schemas']['LineItemInput']",
+		"web/src/routes/line-items/new/+page.server.ts":       "redirect(303, `/line-items/${data.id}?created=1`);",
+		"web/src/routes/line-items/new/+page.svelte":          "Create line item",
 	} {
 		f, ok := plan.Get(path)
 		if !ok || !strings.Contains(string(f.Data), want) {
@@ -235,75 +445,102 @@ func TestPageNames(t *testing.T) {
 	}
 }
 
-// TestPageFormRoundTrip checks timestamp precision and all nullable boolean states.
-func TestPageFormRoundTrip(t *testing.T) {
+// TestPageSchemaRoundTrip runs schema.ts in Node with the zod version of the web
+// pack: the form values of an item pass the schema and convert back to the
+// same API body, and invalid values get their messages.
+func TestPageSchemaRoundTrip(t *testing.T) {
 	t.Parallel()
-	root := webApp(t)
-	spec, err := ParseSpec(root, []string{"widget", "title:string", "at:time", "maybe:time?", "flag:bool?"}, "resource")
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan, _, err := planPages(context.Background(), spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	form, _ := plan.Get("web/src/routes/widgets/form.ts")
-	script := string(form.Data) + `
-import assert from 'node:assert/strict';
-for (const at of ['2026-01-02T03:04:56.789123Z', '2026-01-02T04:04:56.789+01:00', '2026-01-02T03:04:00.789123Z']) {
- for (const maybe of [null, at]) {
-  for (const flag of [null, true, false]) {
-   const item = { title: 'old', at, maybe, flag };
-   const values = toValues(item);
-   assert.equal(values.at, new Date(at).toISOString().slice(0, 19));
-   assert.equal(values.flag, flag === null ? '' : String(flag));
-   const form = new FormData();
-   for (const [key, value] of Object.entries(values)) {
-    // Browsers omit zero seconds from datetime-local submissions.
-    form.set(key, key === 'at' || key === 'maybe' ? String(value).replace(/:00$/, '') : String(value));
-   }
-   form.set('title', 'changed');
-   const result = parse(form, item);
-   assert.deepEqual(result.errors, {});
-   assert.deepEqual(result.body, { ...item, title: 'changed' });
-   form.set('at', '2026-01-02T03:04:57');
-   assert.equal(parse(form, item).body.at, '2026-01-02T03:04:57.000Z');
-   form.set('maybe', '');
-   assert.equal(parse(form, item).body.maybe, null);
-  }
- }
-}
-for (const [value, want] of [['', null], ['true', true], ['false', false]]) {
- const form = new FormData();
- form.set('title', 'new');
- form.set('at', '2026-01-02T03:04:56');
- form.set('flag', value);
- assert.equal(parse(form).body.flag, want);
-}
-`
-	path := filepath.Join(t.TempDir(), "form.mts")
-	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	node, err := runexec.LookPath("node")
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: node, Args: []string{path}})
+	pnpm, err := runexec.LookPath("pnpm")
 	if err != nil {
-		t.Fatalf("form round trip: %v\n%s", err, result.Stderr)
+		t.Skip("pnpm is not on PATH: put scripts/bin on PATH (the Makefile does)")
 	}
-	fields, _ := plan.Get("web/src/routes/widgets/fields.svelte")
-	for _, want := range []string{`type="datetime-local" value={values.at} step="1"`, `type="datetime-local" value={values.maybe} step="1"`, `<select id="flag"`, `<option value=""`, `<option value="true"`, `<option value="false"`} {
-		if !strings.Contains(string(fields.Data), want) {
-			t.Errorf("fields missing %s", want)
-		}
+	root := webApp(t)
+	plan := planTodo(t, root, "title:string", "done:bool", "count:int", "size:bigint?", "ratio:float", "price:decimal?",
+		"at:time", "maybe:time?", "day:date", "due:date?", "key:uuid?", "data:json", "meta:json?", "flag:bool?",
+		"state:enum:draft|in_review", "kind:enum:a|b?", "body:text?")
+
+	data, err := os.ReadFile(filepath.Join(root, "web", "package.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	server, _ := plan.Get("web/src/routes/widgets/[id]/+page.server.ts")
-	if !strings.Contains(string(server.Data), "parse(await request.formData(), original)") {
-		t.Error("update does not pass original item to parse")
+	var pkg struct {
+		Dependencies map[string]string `json:"dependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil || pkg.Dependencies["zod"] == "" {
+		t.Fatalf("web/package.json has no zod: %v", err)
+	}
+	dir := t.TempDir()
+	write(t, dir, map[string]string{
+		"package.json": `{"name":"schema-test","private":true,"type":"module","dependencies":{"zod":"` + pkg.Dependencies["zod"] + `"}}`,
+		"schema.ts":    file(t, plan, "schema.ts"),
+		"test.ts":      schemaRoundTrip,
+	})
+	runner := runexec.OSRunner{}
+	if result, err := runner.Run(t.Context(), runexec.Cmd{Name: pnpm, Args: []string{"install", "--offline", "--silent"}, Dir: dir}); err != nil {
+		t.Fatalf("install zod offline: %v\n%s", err, result.Stderr)
+	}
+	if result, err := runner.Run(t.Context(), runexec.Cmd{Name: node, Args: []string{"test.ts"}, Dir: dir}); err != nil {
+		t.Fatalf("schema round trip: %v\n%s", err, result.Stderr)
 	}
 }
+
+const schemaRoundTrip = `import assert from 'node:assert/strict';
+import { fromItem, itemTitle, problemMessage, schema, toBody } from './schema.ts';
+
+const base = {
+	id: 7, title: 'old', done: true, count: 3, size: null, ratio: 1.5, price: null,
+	at: '2026-01-02T03:04:56.789123Z', maybe: null, day: '2026-10-16', due: null, key: null,
+	data: { a: 1 }, meta: null, flag: null, state: 'in_review', kind: null, body: null,
+	created_at: '2026-01-02T03:04:56Z', updated_at: '2026-01-02T03:04:56Z'
+};
+const items = [
+	base,
+	{
+		...base, size: 9, price: '12.50', maybe: '2026-01-02T04:04:56.789+01:00', due: '2026-12-31',
+		key: '123e4567-e89b-12d3-a456-426614174000', meta: { b: [1] }, flag: false, kind: 'b', body: 'text'
+	},
+	{ ...base, done: false, at: '2026-01-02T03:04:00.789123Z', flag: true }
+];
+for (const item of items) {
+	const values = fromItem(item);
+	// Browsers omit zero seconds from datetime-local values.
+	values.at = values.at.replace(/:00$/, '');
+	const parsed = schema.safeParse(values);
+	assert.ok(parsed.success, JSON.stringify(parsed.error?.issues));
+	const { id, created_at, updated_at, ...input } = item;
+	assert.deepEqual(toBody(parsed.data, item), input);
+}
+
+// A changed time is a new UTC instant. Empty optional inputs send null.
+const changed = schema.parse({ ...fromItem(base), at: '2026-01-02T03:04:57', maybe: '', price: ' ', key: '', meta: ' ', kind: '' });
+const body = toBody(changed, base);
+assert.equal(body.at, '2026-01-02T03:04:57.000Z');
+for (const name of ['maybe', 'price', 'key', 'meta', 'kind']) assert.equal(body[name], null, name);
+
+// Invalid values get the messages of the schema.
+const bad = schema.safeParse({
+	...fromItem(base), title: '  ', count: 1.5, price: 'abc', at: 'x', day: '', key: 'nope', data: '[1]', state: 'other'
+});
+assert.ok(!bad.success);
+assert.deepEqual(Object.fromEntries(bad.error.issues.map((i) => [i.path[0], i.message])), {
+	title: 'Title is required.',
+	count: 'Enter a whole number.',
+	price: 'Enter a decimal number, for example 12.50.',
+	at: 'Enter a date and time.',
+	day: 'Enter a date.',
+	key: 'Enter a UUID, for example 123e4567-e89b-12d3-a456-426614174000.',
+	data: 'Enter a JSON object, for example {"key": "value"}.',
+	state: 'Choose the state.'
+});
+
+assert.equal(itemTitle({ ...base, title: '' }), 'Todo 7');
+assert.equal(problemMessage(undefined, 502), 'The API returned status 502.');
+assert.equal(problemMessage({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Taken.' }, 409), 'Taken.');
+`
 
 func TestEmbedRefusesResourcePages(t *testing.T) {
 	t.Parallel()
