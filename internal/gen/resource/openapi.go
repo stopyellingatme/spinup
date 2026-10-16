@@ -127,6 +127,7 @@ func (w *yamlWriter) problems(words string, codes ...string) {
 	const indent = 3
 	descriptions := map[string]string{
 		"400": "The request is malformed.",
+		"401": "A signed-in user is required.",
 		"404": "The " + words + " does not exist.",
 		"409": "The request conflicts with other data.",
 		"422": "The request has invalid values.",
@@ -158,6 +159,12 @@ func pathsYAML(spec Spec) []byte {
 	words := strings.ReplaceAll(n.Snake(), "_", " ")
 	pluralWords := strings.ReplaceAll(n.PluralSnake(), "_", " ")
 	var w yamlWriter
+	problems := func(words string, codes ...string) {
+		if spec.Owned || spec.Shared {
+			codes = append(codes, "401")
+		}
+		w.problems(words, codes...)
+	}
 	w.line(0, "# Operations of the %s resource. spinup bundles them into api/openapi/bundle.gen.yaml.", n.Snake())
 
 	w.line(0, "/api/%s:", n.PluralSnake())
@@ -185,7 +192,7 @@ func pathsYAML(spec Spec) []byte {
 	w.line(5, "default: 0")
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("A page of %s in id order.", pluralWords), "application/json", singular+"List")
-	w.problems(words, "400", "422")
+	problems(words, "400", "422")
 
 	w.line(1, "post:")
 	w.line(2, "operationId: create%s", singular)
@@ -194,7 +201,7 @@ func pathsYAML(spec Spec) []byte {
 	w.body(2, singular+"Input")
 	w.line(2, "responses:")
 	w.response("201", fmt.Sprintf("The new %s.", words), "application/json", singular)
-	w.problems(words, "400", "409", "422")
+	problems(words, "400", "409", "422")
 
 	w.line(0, "/api/%s/{id}:", n.PluralSnake())
 	w.line(1, "parameters:")
@@ -210,7 +217,7 @@ func pathsYAML(spec Spec) []byte {
 	w.line(2, "tags: [%s]", n.PluralSnake())
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("The %s.", words), "application/json", singular)
-	w.problems(words, "400", "404")
+	problems(words, "400", "404")
 
 	w.line(1, "put:")
 	w.line(2, "operationId: update%s", singular)
@@ -219,7 +226,7 @@ func pathsYAML(spec Spec) []byte {
 	w.body(2, singular+"Input")
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("The updated %s.", words), "application/json", singular)
-	w.problems(words, "400", "404", "409", "422")
+	problems(words, "400", "404", "409", "422")
 
 	w.line(1, "delete:")
 	w.line(2, "operationId: delete%s", singular)
@@ -227,6 +234,6 @@ func pathsYAML(spec Spec) []byte {
 	w.line(2, "tags: [%s]", n.PluralSnake())
 	w.line(2, "responses:")
 	w.response("204", fmt.Sprintf("The %s is deleted.", words), "", "")
-	w.problems(words, "400", "404", "409")
+	problems(words, "400", "404", "409")
 	return []byte(w.b.String())
 }

@@ -214,3 +214,24 @@ func registerGenerated(mux *http.ServeMux, d Deps) {
 func withModule(src, module string) ([]byte, error) {
 	return format.Source([]byte(strings.ReplaceAll(src, "MODULE", module)))
 }
+
+// routesGo puts the authentication guard before OpenAPI parameter binding.
+func routesGo(module string, authenticated bool) ([]byte, error) {
+	source := routesGenGo
+	if authenticated {
+		source = strings.Replace(source, `"MODULE/internal/handlers"`, `"MODULE/internal/handlers"`+"\n"+`"github.com/stopyellingatme/spinup/kit/auth"`, 1)
+		source = strings.Replace(source, "BaseRouter:       mux,", "BaseRouter:       authenticatedMux{mux},", 1)
+		source += authenticatedMuxGo
+	}
+	return withModule(source, module)
+}
+
+const authenticatedMuxGo = `
+// authenticatedMux guards each generated route before OpenAPI decodes parameters.
+// ServeMux still matches the route and supplies path values and r.Pattern.
+type authenticatedMux struct { *http.ServeMux }
+
+func (m authenticatedMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+ m.ServeMux.Handle(pattern, auth.Required(http.HandlerFunc(handler)))
+}
+`

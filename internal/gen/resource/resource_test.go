@@ -35,6 +35,7 @@ func flagSet(t *testing.T, args ...string) *pflag.FlagSet {
 	fs.Bool("api-only", false, "")
 	fs.Bool("no-tests", false, "")
 	fs.Bool("force", false, "")
+	fs.Bool("shared", false, "")
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(err)
 	}
@@ -60,25 +61,48 @@ var goldenArgs = []string{"todo", "title:string", "done:bool", "due:date?", "pri
 func TestGoldenGenResource(t *testing.T) {
 	t.Parallel()
 	testutil.GoldenSelected(t, "gen-resource")
-	// The golden app has the web pack, so the golden files include the pages.
-	root := webApp(t)
-	render := func() (fs.FS, error) {
-		out, err := run(context.Background(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t)})
-		if err != nil {
-			return nil, err
-		}
-		got := fstest.MapFS{}
-		for _, f := range out.Plan.Files {
-			got[f.Path] = &fstest.MapFile{Data: f.Data, Mode: 0o644}
-		}
-		return got, nil
+	for _, tc := range []struct {
+		name         string
+		auth, shared bool
+	}{
+		{"gen-resource", false, false}, {"gen-resource-auth", true, false}, {"gen-resource-shared", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := webApp(t)
+			var flags []string
+			if tc.auth {
+				packs := []string{"base", "api", "web", "auth"}
+				root = t.TempDir()
+				app := testutil.RenderPack(t, packs, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": []string{"auth"}})
+				if err := os.CopyFS(root, app); err != nil {
+					t.Fatal(err)
+				}
+				writeLock(t, root, packs)
+				flags = append(flags, "--api-only")
+			}
+			if tc.shared {
+				flags = append(flags, "--shared")
+			}
+			render := func() (fs.FS, error) {
+				out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, flags...)})
+				if err != nil {
+					return nil, err
+				}
+				got := fstest.MapFS{}
+				for _, f := range out.Plan.Files {
+					got[f.Path] = &fstest.MapFile{Data: f.Data, Mode: 0o644}
+				}
+				return got, nil
+			}
+			got, err := render()
+			if err != nil {
+				t.Fatal(err)
+			}
+			testutil.Golden(t, tc.name, got)
+			testutil.Deterministic(t, render)
+		})
 	}
-	got, err := render()
-	if err != nil {
-		t.Fatal(err)
-	}
-	testutil.Golden(t, "gen-resource", got)
-	testutil.Deterministic(t, render)
 }
 
 func TestRunPlan(t *testing.T) {
@@ -350,5 +374,94 @@ func TestEveryFieldType(t *testing.T) {
 		if len(out.Plan.Files) != 9 {
 			t.Fatalf("%v: %d files, want 9", args, len(out.Plan.Files))
 		}
+	}
+}
+
+func TestOwnershipPlan(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name         string
+		auth, shared bool
+	}{
+		{"plain", false, false}, {"owned", true, false}, {"shared", true, true}, {"shared without auth", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := freshApp(t)
+			if tc.auth {
+				writeLock(t, root, []string{"base", "api", "auth"})
+			}
+			var flags []string
+			if tc.shared {
+				flags = append(flags, "--shared")
+			}
+			var seen Spec
+			part := Part{Name: "capture", Plan: func(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
+				seen = spec
+				return vfs.Plan{}, nil, nil
+			}}
+			out, err := build(t.Context(), gen.Input{Root: root, Args: []string{"note", "title:string"}, Flags: flagSet(t, flags...)}, []Part{part})
+			if tc.shared && !tc.auth {
+				if err == nil || !strings.Contains(err.Error(), "Try: drop --shared") {
+					t.Fatalf("error = %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen.Owned != (tc.auth && !tc.shared) || seen.Shared != tc.shared {
+				t.Fatalf("part spec = %+v", seen)
+			}
+			migration, _ := out.Plan.Get("api/db/migrations/00002_create_notes.sql")
+			if strings.Contains(string(migration.Data), "user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE") != seen.Owned {
+				t.Fatalf("migration: %s", migration.Data)
+			}
+			paths, _ := out.Plan.Get("api/openapi/paths/notes.yaml")
+			want401 := 0
+			if tc.auth {
+				want401 = 5
+			}
+			if got := strings.Count(string(paths.Data), `"401":`); got != want401 {
+				t.Fatalf("401 responses = %d, want %d", got, want401)
+			}
+			routes, _ := out.Plan.Get(routesGenPath)
+			if strings.Contains(string(routes.Data), "auth.Required") != tc.auth {
+				t.Fatalf("routes: %s", routes.Data)
+			}
+		})
+	}
+}
+
+func TestReservedResourceNames(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"doc", "docs", "Doc", "openapi", "openapis", "Openapi"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := ParseSpec(t.TempDir(), []string{name, "title:string"}, "resource")
+			if err == nil || !strings.Contains(err.Error(), "Try: choose another name, for example document") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
+func TestOwnedOwnerColumnRefused(t *testing.T) {
+	t.Parallel()
+	root := freshApp(t)
+	writeLock(t, root, []string{"base", "api", "auth"})
+	_, err := run(t.Context(), gen.Input{Root: root, Args: []string{"note", "user_id:bigint"}, Flags: flagSet(t)})
+	if err == nil || !strings.Contains(err.Error(), "Try: choose another field name") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestOwnershipInvalidLock(t *testing.T) {
+	t.Parallel()
+	root := freshApp(t)
+	write(t, root, map[string]string{"spinup.lock": "invalid"})
+	_, err := run(t.Context(), gen.Input{Root: root, Args: []string{"note", "title:string"}, Flags: flagSet(t)})
+	if err == nil || !strings.Contains(err.Error(), "Try: restore a valid spinup.lock") {
+		t.Fatalf("error = %v", err)
 	}
 }
