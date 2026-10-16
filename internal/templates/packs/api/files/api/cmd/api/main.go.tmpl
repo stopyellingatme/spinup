@@ -11,6 +11,7 @@ import (
 
  "[[ .module ]]/api/db/migrations"
  "[[ .module ]]/api/internal/routes"
+ "[[ .module ]]/api/openapi"
 [[- if eq (index . "frontend_mode") "embed" ]]
  "[[ .module ]]/api/internal/webdist"
 [[- end ]]
@@ -82,6 +83,7 @@ func run() (err error) {
   app.WithName([[ quote .app_name ]]),
   app.WithVersion(version),
   app.WithConfig(cfg),
+  app.WithAPIDocs(openapi.FS),
 [[- if eq (index . "frontend_mode") "embed" ]]
   app.WithSPA(webdist.FS),
 [[- end ]]
