@@ -19,6 +19,7 @@ Use Go 1.26 or later, Node 24 or later, pnpm through corepack, and Docker.
 On Windows, run the command in WSL2.
 
 The command selects free ports when the preferred ports are busy. It records the ports in `.spinup/dev.json`.
+When the app's own Mailpit or Grafana container still runs from an earlier start, the command keeps its port.
 The URL table shows the application, API, and Mailpit addresses. With `--lgtm`, the table also shows Grafana.
 With `--no-infra`, the command does not record or show a Mailpit address.
 

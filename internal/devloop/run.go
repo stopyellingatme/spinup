@@ -109,7 +109,12 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	if err := prerequisites(ctx, root, o, hasWeb, runner); err != nil {
 		return err
 	}
-	ports, err := allocate(o, hasWeb)
+	running := map[string]int{}
+	if !o.NoInfra {
+		base := []string{"compose", "-f", "deploy/compose.dev.yml", "--project-directory", root, "--env-file", filepath.Join(root, ".env")}
+		running = publishedPorts(ctx, runner, base, root)
+	}
+	ports, err := allocate(o, hasWeb, running)
 	if err != nil {
 		return err
 	}
@@ -228,7 +233,10 @@ func prerequisites(ctx context.Context, root string, o Options, web bool, runner
 	}
 	return nil
 }
-func allocate(o Options, web bool) (Ports, error) {
+
+// allocate picks the local ports. running holds the host ports that the app's own running
+// Compose services already publish (see publishedPorts); those are reused without a probe.
+func allocate(o Options, web bool, running map[string]int) (Ports, error) {
 	api, front := o.APIPort, o.Port
 	if api == 0 {
 		api = 8080
@@ -261,7 +269,13 @@ func allocate(o Options, web bool) (Ports, error) {
 		free = FreePort
 	}
 	used := map[int]bool{}
+	held := map[*Endpoint]int{&ports.Mailpit: running["mailpit:8025"], &ports.Grafana: running["otel-lgtm:3000"]}
 	for _, endpoint := range endpoints {
+		if port := held[endpoint]; port > 0 && !used[port] {
+			endpoint.Port = port
+			used[port] = true
+			continue
+		}
 		preferred := endpoint.Port
 		if used[preferred] {
 			preferred = 0

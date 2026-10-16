@@ -71,7 +71,7 @@ func TestAllocateUniquePorts(t *testing.T) {
 			return 32000, nil
 		}
 		return preferred, nil
-	}}, true)
+	}}, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestNoInfraOmitsMailpit(t *testing.T) {
 	t.Parallel()
 	ports, err := allocate(Options{NoInfra: true, PortAllocator: func(port int) (int, error) {
 		return port, nil
-	}}, false)
+	}}, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,5 +96,51 @@ func TestNoInfraOmitsMailpit(t *testing.T) {
 	printURLs(&out, ports, false, false)
 	if strings.Contains(out.String(), "Mailpit") {
 		t.Fatalf("printed unavailable Mailpit URL: %s", out.String())
+	}
+}
+
+func TestAllocateReusesPortsOfRunningServices(t *testing.T) {
+	t.Parallel()
+	// A previous spinup dev left Mailpit running on 8025 and LGTM on 3001. The probe
+	// reports both as busy; allocate must keep them instead of moving the services.
+	probe := func(preferred int) (int, error) {
+		if preferred == 8025 || preferred == 3001 || preferred == 3000 {
+			return 41000 + preferred, nil
+		}
+		return preferred, nil
+	}
+	running := map[string]int{"mailpit:8025": 8025, "otel-lgtm:3000": 3001}
+	ports, err := allocate(Options{LGTM: true, PortAllocator: probe}, true, running)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ports.Mailpit.Port != 8025 || ports.Grafana.Port != 3001 || ports.API.Port != 8080 || ports.Web.Port != 5173 {
+		t.Fatalf("ports: %+v", ports)
+	}
+}
+
+func TestParsePublishedPorts(t *testing.T) {
+	t.Parallel()
+	lines := `{"Service":"postgres","State":"running","Publishers":[{"URL":"127.0.0.1","TargetPort":5432,"PublishedPort":5432,"Protocol":"tcp"}]}
+{"Service":"mailpit","State":"running","Publishers":[{"URL":"127.0.0.1","TargetPort":1025,"PublishedPort":1025,"Protocol":"tcp"},{"URL":"127.0.0.1","TargetPort":8025,"PublishedPort":59970,"Protocol":"tcp"}]}
+{"Service":"otel-lgtm","State":"exited","Publishers":[{"TargetPort":3000,"PublishedPort":3000}]}`
+	array := `[{"Service":"mailpit","State":"running","Publishers":[{"TargetPort":8025,"PublishedPort":8025}]}]`
+	tests := []struct {
+		name string
+		data string
+		want map[string]int
+	}{
+		{"lines", lines, map[string]int{"postgres:5432": 5432, "mailpit:1025": 1025, "mailpit:8025": 59970}},
+		{"array", array, map[string]int{"mailpit:8025": 8025}},
+		{"empty", "", map[string]int{}},
+		{"garbage", "not json", map[string]int{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := parsePublishedPorts([]byte(tc.data)); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
