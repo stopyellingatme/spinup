@@ -22,7 +22,20 @@ import (
 // the web pack (ADR 0008 §4, ADR 0015 §5). The pages call the Go API through
 // the typed client, so the part requests the client post-step.
 func init() {
-	RegisterPart(Part{Name: "pages", Plan: planPages, Paths: pagePaths})
+	RegisterPart(Part{Name: "pages", Plan: planPages, Paths: pageDestroyPaths})
+}
+
+// legacyPageFiles are page files that earlier versions wrote and the current
+// part no longer writes. Destroy still removes them when they are unchanged.
+var legacyPageFiles = []string{"form.ts"}
+
+// pageDestroyPaths returns the current page paths plus the legacy ones.
+func pageDestroyPaths(name fields.Name) []string {
+	paths := pagePaths(name)
+	for _, f := range legacyPageFiles {
+		paths = append(paths, pagesDir(name)+"/"+f)
+	}
+	return paths
 }
 
 // pagesDir returns the route directory of a resource, such as

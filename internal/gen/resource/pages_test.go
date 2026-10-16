@@ -410,6 +410,10 @@ func TestPagePaths(t *testing.T) {
 			t.Errorf("Paths() has no %s", p)
 		}
 	}
+	// Destroy also removes the form.ts that apps generated before ADR 0015.
+	if !slices.Contains(all, "web/src/routes/line-items/form.ts") {
+		t.Errorf("Paths() has no legacy form.ts: %v", all)
+	}
 	todo, _ := fields.ParseName("todo")
 	if !reflect.DeepEqual(pagePaths(todo), todoPages) {
 		t.Fatalf("pagePaths(todo) = %v", pagePaths(todo))
@@ -452,11 +456,16 @@ func TestPageSchemaRoundTrip(t *testing.T) {
 	t.Parallel()
 	node, err := runexec.LookPath("node")
 	if err != nil {
+		t.Skip("node is not on PATH: put Node 24 on PATH (the Makefile does)")
+	}
+	// The repository wrapper runs the pinned pnpm through corepack. A global pnpm of another
+	// version has no offline metadata for the pinned packages.
+	pnpm, err := filepath.Abs(filepath.Join("..", "..", "..", "scripts", "bin", "pnpm"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	pnpm, err := runexec.LookPath("pnpm")
-	if err != nil {
-		t.Skip("pnpm is not on PATH: put scripts/bin on PATH (the Makefile does)")
+	if _, err := runexec.LookPath("corepack"); err != nil {
+		t.Skip("corepack is not on PATH: put Node 24 on PATH (the Makefile does)")
 	}
 	root := webApp(t)
 	plan := planTodo(t, root, "title:string", "done:bool", "count:int", "size:bigint?", "ratio:float", "price:decimal?",
