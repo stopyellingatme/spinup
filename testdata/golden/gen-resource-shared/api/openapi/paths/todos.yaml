@@ -1,0 +1,235 @@
+# Operations of the todo resource. spinup bundles them into api/openapi/bundle.gen.yaml.
+/api/todos:
+  get:
+    operationId: listTodos
+    summary: List todos
+    tags: [todos]
+    parameters:
+      - name: limit
+        in: query
+        description: The number of todos to return.
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: offset
+        in: query
+        description: The number of todos to skip.
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          default: 0
+    responses:
+      "200":
+        description: A page of todos in id order.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoList"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  post:
+    operationId: createTodo
+    summary: Create a todo
+    tags: [todos]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TodoInput"
+    responses:
+      "201":
+        description: The new todo.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Todo"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+/api/todos/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  get:
+    operationId: getTodo
+    summary: Get a todo
+    tags: [todos]
+    responses:
+      "200":
+        description: The todo.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Todo"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The todo does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  put:
+    operationId: updateTodo
+    summary: Replace a todo
+    tags: [todos]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TodoInput"
+    responses:
+      "200":
+        description: The updated todo.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Todo"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The todo does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  delete:
+    operationId: deleteTodo
+    summary: Delete a todo
+    tags: [todos]
+    responses:
+      "204":
+        description: The todo is deleted.
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The todo does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"

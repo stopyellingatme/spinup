@@ -53,6 +53,8 @@ func (rc resourceCode) imports() []string {
 		rc.module + "/internal/handlers",
 		rc.module + "/internal/routes",
 		rc.module + "/internal/store",
+		"github.com/stopyellingatme/spinup/kit/auth",
+		"github.com/stopyellingatme/spinup/kit/auth/authtest",
 	}
 }
 
@@ -177,7 +179,7 @@ func (rc resourceCode) fromStore(g *goFile) bool {
 // toStore writes the function that validates an API input and converts it
 // to the store values of the create and update queries.
 func (rc resourceCode) toStore(g *goFile) {
-	single := len(rc.fields) == 1
+	single := len(rc.fields) == 1 && !rc.spec.Owned
 	input := "gen." + rc.item + "Input"
 	name := rc.conv + "Params"
 	result := "store.Create" + rc.item + "Params"
@@ -304,7 +306,7 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("")
 	withErr := rc.fromStore(g)
 	rc.toStore(g)
-	single := len(rc.fields) == 1
+	single := len(rc.fields) == 1 && !rc.spec.Owned
 	convert := func(ok string) {
 		if withErr {
 			g.p("item, err := %sFromStore(row)", rc.conv)
@@ -317,17 +319,41 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 		}
 	}
 
+	guard := func(operation string) {
+		if !rc.spec.Owned && !rc.spec.Shared {
+			return
+		}
+		if rc.spec.Owned {
+			g.p("user, ok := auth.UserFrom(ctx)")
+		} else {
+			g.p("_, ok := auth.UserFrom(ctx)")
+		}
+		g.p("if !ok {")
+		g.p("detail := \"A signed-in user is required.\"")
+		g.p("return gen.%s401ApplicationProblemPlusJSONResponse{Type: \"about:blank\", Status: http.StatusUnauthorized, Title: http.StatusText(http.StatusUnauthorized), Detail: &detail}, nil", operation)
+		g.p("}")
+	}
+
 	g.p("// List%s returns one page of %s in id order, and the total count.", plural, pluralWords)
 	g.p("func (s *Server) List%s(ctx context.Context, req gen.List%sRequestObject) (gen.List%sResponseObject, error) {", plural, plural, plural)
+	guard("List" + plural)
 	g.p("limit, offset, err := page(req.Params.Limit, req.Params.Offset)")
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
-	g.p("rows, err := s.Queries.List%s(ctx, store.List%sParams{RowLimit: limit, RowOffset: offset})", plural, plural)
+	if rc.spec.Owned {
+		g.p("rows, err := s.Queries.List%s(ctx, store.List%sParams{UserID: user.ID, RowLimit: limit, RowOffset: offset})", plural, plural)
+	} else {
+		g.p("rows, err := s.Queries.List%s(ctx, store.List%sParams{RowLimit: limit, RowOffset: offset})", plural, plural)
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
-	g.p("total, err := s.Queries.Count%s(ctx)", plural)
+	if rc.spec.Owned {
+		g.p("total, err := s.Queries.Count%s(ctx, user.ID)", plural)
+	} else {
+		g.p("total, err := s.Queries.Count%s(ctx)", plural)
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
@@ -349,10 +375,14 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 
 	g.p("// Create%s inserts a %s.", singular, words)
 	g.p("func (s *Server) Create%s(ctx context.Context, req gen.Create%sRequestObject) (gen.Create%sResponseObject, error) {", singular, singular, singular)
+	guard("Create" + singular)
 	g.p("params, err := %sParams(*req.Body)", rc.conv)
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
+	if rc.spec.Owned {
+		g.p("params.UserID = user.ID")
+	}
 	g.p("row, err := s.Queries.Create%s(ctx, params)", singular)
 	g.p("if err != nil {")
 	g.p("return nil, err")
@@ -363,7 +393,12 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 
 	g.p("// Get%s returns one %s.", singular, words)
 	g.p("func (s *Server) Get%s(ctx context.Context, req gen.Get%sRequestObject) (gen.Get%sResponseObject, error) {", singular, singular, singular)
-	g.p("row, err := s.Queries.Get%s(ctx, req.Id)", singular)
+	guard("Get" + singular)
+	if rc.spec.Owned {
+		g.p("row, err := s.Queries.Get%s(ctx, store.Get%sParams{ID: req.Id, UserID: user.ID})", singular, singular)
+	} else {
+		g.p("row, err := s.Queries.Get%s(ctx, req.Id)", singular)
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
@@ -373,12 +408,16 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 
 	g.p("// Update%s replaces every writable field of a %s.", singular, words)
 	g.p("func (s *Server) Update%s(ctx context.Context, req gen.Update%sRequestObject) (gen.Update%sResponseObject, error) {", singular, singular, singular)
+	guard("Update" + singular)
 	g.p("params, err := %sParams(*req.Body)", rc.conv)
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
 	g.p("row, err := s.Queries.Update%s(ctx, store.Update%sParams{", singular, singular)
 	g.p("ID: req.Id,")
+	if rc.spec.Owned {
+		g.p("UserID: user.ID,")
+	}
 	for _, f := range rc.fields {
 		if single {
 			g.p("%s: params,", f.store)
@@ -396,7 +435,12 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 
 	g.p("// Delete%s deletes a %s.", singular, words)
 	g.p("func (s *Server) Delete%s(ctx context.Context, req gen.Delete%sRequestObject) (gen.Delete%sResponseObject, error) {", singular, singular, singular)
-	g.p("deleted, err := s.Queries.Delete%s(ctx, req.Id)", singular)
+	guard("Delete" + singular)
+	if rc.spec.Owned {
+		g.p("deleted, err := s.Queries.Delete%s(ctx, store.Delete%sParams{ID: req.Id, UserID: user.ID})", singular, singular)
+	} else {
+		g.p("deleted, err := s.Queries.Delete%s(ctx, req.Id)", singular)
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
@@ -513,6 +557,20 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{DB: pool})")
 	g.p("})).Handler()")
+	if rc.spec.Owned || rc.spec.Shared {
+		g.p("var userA int64")
+		g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-a@example.com', 'test-hash-a') RETURNING id`).Scan(&userA); err != nil {")
+		g.p("t.Fatalf(\"insert user A: %%v\", err)")
+		g.p("}")
+		if rc.spec.Owned {
+			g.p("var userB int64")
+			g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-b@example.com', 'test-hash-b') RETURNING id`).Scan(&userB); err != nil {")
+			g.p("t.Fatalf(\"insert user B: %%v\", err)")
+			g.p("}")
+			g.p("other := authtest.As(handler, userB)")
+		}
+		g.p("handler = authtest.As(handler, userA)")
+	}
 	if len(parents) > 0 {
 		g.p("")
 		g.p("// Rows that the %s refer to.", strings.ReplaceAll(n.PluralSnake(), "_", " "))
@@ -534,6 +592,19 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("}")
 	g.p("created := testkit.DecodeJSON[gen.%s](t, rec)", rc.item)
 	g.p("path := fmt.Sprintf(\"%s/%%d\", created.Id)", base)
+	if rc.spec.Owned {
+		g.p("for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {")
+		g.p("var body io.Reader")
+		g.p("if method == http.MethodPut { body = %s }", bodyExpr(true))
+		g.p("rec := testkit.Do(t, other, method, path, body)")
+		g.p("if rec.Code != http.StatusNotFound { t.Fatalf(\"other user %%s: status %%d, want 404: %%s\", method, rec.Code, rec.Body) }")
+		g.p("}")
+		g.p("rec = testkit.Do(t, other, http.MethodGet, %q, nil)", base)
+		g.p("if rec.Code != http.StatusOK { t.Fatalf(\"other user list: status %%d: %%s\", rec.Code, rec.Body) }")
+		g.p("otherList := testkit.DecodeJSON[gen.%sList](t, rec)", rc.item)
+		g.p("if otherList.Total != 0 || len(otherList.Items) != 0 { t.Fatalf(\"other user list: got %%+v, want empty\", otherList) }")
+	}
+
 	g.p("")
 	g.p("rec = testkit.Do(t, handler, http.MethodGet, path, nil)")
 	g.p("if rec.Code != http.StatusOK {")
@@ -588,6 +659,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{})")
 	g.p("})).Handler()")
+	if rc.spec.Owned || rc.spec.Shared {
+		g.p("handler = authtest.As(handler, 1)")
+	}
 	g.p("tests := []struct {")
 	g.p("name, method, path, body string")
 	g.p("status int")
@@ -615,6 +689,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("}")
 	g.p("}")
 	rc.requiredFieldsTest(g, base)
+	if rc.spec.Owned || rc.spec.Shared {
+		rc.authenticationTest(g, base)
+	}
 	return g.bytes()
 }
 
@@ -654,6 +731,9 @@ func (rc resourceCode) requiredFieldsTest(g *goFile, base string) {
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{})")
 	g.p("})).Handler()")
+	if rc.spec.Owned || rc.spec.Shared {
+		g.p("handler = authtest.As(handler, 1)")
+	}
 	g.p("tests := []struct {")
 	g.p("name, body string")
 	g.p("want []httpx.FieldError")
@@ -692,5 +772,43 @@ func (rc resourceCode) requiredFieldsTest(g *goFile, base string) {
 	g.p("})")
 	g.p("}")
 	g.p("}")
+	g.p("}")
+}
+
+// authenticationTest checks every route without a signed-in user.
+func (rc resourceCode) authenticationTest(g *goFile, base string) {
+	g.p("func Test%sRequiresUser(t *testing.T) {", rc.spec.Name.PluralPascal())
+	g.p("t.Parallel()")
+	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
+	g.p("routes.Register(mux, routes.Deps{})")
+	g.p("})).Handler()")
+	g.p("tests := []struct { method, path string }{")
+	for _, route := range []struct{ method, suffix string }{{"Get", ""}, {"Post", ""}, {"Get", "/1"}, {"Put", "/1"}, {"Delete", "/1"}, {"Get", "/abc"}, {"Get", "?limit=bad"}} {
+		g.p("{http.Method%s, %q},", route.method, base+route.suffix)
+	}
+	g.p("}")
+	g.p("for _, tc := range tests {")
+	g.p("t.Run(tc.method+tc.path, func(t *testing.T) {")
+	g.p("t.Parallel()")
+	g.p("rec := testkit.Do(t, handler, tc.method, tc.path, strings.NewReader(\"{}\"))")
+	g.p("if rec.Code != http.StatusUnauthorized { t.Fatalf(\"status %%d, want 401: %%s\", rec.Code, rec.Body) }")
+	g.p("if got := rec.Header().Get(\"Content-Type\"); got != \"application/problem+json\" { t.Fatalf(\"Content-Type %%q, want application/problem+json\", got) }")
+	g.p("if problem := testkit.DecodeJSON[httpx.Problem](t, rec); problem.Status != http.StatusUnauthorized { t.Fatalf(\"problem = %%+v\", problem) }")
+	g.p("})")
+	g.p("}")
+	// Call strict methods directly to prove their defensive missing-user branch.
+	g.p("server := handlers.NewServer(nil)")
+	for _, op := range []string{"List", "Create", "Get", "Update", "Delete"} {
+		name := rc.spec.Name.Pascal()
+		if op == "List" {
+			name = rc.spec.Name.PluralPascal()
+		}
+		g.p("t.Run(%q, func(t *testing.T) {", "strict "+op)
+		g.p("response, err := server.%s%s(t.Context(), gen.%s%sRequestObject{})", op, name, op, name)
+		g.p("if err != nil { t.Fatal(err) }")
+		g.p("problem, ok := response.(gen.%s%s401ApplicationProblemPlusJSONResponse)", op, name)
+		g.p("if !ok || problem.Status != http.StatusUnauthorized { t.Fatalf(\"response = %%+v, want 401 problem\", response) }")
+		g.p("})")
+	}
 	g.p("}")
 }

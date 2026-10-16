@@ -107,6 +107,45 @@ Other packs can add files to each resource, such as web pages.
 Use `--api-only` to write only the API files.
 Use `--no-tests` to leave out the handler test.
 
+## Ownership and authentication
+
+When `spinup.lock` lists `auth`, each new resource belongs to its signed-in user.
+The table has a `user_id` foreign key and an index on `(user_id, id)`.
+Every query uses the signed-in user ID.
+The API schemas do not expose `user_id`.
+
+Every resource route requires a signed-in user, including resources with `--shared`.
+A request without a user receives a 401 problem response.
+A request for another user's row receives 404, including update and delete requests.
+The list includes only the signed-in user's rows and their total count.
+The generated tests verify these rules with two users.
+
+Use `--shared` for a global table that all signed-in users can access.
+The shared table has no owner column.
+Without `auth`, resource output stays the same, and `--shared` fails.
+
+```console
+$ spinup g resource announcement title:string --shared --api-only
+Error: generator "resource" failed: cannot generate a shared resource without the auth module
+  Try: drop --shared
+[exit 1]
+```
+
+The names `doc`, `docs`, `openapi`, and `openapis` are reserved for the API reference.
+Both `g resource` and `g model` refuse these names.
+Use `document` for application documents.
+
+```console
+$ spinup g resource doc title:string
+Error: generator "resource" failed: resource name "doc" is reserved for the API reference
+  Try: choose another name, for example document
+[exit 1]
+$ spinup g model openapi title:string
+Error: generator "model" failed: resource name "openapi" is reserved for the API reference
+  Try: choose another name, for example document
+[exit 1]
+```
+
 ## Model
 
 `spinup g model` writes the migration, the queries, and the OpenAPI schemas, but no API paths or handlers.

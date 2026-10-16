@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/stopyellingatme/spinup/internal/gen/fields"
 )
 
 // apiName returns the Go field name that oapi-codegen gives a property. It
@@ -148,4 +150,13 @@ func apiModule(root string) (string, error) {
 		return "", fmt.Errorf("api/go.mod has no module line\nTry: add a module line to api/go.mod")
 	}
 	return string(m[1]), nil
+}
+
+// reservedResourceName protects the API reference routes.
+func reservedResourceName(name fields.Name) bool {
+	switch name.Snake() {
+	case "doc", "docs", "openapi", "openapis":
+		return true
+	}
+	return name.PluralSnake() == "docs" || name.PluralSnake() == "openapi"
 }
