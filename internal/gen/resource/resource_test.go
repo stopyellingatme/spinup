@@ -79,10 +79,10 @@ func TestGoldenGenResource(t *testing.T) {
 					t.Fatal(err)
 				}
 				writeLock(t, root, packs)
-				flags = append(flags, "--api-only")
 			}
 			if tc.shared {
-				flags = append(flags, "--shared")
+				// The pages of a shared resource match those of an owned one.
+				flags = append(flags, "--shared", "--api-only")
 			}
 			render := func() (fs.FS, error) {
 				out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, flags...)})

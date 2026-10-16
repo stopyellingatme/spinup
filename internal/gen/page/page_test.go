@@ -2,6 +2,8 @@ package page
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -158,5 +160,92 @@ func TestEmbedPage(t *testing.T) {
 				t.Fatalf("client page: %v %v", out, err)
 			}
 		})
+	}
+}
+
+// TestPlanShellAndAuth checks that a page uses the page header when the app has
+// it, and that a server page of an app with auth requires a signed-in user.
+func TestPlanShellAndAuth(t *testing.T) {
+	t.Parallel()
+	shell := t.TempDir()
+	path := filepath.Join(shell, filepath.FromSlash(pageHeaderPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("<h1 />\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	authLock := webLock()
+	authLock.Packs = append(authLock.Packs, "auth")
+	tests := []struct {
+		name   string
+		root   string
+		lock   *manifest.Lock
+		page   []string
+		server []string
+		absent []string
+	}{
+		{
+			name:   "old app",
+			root:   t.TempDir(),
+			lock:   webLock(),
+			page:   []string{`<h1 class="mb-2 text-2xl font-semibold">{data.title}</h1>`},
+			server: []string{"export const load: PageServerLoad = () => {"},
+			absent: []string{"PageHeader", "requireUser"},
+		},
+		{
+			name:   "shell",
+			root:   shell,
+			lock:   webLock(),
+			page:   []string{"import PageHeader from '#lib/components/app/page-header.svelte';", "<PageHeader title={data.title} />"},
+			server: []string{"export const load: PageServerLoad = () => {"},
+			absent: []string{"<h1", "requireUser", "#lib/server/auth"},
+		},
+		{
+			name: "auth",
+			root: shell,
+			lock: authLock,
+			page: []string{"<PageHeader title={data.title} />"},
+			server: []string{
+				"import { requireUser } from '#lib/server/auth.js';",
+				"export const load: PageServerLoad = ({ locals, url }) => {\n\trequireUser(locals, url);\n\treturn { title: 'Profile' };",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out, err := plan(t.Context(), gen.Input{Root: tc.root, Lock: tc.lock, Args: []string{"settings/profile"}, Flags: flags(t, "--server")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, _ := out.Plan.Get("web/src/routes/settings/profile/+page.svelte")
+			server, _ := out.Plan.Get("web/src/routes/settings/profile/+page.server.ts")
+			for _, w := range tc.page {
+				if !strings.Contains(string(page.Data), w) {
+					t.Errorf("page has no %q:\n%s", w, page.Data)
+				}
+			}
+			for _, w := range tc.server {
+				if !strings.Contains(string(server.Data), w) {
+					t.Errorf("server file has no %q:\n%s", w, server.Data)
+				}
+			}
+			for _, w := range tc.absent {
+				if strings.Contains(string(page.Data)+string(server.Data), w) {
+					t.Errorf("files contain %q:\n%s\n%s", w, page.Data, server.Data)
+				}
+			}
+		})
+	}
+
+	// A client page in an app with the shell uses the header with a fixed title.
+	out, err := plan(t.Context(), gen.Input{Root: shell, Lock: authLock, Args: []string{"about"}, Flags: flags(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := out.Plan.Get("web/src/routes/about/+page.svelte")
+	if !strings.Contains(string(page.Data), `<PageHeader title="About" />`) || strings.Contains(string(page.Data), "$props") {
+		t.Fatalf("client page:\n%s", page.Data)
 	}
 }

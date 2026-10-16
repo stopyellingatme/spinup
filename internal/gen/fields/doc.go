@@ -16,4 +16,22 @@
 //	json     jsonb             []byte                 map[string]interface{}       object              Record<string, unknown>
 //	ref      bigint            int64                  int64                        integer/int64       number
 //	enum     text              string                 string                       string              enum union
+//
+// The resource pages give each type one input, through the field component of
+// the web pack:
+//
+//	Type     Input                          Nullable input
+//	string   text input                     text input, empty sends null
+//	text     textarea                       textarea, empty sends null
+//	int      number input, step 1           number input, empty sends null
+//	bigint   number input, step 1           number input, empty sends null
+//	bool     checkbox                       native select: not set, yes, no
+//	float    number input, any step         number input, empty sends null
+//	decimal  text input, decimal keyboard   text input, empty sends null
+//	time     datetime-local input, in UTC   datetime-local input, empty sends null
+//	date     date input                     date input, empty sends null
+//	uuid     text input                     text input, empty sends null
+//	json     textarea, a JSON object        textarea, empty sends null
+//	ref      number input for the id        number input, empty sends null
+//	enum     native select                  native select with "None"
 package fields

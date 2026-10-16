@@ -1,42 +1,43 @@
 <!-- The inputs of a todo. The new and edit pages share them. -->
 <script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import Field from '#lib/components/app/field.svelte';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import { Label } from '#lib/components/ui/label/index.js';
-	import type { Errors, Values } from './form';
+	import { priorityLabels, type Values } from './schema';
 
-	let { values, errors = {} }: { values: Values; errors?: Errors } = $props();
+	let { form }: { form: SuperForm<Values> } = $props();
+
+	// The stores of the form. A page creates its form once.
+	const values = $derived(form.form);
+	const errors = $derived(form.errors);
 
 	// The look of the Input component, for the native textarea and select elements.
 	const control =
-		'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 w-full min-w-0 rounded-lg border bg-transparent px-2.5 py-1 text-base outline-none focus-visible:ring-3 aria-invalid:ring-3 md:text-sm';
+		'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 w-full min-w-0 rounded-lg border bg-transparent px-2.5 py-1 text-base outline-none transition-colors focus-visible:ring-3 aria-invalid:ring-3 md:text-sm';
 </script>
 
-<div class="grid gap-2">
-	<Label for="title">Title</Label>
-	<Input id="title" name="title" type="text" value={values.title} required aria-invalid={errors.title ? true : undefined} />
-	{#if errors.title}<p class="text-destructive text-sm">{errors.title}</p>{/if}
-</div>
-
-<div class="grid gap-2">
-	<div class="flex items-center gap-2">
-		<input id="done" name="done" type="checkbox" checked={values.done} class="accent-primary size-4" />
-		<Label for="done">Done</Label>
-	</div>
-	{#if errors.done}<p class="text-destructive text-sm">{errors.done}</p>{/if}
-</div>
-
-<div class="grid gap-2">
-	<Label for="due">Due</Label>
-	<Input id="due" name="due" type="date" value={values.due} aria-invalid={errors.due ? true : undefined} />
-	{#if errors.due}<p class="text-destructive text-sm">{errors.due}</p>{/if}
-</div>
-
-<div class="grid gap-2">
-	<Label for="priority">Priority</Label>
-	<select id="priority" name="priority" class={control} required aria-invalid={errors.priority ? true : undefined}>
-		<option value="low" selected={values.priority === 'low'}>low</option>
-		<option value="normal" selected={values.priority === 'normal'}>normal</option>
-		<option value="high" selected={values.priority === 'high'}>high</option>
-	</select>
-	{#if errors.priority}<p class="text-destructive text-sm">{errors.priority}</p>{/if}
-</div>
+<Field label="Title" name="title" errors={$errors.title}>
+	{#snippet children({ props })}
+		<Input {...props} bind:value={$values.title} required />
+	{/snippet}
+</Field>
+<Field label="Done" name="done" errors={$errors.done}>
+	{#snippet children({ props })}
+		<Checkbox {...props} bind:checked={$values.done} />
+	{/snippet}
+</Field>
+<Field label="Due" name="due" errors={$errors.due}>
+	{#snippet children({ props })}
+		<Input {...props} type="date" bind:value={$values.due} />
+	{/snippet}
+</Field>
+<Field label="Priority" name="priority" errors={$errors.priority}>
+	{#snippet children({ props })}
+		<select {...props} bind:value={$values.priority} class={[control, 'h-8']} required>
+			{#each Object.entries(priorityLabels) as [value, label] (value)}
+				<option {value}>{label}</option>
+			{/each}
+		</select>
+	{/snippet}
+</Field>

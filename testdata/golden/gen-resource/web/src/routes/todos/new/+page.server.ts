@@ -1,28 +1,43 @@
 import { fail, redirect } from '@sveltejs/kit';
+import {
+	message,
+	setError,
+	superValidate,
+	type ErrorStatus,
+	type FormPathLeavesWithErrors,
+	type SuperValidated
+} from 'sveltekit-superforms';
+import { zod4 } from 'sveltekit-superforms/adapters';
 import { api } from '#lib/api/client.js';
-import { empty, message, parse, problemErrors } from '../form';
+import { problemMessage, schema, toBody, type Problem, type Values } from '../schema';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = () => ({ values: empty });
+// failure returns the answer of an action whose API call failed. The field errors of the problem
+// show at their inputs. Any other problem shows above the form.
+function failure(form: SuperValidated<Values>, problem: Problem | undefined, status: number) {
+	const code = (status >= 400 && status <= 599 ? status : 500) as ErrorStatus;
+	const errors = (problem?.errors ?? []).filter((e) => e.field in form.data);
+	if (errors.length === 0) return message(form, problemMessage(problem, status), { status: code });
+	for (const e of errors) {
+		setError(form, e.field as FormPathLeavesWithErrors<Values>, e.message, { status: code });
+	}
+	return fail(code, { form });
+}
+
+export const load: PageServerLoad = async () => {
+	return { form: await superValidate(zod4(schema)) };
+};
 
 export const actions: Actions = {
 	default: async ({ request, fetch }) => {
-		const { values, body, errors } = parse(await request.formData());
-		if (Object.keys(errors).length > 0) {
-			return fail(422, { values, errors, message: 'Correct the marked fields.' });
-		}
+		const form = await superValidate(request, zod4(schema));
+		if (!form.valid) return fail(400, { form });
 		const { data, error: problem, response } = await api.POST('/api/todos', {
 			fetch,
 			baseUrl: __PUBLIC_ORIGIN__,
-			body
+			body: toBody(form.data)
 		});
-		if (!data) {
-			return fail(response.status, {
-				values,
-				errors: problemErrors(problem),
-				message: message(problem, response.status)
-			});
-		}
-		redirect(303, '/todos/' + data.id);
+		if (!data) return failure(form, problem, response.status);
+		redirect(303, `/todos/${data.id}?created=1`);
 	}
 };
