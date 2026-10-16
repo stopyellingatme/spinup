@@ -23,7 +23,7 @@ stderr 'goes to the Go API'
 exec spinup g component dialog --dry-run
 stdout '^run pnpm dlx shadcn-svelte@1\.7\.0 add dialog --yes --no-deps-install \(in web\)$'
 ! exists web/src/lib/components/ui/dialog
-! grep 'dialog' spinup.lock
+! grep 'components/ui/dialog/' spinup.lock
 
 # A resource dry run lists the pages.
 exec spinup g resource todo title:string done:bool 'due:date?' --dry-run

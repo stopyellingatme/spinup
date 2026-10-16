@@ -32,6 +32,7 @@ Read these before you change anything:
 - The M8 contracts (release assets, versions and signing, installing spinup, generated workflows, `spinup ci`) are in `docs/adr/0012-m8-contracts.md`.
 - The M9 contracts (modules, mail and password reset, OIDC, pack plugins) are in `docs/adr/0013-m9-contracts.md`.
 - The M10 contracts (tier-2 plugins and the plugin SDK, embed mode, bun and heyapi, OpenTofu, self-update, WAL-G, in-place pg_upgrade, the docs site) are in `docs/adr/0014-m10-contracts.md`.
+- The M12 contracts (resource ownership, the API reference, navigation and home, the sign-in flow, resource pages with superforms) are in `docs/adr/0015-m12-contracts.md`. The vendored Scalar bundle `kit/apidocs/assets/` is a shared file (main loop only).
 
 ## Commands
 

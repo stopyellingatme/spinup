@@ -309,6 +309,20 @@ Note: `packs/` means `internal/templates/packs/`.
 
 **M11 — Stabilize** runs without orchestrate. Keep two minors with no breaking kit change. Pass the deprecation tests. The dogfood app must upgrade across two or more minors. Then freeze v1.0.
 
+#### M12 — Senior-grade defaults (added 2026-10-16 after the first hands-on dogfood test; contracts in ADR 0015)
+
+| Unit | Outcome | Check | File set | Deps |
+|---|---|---|---|---|
+| U1 | `kit/apidocs` (spec and Scalar page, own CSP), `app.WithAPIDocs`, `config.Base.APIDocs`, a link from `/_dev`, the kit API baseline, `docs/api-docs.md`, the kit-compat correction | `T ./kit/apidocs/... ./kit/app/... ./kit/config/...`, `T ./internal/apicompat/...` | `kit/apidocs/` (not `assets/`), `kit/app/`, `kit/config/config.go`, `kit/devtools/devtools.go`, `kit/api/current.txt`, `docs/api-docs.md`, `docs/policy/kit-compat.md` | – |
+| U2 | `auth.Required`, `auth.WithUser`, `authtest.As` | `T ./kit/auth/...` | `kit/auth/required.go`, `kit/auth/authtest/` | – |
+| U3 | Resource ownership in the API generator, `--shared`, reserved names | `T ./internal/gen/resource/...`, `S gen_resource`, `G gen-resource`; gate: app-gate † | `internal/gen/resource/{sql,handlers,openapi,shared,resource}.go`, `testdata/script/gen_resource.txtar`, `testdata/golden/gen-resource/api/`, `docs/commands/generate-resource.md` | U2 |
+| U4 | The api pack embeds the spec and mounts the docs | `G api`, `G api-openapi`, `S new_api` | `packs/api/files/api/openapi/embed.go.tmpl`, `packs/api/pack.d/openapi.toml`, `packs/api/files/api/cmd/api/main.go.tmpl`, goldens, `docs/commands/generate-openapi.md` | U1 |
+| U5 | Web shell: sidebar and top bar, `nav.gen.ts`, `+error.svelte`, toasts, field component | `G web`, `G web-embed`, `G web-variants` | web pack routes and `src/lib/{nav.gen.ts,components/app/}`, embed layout, `pack.d/shell.toml`, goldens, `docs/web.md` | – |
+| U6 | Sign-in flow: `requireUser`, `safeRedirect`, `redirectTo`, home | `G auth` | auth pack web routes and `src/lib/server/auth.ts`, `OidcButtons.svelte`, goldens, `docs/auth.md` | U5 |
+| U7 | `nav.gen.ts` rebuild in `g resource` and `destroy` | `T ./internal/gen/resource/ -run Nav`, `T ./internal/gen/destroy/...` | `internal/gen/resource/nav.go`, `internal/gen/destroy/destroy.go` | U5 |
+| U8 | Resource pages: superforms, read and edit views, row menu, inline toggle, pagination, dialogs, toasts, guards | `T ./internal/gen/resource/ -run Page`, `S gen_page`, `G gen-resource`; gate: app-gate † | `internal/gen/resource/pages*.go`, `internal/gen/page/`, `testdata/script/gen_page.txtar`, `testdata/golden/gen-resource/web/` | U3, U6, U7 |
+| U9 | E2E and docs for the new flow | `playwright test --list`; gate: `make e2e` † | `testdata/e2e/web/`, the web pack e2e template, `docs/commands/{generate-page,destroy}.md` | U4, U8 |
+
 ## Verification
 
 - **Per unit:** the orchestrate Phase 5 runs the unit's Check column, plus `make build lint`. Lanes do not self-certify.

@@ -1,6 +1,9 @@
-# shadcn-svelte 1.7.0 components (button, card, input, label), output of `shadcn-svelte add`.
+# shadcn-svelte 1.7.0 components (button, card, input, label; M12 adds alert-dialog, badge, checkbox,
+# dropdown-menu, pagination, separator, sheet, skeleton, sonner, table), output of `shadcn-svelte add`.
 # Main loop only: regenerate with the shadcn-svelte CLI at the pinned version. They are seed files
 # (critic resolution 6): upgrades never touch them, and `spinup upgrade --ui` (M4.8) offers updates.
+# One local edit: ui/sonner/sonner.svelte uses theme="system" instead of mode-watcher, so the app needs no
+# extra package. The components keep @lucide/svelte at the pinned 1.49.0 (the icons they import exist there).
 
 [[files]]
 path = "web/src/lib/components/ui/button/button.svelte"
@@ -70,4 +73,359 @@ class = "seed"
 [[files]]
 path = "web/src/lib/components/ui/label/label.svelte"
 source = "files/web/src/lib/components/ui/label/label.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/alert-dialog.svelte"
+source = "files/web/src/lib/components/ui/alert-dialog/alert-dialog.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/alert-dialog/index.ts"
+source = "files/web/src/lib/components/ui/alert-dialog/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/badge/badge.svelte"
+source = "files/web/src/lib/components/ui/badge/badge.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/badge/index.ts"
+source = "files/web/src/lib/components/ui/badge/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/checkbox/checkbox.svelte"
+source = "files/web/src/lib/components/ui/checkbox/checkbox.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/checkbox/index.ts"
+source = "files/web/src/lib/components/ui/checkbox/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte"
+source = "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/dropdown-menu/index.ts"
+source = "files/web/src/lib/components/ui/dropdown-menu/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/index.ts"
+source = "files/web/src/lib/components/ui/pagination/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-content.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-ellipsis.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-ellipsis.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-item.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-item.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-link.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-link.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-next-button.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-next-button.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-next.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-next.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-prev-button.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-prev-button.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination-previous.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination-previous.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/pagination/pagination.svelte"
+source = "files/web/src/lib/components/ui/pagination/pagination.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/separator/index.ts"
+source = "files/web/src/lib/components/ui/separator/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/separator/separator.svelte"
+source = "files/web/src/lib/components/ui/separator/separator.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/index.ts"
+source = "files/web/src/lib/components/ui/sheet/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-close.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-close.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-content.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-content.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-description.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-description.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-footer.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-footer.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-header.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-header.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-overlay.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-overlay.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-portal.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-portal.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-title.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-title.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet-trigger.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet-trigger.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sheet/sheet.svelte"
+source = "files/web/src/lib/components/ui/sheet/sheet.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/skeleton/index.ts"
+source = "files/web/src/lib/components/ui/skeleton/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/skeleton/skeleton.svelte"
+source = "files/web/src/lib/components/ui/skeleton/skeleton.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sonner/index.ts"
+source = "files/web/src/lib/components/ui/sonner/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/sonner/sonner.svelte"
+source = "files/web/src/lib/components/ui/sonner/sonner.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/index.ts"
+source = "files/web/src/lib/components/ui/table/index.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-body.svelte"
+source = "files/web/src/lib/components/ui/table/table-body.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-caption.svelte"
+source = "files/web/src/lib/components/ui/table/table-caption.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-cell.svelte"
+source = "files/web/src/lib/components/ui/table/table-cell.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-footer.svelte"
+source = "files/web/src/lib/components/ui/table/table-footer.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-head.svelte"
+source = "files/web/src/lib/components/ui/table/table-head.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-header.svelte"
+source = "files/web/src/lib/components/ui/table/table-header.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table-row.svelte"
+source = "files/web/src/lib/components/ui/table/table-row.svelte"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/ui/table/table.svelte"
+source = "files/web/src/lib/components/ui/table/table.svelte"
 class = "seed"
