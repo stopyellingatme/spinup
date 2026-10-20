@@ -42,6 +42,9 @@ func TestRun(t *testing.T) {
 	if err := Run(context.Background(), Options{Root: root, Kind: "resource", Name: "todo", DryRun: true, Out: &out}, fake); err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(out.String(), "would remove web/src/routes/todos/\n") {
+		t.Fatalf("dry run lists no emptied directory:\n%s", out.String())
+	}
 	for _, path := range paths {
 		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
 			t.Fatal(err)
@@ -60,6 +63,12 @@ func TestRun(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "keep "+changed) || !strings.Contains(out.String(), "Next: spinup db new drop_todos") {
 		t.Fatal(out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "web/src/routes/todos")); !os.IsNotExist(err) {
+		t.Fatalf("destroy left web/src/routes/todos: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "api/internal/handlers")); err != nil {
+		t.Fatalf("destroy removed the folder of a kept file: %v", err)
 	}
 	updated, err := manifest.Load(filepath.Join(root, "spinup.lock"))
 	if err != nil {

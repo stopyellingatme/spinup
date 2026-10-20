@@ -25,6 +25,10 @@ For an app with the web pack, resource destruction also removes the pages of the
 These are the list, the read view, the edit page, the create page, `fields.svelte`, and `schema.ts` in `web/src/routes/<plural>/`.
 The command then rebuilds `web/src/lib/nav.gen.ts`, so the sidebar link of the resource goes away.
 If you changed a page, the command keeps it and prints a `Try:` line.
+The command also removes the folders that the deletions leave empty, such as `web/src/routes/<plural>/`.
+A folder that still holds a kept file or a file of your own stays.
+The command never follows a symbolic link, and it never removes the project root.
+The command removes the legacy `form.ts` of pages from versions before ADR 0015 when that file is unchanged.
 
 Migrations remain on disk and in the lock.
 The `Next:` line suggests `spinup db new drop_<plural>` for resources and models.

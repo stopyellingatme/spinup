@@ -45,6 +45,8 @@ type Plan struct {
 	Kept []string
 	// Next suggests a migration without deleting an existing migration.
 	Next string
+	// Dirs lists the directories that the deletions leave empty, deepest first.
+	Dirs []string
 }
 
 // Build compares generator paths with the lock without changing the project.
@@ -114,6 +116,17 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 		result.Files = navPlan
 	}
 	result.Files = result.Files.Sorted()
+	var deleted []string
+	for _, file := range result.Files.Files {
+		if file.Delete {
+			deleted = append(deleted, file.Path)
+		}
+	}
+	dirs, err := emptiedDirs(o.Root, deleted)
+	if err != nil {
+		return nil, err
+	}
+	result.Dirs = dirs
 	return result, nil
 }
 
@@ -166,6 +179,15 @@ func Run(ctx context.Context, o Options, runner exec.Runner) error {
 			return destroyError(err)
 		}
 	}
+	for _, dir := range plan.Dirs {
+		action := "remove"
+		if o.DryRun {
+			action = "would remove"
+		}
+		if _, err := fmt.Fprintf(o.Out, "%s %s/\n", action, dir); err != nil {
+			return destroyError(err)
+		}
+	}
 	if !o.DryRun && len(plan.Files.Files) > 0 {
 		// Recheck immediately before apply so a stale preview never authorizes deletion.
 		checked, err := Build(ctx, o, lock)
@@ -176,6 +198,9 @@ func Run(ctx context.Context, o Options, runner exec.Runner) error {
 			return destroyError(errors.New("files changed during destruction"))
 		}
 		if _, err := vfs.Apply(o.Root, plan.Files, vfs.ApplyOptions{}); err != nil {
+			return err
+		}
+		if err := removeDirs(o.Root, plan.Dirs); err != nil {
 			return err
 		}
 		for _, file := range plan.Files.Files {
