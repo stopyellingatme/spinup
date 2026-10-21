@@ -29,6 +29,8 @@
 		open = $state(false);
 		id: number | null = $state(null);
 		anchor: HTMLElement | null = $state(null);
+		/** When the menu closes, the row button gets the focus back. An item that opens a dialog turns this off. */
+		refocus = true;
 
 		/** openFor opens the menu for the row of a button. */
 		openFor(id: number, anchor: HTMLElement) {
@@ -110,7 +112,8 @@
 		customAnchor={menu.anchor}
 		onCloseAutoFocus={(event) => {
 			event.preventDefault();
-			menu.anchor?.focus();
+			if (menu.refocus) menu.anchor?.focus();
+			menu.refocus = true;
 		}}
 		onInteractOutside={(event) => {
 			// A click on a row button toggles the menu, and the button does it.
@@ -142,7 +145,14 @@
 				{/snippet}
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator />
-			<DropdownMenu.Item variant="destructive" onSelect={() => ondelete(id)}>
+			<!-- Delete opens a dialog, and the dialog takes the focus. -->
+			<DropdownMenu.Item
+				variant="destructive"
+				onSelect={() => {
+					menu.refocus = false;
+					ondelete(id);
+				}}
+			>
 				<Trash2Icon aria-hidden="true" />
 				Delete
 			</DropdownMenu.Item>

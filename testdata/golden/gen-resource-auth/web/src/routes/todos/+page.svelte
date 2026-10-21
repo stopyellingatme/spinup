@@ -47,8 +47,10 @@
 
 	// The checkbox is a submit button. Without JavaScript, a click posts the form. With JavaScript, the
 	// checkbox shows the new value at once, and goes back with an error toast when the save fails.
-	const toggle: SubmitFunction = ({ formData }) => {
+	// A second click while the first save runs does nothing. The button stays enabled, so it keeps the focus.
+	const toggle: SubmitFunction = ({ formData, cancel }) => {
 		const id = Number(formData.get('id'));
+		if (id in pending) return cancel();
 		pending[id] = formData.get('value') === 'true';
 		return async ({ result, update }) => {
 			if (result.type === 'failure' || result.type === 'error') {
@@ -145,8 +147,7 @@
 										role="checkbox"
 										aria-checked={pending[item.id] ?? item.done}
 										aria-label="Done: {itemTitle(item)}"
-										disabled={item.id in pending}
-										class="border-input dark:bg-input/30 aria-checked:bg-primary aria-checked:text-primary-foreground dark:aria-checked:bg-primary aria-checked:border-primary focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50"
+										class="border-input dark:bg-input/30 aria-checked:bg-primary aria-checked:text-primary-foreground dark:aria-checked:bg-primary aria-checked:border-primary focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:ring-3"
 									>
 										{#if pending[item.id] ?? item.done}
 											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
@@ -218,7 +219,13 @@
 <RowMenu {menu} items={data.items} href="/todos" ondelete={confirmDelete} />
 
 <AlertDialog.Root bind:open={confirming}>
-	<AlertDialog.Content>
+	<!-- The dialog has no trigger. When it closes, the row button of the menu gets the focus back. -->
+	<AlertDialog.Content
+		onCloseAutoFocus={(event) => {
+			event.preventDefault();
+			menu.anchor?.focus();
+		}}
+	>
 		<form method="POST" action="?/delete&page={data.page}" use:enhance={remove} class="grid gap-4">
 			<input type="hidden" name="id" value={target?.id} />
 			<AlertDialog.Header>

@@ -130,11 +130,19 @@ test('the row menu opens with the keyboard and gives the focus back', async ({ p
 	await button.click();
 	await expect(page.getByRole('menu')).toHaveCount(0);
 
-	// Delete is an item of the menu. It asks first, then removes the row.
+	// Delete is an item of the menu. It asks first. The dialog keeps the focus, and Cancel gives it back to the row button.
 	await button.click();
 	await page.getByRole('menuitem', { name: 'Delete' }).click();
 	const dialog = page.getByRole('alertdialog');
 	await expect(dialog).toBeVisible();
+	await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toHaveCount(0);
+	await expect(button).toBeFocused();
+
+	// Delete again, and confirm. The row goes away.
+	await button.click();
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
 	await dialog.getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText('Todo deleted.')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
