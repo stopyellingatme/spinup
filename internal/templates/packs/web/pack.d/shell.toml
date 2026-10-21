@@ -33,6 +33,12 @@ path = "web/src/lib/components/app/field.svelte"
 source = "files/web/src/lib/components/app/field.svelte"
 class = "scaffold"
 
+# One menu for the rows of a list (the resource list page uses it).
+[[files]]
+path = "web/src/lib/components/app/row-menu.svelte"
+source = "files/web/src/lib/components/app/row-menu.svelte"
+class = "scaffold"
+
 # The error page has no server code, so the embed app (an SPA) uses it too.
 [[files]]
 path = "web/src/routes/+error.svelte"

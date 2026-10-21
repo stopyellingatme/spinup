@@ -116,14 +116,14 @@ func (d *pageData) field(f fields.Field) pageField {
 	<option value="true">Yes</option>
 	<option value="false">No</option>
 </select>`, col)
-			p.Cell = fmt.Sprintf(`{#if %s === null}—{:else if %s}<CheckIcon class="size-4" aria-hidden="true" /><span class="sr-only">Yes</span>{:else}<span class="sr-only">No</span>{/if}`, item, item)
+			p.Cell = fmt.Sprintf(`{#if %s === null}—{:else if %s}`+checkSVG+`<span class="sr-only">Yes</span>{:else}<span class="sr-only">No</span>{/if}`, item, item)
 			p.Value = fmt.Sprintf("{%s === null ? '—' : %s ? 'Yes' : 'No'}", item, item)
 			break
 		}
 		d.Checkbox = true
 		p.Zod = "z.boolean()"
 		p.Control = fmt.Sprintf("<Checkbox {...props} bind:checked={$values.%s} />", col)
-		p.Cell = fmt.Sprintf(`{#if %s}<CheckIcon class="size-4" aria-hidden="true" /><span class="sr-only">Yes</span>{:else}<span class="sr-only">No</span>{/if}`, item)
+		p.Cell = fmt.Sprintf(`{#if %s}`+checkSVG+`<span class="sr-only">Yes</span>{:else}<span class="sr-only">No</span>{/if}`, item)
 		p.Value = fmt.Sprintf("{%s ? 'Yes' : 'No'}", item)
 	case "int", "bigint", "ref", "float":
 		d.Input = true
@@ -235,3 +235,7 @@ func (d *pageData) field(f fields.Field) pageField {
 	}
 	return p
 }
+
+// checkSVG is the check mark of a list cell for a bool. It is the Lucide check icon as inline markup.
+// A list has many rows, and an inline svg is cheaper to render than an icon component.
+const checkSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>`

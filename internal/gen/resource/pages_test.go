@@ -235,8 +235,8 @@ func TestPageInputs(t *testing.T) {
 	}{
 		{"name:string", []string{`<Field label="Name" name="name" errors={$errors.name}>`, `<Input {...props} bind:value={$values.name} required />`}, []string{"name: z.string().trim().min(1, 'Name is required.')", "name: item.name", "name: values.name"}, "{itemTitle(item)}"},
 		{"body:text?", []string{`<textarea {...props} rows="4" bind:value={$values.body} class={[control, 'min-h-24']}></textarea>`}, []string{"body: z.string().trim()", "body: item.body ?? ''", "body: values.body === '' ? null : values.body"}, ""},
-		{"done:bool", []string{`<Checkbox {...props} bind:checked={$values.done} />`}, []string{"done: z.boolean()", "done: item.done", "done: values.done"}, `<Checkbox`},
-		{"flag:bool?", []string{`<select {...props} bind:value={$values.flag} class={[control, 'h-8']}>`, `<option value="">Not set</option>`, `<option value="true">Yes</option>`, `<option value="false">No</option>`}, []string{"flag: z.enum(['', 'true', 'false']", "flag: item.flag === null ? '' : item.flag ? 'true' : 'false'", "flag: values.flag === '' ? null : values.flag === 'true'"}, "{#if item.flag === null}—{:else if item.flag}<CheckIcon"},
+		{"done:bool", []string{`<Checkbox {...props} bind:checked={$values.done} />`}, []string{"done: z.boolean()", "done: item.done", "done: values.done"}, `role="checkbox"`},
+		{"flag:bool?", []string{`<select {...props} bind:value={$values.flag} class={[control, 'h-8']}>`, `<option value="">Not set</option>`, `<option value="true">Yes</option>`, `<option value="false">No</option>`}, []string{"flag: z.enum(['', 'true', 'false']", "flag: item.flag === null ? '' : item.flag ? 'true' : 'false'", "flag: values.flag === '' ? null : values.flag === 'true'"}, "{#if item.flag === null}—{:else if item.flag}<svg"},
 		{"rank:int", []string{`<Input {...props} type="number" step="1" bind:value={$values.rank} required />`}, []string{"rank: z.number({ error: 'Enter a whole number.' }).int('Enter a whole number.')", "rank: item.rank", "rank: values.rank"}, "{item.rank}"},
 		{"size:bigint?", []string{`<Input {...props} type="number" step="1" bind:value={$values.size} />`}, []string{".int('Enter a whole number.').nullable()", "size: item.size"}, "{item.size ?? '—'}"},
 		{"ratio:float", []string{`type="number" step="any" bind:value={$values.ratio} required`}, []string{"ratio: z.number({ error: 'Enter a number.' })"}, "{item.ratio}"},
@@ -302,14 +302,16 @@ func TestPageList(t *testing.T) {
 	for _, want := range []string{
 		`<a href="/todos/{item.id}" class="font-medium underline-offset-4 hover:underline">`,
 		`<Table.Head>Title</Table.Head>`,
-		`action="?/toggle"`,
+		`action="?/toggle&page={data.page}"`,
+		`role="checkbox"`,
+		`aria-checked={pending[item.id] ?? item.done}`,
+		`aria-label="Done: {itemTitle(item)}"`,
+		`<button {...menu.button(item.id, ` + "`Actions for ${itemTitle(item)}`" + `)}>`,
+		`<RowMenu {menu} items={data.items} href="/todos" ondelete={confirmDelete} />`,
 		`<input type="hidden" name="value" value={String(!item.done)} />`,
-		`checked={pending[item.id] ?? item.done}`,
 		`await update({ reset: false, navigate: false });`,
 		`<Table.Head>Other</Table.Head>`,
 		`<Table.Head>Label</Table.Head>`,
-		`<a {...props} href="/todos/{item.id}/edit">`,
-		`onSelect={() => confirmDelete(item)}`,
 		`<AlertDialog.Root bind:open={confirming}>`,
 		`action="?/delete&page={data.page}"`,
 		`{#if data.total > data.perPage}`,
@@ -320,6 +322,11 @@ func TestPageList(t *testing.T) {
 	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("the list does not contain %q", want)
+		}
+	}
+	for _, unused := range []string{"<Checkbox", "DropdownMenu", "EllipsisIcon", "bind:this", "requestSubmit", "CheckIcon"} {
+		if strings.Contains(list, unused) {
+			t.Errorf("the list has %s", unused)
 		}
 	}
 	if strings.Contains(list, `<Table.Head>Done</Table.Head>`) || strings.Contains(list, "String(!item.other)") {

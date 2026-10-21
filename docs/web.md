@@ -39,6 +39,7 @@ $ ls web/src/lib/components/app
 app-sidebar.svelte
 field.svelte
 page-header.svelte
+row-menu.svelte
 top-bar.svelte
 ```
 
@@ -66,6 +67,15 @@ The shell parts are in `web/src/lib/components/app/`:
 | `user-menu.svelte` | The user menu. Only apps with the `auth` module have it. |
 | `page-header.svelte` | The page heading, with `title`, an optional `description`, and an `actions` snippet. |
 | `field.svelte` | A form field: the label, the control, the description, and the errors. |
+| `row-menu.svelte` | The actions menu of a list. A list renders one menu for all rows, and each row has a plain button that opens it. |
+
+The resource list page (`spinup g resource`) keeps the server render cheap.
+Each row has a plain button for the actions menu and a submit button for the checkbox, with inline icons.
+The list renders one `RowMenu` outside the rows, and the menu opens at the button that the user chose.
+The checkbox button posts its form, so it works without JavaScript.
+
+The shadcn-svelte components use the variants `data-open:`, `data-closed:`, `data-checked:`, `data-unchecked:`, `data-disabled:`, `data-active:`, `data-horizontal:`, and `data-vertical:`.
+`app.css` defines them with `@custom-variant`, as the `shadcn-svelte/tailwind.css` file of shadcn-svelte 1.7.0 does.
 
 These files are scaffold files. Change them to fit your app. `spinup upgrade` merges your changes with new template versions.
 

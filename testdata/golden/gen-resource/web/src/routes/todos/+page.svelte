@@ -4,21 +4,16 @@
 	import { page } from '$app/state';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
-	import EyeIcon from '@lucide/svelte/icons/eye';
 	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
-	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
 	import PageHeader from '#lib/components/app/page-header.svelte';
+	import RowMenu, { RowMenuState } from '#lib/components/app/row-menu.svelte';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
-	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as Pagination from '#lib/components/ui/pagination/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { priorityLabels, formatDate, itemTitle, type Item } from './schema';
@@ -49,9 +44,9 @@
 
 	// The done values that a toggle has sent and the API has not saved yet, by id.
 	let pending: Record<number, boolean> = $state({});
-	const toggleForms: Record<number, HTMLFormElement> = {};
 
-	// The checkbox shows the new value at once, and goes back with an error toast when the save fails.
+	// The checkbox is a submit button. Without JavaScript, a click posts the form. With JavaScript, the
+	// checkbox shows the new value at once, and goes back with an error toast when the save fails.
 	const toggle: SubmitFunction = ({ formData }) => {
 		const id = Number(formData.get('id'));
 		pending[id] = formData.get('value') === 'true';
@@ -65,14 +60,17 @@
 		};
 	};
 
+	// The one menu of the row buttons (see RowMenu). The page renders it once, outside the rows.
+	const menu = new RowMenuState();
+
 	// The todo that the delete dialog asks about. It stays set while the dialog closes.
 	let target: Item | null = $state(null);
 	let confirming = $state(false);
 	let deleting = $state(false);
 
-	function confirmDelete(item: Item) {
-		target = item;
-		confirming = true;
+	function confirmDelete(id: number) {
+		target = data.items.find((item) => item.id === id) ?? null;
+		confirming = target !== null;
 	}
 
 	const remove: SubmitFunction = () => {
@@ -138,21 +136,22 @@
 					{#each data.items as item (item.id)}
 						<Table.Row>
 							<Table.Cell>
-								<form
-									method="POST"
-									action="?/toggle"
-									use:enhance={toggle}
-									bind:this={toggleForms[item.id]}
-									class="flex items-center"
-								>
+								<form method="POST" action="?/toggle&page={data.page}" use:enhance={toggle} class="flex items-center">
 									<input type="hidden" name="id" value={item.id} />
 									<input type="hidden" name="value" value={String(!item.done)} />
-									<Checkbox
-										checked={pending[item.id] ?? item.done}
-										disabled={item.id in pending}
-										onCheckedChange={() => toggleForms[item.id]?.requestSubmit()}
+									<!-- A submit button with the checkbox role. It works without JavaScript, and it looks like the Checkbox component. -->
+									<button
+										type="submit"
+										role="checkbox"
+										aria-checked={pending[item.id] ?? item.done}
 										aria-label="Done: {itemTitle(item)}"
-									/>
+										disabled={item.id in pending}
+										class="border-input dark:bg-input/30 aria-checked:bg-primary aria-checked:text-primary-foreground dark:aria-checked:bg-primary aria-checked:border-primary focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										{#if pending[item.id] ?? item.done}
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+										{/if}
+									</button>
 								</form>
 							</Table.Cell>
 							<Table.Cell class="max-w-xs truncate">
@@ -163,38 +162,9 @@
 							<Table.Cell>{item.due ? formatDate(item.due) : '—'}</Table.Cell>
 							<Table.Cell><Badge variant="secondary">{priorityLabels[item.priority]}</Badge></Table.Cell>
 							<Table.Cell class="text-right">
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger>
-										{#snippet child({ props })}
-											<Button {...props} variant="ghost" size="icon-sm" aria-label="Actions for {itemTitle(item)}">
-												<EllipsisIcon aria-hidden="true" />
-											</Button>
-										{/snippet}
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Content align="end" class="w-40">
-										<DropdownMenu.Item>
-											{#snippet child({ props })}
-												<a {...props} href="/todos/{item.id}">
-													<EyeIcon aria-hidden="true" />
-													View
-												</a>
-											{/snippet}
-										</DropdownMenu.Item>
-										<DropdownMenu.Item>
-											{#snippet child({ props })}
-												<a {...props} href="/todos/{item.id}/edit">
-													<PencilIcon aria-hidden="true" />
-													Edit
-												</a>
-											{/snippet}
-										</DropdownMenu.Item>
-										<DropdownMenu.Separator />
-										<DropdownMenu.Item variant="destructive" onSelect={() => confirmDelete(item)}>
-											<Trash2Icon aria-hidden="true" />
-											Delete
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Root>
+								<button {...menu.button(item.id, `Actions for ${itemTitle(item)}`)}>
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
+								</button>
 							</Table.Cell>
 						</Table.Row>
 					{/each}
@@ -243,6 +213,9 @@
 		</Pagination.Root>
 	{/if}
 {/if}
+
+<!-- One menu for all rows. It opens at the button of the row that the user chose. -->
+<RowMenu {menu} items={data.items} href="/todos" ondelete={confirmDelete} />
 
 <AlertDialog.Root bind:open={confirming}>
 	<AlertDialog.Content>

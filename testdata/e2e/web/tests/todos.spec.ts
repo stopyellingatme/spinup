@@ -104,3 +104,85 @@ test('the list has 20 rows on a page and links to the next page', async ({ page 
 	await expect(page).toHaveURL(/\/todos\?page=2$/);
 	await expect(page.getByRole('row')).toHaveCount(2); // 1 row and the header row
 });
+
+test('the row menu opens with the keyboard and gives the focus back', async ({ page }) => {
+	await register(page, uniqueEmail('menu'));
+	await createTodo(page, 'Menu todo');
+	await page.goto('/todos');
+
+	// ArrowDown on the row button opens the menu. The first item gets the focus.
+	const button = page.getByRole('button', { name: 'Actions for Menu todo' });
+	await button.focus();
+	await expect(button).toHaveAttribute('aria-expanded', 'false');
+	await page.keyboard.press('ArrowDown');
+	await expect(button).toHaveAttribute('aria-expanded', 'true');
+	await expect(page.getByRole('menuitem').first()).toBeFocused();
+
+	// Escape closes the menu, and the focus returns to the row button.
+	await page.keyboard.press('Escape');
+	await expect(page.getByRole('menu')).toHaveCount(0);
+	await expect(button).toBeFocused();
+	await expect(button).toHaveAttribute('aria-expanded', 'false');
+
+	// Enter opens the menu, and a click on the same button closes it.
+	await page.keyboard.press('Enter');
+	await expect(page.getByRole('menu')).toBeVisible();
+	await button.click();
+	await expect(page.getByRole('menu')).toHaveCount(0);
+
+	// Delete is an item of the menu. It asks first, then removes the row.
+	await button.click();
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	const dialog = page.getByRole('alertdialog');
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Delete' }).click();
+	await expect(page.getByText('Todo deleted.')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
+});
+
+test('the checkbox of a row toggles without JavaScript', async ({ browser, page }) => {
+	await register(page, uniqueEmail('nojs'));
+	await createTodo(page, 'Plain form');
+
+	// The same session, in a context that runs no scripts.
+	const plain = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
+	const view = await plain.newPage();
+	await view.goto('/todos');
+	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).not.toBeChecked();
+	await Promise.all([view.waitForURL(/\/todos/), view.getByRole('checkbox', { name: 'Done: Plain form' }).click()]);
+	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).toBeChecked();
+	await view.reload();
+	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).toBeChecked();
+	await plain.close();
+});
+
+test('a checked checkbox has the primary background', async ({ page }) => {
+	await register(page, uniqueEmail('look'));
+	for (const [title, done] of [['Open item', false], ['Done item', true]] as const) {
+		const res = await page.context().request.post(`${apiURL}/api/todos`, { data: { title, done } });
+		expect(res.ok()).toBeTruthy();
+	}
+	await page.goto('/todos');
+	const background = (name: string) =>
+		page.getByRole('checkbox', { name }).evaluate((el) => getComputedStyle(el).backgroundColor);
+	const open = await background('Done: Open item');
+	const done = await background('Done: Done item');
+	expect(done).not.toBe(open);
+	// The primary color is opaque, and the unchecked box is transparent or tinted.
+	expect(done).toMatch(/^(rgb|oklch|lab|color)\(/);
+});
+
+test('the toggle on page 2 stays on page 2', async ({ page }) => {
+	await register(page, uniqueEmail('page2'));
+	for (let i = 1; i <= 21; i++) {
+		const res = await page.context().request.post(`${apiURL}/api/todos`, {
+			data: { title: `Row ${String(i).padStart(2, '0')}`, done: false }
+		});
+		expect(res.ok()).toBeTruthy();
+	}
+	await page.goto('/todos?page=2');
+	const box = page.getByRole('checkbox').first();
+	await Promise.all([page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('toggle')), box.click()]);
+	await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(1);
+	await expect(page).toHaveURL(/\/todos\?page=2/);
+});

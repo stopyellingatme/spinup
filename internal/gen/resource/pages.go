@@ -112,7 +112,7 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 // them until spinup upgrade adds the new web pack files (ADR 0015 §5).
 var (
 	pageComponents = []string{"alert-dialog", "badge", "button", "card", "checkbox", "dropdown-menu", "input", "label", "pagination", "table"}
-	pageAppFiles   = []string{"web/src/lib/components/app/field.svelte", "web/src/lib/components/app/page-header.svelte"}
+	pageAppFiles   = []string{"web/src/lib/components/app/field.svelte", "web/src/lib/components/app/page-header.svelte", "web/src/lib/components/app/row-menu.svelte"}
 	pagePackages   = []string{"sveltekit-superforms", "zod", "svelte-sonner"}
 )
 
@@ -225,8 +225,6 @@ type pageData struct {
 	Columns []pageField
 	// Enums are the enum fields. schema.ts has a label map for each.
 	Enums []pageField
-	// ListIcon is true when a list column shows a check icon.
-	ListIcon bool
 	// ListBadge is true when a list column shows a badge.
 	ListBadge bool
 	// The helpers and components that the fields use.
@@ -266,7 +264,6 @@ func newPageData(spec Spec) pageData {
 			d.Toggle = &toggle
 		case p.Cell != "":
 			d.Columns = append(d.Columns, p)
-			d.ListIcon = d.ListIcon || strings.Contains(p.Cell, "<CheckIcon")
 			d.ListBadge = d.ListBadge || strings.Contains(p.Cell, "<Badge")
 		}
 	}

@@ -104,6 +104,9 @@ Error: generator "resource" failed: the table todos already exists in api/db/mig
 ```
 
 Other packs can add files to each resource, such as web pages.
+The web list page shows each row with a submit button for the first non-null `bool` field (it works without JavaScript) and one shared actions menu.
+The page needs `web/src/lib/components/app/row-menu.svelte`.
+Run `spinup upgrade` to add this file to an older app.
 Use `--api-only` to write only the API files.
 Use `--no-tests` to leave out the handler test.
 
