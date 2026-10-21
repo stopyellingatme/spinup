@@ -44,7 +44,7 @@ func run() (err error) {
 		defer cancel()
 		err = errors.Join(err, shutdown(shutdownCtx))
 	}()
-	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithMaxConns(cfg.DatabaseMaxConns))
 	if err != nil {
 		return err
 	}

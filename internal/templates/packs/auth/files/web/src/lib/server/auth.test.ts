@@ -118,6 +118,9 @@ describe('postAuth', () => {
 		const broken = await postAuth(reply(response(500, [], { detail: 'internal' })), cookies, '/api/auth/login', {});
 		expect(broken).toMatchObject({ ok: false, status: 500 });
 		expect(broken.ok === false && broken.errors.form).not.toContain('internal');
+
+		const busy = await postAuth(reply(response(503, [], { detail: 'The server is busy. Try again in a moment.' })), cookies, '/api/auth/login', {});
+		expect(busy).toEqual({ ok: false, status: 503, errors: { form: 'The server is busy. Try again in a moment.' } });
 	});
 
 	it('never throws when the API is down', async () => {

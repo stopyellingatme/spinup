@@ -242,6 +242,12 @@ A new pin gives a new tag, so Compose builds the new image.
 
 Postgres reads `/etc/postgresql/postgresql.conf`. On the VM, this directory is `/opt/<app>/postgres`.
 The file sets `max_connections = 200`, because both colors connect during a switch.
+Each API process holds a pool of at most 20 connections (`db.DefaultMaxConns`).
+A switch runs both colors, so the API pools use at most 2 × `replicas.api` × 20 connections.
+With the default of 2 replicas, that is 80. The migrate step and the monitoring and backup tools add a few more.
+To change the pool size in production, add `pool_max_conns=<n>` to the `DATABASE_URL` secret.
+The production Compose file does not pass `DATABASE_MAX_CONNS` to the containers. That variable is for `spinup dev` and for binaries that you start yourself.
+If you raise `replicas.api` or the pool size, keep 2 × replicas × pool below `max_connections`.
 It includes `conf.d/` for your own settings. The backups pack sets its archive settings in `deploy/compose.backups.yml`, which the deployer loads after `compose.edge.yml`.
 
 ## Environments

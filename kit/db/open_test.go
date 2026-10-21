@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -91,6 +92,28 @@ func TestOpenRuntimeParams(t *testing.T) {
 			maxConns: 3,
 		},
 		{
+			name:     "default pool size",
+			url:      base,
+			maxConns: db.DefaultMaxConns,
+		},
+		{
+			name:     "URL pool size wins over the default",
+			url:      withQuery(base, "pool_max_conns=7"),
+			maxConns: 7,
+		},
+		{
+			name:     "option pool size wins over the URL",
+			url:      withQuery(base, "pool_max_conns=7"),
+			opts:     []db.Option{db.WithMaxConns(9)},
+			maxConns: 9,
+		},
+		{
+			name:     "zero option keeps the URL pool size",
+			url:      withQuery(base, "pool_max_conns=7"),
+			opts:     []db.Option{db.WithMaxConns(0)},
+			maxConns: 7,
+		},
+		{
 			name: "URL value wins over the default",
 			url:  withQuery(base, "lock_timeout=750"),
 			want: map[string]string{"statement_timeout": "30s", "lock_timeout": "750ms"},
@@ -120,6 +143,36 @@ func TestOpenRuntimeParams(t *testing.T) {
 				t.Errorf("MaxConns = %d, want %d", pool.Config().MaxConns, tt.maxConns)
 			}
 		})
+	}
+}
+
+func TestOpenRejectsBadMaxConns(t *testing.T) {
+	t.Parallel()
+	for _, n := range []int{-1, math.MaxInt32 + 1} {
+		_, err := db.Open(context.Background(), "postgres://app:pw@127.0.0.1:1/app?sslmode=disable", db.WithMaxConns(n))
+		if err == nil || !strings.Contains(err.Error(), "Try: set DATABASE_MAX_CONNS") {
+			t.Errorf("WithMaxConns(%d): err = %v, want a DATABASE_MAX_CONNS hint", n, err)
+		}
+	}
+}
+
+func TestOpenKeywordMaxConns(t *testing.T) {
+	t.Parallel()
+	for conn, want := range map[string]int32{
+		"host=127.0.0.1 port=1 user=app dbname=app sslmode=disable":                                db.DefaultMaxConns,
+		"host=127.0.0.1 port=1 user=app dbname=app sslmode=disable pool_max_conns=3":               3,
+		"pool_max_conns = 5 host=127.0.0.1 port=1 user=app dbname=app sslmode=disable":             5,
+		"postgresql://app:pw@127.0.0.1:1/app?sslmode=disable&pool_max_conns=6":                     6,
+		"host=127.0.0.1 port=1 user=app password='my pool_max_conns=3' dbname=app sslmode=disable": db.DefaultMaxConns,
+	} {
+		pool, err := db.Open(context.Background(), conn)
+		if err != nil {
+			t.Fatalf("Open(%q): %v", conn, err)
+		}
+		if got := pool.Config().MaxConns; got != want {
+			t.Errorf("Open(%q): MaxConns = %d, want %d", conn, got, want)
+		}
+		pool.Close()
 	}
 }
 

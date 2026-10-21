@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
@@ -49,6 +50,7 @@ var (
 	b64             = base64.RawStdEncoding
 	errInvalidHash  = errors.New("auth: the password hash is not a supported argon2id PHC string")
 	errHashCanceled = errors.New("auth: the password hash was canceled")
+	errHashBusy     = errors.New("auth: all password hash slots are busy")
 )
 
 // hashPassword returns the argon2id PHC string of password with a random salt:
@@ -118,18 +120,51 @@ func phcUint(field, prefix string, limit uint64) (uint64, bool) {
 // passwordLength returns the number of code points in password.
 func passwordLength(password string) int { return utf8.RuneCountInString(password) }
 
-// hashSlots limits the number of argon2id computations that run at the same time,
-// so a burst of logins cannot exhaust memory (each one uses params.memory KiB).
-type hashSlots chan struct{}
+// hashSlots limits the argon2id computations of the process. At most cap(active)
+// run at the same time, so a burst of logins cannot exhaust memory (each one
+// uses params.memory KiB). At most cap(admitted) requests run or wait. A request
+// that finds the queue full, or that waits longer than wait, gets errHashBusy.
+// The handlers answer it with 503 and Retry-After, so the other routes keep
+// their CPU and the client knows when to retry.
+type hashSlots struct {
+	active   chan struct{}
+	admitted chan struct{}
+	wait     time.Duration
+}
 
-// run runs f in a free slot. It returns errHashCanceled when ctx ends first.
-func (s hashSlots) run(ctx context.Context, f func()) error {
+// newHashSlots returns slots for concurrent hashes, with a queue of waiting
+// requests that wait at most wait.
+func newHashSlots(concurrent, waiting int, wait time.Duration) *hashSlots {
+	return &hashSlots{
+		active:   make(chan struct{}, concurrent),
+		admitted: make(chan struct{}, concurrent+waiting),
+		wait:     wait,
+	}
+}
+
+// full reports whether a new request would get errHashBusy at once. The answer
+// can be stale. It only lets a handler skip work that a busy answer would waste.
+func (s *hashSlots) full() bool { return len(s.admitted) == cap(s.admitted) }
+
+// run runs f in a free slot. It returns errHashBusy when the queue is full or
+// the wait ends, and errHashCanceled when ctx ends first.
+func (s *hashSlots) run(ctx context.Context, f func()) error {
 	select {
-	case s <- struct{}{}:
+	case s.admitted <- struct{}{}:
+	default:
+		return errHashBusy
+	}
+	defer func() { <-s.admitted }()
+	timer := time.NewTimer(s.wait)
+	defer timer.Stop()
+	select {
+	case s.active <- struct{}{}:
+	case <-timer.C:
+		return errHashBusy
 	case <-ctx.Done():
 		return errHashCanceled
 	}
-	defer func() { <-s }()
+	defer func() { <-s.active }()
 	f()
 	return nil
 }

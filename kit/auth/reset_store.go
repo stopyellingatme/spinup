@@ -12,14 +12,14 @@ var errResetNotFound = pgx.ErrNoRows
 // reserveResetRequest applies the email limit before reserving global capacity.
 // Repeated requests for one email cannot exhaust the global bucket.
 func (a *Auth) reserveResetRequest(ctx context.Context, email string, now time.Time) (bool, error) {
-	until, err := a.reserveAttempt(ctx, "reset-email:"+email, now)
+	until, _, err := a.reserveAttempt(ctx, "reset-email:"+email, now)
 	if err != nil || !until.IsZero() {
 		return false, err
 	}
 	// Reuse the database reservation with a separate threshold and the same window.
 	// Construct only the limiter fields. Do not copy Auth's synchronization state.
 	global := Auth{pool: a.pool, threshold: resetGlobalThreshold, window: a.window}
-	until, err = global.reserveAttempt(ctx, "reset-global", now)
+	until, _, err = global.reserveAttempt(ctx, "reset-global", now)
 	return err == nil && until.IsZero(), err
 }
 

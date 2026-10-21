@@ -99,7 +99,8 @@ export function forwardSessionCookie(res: Response, cookies: Cookies): void {
 }
 
 async function problemErrors(res: Response, path: string): Promise<AuthErrors> {
-	if (res.status >= 500) {
+	// A 503 is a busy API (every password hash slot is taken). Its detail tells the user to retry.
+	if (res.status >= 500 && res.status !== 503) {
 		console.error(`auth: POST ${path} returned ${res.status}`);
 		return { form: 'Something went wrong on the server. Try again later.' };
 	}
@@ -116,7 +117,8 @@ async function problemErrors(res: Response, path: string): Promise<AuthErrors> {
 		}
 	}
 	if (!errors.email && !errors.password) {
-		errors.form = problem.detail ?? `The request failed (${res.status}).`;
+		errors.form =
+			problem.detail ?? (res.status === 503 ? 'The server is busy. Try again in a moment.' : `The request failed (${res.status}).`);
 	}
 	return errors;
 }

@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -82,20 +84,64 @@ func TestParseHashRejects(t *testing.T) {
 	}
 }
 
-func TestHashSlotsCancel(t *testing.T) {
+func TestHashSlots(t *testing.T) {
 	t.Parallel()
-	slots := make(hashSlots, 1)
-	slots <- struct{}{} // the only slot is busy
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-	ran := false
-	if err := slots.run(ctx, func() { ran = true }); err == nil || ran {
-		t.Fatalf("run = %v, ran = %v; want a cancellation", err, ran)
-	}
-	<-slots
-	if err := slots.run(context.Background(), func() { ran = true }); err != nil || !ran {
-		t.Fatalf("run = %v, ran = %v", err, ran)
-	}
+	t.Run("cancel", func(t *testing.T) {
+		t.Parallel()
+		slots := newHashSlots(1, 1, time.Minute)
+		slots.active <- struct{}{} // the only slot is busy
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+		ran := false
+		if err := slots.run(ctx, func() { ran = true }); !errors.Is(err, errHashCanceled) || ran {
+			t.Fatalf("run = %v, ran = %v; want a cancellation", err, ran)
+		}
+		<-slots.active
+		if err := slots.run(context.Background(), func() { ran = true }); err != nil || !ran {
+			t.Fatalf("run = %v, ran = %v", err, ran)
+		}
+		if len(slots.active) != 0 || len(slots.admitted) != 0 {
+			t.Fatalf("run kept %d slots and %d places", len(slots.active), len(slots.admitted))
+		}
+	})
+	t.Run("full queue", func(t *testing.T) {
+		t.Parallel()
+		slots := newHashSlots(1, 1, time.Minute)
+		if slots.full() {
+			t.Fatal("full() = true for an empty queue")
+		}
+		hold, held := make(chan struct{}), make(chan struct{})
+		go func() { _ = slots.run(context.Background(), func() { close(held); <-hold }) }()
+		<-held
+		waiting := make(chan error)
+		go func() { waiting <- slots.run(context.Background(), func() {}) }()
+		for len(slots.admitted) < 2 {
+			runtime.Gosched()
+		}
+		if !slots.full() {
+			t.Fatal("full() = false with one hash running and one waiting")
+		}
+		ran := false
+		if err := slots.run(context.Background(), func() { ran = true }); !errors.Is(err, errHashBusy) || ran {
+			t.Fatalf("run = %v, ran = %v; want errHashBusy at once", err, ran)
+		}
+		close(hold)
+		if err := <-waiting; err != nil {
+			t.Fatalf("the waiting run = %v", err)
+		}
+	})
+	t.Run("wait ends", func(t *testing.T) {
+		t.Parallel()
+		slots := newHashSlots(1, 1, 10*time.Millisecond)
+		slots.active <- struct{}{}
+		ran := false
+		if err := slots.run(context.Background(), func() { ran = true }); !errors.Is(err, errHashBusy) || ran {
+			t.Fatalf("run = %v, ran = %v; want errHashBusy after the wait", err, ran)
+		}
+		if len(slots.admitted) != 0 {
+			t.Fatal("a busy run kept its place in the queue")
+		}
+	})
 }
 
 func TestNormalizeEmail(t *testing.T) {

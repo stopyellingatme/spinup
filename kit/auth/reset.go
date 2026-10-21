@@ -192,7 +192,7 @@ func (h *resetHandler) confirm(w http.ResponseWriter, r *http.Request) {
 	// Bound password hashing with the same slots and parameters as registration.
 	hash, err := h.auth.hash(r.Context(), in.Password)
 	if err != nil {
-		h.auth.internalError(w, r, "hash the reset password", err)
+		h.auth.hashFailed(w, r, "hash the reset password", err)
 		return
 	}
 	id, err := h.auth.consumeReset(r.Context(), digest[:], hash)

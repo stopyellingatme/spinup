@@ -20,6 +20,9 @@ type Base struct {
 	Port int `env:"PORT" default:"8080"`
 	// DatabaseURL contains the PostgreSQL connection string.
 	DatabaseURL string `env:"DATABASE_URL"`
+	// DatabaseMaxConns sets the maximum size of the database pool. Zero keeps
+	// pool_max_conns in DATABASE_URL, or the kit default (db.DefaultMaxConns).
+	DatabaseMaxConns int `env:"DATABASE_MAX_CONNS"`
 	// LogLevel selects the slog severity threshold.
 	LogLevel string `env:"LOG_LEVEL" default:"info"`
 	// ShutdownTimeout limits graceful shutdown.

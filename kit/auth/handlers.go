@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"math"
 	"mime"
 	"net/http"
@@ -29,13 +30,14 @@ type userResponse struct {
 
 // Routes registers the auth endpoints (ADR 0008 §3). They need Middleware.
 //
-//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 409, 422
-//	POST /api/auth/login     {"email","password"} -> 200 {"user"}, 401, 422, 429
+//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 409, 422, 503
+//	POST /api/auth/login     {"email","password"} -> 200 {"user"}, 401, 422, 429, 503
 //	POST /api/auth/logout                         -> 204
 //	GET  /api/session                             -> 200 {"user"}, 401
 //
 // Errors are problem details. A 422 problem lists field errors for "email" and
 // "password". Register and login set the session cookie with a new token.
+// When every password hash slot is busy, they answer 503 with Retry-After.
 func (a *Auth) Routes(mux *http.ServeMux) {
 	a.oidcRoutes(mux)
 	mux.Handle("POST /api/auth/register", a.endpoint(a.register))
@@ -76,7 +78,7 @@ func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := a.hash(r.Context(), in.Password)
 	if err != nil {
-		a.internalError(w, r, "hash a password", err)
+		a.hashFailed(w, r, "hash a password", err)
 		return
 	}
 	user, created, err := a.createUser(r.Context(), email, hash)
@@ -119,9 +121,14 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		invalid(w, r, fields)
 		return
 	}
+	// Answer a full queue before the database work that a busy answer would waste.
+	if a.slots.full() {
+		busy(w, r)
+		return
+	}
 	ctx := r.Context()
 	now := a.now()
-	until, err := a.reserveAttempt(ctx, email, now)
+	until, attempt, err := a.reserveAttempt(ctx, email, now)
 	if err != nil {
 		a.internalError(w, r, "reserve a login attempt", err)
 		return
@@ -145,7 +152,12 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	var used params
 	var verifyErr error
 	if err := a.slots.run(ctx, func() { match, used, verifyErr = verifyPassword(stored, in.Password) }); err != nil {
-		verifyErr = err
+		// No password was checked, so this attempt must not count toward the lockout.
+		if releaseErr := a.releaseAttempt(context.WithoutCancel(ctx), attempt); releaseErr != nil {
+			a.logger.WarnContext(ctx, "auth: cannot release a login attempt", "error", releaseErr, "request_id", httpx.RequestIDFrom(ctx))
+		}
+		a.hashFailed(w, r, "verify a password", err)
+		return
 	}
 	if verifyErr != nil {
 		a.internalError(w, r, "verify a password", verifyErr)
@@ -219,6 +231,21 @@ func (a *Auth) rehash(ctx context.Context, user User, old, password string) {
 	if err != nil {
 		a.logger.WarnContext(ctx, "auth: cannot rehash a password with the current parameters", "error", err, "request_id", httpx.RequestIDFrom(ctx))
 	}
+}
+
+// hashFailed answers an error from the hash slots. A busy queue gets 503.
+func (a *Auth) hashFailed(w http.ResponseWriter, r *http.Request, what string, err error) {
+	if errors.Is(err, errHashBusy) {
+		busy(w, r)
+		return
+	}
+	a.internalError(w, r, what, err)
+}
+
+// busy answers 503 with Retry-After when every hash slot and queue place is taken.
+func busy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Retry-After", "1")
+	httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusServiceUnavailable, Detail: "The server is busy. Try again in a moment."})
 }
 
 // decodeCredentials reads the JSON body. It writes the problem and returns false

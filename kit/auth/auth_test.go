@@ -456,11 +456,12 @@ func TestConcurrentLoginLockout(t *testing.T) {
 	for _, known := range []bool{true, false} {
 		t.Run(strconv.FormatBool(known), func(t *testing.T) {
 			t.Parallel()
-			f := newFixture(t)
+			const attempts = 20
+			// Every request must wait for a slot, however slow the test machine is.
+			f := newFixture(t, WithHashLimits(2, attempts, time.Minute))
 			if known {
 				f.register(t, "burst@example.com")
 			}
-			const attempts = 20
 			tracer := &loginCheckTracer{checked: make(chan struct{}, attempts)}
 			cfg := f.pool.Config()
 			cfg.ConnConfig.Tracer = tracer
@@ -471,14 +472,14 @@ func TestConcurrentLoginLockout(t *testing.T) {
 			t.Cleanup(pool.Close)
 			f.auth.pool = pool
 			// Hold every hash slot until all requests are admitted or refused.
-			for range cap(f.auth.slots) {
-				f.auth.slots <- struct{}{}
+			for range cap(f.auth.slots.active) {
+				f.auth.slots.active <- struct{}{}
 			}
 			var release sync.Once
 			releaseSlots := func() {
 				release.Do(func() {
-					for range cap(f.auth.slots) {
-						<-f.auth.slots
+					for range cap(f.auth.slots.active) {
+						<-f.auth.slots.active
 					}
 				})
 			}
@@ -529,6 +530,69 @@ func TestConcurrentLoginLockout(t *testing.T) {
 				t.Fatalf("login attempts = %d (%v), want 5", rows, err)
 			}
 		})
+	}
+}
+
+func TestBusyHashSlots(t *testing.T) {
+	t.Parallel()
+	attempts := func(t *testing.T, f *fixture) int {
+		t.Helper()
+		var rows int
+		if err := f.pool.QueryRow(t.Context(), `SELECT count(*) FROM login_attempts`).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		return rows
+	}
+	busy := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "1" {
+			t.Fatalf("status %d, Retry-After %q, want 503 and 1: %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+		}
+	}
+	t.Run("full queue", func(t *testing.T) {
+		t.Parallel()
+		f := newFixture(t, WithHashLimits(1, 0, time.Minute))
+		f.register(t, "busy@example.com")
+		f.auth.slots.admitted <- struct{}{} // the only place is taken
+		busy(t, f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("busy@example.com", goodPassword)}))
+		busy(t, f.do(t, request{method: http.MethodPost, path: "/api/auth/register", body: creds("new@example.com", goodPassword)}))
+		if n := attempts(t, f); n != 0 {
+			t.Errorf("login attempts = %d, want 0: a busy answer reserves nothing", n)
+		}
+		<-f.auth.slots.admitted
+		if rec := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("busy@example.com", goodPassword)}); rec.Code != http.StatusOK {
+			t.Fatalf("login after the burst: status %d: %s", rec.Code, rec.Body)
+		}
+	})
+	t.Run("wait ends", func(t *testing.T) {
+		t.Parallel()
+		f := newFixture(t, WithHashLimits(1, 1, 20*time.Millisecond))
+		f.register(t, "slow@example.com")
+		f.auth.slots.active <- struct{}{} // the only slot runs a long hash
+		for range DefaultLockoutThreshold + 1 {
+			busy(t, f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("slow@example.com", "wrong password!")}))
+		}
+		if n := attempts(t, f); n != 0 {
+			t.Errorf("login attempts = %d, want 0: logins that checked no password do not count", n)
+		}
+		<-f.auth.slots.active
+		if rec := f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("slow@example.com", goodPassword)}); rec.Code != http.StatusOK {
+			t.Fatalf("login after the burst: status %d: %s", rec.Code, rec.Body)
+		}
+	})
+}
+
+func TestHashLimitsValidation(t *testing.T) {
+	t.Parallel()
+	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
+	for _, limits := range [][3]int{{0, 1, 1}, {1, -1, 1}, {1, 1, 0}} {
+		a, err := New(pool, WithHashLimits(limits[0], limits[1], time.Duration(limits[2])))
+		if err == nil {
+			_ = a.Close(context.Background())
+			t.Errorf("New with hash limits %v succeeded", limits)
+		} else if !strings.Contains(err.Error(), "Try: correct the values of auth.WithHashLimits") {
+			t.Errorf("error %q has no Try line", err)
+		}
 	}
 }
 

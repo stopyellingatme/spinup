@@ -18,9 +18,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - M7: Verify and restore backups. Add PostgreSQL maintenance, remote checks, dependency updates, and recovery drills.
 - M8: Generate GitHub workflows and browser checks. Add release archives, signatures, SBOMs, provenance, an installer, Homebrew, and the CI image.
 
+### Changed
+
+- Load test fixes: the database pool holds 20 connections by default (`db.DefaultMaxConns`), and `DATABASE_MAX_CONNS` changes the size. Login, registration, and password reset answer 503 with `Retry-After` when the password hash queue is full (`auth.WithHashLimits`).
+
 ### Breaking
 
 - No release is declared by this section.
+- `db.WithMaxConns` takes an `int`, not an `int32`.
 
 ### Upgrade steps
 

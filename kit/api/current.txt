@@ -27,6 +27,8 @@ kit/app type App struct
 kit/app type Option func(*App)
 kit/auth const CookieName = "session"
 kit/auth const DefaultCSP = "default-src 'none'; frame-ancestors 'none'"
+kit/auth const DefaultHashQueue = 4
+kit/auth const DefaultHashWait = 2 * time.Second
 kit/auth const DefaultLifetime = 7 * 24 * time.Hour
 kit/auth const DefaultLockoutThreshold = 5
 kit/auth const DefaultLockoutWindow = 15 * time.Minute
@@ -39,6 +41,7 @@ kit/auth field User.ID int64
 kit/auth func New(*pgxpool.Pool, ...Option) (*Auth, error)
 kit/auth func Required(http.Handler) http.Handler
 kit/auth func UserFrom(context.Context) (User, bool)
+kit/auth func WithHashLimits(int, int, time.Duration) Option
 kit/auth func WithIdleTimeout(time.Duration) Option
 kit/auth func WithLifetime(time.Duration) Option
 kit/auth func WithLockout(int, time.Duration) Option
@@ -71,6 +74,7 @@ kit/backup type Response struct
 kit/backup var ErrNoBackup = errors.New("no backup exists yet")
 kit/config field Base.APIDocs bool
 kit/config field Base.BehaviorVersion int
+kit/config field Base.DatabaseMaxConns int
 kit/config field Base.DatabaseURL string
 kit/config field Base.Env string
 kit/config field Base.LogLevel string
@@ -82,6 +86,7 @@ kit/config method Base.Behavior(int) bool
 kit/config type Base struct
 kit/db const DefaultAppName = "spinup-app"
 kit/db const DefaultLockTimeout = 5 * time.Second
+kit/db const DefaultMaxConns = 20
 kit/db const DefaultMigrationLockTimeout = 5 * time.Second
 kit/db const DefaultMigrationStatementTimeout = 5 * time.Minute
 kit/db const DefaultStatementTimeout = 30 * time.Second
@@ -97,7 +102,7 @@ kit/db func WithAppName(string) Option
 kit/db func WithDatabaseURL(string) MigrateOption
 kit/db func WithHook(Hook) MigrateOption
 kit/db func WithLockTimeout(time.Duration) Option
-kit/db func WithMaxConns(int32) Option
+kit/db func WithMaxConns(int) Option
 kit/db func WithMigrationLockTimeout(time.Duration) MigrateOption
 kit/db func WithMigrationStatementTimeout(time.Duration) MigrateOption
 kit/db func WithOutput(io.Writer) MigrateOption

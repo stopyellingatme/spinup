@@ -39,7 +39,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithAppName("todo"+"-worker"))
+	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithAppName("todo"+"-worker"), db.WithMaxConns(cfg.DatabaseMaxConns))
 	if err != nil {
 		return err
 	}

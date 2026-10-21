@@ -32,6 +32,11 @@ const (
 	DefaultLockoutWindow = 15 * time.Minute
 	// DefaultCSP is the Content-Security-Policy for API responses that set none.
 	DefaultCSP = "default-src 'none'; frame-ancestors 'none'"
+	// DefaultHashQueue is the number of password checks that can wait for each
+	// hash slot. A login that finds the queue full gets 503 with Retry-After.
+	DefaultHashQueue = 4
+	// DefaultHashWait is the longest time a password check waits for a hash slot.
+	DefaultHashWait = 2 * time.Second
 )
 
 // cleanupInterval is the time between two deletions of expired rows.
@@ -59,6 +64,10 @@ type options struct {
 	params      params
 	cleanup     time.Duration
 	now         func() time.Time
+
+	hashConcurrent int
+	hashWaiting    int
+	hashWait       time.Duration
 }
 
 // WithSecureCookie sets the Secure attribute of the session cookie. The default is
@@ -83,6 +92,16 @@ func WithLockout(threshold int, window time.Duration) Option {
 	return func(o *options) { o.threshold, o.window = threshold, window }
 }
 
+// WithHashLimits sets how many password hashes run at the same time
+// (concurrent), how many more requests can wait for a slot (waiting), and how
+// long a request waits (wait). A request that finds the queue full or waits
+// too long gets 503 with Retry-After. The defaults are max(2, GOMAXPROCS),
+// [DefaultHashQueue] for each slot, and [DefaultHashWait]. Each running hash
+// uses 64 MiB of memory.
+func WithHashLimits(concurrent, waiting int, wait time.Duration) Option {
+	return func(o *options) { o.hashConcurrent, o.hashWaiting, o.hashWait = concurrent, waiting, wait }
+}
+
 // WithLogger sets the logger for store failures. A nil logger uses slog.Default.
 func WithLogger(l *slog.Logger) Option { return func(o *options) { o.logger = l } }
 
@@ -103,7 +122,7 @@ type Auth struct {
 	logger    *slog.Logger
 	params    params
 	dummy     string
-	slots     hashSlots
+	slots     *hashSlots
 	threshold int
 	window    time.Duration
 	now       func() time.Time
@@ -120,7 +139,9 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	if pool == nil {
 		return nil, errors.New("auth: cannot start: the database pool is nil\nTry: pass the pool from db.Open to auth.New")
 	}
-	o := options{secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now}
+	slots := max(2, runtime.GOMAXPROCS(0))
+	o := options{secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
+		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait}
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -129,6 +150,8 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		return nil, fmt.Errorf("auth: cannot start: the session lifetime %s is not positive\nTry: pass a positive duration to auth.WithLifetime", o.lifetime)
 	case o.idleTimeout < 0:
 		return nil, fmt.Errorf("auth: cannot start: the idle timeout %s is negative\nTry: pass 0 (off) or a positive duration to auth.WithIdleTimeout", o.idleTimeout)
+	case o.hashConcurrent < 1 || o.hashWaiting < 0 || o.hashWait <= 0:
+		return nil, fmt.Errorf("auth: cannot start: the hash limits need at least 1 slot, 0 or more waiting requests, and a positive wait, got %d, %d, and %s\nTry: correct the values of auth.WithHashLimits", o.hashConcurrent, o.hashWaiting, o.hashWait)
 	case o.threshold < 1 || o.window <= 0:
 		return nil, fmt.Errorf("auth: cannot start: the lockout needs a threshold of at least 1 and a positive window, got %d and %s\nTry: correct the values of auth.WithLockout", o.threshold, o.window)
 	}
@@ -139,7 +162,7 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		pool:      pool,
 		logger:    o.logger,
 		params:    o.params,
-		slots:     make(hashSlots, max(2, runtime.GOMAXPROCS(0))),
+		slots:     newHashSlots(o.hashConcurrent, o.hashWaiting, o.hashWait),
 		threshold: o.threshold,
 		window:    o.window,
 		now:       o.now,

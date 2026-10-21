@@ -108,8 +108,8 @@ export const home: string = '/';
 
 | Route | Body | Success | Errors |
 | --- | --- | --- | --- |
-| `POST /api/auth/register` | `{"email","password"}` | 201 `{"user":{"id","email"}}` and the session cookie | 409 (email taken), 422 |
-| `POST /api/auth/login` | `{"email","password"}` | 200 `{"user":{"id","email"}}` and a new session cookie | 401, 422, 429 |
+| `POST /api/auth/register` | `{"email","password"}` | 201 `{"user":{"id","email"}}` and the session cookie | 409 (email taken), 422, 503 (busy) |
+| `POST /api/auth/login` | `{"email","password"}` | 200 `{"user":{"id","email"}}` and a new session cookie | 401, 422, 429, 503 (busy) |
 | `POST /api/auth/logout` | none | 204, and the cookie is cleared | |
 | `GET /api/session` | none | 200 `{"user":{"id","email"}}` | 401 |
 
@@ -166,6 +166,10 @@ mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.Resp
 - The comparison runs in constant time.
 - If the parameters of a stored hash differ from the current parameters, a successful login stores a new hash.
 - The number of hashes that run at the same time is limited to `GOMAXPROCS` (at least 2). Thus a burst of logins cannot use all the memory.
+- Four more requests for each slot can wait, for a maximum of 2 seconds. A request that finds the queue full, or that waits too long, gets 503 with `Retry-After: 1`. Thus a burst of logins cannot hold the CPU and the connections of the other routes.
+- A login that gets 503 checked no password, so it does not count toward the lockout.
+- `auth.WithHashLimits(concurrent, waiting, wait)` changes the limits.
+- One hash takes about 0.16 CPU-seconds. Thus one CPU core checks about 6 passwords each second. The load test of the todo app measured 50 logins each second on 10 cores.
 - A login for an unknown email checks a dummy hash, so the response time does not show which emails have accounts.
 
 ### Emails
@@ -209,7 +213,7 @@ The form actions post to the API with the `fetch` of the action.
 The `Set-Cookie` header of a server-side fetch does not go to the browser by itself.
 Thus `forwardSessionCookie()` reads `res.headers.getSetCookie()` and calls `cookies.set()` with the same attributes (ADR 0002 rule 7).
 
-- A successful login or registration goes to `/`.
+- A successful login or registration goes to `redirectTo`, or to `home` when there is none.
 - A failure shows the field errors and keeps the email. The password is never sent back to the page.
 - On every request, `hooks.server.ts` reads the user from `GET /api/session`. Thus `/account` renders the email on the server.
 - SvelteKit checks the `Origin` of form posts in production builds. A post without an `Origin` gets 403.
