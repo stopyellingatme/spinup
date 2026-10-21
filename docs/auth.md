@@ -167,6 +167,7 @@ mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.Resp
 - If the parameters of a stored hash differ from the current parameters, a successful login stores a new hash.
 - The number of hashes that run at the same time is limited to `GOMAXPROCS` (at least 2). Thus a burst of logins cannot use all the memory.
 - Four more requests for each slot can wait, for a maximum of 2 seconds. A request that finds the queue full, or that waits too long, gets 503 with `Retry-After: 1`. Thus a burst of logins cannot hold the CPU and the connections of the other routes.
+- A login takes its place in the queue before its database work. Thus a login that the queue refuses never waits for a database connection, and a burst of logins cannot hold the pool that other requests need.
 - A login that gets 503 checked no password, so it does not count toward the lockout.
 - `auth.WithHashLimits(concurrent, waiting, wait)` changes the limits.
 - One hash takes about 0.16 CPU-seconds. Thus one CPU core checks about 6 passwords each second. The load test of the todo app measured 50 logins each second on 10 cores.

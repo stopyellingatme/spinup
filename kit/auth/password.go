@@ -142,19 +142,22 @@ func newHashSlots(concurrent, waiting int, wait time.Duration) *hashSlots {
 	}
 }
 
-// full reports whether a new request would get errHashBusy at once. The answer
-// can be stale. It only lets a handler skip work that a busy answer would waste.
-func (s *hashSlots) full() bool { return len(s.admitted) == cap(s.admitted) }
-
-// run runs f in a free slot. It returns errHashBusy when the queue is full or
-// the wait ends, and errHashCanceled when ctx ends first.
-func (s *hashSlots) run(ctx context.Context, f func()) error {
+// admit takes a place in the queue without waiting. It returns errHashBusy when
+// the queue is full. Call leave exactly once when the request is done with its
+// hash. A login admits itself before its database work, so a busy answer never
+// takes a pool connection from other requests.
+func (s *hashSlots) admit() (leave func(), err error) {
 	select {
 	case s.admitted <- struct{}{}:
+		return func() { <-s.admitted }, nil
 	default:
-		return errHashBusy
+		return nil, errHashBusy
 	}
-	defer func() { <-s.admitted }()
+}
+
+// runAdmitted runs f in a free slot. The caller must hold a place from admit.
+// It returns errHashBusy when the wait ends, and errHashCanceled when ctx ends first.
+func (s *hashSlots) runAdmitted(ctx context.Context, f func()) error {
 	timer := time.NewTimer(s.wait)
 	defer timer.Stop()
 	select {
@@ -167,4 +170,15 @@ func (s *hashSlots) run(ctx context.Context, f func()) error {
 	defer func() { <-s.active }()
 	f()
 	return nil
+}
+
+// run admits itself, then runs f in a free slot. It returns errHashBusy when the
+// queue is full or the wait ends, and errHashCanceled when ctx ends first.
+func (s *hashSlots) run(ctx context.Context, f func()) error {
+	leave, err := s.admit()
+	if err != nil {
+		return err
+	}
+	defer leave()
+	return s.runAdmitted(ctx, f)
 }

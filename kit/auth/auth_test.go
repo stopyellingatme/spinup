@@ -554,7 +554,11 @@ func TestBusyHashSlots(t *testing.T) {
 		f := newFixture(t, WithHashLimits(1, 0, time.Minute))
 		f.register(t, "busy@example.com")
 		f.auth.slots.admitted <- struct{}{} // the only place is taken
+		acquired := f.pool.Stat().AcquireCount()
 		busy(t, f.do(t, request{method: http.MethodPost, path: "/api/auth/login", body: creds("busy@example.com", goodPassword)}))
+		if n := f.pool.Stat().AcquireCount() - acquired; n != 0 {
+			t.Errorf("a refused login acquired %d pool connections, want 0", n)
+		}
 		busy(t, f.do(t, request{method: http.MethodPost, path: "/api/auth/register", body: creds("new@example.com", goodPassword)}))
 		if n := attempts(t, f); n != 0 {
 			t.Errorf("login attempts = %d, want 0: a busy answer reserves nothing", n)
@@ -711,7 +715,8 @@ func TestDefaultCSP(t *testing.T) {
 
 func TestRehashOnLogin(t *testing.T) {
 	t.Parallel()
-	f := newFixture(t)
+	// One place in the queue: the rehash must use the place of its login.
+	f := newFixture(t, WithHashLimits(1, 0, time.Minute))
 	f.register(t, "ivan@example.com")
 	newer := params{memory: 128, time: 2, threads: 1, saltLen: 16, keyLen: 32}
 	f.auth.params = newer

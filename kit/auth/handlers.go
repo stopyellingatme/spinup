@@ -121,11 +121,14 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		invalid(w, r, fields)
 		return
 	}
-	// Answer a full queue before the database work that a busy answer would waste.
-	if a.slots.full() {
+	// Take a place in the hash queue before any database work. Thus a burst of
+	// logins that the queue refuses never waits for, or holds, a pool connection.
+	leave, err := a.slots.admit()
+	if err != nil {
 		busy(w, r)
 		return
 	}
+	defer leave()
 	ctx := r.Context()
 	now := a.now()
 	until, attempt, err := a.reserveAttempt(ctx, email, now)
@@ -151,7 +154,7 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	var match bool
 	var used params
 	var verifyErr error
-	if err := a.slots.run(ctx, func() { match, used, verifyErr = verifyPassword(stored, in.Password) }); err != nil {
+	if err := a.slots.runAdmitted(ctx, func() { match, used, verifyErr = verifyPassword(stored, in.Password) }); err != nil {
 		// No password was checked, so this attempt must not count toward the lockout.
 		if releaseErr := a.releaseAttempt(context.WithoutCancel(ctx), attempt); releaseErr != nil {
 			a.logger.WarnContext(ctx, "auth: cannot release a login attempt", "error", releaseErr, "request_id", httpx.RequestIDFrom(ctx))
@@ -222,9 +225,12 @@ func (a *Auth) hash(ctx context.Context, password string) (string, error) {
 }
 
 // rehash stores a hash with the current parameters after a successful login with
-// older ones. A failure only logs: the old hash still works.
+// older ones. The login already holds a place in the hash queue, so rehash uses
+// that place and does not take a second one. A failure only logs: the old hash
+// still works.
 func (a *Auth) rehash(ctx context.Context, user User, old, password string) {
-	hash, err := a.hash(ctx, password)
+	var hash string
+	err := a.slots.runAdmitted(ctx, func() { hash = hashPassword(a.params, password) })
 	if err == nil {
 		err = a.updatePasswordHash(ctx, user.ID, old, hash)
 	}

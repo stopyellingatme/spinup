@@ -107,9 +107,6 @@ func TestHashSlots(t *testing.T) {
 	t.Run("full queue", func(t *testing.T) {
 		t.Parallel()
 		slots := newHashSlots(1, 1, time.Minute)
-		if slots.full() {
-			t.Fatal("full() = true for an empty queue")
-		}
 		hold, held := make(chan struct{}), make(chan struct{})
 		go func() { _ = slots.run(context.Background(), func() { close(held); <-hold }) }()
 		<-held
@@ -118,8 +115,8 @@ func TestHashSlots(t *testing.T) {
 		for len(slots.admitted) < 2 {
 			runtime.Gosched()
 		}
-		if !slots.full() {
-			t.Fatal("full() = false with one hash running and one waiting")
+		if _, err := slots.admit(); !errors.Is(err, errHashBusy) {
+			t.Fatalf("admit = %v with one hash running and one waiting, want errHashBusy", err)
 		}
 		ran := false
 		if err := slots.run(context.Background(), func() { ran = true }); !errors.Is(err, errHashBusy) || ran {
@@ -128,6 +125,24 @@ func TestHashSlots(t *testing.T) {
 		close(hold)
 		if err := <-waiting; err != nil {
 			t.Fatalf("the waiting run = %v", err)
+		}
+	})
+	t.Run("admit", func(t *testing.T) {
+		t.Parallel()
+		slots := newHashSlots(1, 0, time.Minute)
+		leave, err := slots.admit()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := slots.admit(); !errors.Is(err, errHashBusy) {
+			t.Fatalf("second admit = %v, want errHashBusy", err)
+		}
+		if err := slots.runAdmitted(context.Background(), func() {}); err != nil {
+			t.Fatalf("runAdmitted = %v", err)
+		}
+		leave()
+		if len(slots.admitted) != 0 || len(slots.active) != 0 {
+			t.Fatalf("leave kept %d places and %d slots", len(slots.admitted), len(slots.active))
 		}
 	})
 	t.Run("wait ends", func(t *testing.T) {
