@@ -95,7 +95,7 @@ func WithLockout(threshold int, window time.Duration) Option {
 // WithHashLimits sets how many password hashes run at the same time
 // (concurrent), how many more requests can wait for a slot (waiting), and how
 // long a request waits (wait). A request that finds the queue full or waits
-// too long gets 503 with Retry-After. The defaults are max(2, GOMAXPROCS),
+// too long gets 503 with Retry-After. The defaults are max(1, GOMAXPROCS/10),
 // [DefaultHashQueue] for each slot, and [DefaultHashWait]. Each running hash
 // uses 64 MiB of memory.
 func WithHashLimits(concurrent, waiting int, wait time.Duration) Option {
@@ -139,7 +139,11 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	if pool == nil {
 		return nil, errors.New("auth: cannot start: the database pool is nil\nTry: pass the pool from db.Open to auth.New")
 	}
-	slots := max(2, runtime.GOMAXPROCS(0))
+	// A hash runs 4 lanes, so each slot keeps 4 goroutines busy. The load test
+	// kept other requests fast only when argon2 took at most about 40% of
+	// GOMAXPROCS: with more, the goroutines that hold pool connections wait for
+	// CPU, and every request that needs the database queues behind them.
+	slots := max(1, runtime.GOMAXPROCS(0)/10)
 	o := options{secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
 		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait}
 	for _, opt := range opts {

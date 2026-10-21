@@ -165,12 +165,14 @@ mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.Resp
 - The parameters follow the second recommended option of RFC 9106: 64 MiB of memory, 3 passes, and 4 lanes. The salt has 16 random bytes. The key has 32 bytes.
 - The comparison runs in constant time.
 - If the parameters of a stored hash differ from the current parameters, a successful login stores a new hash.
-- The number of hashes that run at the same time is limited to `GOMAXPROCS` (at least 2). Thus a burst of logins cannot use all the memory.
+- One hash runs at the same time for each 10 CPUs of `GOMAXPROCS` (at least 1). Each hash uses 4 lanes, so argon2 takes at most about 40% of the CPUs. Thus a burst of logins cannot use all the memory, and it cannot starve the other routes.
 - Four more requests for each slot can wait, for a maximum of 2 seconds. A request that finds the queue full, or that waits too long, gets 503 with `Retry-After: 1`. Thus a burst of logins cannot hold the CPU and the connections of the other routes.
 - A login takes its place in the queue before its database work. Thus a login that the queue refuses never waits for a database connection, and a burst of logins cannot hold the pool that other requests need.
 - A login that gets 503 checked no password, so it does not count toward the lockout.
 - `auth.WithHashLimits(concurrent, waiting, wait)` changes the limits.
-- One hash takes about 0.16 CPU-seconds. Thus one CPU core checks about 6 passwords each second. The load test of the todo app measured 50 logins each second on 10 cores.
+- One hash takes about 0.14 CPU-seconds and about 43 ms on an idle machine. Thus one slot checks about 23 passwords each second.
+- The load test of the todo app compared the limits on 10 CPUs during a burst of logins. With one hash for each CPU, reads waited up to 12 seconds (p99). With one hash in total, reads stayed below 0.32 seconds, and logins ran at 9 to 27 each second.
+- To check more passwords each second, raise the limit with `auth.WithHashLimits`, or run more API replicas.
 - A login for an unknown email checks a dummy hash, so the response time does not show which emails have accounts.
 
 ### Emails
