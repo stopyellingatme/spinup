@@ -65,6 +65,13 @@ func (c *Client) EnsureFirewall(ctx context.Context, want Firewall) (Firewall, b
 	body.DropletIDs = nonNil(body.DropletIDs)
 	body.InboundRules = nonNil(body.InboundRules)
 	body.OutboundRules = nonNil(body.OutboundRules)
+	if i < 0 || !sameFirewall(all[i], want) {
+		for _, tag := range body.Tags {
+			if _, err := c.EnsureTag(ctx, tag); err != nil {
+				return Firewall{}, false, err
+			}
+		}
+	}
 	var out struct {
 		Firewall Firewall `json:"firewall"`
 	}

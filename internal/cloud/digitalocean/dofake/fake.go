@@ -52,6 +52,7 @@ type Server struct {
 	nextID      int
 	droplets    []*dropletState
 	firewalls   []map[string]any
+	tags        []string
 	sshKeys     []SSHKey
 	domains     []string
 	records     map[string][]Record

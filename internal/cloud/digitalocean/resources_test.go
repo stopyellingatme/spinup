@@ -6,6 +6,7 @@ import (
 	"crypto/md5" //nolint:gosec // test of the MD5 fingerprint.
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -312,6 +313,31 @@ func TestEnsureFirewall(t *testing.T) {
 	}
 	if err := c.DeleteFirewall(ctx, fw.ID); err != nil {
 		t.Fatalf("second delete: %v", err)
+	}
+	// The create made the tag first, because the API refuses a firewall with an unknown tag.
+	if tags := f.Tags(); !reflect.DeepEqual(tags, []string{"spinup:app:prod"}) {
+		t.Fatalf("fake tags = %v", tags)
+	}
+}
+
+func TestEnsureTag(t *testing.T) {
+	ctx := context.Background()
+	c, f, _ := newFake(t, dofake.Options{})
+	created, err := c.EnsureTag(ctx, "spinup:app:prod")
+	if err != nil || !created {
+		t.Fatalf("create: %v %v", created, err)
+	}
+	created, err = c.EnsureTag(ctx, "spinup:app:prod")
+	if err != nil || created {
+		t.Fatalf("second ensure: %v %v", created, err)
+	}
+	if tags := f.Tags(); len(tags) != 1 {
+		t.Fatalf("fake tags = %v", tags)
+	}
+	// The fake refuses a firewall with an unknown tag, as the real API does.
+	err = c.do(ctx, http.MethodPost, "/v2/firewalls", map[string]any{"name": "x", "tags": []string{"missing"}}, nil)
+	if ae := (*APIError)(nil); !errors.As(err, &ae) || ae.Status != http.StatusUnprocessableEntity {
+		t.Fatalf("firewall with an unknown tag: %v, want HTTP 422", err)
 	}
 }
 

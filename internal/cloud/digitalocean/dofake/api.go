@@ -98,6 +98,13 @@ func (s *Server) Records(zone string) []Record {
 	return slices.Clone(s.records[strings.ToLower(zone)])
 }
 
+// Tags returns a snapshot of the account tags.
+func (s *Server) Tags() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.tags)
+}
+
 // SSHKeys returns a snapshot of the account SSH keys.
 func (s *Server) SSHKeys() []SSHKey {
 	s.mu.Lock()
@@ -126,6 +133,8 @@ func (s *Server) api(w http.ResponseWriter, r *http.Request, body []byte) {
 		s.dropletRoutes(w, r, parts[1:], body)
 	case parts[0] == "firewalls":
 		s.firewallRoutes(w, r, parts[1:], body)
+	case parts[0] == "tags":
+		s.tagRoutes(w, m, parts[1:], body)
 	case parts[0] == "domains":
 		s.domainRoutes(w, r, parts[1:], body)
 	case parts[0] == "sizes" && len(parts) == 1 && m == "GET":
@@ -414,10 +423,47 @@ func (s *Server) createDroplet(w http.ResponseWriter, body []byte) {
 			return
 		}
 	}
+	// A droplet create makes its tags, as the real API does.
+	for _, t := range d.Tags {
+		s.addTag(t)
+	}
 	d.ID = s.id()
 	st := &dropletState{Droplet: d}
 	s.droplets = append(s.droplets, st)
 	writeJSON(w, 202, map[string]any{"droplet": s.dropletJSON(st), "links": map[string]any{}})
+}
+
+// ---- tags ----
+
+func (s *Server) addTag(name string) {
+	if !slices.Contains(s.tags, name) {
+		s.tags = append(s.tags, name)
+	}
+}
+
+func (s *Server) tagRoutes(w http.ResponseWriter, m string, rest []string, body []byte) {
+	switch {
+	case len(rest) == 0 && m == "POST":
+		req, ok := decode(w, body)
+		if !ok {
+			return
+		}
+		name := str(req, "name")
+		if name == "" {
+			apiError(w, 422, "unprocessable_entity", "name is required")
+			return
+		}
+		s.addTag(name)
+		writeJSON(w, 201, map[string]any{"tag": map[string]any{"name": name}})
+	case len(rest) == 1 && m == "GET":
+		if !slices.Contains(s.tags, rest[0]) {
+			notFound(w)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"tag": map[string]any{"name": rest[0]}})
+	default:
+		notFound(w)
+	}
 }
 
 // ---- firewalls ----
@@ -443,6 +489,13 @@ func (s *Server) firewallRoutes(w http.ResponseWriter, r *http.Request, rest []s
 		if str(req, "name") == "" {
 			apiError(w, 422, "unprocessable_entity", "name is required")
 			return
+		}
+		// The real API refuses a firewall with a tag that does not exist.
+		for _, t := range strs(req, "tags") {
+			if !slices.Contains(s.tags, t) {
+				apiError(w, 422, "unprocessable_entity", "tag "+t+" does not exist")
+				return
+			}
 		}
 		fw := map[string]any{"name": req["name"], "status": "succeeded"}
 		for _, k := range []string{"tags", "droplet_ids", "inbound_rules", "outbound_rules"} {

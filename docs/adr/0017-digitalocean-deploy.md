@@ -61,11 +61,11 @@ Token store:
 - Tags: `spinup` and `spinup:<app>:<env>`. App names and environment names cannot contain a colon, so the tag is not ambiguous.
 - The tag finds the droplet. `droplet_id` in `spinup.toml` checks it. More than one tagged droplet is an error.
 - Droplet: name `<app>-<env>`, the image, region, and size, the SSH key, `ipv6: true`, no DigitalOcean backups or monitoring, the default VPC, and the cloud-init user data.
-- Firewall `spinup-<app>-<env>`, applied by tag: 22/tcp from `--ssh-from` (default all), 80/tcp, 443/tcp, and 443/udp from all, all outbound. Docker-published ports bypass ufw, so the Cloud Firewall is the real filter.
+- Firewall `spinup-<app>-<env>`, applied by tag: 22/tcp from `--ssh-from` (default all), 80/tcp, 443/tcp, and 443/udp from all, all outbound. Docker-published ports bypass ufw, so the Cloud Firewall is the real filter. The API refuses a firewall that names a tag that does not exist (HTTP 422), so spinup creates the tag first (`POST /v2/tags`). A droplet create makes its own tags.
 - Defaults are in `stackversions.yaml` (`digitalocean:`). A production environment uses `size_production` (`s-2vcpu-4gb`), because `production.toml` gives postgres `cpus = "2.0"`. Other environments use `size_default` (`s-1vcpu-2gb`).
 - Size check: vCPUs ≥ the largest `cpus` value in `deploy/environments/<env>.toml`, and memory ≥ 2 GiB.
 - Only Ubuntu images are accepted. The cloud-init template is Ubuntu only.
-- Scopes: `account:read regions:read sizes:read image:read actions:read droplet:create droplet:read droplet:delete ssh_key:create ssh_key:read firewall:create firewall:read firewall:update firewall:delete tag:create tag:read domain:read domain:create domain:update domain:delete`. The live test confirms the exact strings.
+- Scopes: `account:read regions:read sizes:read image:read actions:read droplet:create droplet:read droplet:delete ssh_key:create ssh_key:read firewall:create firewall:read firewall:update firewall:delete tag:create tag:read domain:read domain:create domain:update domain:delete`. The live sign-in on 2026-10-23 accepted these strings. DigitalOcean also granted `snapshot:read` and `vpc:read`, and it issued a refresh token to the public client.
 
 ## 5. spinup.toml
 
