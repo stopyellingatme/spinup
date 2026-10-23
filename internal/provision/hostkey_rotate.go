@@ -28,6 +28,3 @@ func rotateHostKey(ctx context.Context, r rotation) ([]string, error) {
 	}
 	return r.Keys, nil
 }
-
-// The callers arrive with unit U5. Remove this line then.
-var _, _ = rotateHostKey, addRotationTooling
