@@ -16,6 +16,7 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
+	"github.com/stopyellingatme/spinup/internal/cloud/digitalocean/dofake"
 	"github.com/stopyellingatme/spinup/internal/testutil"
 )
 
@@ -83,6 +84,20 @@ func TestScripts(t *testing.T) {
 			return os.Getenv(name) != "", nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
+			// dofake start runs the DigitalOcean API fake and points the CLI at it.
+			"dofake": func(ts *testscript.TestScript, neg bool, args []string) {
+				if neg || len(args) != 1 || args[0] != "start" {
+					ts.Fatalf("usage: dofake start")
+				}
+				srv := dofake.New(dofake.Options{ClientID: "spinup-test-client", StaticTokens: []string{"static-test-token"}})
+				url := srv.Start()
+				ts.Defer(srv.Close)
+				ts.Setenv("SPINUP_DO_API_BASE", url)
+				ts.Setenv("SPINUP_DO_OAUTH_BASE", url)
+				ts.Setenv("SPINUP_DO_CLIENT_ID", "spinup-test-client")
+				ts.Setenv("SPINUP_CREDENTIALS_DIR", ts.MkAbs("creds"))
+				ts.Setenv("SPINUP_BROWSER", "curl -fsSL")
+			},
 			"mkversion": func(ts *testscript.TestScript, neg bool, args []string) {
 				if neg || len(args) < 1 || len(args) > 2 {
 					ts.Fatalf("usage: mkversion <version> [overlay-dir]")

@@ -32,6 +32,11 @@
 - [`spinup db status`](db-status.md) — List applied and pending migrations
 - [`spinup db to`](db-to.md) — Migrate up or down to a version
 - [`spinup deploy`](deploy.md) — Ship the current commit to an environment with zero downtime
+- [`spinup deploy digital-ocean`](deploy-digital-ocean.md) — Create a DigitalOcean droplet for the app and deploy to it
+- [`spinup deploy digital-ocean destroy`](deploy-digital-ocean-destroy.md) — Delete the droplet, the firewall, and the DNS record of the environment
+- [`spinup deploy digital-ocean login`](deploy-digital-ocean-login.md) — Sign in to DigitalOcean in a browser and store the token
+- [`spinup deploy digital-ocean logout`](deploy-digital-ocean-logout.md) — Revoke the stored DigitalOcean token and delete it
+- [`spinup deploy digital-ocean status`](deploy-digital-ocean-status.md) — Show the token source, the account, and the resources of the environment
 - [`spinup deploy status`](deploy-status.md) — Show the current release, the deploy lock, and the last deploy journal
 - [`spinup deploy unlock`](deploy-unlock.md) — Remove the deploy lock of an environment
 - [`spinup destroy`](destroy.md) — Remove unchanged generated files

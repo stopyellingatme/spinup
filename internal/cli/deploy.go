@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/stopyellingatme/spinup/internal/backup"
 	"github.com/stopyellingatme/spinup/internal/deploy"
@@ -33,6 +34,18 @@ func projectRoot(dir string) string {
 	return dir
 }
 
+// addDeployFlags defines the deploy flags that both spinup deploy and
+// spinup deploy digital-ocean accept.
+func addDeployFlags(f *pflag.FlagSet, o *deploy.Options) {
+	f.BoolVar(&o.AllowDirty, "allow-dirty", false, "deploy with uncommitted changes")
+	f.BoolVar(&o.AllowDestructive, "allow-destructive", false, "deploy migrations that db lint reports as unsafe")
+	f.BoolVar(&o.SkipBuild, "skip-build", false, "use the images of the release that exist already")
+	f.BoolVar(&o.NoAutoRollback, "no-auto-rollback", false, "leave an unhealthy new color running for debugging")
+	f.StringVar(&o.Tag, "tag", "", "release ID of images that exist already (<YYYYMMDDTHHMMSSZ>-<12-char SHA>)")
+	f.StringVar(&o.Platform, "platform", "", "image platform (default linux/amd64)")
+	f.DurationVar(&o.HealthTimeout, "health-timeout", deploy.DefaultHealthTimeout, "time for the new color to become healthy")
+}
+
 func newDeploy(app *App) *cobra.Command {
 	var o deploy.Options
 	var acceptNewHostKey bool
@@ -60,15 +73,9 @@ func newDeploy(app *App) *cobra.Command {
 	f := c.Flags()
 	f.BoolVar(&o.Plan, "plan", false, "print what would change and change nothing on the VM")
 	f.BoolVar(&o.Resume, "resume", false, "continue the last deploy from its first step that is not done")
-	f.BoolVar(&o.AllowDirty, "allow-dirty", false, "deploy with uncommitted changes")
-	f.BoolVar(&o.AllowDestructive, "allow-destructive", false, "deploy migrations that db lint reports as unsafe")
 	f.BoolVar(&o.Redeploy, "redeploy", false, "reuse a release ID in a new directory with a -r<N> suffix")
-	f.BoolVar(&o.SkipBuild, "skip-build", false, "use the images of the release that exist already")
 	f.BoolVar(&o.SkipBackup, "skip-backup", false, "skip the pre-deploy backup")
-	f.BoolVar(&o.NoAutoRollback, "no-auto-rollback", false, "leave an unhealthy new color running for debugging")
-	f.StringVar(&o.Tag, "tag", "", "release ID of images that exist already (<YYYYMMDDTHHMMSSZ>-<12-char SHA>)")
-	f.StringVar(&o.Platform, "platform", "", "image platform (default linux/amd64)")
-	f.DurationVar(&o.HealthTimeout, "health-timeout", deploy.DefaultHealthTimeout, "time for the new color to become healthy")
+	addDeployFlags(f, &o)
 	c.PersistentFlags().BoolVar(&acceptNewHostKey, "accept-new-host-key", false, "accept the SSH host key of a new VM")
 
 	status := &cobra.Command{
@@ -93,6 +100,6 @@ func newDeploy(app *App) *cobra.Command {
 		},
 	}
 	unlock.Flags().BoolVar(&force, "force", false, "remove the lock without an ownership check")
-	c.AddCommand(status, unlock)
+	c.AddCommand(status, unlock, newDeployDigitalOcean(app))
 	return c
 }

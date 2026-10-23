@@ -1,0 +1,92 @@
+# spinup deploy digital-ocean against the dofake API fake.
+# The full create path needs SSH to a real host. The dind suite covers it.
+[!exec:curl] skip 'curl opens the sign-in URL in this script'
+dofake start
+mkdir empty
+cd empty
+
+# Without a stored token, a token variable, or a terminal, status fails with a hint.
+! exec spinup deploy digital-ocean status
+stderr 'Try: export DIGITALOCEAN_ACCESS_TOKEN'
+
+# A personal access token shows the environment source and the account.
+env DIGITALOCEAN_ACCESS_TOKEN=static-test-token
+exec spinup deploy digital-ocean status
+stdout 'Token source: env:DIGITALOCEAN_ACCESS_TOKEN'
+stdout 'Account: dev@example.com'
+stdout 'No spinup project found'
+exec spinup deploy do status --json
+stdout '"token_source": "env:DIGITALOCEAN_ACCESS_TOKEN"'
+stdout '"email": "dev@example.com"'
+env DIGITALOCEAN_ACCESS_TOKEN=
+
+# A token that the API does not know fails with a hint to sign in.
+env DIGITALOCEAN_TOKEN=wrong-token
+! exec spinup deploy digital-ocean status
+stderr 'Try:'
+env DIGITALOCEAN_TOKEN=
+
+# The command refuses --offline.
+! exec spinup deploy digital-ocean status --offline
+stderr 'Try: run the command without --offline'
+
+# Login stores a token with mode 0600 and never prints it.
+exec spinup deploy digital-ocean login
+stdout 'Signed in to DigitalOcean as dev@example.com'
+! stdout 'access_token'
+stderr 'Open this URL in a browser to sign in'
+exists $WORK/creds/digitalocean.json
+exec ls -l $WORK/creds/digitalocean.json
+stdout '^-rw-------'
+exec spinup deploy digital-ocean status
+stdout 'Token source: store'
+stdout 'Account: dev@example.com'
+
+# Logout removes the file.
+exec spinup deploy digital-ocean logout
+stdout 'removed'
+! exists $WORK/creds/digitalocean.json
+! exec spinup deploy digital-ocean status
+stderr 'Try:'
+
+# A build with no client ID has no browser sign-in.
+env SPINUP_DO_CLIENT_ID=
+! exec spinup deploy digital-ocean login
+stderr 'the browser sign-in is not available in this build'
+stderr 'Try: export DIGITALOCEAN_ACCESS_TOKEN=<a personal access token>'
+env SPINUP_DO_CLIENT_ID=spinup-test-client
+
+# Outside a project the main command and destroy fail with a Try line.
+env DIGITALOCEAN_ACCESS_TOKEN=static-test-token
+! exec spinup deploy digital-ocean --no-recovery
+stderr 'Try:'
+! exec spinup deploy digital-ocean destroy
+stderr '--i-know'
+stderr 'Try:'
+cd $WORK
+
+# A generated app: --plan creates nothing, and a run with no terminal and no --yes asks for --yes.
+[!exec:sops] skip 'sops is not installed'
+[!exec:age-keygen] skip 'age-keygen is not installed'
+[!exec:ssh-keygen] skip 'ssh-keygen is not installed'
+[!exec:ssh] skip 'ssh is not installed'
+[!exec:git] skip 'git is not installed'
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+cp spinup.toml before.toml
+exec spinup deploy digital-ocean --plan --skip-build --allow-dirty --no-recovery --ssh-key $WORK/operator.pub
+stdout 'Droplet: create todo-production'
+stdout 'No changes made'
+cmp spinup.toml before.toml
+! exists secrets
+! exec spinup deploy digital-ocean --skip-build --allow-dirty --no-recovery --ssh-key $WORK/operator.pub
+stderr '--yes'
+stderr 'Try:'
+cmp spinup.toml before.toml
+! exec spinup deploy digital-ocean destroy
+stderr '--i-know'
+stderr 'Try:'
+
+-- operator.pub --
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl operator@example.com
