@@ -302,3 +302,15 @@ func TestDestroyTeamMismatch(t *testing.T) {
 		t.Errorf("error = %+v", ue)
 	}
 }
+
+func TestDatabaseURLEscapesThePassword(t *testing.T) {
+	for _, pw := range []string{"plain", "p@ss/w:rd#1", "a b?c%d"} {
+		got, err := passwordFromURL(databaseURL(pw))
+		if err != nil || got != pw {
+			t.Errorf("round trip of %q: got %q, %v (url %s)", pw, got, err, databaseURL(pw))
+		}
+	}
+	if got := databaseURL("abc"); got != "postgres://app:abc@postgres:5432/app?sslmode=disable" {
+		t.Errorf("databaseURL = %s", got)
+	}
+}

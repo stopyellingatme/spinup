@@ -26,8 +26,10 @@ func randomSecret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+// databaseURL escapes the password, so a user-set POSTGRES_PASSWORD with @, /, : or # stays intact.
 func databaseURL(password string) string {
-	return "postgres://app:" + password + "@postgres:5432/app?sslmode=disable"
+	u := url.URL{Scheme: "postgres", User: url.UserPassword("app", password), Host: "postgres:5432", Path: "/app", RawQuery: "sslmode=disable"}
+	return u.String()
 }
 
 // passwordFromURL reads the password of a DATABASE_URL that uses the user app.

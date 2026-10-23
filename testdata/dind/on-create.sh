@@ -21,9 +21,9 @@ sudoers="$(find "$dir/root/run" -name 'spinup-*-hostkey-sudoers' 2>/dev/null | h
 # Record the key that the user data injects. The suite checks that rotation replaced it.
 cp "$dir/ssh_host_ed25519_key.pub" "$work/injected_host_key.pub"
 
+# Stream the staged files into the VM with tar. The VM runs the commands below as root.
 stage=/tmp/dofake-create
-docker exec "$vm" rm -rf "$stage"
-docker cp "$dir" "$vm:$stage" >/dev/null
+tar -C "$dir" -cf - . | docker exec -i "$vm" sh -c "rm -rf $stage && mkdir -p $stage && tar -C $stage -xf -"
 
 docker exec -i "$vm" sh -s "$stage" "$(basename "$sudoers")" <<'VM'
 set -eu
@@ -37,6 +37,9 @@ install -d -m 0755 /usr/local/sbin /var/lib/spinup
 install -m 0755 -o root -g root "$stage/root/usr/local/sbin/spinup-host-key" /usr/local/sbin/spinup-host-key
 visudo -cf "$stage/root/run/$rule"
 install -m 0440 -o root -g root "$stage/root/run/$rule" "/etc/sudoers.d/${rule%-sudoers}"
+# A droplet gives the deploy user only the sudo rules of the user data. Remove the blanket rule
+# of the dind image, so the rotation must use the installed rule.
+rm -f /etc/sudoers.d/deploy
 rm -f /var/lib/spinup/host-key-rotated /etc/ssh/ssh_host_ed25519_key.next /etc/ssh/ssh_host_ed25519_key.next.pub
 # sshd serves only the ed25519 host key, so the pin holds.
 if grep -qE '^[[:space:]]*Include[[:space:]]' /etc/ssh/sshd_config; then

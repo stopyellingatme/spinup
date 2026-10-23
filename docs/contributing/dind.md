@@ -44,12 +44,14 @@ Step 7 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of 
 
 1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.
 2. The suite adds a `Host 127.0.0.1` block to the `ssh_config`, with the port of the VM and the operator key. The droplet address is `127.0.0.1`, and the new environment has no port.
-3. The suite copies `deploy/environments/staging.toml` to `do.toml` and commits it.
-4. The suite runs `spinup deploy digital-ocean --env do --public-url http://localhost:<port> --skip-build --tag <release> --no-recovery --yes --ssh-key <key>`. The environment holds `SPINUP_DO_API_BASE` and `SPINUP_DO_OAUTH_BASE` (the fake), `DIGITALOCEAN_ACCESS_TOKEN` (the static token), and `SPINUP_CREDENTIALS_DIR`. No browser sign-in runs.
-5. When the fake creates a droplet, it parses the user data and runs `testdata/dind/on-create.sh`. The script installs the injected host key, `/usr/local/sbin/spinup-host-key`, and its sudoers rule on the VM, and makes `sshd` use only the ed25519 key.
-6. The suite checks `/version`. It checks that `[env.do]` in `spinup.toml` pins exactly one host key. This key is the key that the VM serves now, and it is not the injected key.
-7. A second run must create no droplet.
+3. The suite copies `deploy/environments/staging.toml` to `do.toml`. It gives `do` the database secrets of staging, because the postgres volume on the VM holds the staging password. Then it commits.
+4. The suite runs `spinup deploy digital-ocean --env do --public-url http://localhost:<port> --no-recovery --yes --ssh-key <key> --skip-deploy`. The environment holds `SPINUP_DO_API_BASE` and `SPINUP_DO_OAUTH_BASE` (the fake), `DIGITALOCEAN_ACCESS_TOKEN` (the static token), and `SPINUP_CREDENTIALS_DIR`. No browser sign-in runs.
+5. When the fake creates a droplet, it parses the user data and runs `testdata/dind/on-create.sh`. The script streams the files into the VM. It installs the injected host key, `/usr/local/sbin/spinup-host-key`, and its sudoers rule, and it makes `sshd` use only the ed25519 key. It removes the blanket sudo rule of the dind image, so the rotation must use the installed rule.
+6. The suite checks that the tree is clean and that `[env.do]` in `spinup.toml` pins exactly one host key. This key is the key that the VM serves now, and it is not the injected key.
+7. The suite builds a new release for the new HEAD. The first run committed `spinup.toml`, and a release ID must end with the HEAD SHA. A second run with `--skip-build --tag <release>` must create no droplet and must deploy the release. `/version` must report it.
 8. `spinup deploy digital-ocean destroy --env do --i-know --yes` (with `CI=1`) must remove the droplet from the fake.
+
+The `systemctl` shim of the VM sends a HUP to `sshd` and waits until `sshd` serves the new key.
 
 The step needs `ssh-keyscan` and the `go` toolchain, in addition to the tools of the other steps. The trap stops the fake, because the script keeps its process ID in `pids`.
 

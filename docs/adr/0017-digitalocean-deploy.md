@@ -135,7 +135,7 @@ Any failure after step 5 prints the droplet, its price for each hour, and the de
 
 ## 9. Secrets
 
-- When `secrets/<env>.enc.yaml` does not exist, spinup runs `secrets.Init` with `--recovery-recipient` or `--no-recovery`. In a TTY with neither flag, spinup asks for a recipient. With no TTY, it fails with a `Try:` line.
+- When `secrets/<env>.enc.yaml` does not exist, spinup runs `secrets.Init` with `--recovery-recipient` or `--no-recovery`. With neither flag, spinup fails in the local preflight, before any cost, with a `Try:` line. It does not ask.
 - `deploy.RequiredSecrets(root, config)` gives the names. spinup makes only the missing values, from 32 random bytes (base64url): `POSTGRES_PASSWORD`, `DATABASE_URL` (`postgres://app:<pw>@postgres:5432/app?sslmode=disable`), and `GRAFANA_ADMIN_PASSWORD` when monitoring is on.
 - spinup never replaces a value. When only `DATABASE_URL` exists, spinup takes the password from it.
 - spinup prints the names only, never the values. It does not make backup secrets.

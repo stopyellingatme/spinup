@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -111,6 +112,9 @@ func newDeployDigitalOcean(app *App) *cobra.Command {
 			"After the first run, plain spinup deploy needs no DigitalOcean token.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := refuseDryRun(app, "login", "run the command without --dry-run"); err != nil {
+				return err
+			}
 			sess, err := newDOSession(app, c, noBrowser)
 			if err != nil {
 				return err
@@ -176,6 +180,9 @@ func newDOLogin(app *App) *cobra.Command {
 			"Use a personal access token in DIGITALOCEAN_ACCESS_TOKEN on a machine with no browser.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := refuseDryRun(app, "login", "run the command without --dry-run"); err != nil {
+				return err
+			}
 			sess, err := newDOSession(app, c, noBrowser)
 			if err != nil {
 				return err
@@ -216,6 +223,9 @@ func newDOLogout(app *App) *cobra.Command {
 		Short: "Revoke the stored DigitalOcean token and delete it",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := refuseDryRun(app, "logout", "run the command without --dry-run"); err != nil {
+				return err
+			}
 			sess, err := newDOSession(app, c, true)
 			if err != nil {
 				return err
@@ -223,6 +233,10 @@ func newDOLogout(app *App) *cobra.Command {
 			path := filepath.Join(sess.source.Store.Dir, sess.source.Store.Name)
 			_, statErr := os.Stat(path)
 			if err := sess.source.Logout(c.Context()); err != nil {
+				if errors.Is(err, cloudauth.ErrNotRevoked) {
+					return &ui.Error{What: "Removed " + path + ", but the token was not revoked", Why: err.Error(),
+						Try: "revoke the spinup access at https://cloud.digitalocean.com/account/api/applications, or wait until the token expires"}
+				}
 				return err
 			}
 			out := c.OutOrStdout()
@@ -303,6 +317,9 @@ func newDODestroy(app *App) *cobra.Command {
 			"The database on the droplet is lost. Run spinup backup first. The account SSH key and the local secrets stay.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := refuseDryRun(app, "destroy", "run spinup deploy digital-ocean status to see the resources"); err != nil {
+				return err
+			}
 			sess, err := newDOSession(app, c, true)
 			if err != nil {
 				return err
@@ -313,6 +330,14 @@ func newDODestroy(app *App) *cobra.Command {
 	}
 	c.Flags().BoolVar(&iKnow, "i-know", false, "accept that the command deletes the droplet and its database")
 	return c
+}
+
+// refuseDryRun stops a subcommand that has no preview mode, so --dry-run never changes anything.
+func refuseDryRun(app *App, cmd, try string) error {
+	if app.Flags.DryRun {
+		return &ui.Error{What: "spinup deploy digital-ocean " + cmd + " has no dry run", Why: "the command has no preview mode, and --dry-run must not change anything", Code: ui.ExitUsage, Try: try}
+	}
+	return nil
 }
 
 func dirOrDot(dir string) string {

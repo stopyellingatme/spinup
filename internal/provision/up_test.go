@@ -270,13 +270,17 @@ func TestUpSSHWaitTimesOut(t *testing.T) {
 	f.vm.handler = func([]string) (string, string, int, error) {
 		return "", "ssh: connect to host: Connection refused\n", 255, nil
 	}
+	start := f.clock.Now()
 	err := f.up()
 	ue := uiErr(t, err)
 	if !strings.Contains(ue.Why, "Connection refused") {
 		t.Errorf("error = %+v", ue)
 	}
-	if got := f.clock.Now().Sub(f.clock.t.Add(-sshWaitTotal)); got < sshWaitTotal {
-		t.Logf("elapsed %v", got)
+	if got := f.clock.Now().Sub(start); got < sshWaitTotal {
+		t.Errorf("the SSH wait ended after %v, want at least %v", got, sshWaitTotal)
+	}
+	if n := f.vm.ran("true"); n < 2 {
+		t.Errorf("the SSH wait tried %d times, want several attempts", n)
 	}
 }
 
@@ -703,6 +707,13 @@ func TestUpPassesDeployFlags(t *testing.T) {
 	f := newFixture(t, nil)
 	f.opts.Deploy.AllowDestructive = true
 	f.opts.Deploy.Tag = "abc"
+	f.exec.staged = "spinup.toml\n"
+	// The first run commits, so HEAD moves and the tag cannot match it.
+	if ue := uiErr(t, f.up()); !strings.Contains(ue.Try, "--skip-deploy") || len(f.deploys) != 0 {
+		t.Fatalf("first run with --tag: %+v, deploys = %d", ue, len(f.deploys))
+	}
+	// The files are committed now, so the second run deploys the tag.
+	f.exec.staged = ""
 	if err := f.up(); err != nil {
 		t.Fatal(err)
 	}

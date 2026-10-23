@@ -9,8 +9,8 @@
 #   4. a good second release, then rollback to the first release
 #   5. lock contention: a held lock makes a deploy exit 5, then deploy unlock --force
 #   6. a deploy with a new secret: the secret file on the VM has mode 0600
-#   7. deploy digital-ocean against the dofake binary, with the VM as the droplet: host key
-#      rotation, a second run that creates nothing, and destroy
+#   7. deploy digital-ocean against the dofake binary, with the VM as the droplet: a provision run
+#      with host key rotation, a second run that creates nothing and deploys a new release, and destroy
 #
 # Every container, volume, and image that it creates has a name that starts with
 # spinup-dind-. A trap removes them, also when a step fails.
@@ -446,18 +446,27 @@ pinned_keys() {
 }
 if [[ "$(droplet_count)" != 0 ]]; then fail "the fake has a droplet before the run"; fi
 
-# The environment file of "do" is a copy of the staging file. A clean tree is a precondition.
+# The environment "do" is a copy of staging. The postgres volume on the VM holds the staging
+# password, so "do" gets the same database secrets. A clean tree is a precondition.
 cp "$work/$app/deploy/environments/staging.toml" "$work/$app/deploy/environments/do.toml"
+sp do-secrets-init secrets init --env "do" --no-recovery || { show_log do-secrets-init; fail "secrets init --env do failed"; }
+printf '%s' "postgres://app:$db_password@postgres:5432/app?sslmode=disable" >"$work/value"
+sp do-secrets-db secrets set --env "do" DATABASE_URL <"$work/value" || { show_log do-secrets-db; fail "secrets set failed"; }
+printf '%s' "$db_password" >"$work/value"
+sp do-secrets-pg secrets set --env "do" POSTGRES_PASSWORD <"$work/value" || { show_log do-secrets-pg; fail "secrets set failed"; }
+rm -f "$work/value"
 commit "dind: add the do environment"
 
 export SPINUP_DO_API_BASE="$do_url" SPINUP_DO_OAUTH_BASE="$do_url"
 export DIGITALOCEAN_ACCESS_TOKEN="$do_token" SPINUP_CREDENTIALS_DIR="$work/creds"
-do_args=(deploy digital-ocean --env "do" --public-url "http://localhost:$http_port" --skip-build --tag "$rel3"
-  --no-recovery --yes --ssh-key "$work/id_ed25519.pub")
+do_args=(deploy digital-ocean --env "do" --public-url "http://localhost:$http_port" --no-recovery --yes
+  --ssh-key "$work/id_ed25519.pub")
 
-sp do-up "${do_args[@]}" || { show_log do-up 60; fail "spinup deploy digital-ocean failed"; }
-expect_version "$rel3"
+# The first run provisions only. Its commit moves HEAD, and a release ID must end with the HEAD
+# SHA, so the release images are built after it.
+sp do-up "${do_args[@]}" --skip-deploy || { show_log do-up 60; fail "spinup deploy digital-ocean --skip-deploy failed"; }
 if [[ "$(droplet_count)" != 1 ]]; then fail "the first run did not create exactly one droplet"; fi
+[[ -z "$(git -C "$work/$app" status --porcelain)" ]] || fail "the first run left uncommitted changes"
 
 # spinup.toml pins one host key, and it is the key that the VM serves now.
 pinned="$(pinned_keys)"
@@ -472,12 +481,13 @@ served="$(ssh-keyscan -t ed25519 -p "$ssh_port" 127.0.0.1 2>/dev/null | awk '{pr
 [[ "$served" == "$vm_key" ]] || fail "sshd does not serve the rotated host key" "served: $served" "file:   $vm_key"
 echo "    host key rotated and pinned: ${vm_key:0:40}..."
 
-# A second run finds the droplet by its tag and creates nothing.
-sp do-up-2 "${do_args[@]}" || { show_log do-up-2 60; fail "the second spinup deploy digital-ocean failed"; }
+# The second run finds the droplet by its tag, creates nothing, and deploys a new release.
+rel4="$(new_release)"
+sp do-up-2 "${do_args[@]}" --skip-build --tag "$rel4" || { show_log do-up-2 60; fail "the second spinup deploy digital-ocean failed"; }
 if [[ "$(droplet_count)" != 1 ]]; then fail "the second run changed the number of droplets"; fi
-expect_version "$rel3"
+expect_version "$rel4"
 [[ "$(pinned_keys)" == "$vm_key" ]] || fail "the second run changed the pinned host key" "pinned: $(pinned_keys)"
-echo "    the second run created nothing"
+echo "    the second run created nothing and deployed $rel4"
 
 # destroy deletes the droplet from the fake. The VM stays.
 CI=1 sp do-destroy deploy digital-ocean destroy --env "do" --i-know --yes ||
@@ -486,4 +496,4 @@ if [[ "$(droplet_count)" != 0 ]]; then fail "destroy left the droplet in the fak
 echo "    destroy removed the droplet"
 unset SPINUP_DO_API_BASE SPINUP_DO_OAUTH_BASE DIGITALOCEAN_ACCESS_TOKEN SPINUP_CREDENTIALS_DIR
 
-printf '\nrun.sh: PASS (releases %s, %s, %s)\n' "$rel1" "$rel2" "$rel3"
+printf '\nrun.sh: PASS (releases %s, %s, %s, %s)\n' "$rel1" "$rel2" "$rel3" "$rel4"

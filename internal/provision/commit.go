@@ -45,5 +45,11 @@ func (r *run) commitFiles(ctx context.Context) (bool, error) {
 		return false, failWrap("commit the provisioning files", err, "commit the files by hand, then run spinup deploy --env "+r.env)
 	}
 	r.say("Committed: %s", msg)
+	// A release ID of --tag ends with the SHA of the commit that built its images. The new commit
+	// moved HEAD, so the deploy would refuse that tag.
+	if r.o.Deploy.Tag != "" && !r.o.SkipDeploy {
+		return false, fail("deploy the images of --tag "+r.o.Deploy.Tag, "the provisioning commit moved HEAD, and the release ID must end with the HEAD SHA",
+			"build the images of the new commit, then run spinup deploy --env "+r.env+"; or provision first with --skip-deploy")
+	}
 	return true, nil
 }

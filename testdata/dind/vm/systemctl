@@ -1,9 +1,26 @@
 #!/bin/sh
-# Shim of systemctl for the dind VM (Alpine has no systemd). It maps the ssh.service reload and restart to a HUP of sshd.
+# Shim of systemctl for the dind VM (Alpine has no systemd). It maps the ssh.service reload and
+# restart to a HUP of sshd. sshd reloads after the signal, so the shim waits until sshd serves the
+# key in /etc/ssh/ssh_host_ed25519_key.pub. The rotation connects again at once after the reload.
 case "$*" in
   "reload ssh.service" | "restart ssh.service" | "reload sshd.service" | "restart sshd.service")
     pid="$(cat /run/sshd.pid 2>/dev/null || cat /var/run/sshd.pid)"
-    exec kill -HUP "$pid"
+    kill -HUP "$pid"
+    want="$(awk '{print $2}' /etc/ssh/ssh_host_ed25519_key.pub)"
+    if ! command -v ssh-keyscan >/dev/null 2>&1; then
+      sleep 2
+      exit 0
+    fi
+    i=0
+    while [ "$i" -lt 50 ]; do
+      if ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null | awk '{print $3}' | grep -qxF "$want"; then
+        exit 0
+      fi
+      i=$((i + 1))
+      sleep 0.2
+    done
+    echo "systemctl shim: sshd does not serve the new host key after 10 seconds" >&2
+    exit 1
     ;;
   *)
     echo "systemctl shim: unsupported: $*" >&2

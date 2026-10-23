@@ -140,14 +140,22 @@ func (s *Source) Current(ctx context.Context) (Token, string, error) {
 	return res, from, nil
 }
 
-// Logout revokes the refresh token and the access token, then deletes the file.
-// Revoke errors are ignored unless the file cannot be deleted. Then the error reports both.
+// ErrNotRevoked means that Logout deleted the stored token, but DigitalOcean did not confirm the
+// revoke. The token can still be valid until it expires.
+var ErrNotRevoked = errors.New("the stored token was deleted, but the revoke failed")
+
+// Logout revokes the refresh token and the access token, then deletes the file. When a revoke
+// fails, it still deletes the file and returns an error that wraps ErrNotRevoked. When the file
+// cannot be read, it keeps the file, so that the user can fix it and revoke later.
 func (s *Source) Logout(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cached = Token{}
 	return s.Store.WithLock(ctx, func() error {
-		t, found, _ := s.Store.Load()
+		t, found, err := s.Store.Load()
+		if err != nil {
+			return err
+		}
 		var rerrs []error
 		if found {
 			if t.RefreshToken != "" {
@@ -163,6 +171,9 @@ func (s *Source) Logout(ctx context.Context) error {
 		}
 		if err := s.Store.Delete(); err != nil {
 			return errors.Join(append([]error{err}, rerrs...)...)
+		}
+		if len(rerrs) > 0 {
+			return fmt.Errorf("%w: %w", ErrNotRevoked, errors.Join(rerrs...))
 		}
 		return nil
 	})

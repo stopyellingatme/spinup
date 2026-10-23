@@ -540,6 +540,27 @@ func TestSourceLogout(t *testing.T) {
 	}
 }
 
+func TestSourceLogoutReportsFailedRevoke(t *testing.T) {
+	p := newProvider(t)
+	s := newSource(p, t.TempDir())
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
+	}))
+	defer down.Close()
+	s.Config.RevokeURL = down.URL
+	seed(t, s, Token{AccessToken: "secret-access-1", RefreshToken: "secret-refresh-1", Expiry: time.Now().Add(time.Hour)})
+	err := s.Logout(context.Background())
+	if !errors.Is(err, ErrNotRevoked) {
+		t.Fatalf("err = %v, want ErrNotRevoked", err)
+	}
+	if strings.Contains(err.Error(), "secret-access-1") || strings.Contains(err.Error(), "secret-refresh-1") {
+		t.Errorf("error leaks a token: %v", err)
+	}
+	if _, found, _ := s.Store.Load(); found {
+		t.Error("file must be deleted also when the revoke fails")
+	}
+}
+
 func get(u string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
 	if err != nil {

@@ -115,7 +115,7 @@ A host key mismatch stops the command. spinup never retries it.
 
 If `secrets/<env>.enc.yaml` does not exist, spinup creates it.
 You must pass `--recovery-recipient <age recipient>` or `--no-recovery`.
-In a terminal with neither flag, spinup asks for a recipient.
+Without one of these flags, the command stops before it creates anything, and it names the two flags.
 spinup makes only the secrets that are missing.
 It makes `POSTGRES_PASSWORD` and `DATABASE_URL`.
 It makes `GRAFANA_ADMIN_PASSWORD` when monitoring is on.
