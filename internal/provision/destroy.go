@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -43,8 +44,11 @@ func Destroy(ctx context.Context, o Options, d Deps) error {
 	ip := b.envCfg.Host
 	var mine, others []string
 	var mineID int
+	// A run that stopped between the create call and the write of droplet_id leaves one tagged
+	// droplet and no ID. That droplet belongs to this environment, so destroy deletes it too.
+	adopt := b.st.DropletID == 0 && len(list) == 1
 	for _, x := range list {
-		if b.st.DropletID != 0 && int64(x.ID) == b.st.DropletID {
+		if adopt || b.st.DropletID != 0 && int64(x.ID) == b.st.DropletID {
 			mine = append(mine, strconv.Itoa(x.ID))
 			mineID = x.ID
 			if v := x.PublicIPv4(); v != "" {
@@ -108,17 +112,20 @@ func (b *base) destroyRecord(ctx context.Context, ip string) error {
 	return nil
 }
 
-// destroyFirewall deletes the firewall by ID after it checks the name.
+// destroyFirewall deletes the firewall by ID after it checks the name. When spinup.toml has no
+// firewall_id (a run stopped before it wrote the ID), it deletes the firewall that has the
+// environment name and the environment tag.
 func (b *base) destroyFirewall(ctx context.Context) error {
-	if b.st.FirewallID == "" {
-		return nil
-	}
 	all, err := b.d.Cloud.Firewalls(ctx)
 	if err != nil {
 		return failWrap("list the cloud firewalls", err, "run the command again")
 	}
 	for _, f := range all {
-		if f.ID != b.st.FirewallID {
+		if b.st.FirewallID == "" {
+			if f.Name != b.firewallName() || !slices.Contains(f.Tags, b.tag()) {
+				continue
+			}
+		} else if f.ID != b.st.FirewallID {
 			continue
 		}
 		if f.Name != b.firewallName() {

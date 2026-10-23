@@ -314,3 +314,43 @@ func TestDatabaseURLEscapesThePassword(t *testing.T) {
 		t.Errorf("databaseURL = %s", got)
 	}
 }
+
+func TestDestroyAfterAnUpThatStoppedEarly(t *testing.T) {
+	// The droplet exists, but the run stops before the droplet is active.
+	f := newFixture(t, nil)
+	f.srv.FailNext("GET", "/v2/droplets/", 404, 100)
+	if err := f.up(); err == nil {
+		t.Fatal("up must fail while the droplet cannot be read")
+	}
+	st, _ := readStored(f.root, "production")
+	if st.DropletID == 0 || st.FirewallID == "" {
+		t.Fatalf("the IDs must be in spinup.toml at once: %+v", st)
+	}
+	f.srv.FailNext("GET", "/v2/droplets/", 404, 0)
+	f.opts.IKnow = true
+	f.opts.Confirm = project.Confirm{Yes: true, CI: true}
+	if err := Destroy(context.Background(), f.opts, f.deps); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.srv.Droplets()) != 0 || len(f.srv.Firewalls()) != 0 {
+		t.Errorf("droplets = %d, firewalls = %d, want 0 and 0", len(f.srv.Droplets()), len(f.srv.Firewalls()))
+	}
+
+	// The create fails after the firewall exists. spinup.toml has no firewall_id.
+	g := newFixture(t, nil)
+	g.srv.FailNext("POST", "/v2/droplets", 422, 1)
+	if err := g.up(); err == nil {
+		t.Fatal("up must fail when the create fails")
+	}
+	if st, _ := readStored(g.root, "production"); st.FirewallID != "" {
+		t.Fatalf("firewall_id = %q, want none", st.FirewallID)
+	}
+	g.opts.IKnow = true
+	g.opts.Confirm = project.Confirm{Yes: true, CI: true}
+	if err := Destroy(context.Background(), g.opts, g.deps); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.srv.Firewalls()) != 0 {
+		t.Error("destroy must delete the firewall of the environment by its name and tag")
+	}
+}

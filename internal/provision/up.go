@@ -50,6 +50,11 @@ func Up(ctx context.Context, o Options, d Deps) (err error) {
 	if err = r.ensureDroplet(ctx); err != nil {
 		return err
 	}
+	// Record the IDs at once, so destroy finds the droplet and the firewall also when the run
+	// stops before the droplet is active.
+	if err = r.recordIDs(); err != nil {
+		return err
+	}
 	if err = r.waitActive(ctx); err != nil {
 		return err
 	}
@@ -136,6 +141,17 @@ func (r *run) publicURLFor() string {
 }
 
 // writeEnvironment writes the environment to spinup.toml (ADR 0017 §7 step 6).
+// recordIDs writes the droplet ID, the firewall ID, the tag, and the team to spinup.toml.
+func (r *run) recordIDs() error {
+	doT := []string{"env", r.env, "digitalocean"}
+	return editConfig(r.root, []edit{
+		set(doT, "droplet_id", int64(r.droplet.ID)),
+		set(doT, "firewall_id", r.fw.ID),
+		set(doT, "tag", r.tag()),
+		set(doT, "team", r.team),
+	})
+}
+
 func (r *run) writeEnvironment() error {
 	r.publicURL = r.publicURLFor()
 	envT := []string{"env", r.env}
