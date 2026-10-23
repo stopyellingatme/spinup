@@ -37,6 +37,8 @@ The M4 units run in parallel. These decisions fix the contracts between them. AD
 - Cookie: name `session`, `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` unless `SPINUP_ENV=dev`.
 - Kit `auth` wraps scs with the pgxstore store (table `sessions`), hashes passwords with argon2id, locks an account after repeated failures, rejects unsafe cross-site requests (`Sec-Fetch-Site: cross-site`, or a foreign `Origin`), and sets a default CSP. The auth pack ships its migration, wires kit `auth` into `api/cmd/api/main.go` (only when the auth module is on; apps without it keep byte-identical output), and adds the web pages `login`, `register`, and a `logout` action. Form actions re-set the Go cookie with `getSetCookie()` (rule 7).
 
+- **Amendment (2026-10-22):** the status lists of the auth routes now include 429. `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/reset/request`, and `POST /api/auth/reset/confirm` answer 429 with `Retry-After` when a client uses up its rate limit. `GET /api/auth/oidc/{provider}/callback` answers a 303 redirect to `/login?error=rate_limited` in that case. For login, 429 also means the lockout of one email. The two cases have the same status and `type`, and they differ in the `detail` text. ADR 0016 has the contract.
+
 ## 4. Client generation (unit M4.2)
 
 `spinup g client` and the `client` post-step run `pnpm --dir web exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts` when the app has a web pack and a bundle. The resource generator requests `client` when the web pack is present (unit M4.6). The `client-drift` doctor check compares a fresh generation with the file on disk.

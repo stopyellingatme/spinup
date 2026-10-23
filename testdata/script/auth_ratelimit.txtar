@@ -1,0 +1,69 @@
+# The kit auth rate limit (ADR 0016): each client has its own budget for the login route.
+# The API runs with a small budget. The curl peer is loopback, so X-Forwarded-For names the client.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --module example.com/todo --modules ci,auth --no-git --non-interactive
+stdout 'from packs base, api, ci, web, auth'
+cd todo
+
+[!env:DATABASE_URL] stop 'a rate limit check needs DATABASE_URL'
+
+exec spinup db migrate up
+stdout 'applied  00002_create_auth\.sql'
+cd api
+exec go build -o bin/api ./cmd/api
+
+# A bad value stops the start with a Try line. The value is not a secret, so the message names it.
+env SPINUP_ENV=dev
+env PORT=38439
+env AUTH_RATE_LIMIT_LOGIN=burst=0
+! exec bin/api
+stderr 'AUTH_RATE_LIMIT_LOGIN "burst=0" is not valid'
+stderr 'Try: set AUTH_RATE_LIMIT_LOGIN=burst=20,every=3s'
+env AUTH_RATE_LIMIT_LOGIN=burst=2,every=1h
+env AUTH_TRUSTED_PROXIES=bad-proxy
+! exec bin/api
+stderr 'AUTH_TRUSTED_PROXIES item "bad-proxy"'
+stderr 'Try: use items such as private'
+
+env AUTH_TRUSTED_PROXIES=
+exec bin/api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o /dev/null -w '%{http_code}' http://127.0.0.1:38439/healthz
+stdout '^200$'
+
+# Two logins pass the limit and fail the password check. The third gets 429.
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.1' -d '{"email":"a1@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.1' -d '{"email":"a2@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+exec curl -sS -D limited.headers -o limited.json -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.1' -d '{"email":"a3@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^429$'
+grep '(?i)^retry-after: 3600' limited.headers
+grep 'Try again in 3600 seconds' limited.json
+
+# Another client has its own budget.
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.2' -d '{"email":"b1@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+
+# A forged entry on the left does not give the client a new budget.
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 10.0.0.9, 198.51.100.1' -d '{"email":"a4@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^429$'
+
+# A local request without a client address (curl, a health check) has no limit.
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"c1@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"c2@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"c3@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
+stdout '^401$'
+
+# The session route has no limit.
+exec curl -sS -o /dev/null -w '%{http_code}' -H 'X-Forwarded-For: 198.51.100.1' http://127.0.0.1:38439/api/session
+stdout '^401$'
+
+kill -INT server
+wait server
+
+# Roll back so that the next run starts from an empty database.
+cd ..
+exec spinup db to 0 --i-know
+stdout 'rolled back  00002_create_auth\.sql'

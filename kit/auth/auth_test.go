@@ -55,7 +55,7 @@ func newFixture(t *testing.T, opts ...Option) *fixture {
 	t.Helper()
 	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
 	c := &clock{now: time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)}
-	base := []Option{WithSecureCookie(false), func(o *options) { o.params = testParams; o.now = c.Now }}
+	base := []Option{WithSecureCookie(false), withEnv(map[string]string{"AUTH_RATE_LIMIT": "off"}), func(o *options) { o.params = testParams; o.now = c.Now }}
 	a, err := New(pool, append(base, opts...)...)
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +84,7 @@ type request struct {
 	body         any // a string is sent as is; other values are JSON-encoded
 	cookie       string
 	headers      map[string]string
+	remote       string // the peer address; the default is the httptest address 192.0.2.1:1234
 }
 
 func (f *fixture) do(t *testing.T, req request) *httptest.ResponseRecorder {
@@ -109,6 +110,9 @@ func (f *fixture) do(t *testing.T, req request) *httptest.ResponseRecorder {
 	}
 	for k, v := range req.headers {
 		r.Header.Set(k, v)
+	}
+	if req.remote != "" {
+		r.RemoteAddr = req.remote
 	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, r)
@@ -236,7 +240,7 @@ func TestCookieSecurityFromEnvironment(t *testing.T) {
 			}
 			t.Cleanup(pool.Close)
 			a, err := New(pool, WithSecureCookie(cfg.Env != "dev"), func(o *options) {
-				o.params, o.cleanup = testParams, 0
+				o.params, o.cleanup, o.lookup = testParams, 0, noEnv
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -590,7 +594,7 @@ func TestHashLimitsValidation(t *testing.T) {
 	t.Parallel()
 	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
 	for _, limits := range [][3]int{{0, 1, 1}, {1, -1, 1}, {1, 1, 0}} {
-		a, err := New(pool, WithHashLimits(limits[0], limits[1], time.Duration(limits[2])))
+		a, err := New(pool, WithHashLimits(limits[0], limits[1], time.Duration(limits[2])), withEnv(nil))
 		if err == nil {
 			_ = a.Close(context.Background())
 			t.Errorf("New with hash limits %v succeeded", limits)
@@ -773,7 +777,7 @@ func TestNewErrors(t *testing.T) {
 		{"zero threshold", pool, []Option{WithLockout(0, time.Minute)}, "lockout"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]Option{func(o *options) { o.params = testParams }}, tc.opts...)
+			opts := append([]Option{withEnv(nil), func(o *options) { o.params = testParams }}, tc.opts...)
 			a, err := New(tc.pool, opts...)
 			if err == nil {
 				_ = a.Close(context.Background())
