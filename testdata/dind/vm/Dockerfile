@@ -21,6 +21,13 @@ RUN (getent group docker >/dev/null || addgroup -S docker) \
 COPY sshd_config /etc/ssh/sshd_config.d/spinup-dind.conf
 COPY entrypoint.sh /usr/local/bin/spinup-dind-entrypoint.sh
 
+# Stand-ins for the droplet tools that spinup deploy digital-ocean calls (docs/contributing/dind.md).
+# cloud-init answers "status: done". systemctl turns the reload of ssh.service into a HUP of sshd.
+# ssh-keygen (used by the host key rotation) came with openssh-server, and visudo with sudo.
+COPY cloud-init /usr/bin/cloud-init
+COPY systemctl /usr/bin/systemctl
+RUN chmod 0755 /usr/bin/cloud-init /usr/bin/systemctl
+
 # Each run generates a new key pair, so only this layer changes between runs.
 ARG DEPLOY_PUBKEY
 RUN test -n "$DEPLOY_PUBKEY" \

@@ -9,12 +9,14 @@
 #   4. a good second release, then rollback to the first release
 #   5. lock contention: a held lock makes a deploy exit 5, then deploy unlock --force
 #   6. a deploy with a new secret: the secret file on the VM has mode 0600
+#   7. deploy digital-ocean against the dofake binary, with the VM as the droplet: host key
+#      rotation, a second run that creates nothing, and destroy
 #
 # Every container, volume, and image that it creates has a name that starts with
 # spinup-dind-. A trap removes them, also when a step fails.
 #
 # Needs: docker (with network access to build the VM and to pull images in it), go, git,
-# ssh, ssh-keygen, sops, age-keygen, curl, and python3.
+# ssh, ssh-keygen, ssh-keyscan, sops, age-keygen, curl, and python3.
 # Set DIND_WEB=1 to generate a full app (api and web). The web image build needs the network.
 # Set DIND_KEEP=1 to keep the work directory and its logs. The trap still removes the VM.
 set -euo pipefail
@@ -33,7 +35,7 @@ vm="spinup-dind-vm-$run_id"
 vm_image="spinup-dind-vm:$run_id"
 host_alias=spinup-dind-vm
 
-for tool in docker "$GO" git ssh ssh-keygen sops age-keygen curl python3; do
+for tool in docker "$GO" git ssh ssh-keygen ssh-keyscan sops age-keygen curl python3; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "run.sh: $tool is not on PATH." >&2
     echo "  Try: install $tool, or run spinup tools install for sops and age" >&2
@@ -176,7 +178,7 @@ fi
 dind_ref="$dind_image:$dind_tag@$dind_digest"
 mkdir -p "$work/vm"
 sed "s#\[\[ image \"docker-dind\" \]\]#$dind_ref#" "$here/vm/Dockerfile" >"$work/vm/Dockerfile"
-cp "$here/vm/sshd_config" "$here/vm/entrypoint.sh" "$work/vm/"
+cp "$here/vm/sshd_config" "$here/vm/entrypoint.sh" "$here/vm/cloud-init" "$here/vm/systemctl" "$work/vm/"
 chmod 0755 "$work/vm/entrypoint.sh"
 echo "    FROM $dind_ref"
 docker build -t "$vm_image" --build-arg DEPLOY_PUBKEY="$(cat "$work/id_ed25519.pub")" "$work/vm" \
@@ -401,5 +403,87 @@ if [[ "$(ssh -F "$work/ssh_config" -o BatchMode=yes "$host_alias" cat "/opt/$app
 fi
 [[ "$(docker exec "$vm" stat -c '%a' "/opt/$app/secrets/DIND_TOKEN")" == 600 ]] || fail "secrets push left DIND_TOKEN without mode 0600"
 echo "    secrets push wrote the new value with mode 0600"
+
+# ---------------------------------------------------------------------------------------------
+step "7. spinup deploy digital-ocean on the VM as a droplet"
+# The dofake binary serves the DigitalOcean API. On a droplet create it extracts the user data
+# and runs on-create.sh, which installs the injected host key and the rotation script on the VM,
+# as cloud-init does. The command must rotate the key, deploy, and do nothing on a second run.
+mkdir -p "$work/bin" "$work/creds"
+(cd "$repo" && "$GO" build -o "$work/bin/dofake" ./testdata/dind/dofake) >"$logs/dofake-build.log" 2>&1 ||
+  { show_log dofake-build; fail "the dofake binary did not build"; }
+do_token="dind-do-token-$run_id"
+DIND_VM="$vm" DIND_WORK="$work" "$work/bin/dofake" -token "$do_token" -ipv4 127.0.0.1 \
+  -on-create "$here/on-create.sh" >"$work/dofake.out" 2>"$logs/dofake.log" &
+pids+=("$!")
+do_url=""
+for _ in $(seq 1 30); do
+  do_url="$(head -n 1 "$work/dofake.out" 2>/dev/null || true)"
+  if [[ -n "$do_url" ]]; then break; fi
+  sleep 0.5
+done
+[[ -n "$do_url" ]] || { show_log dofake; fail "the dofake binary did not print its URL"; }
+echo "    dofake on $do_url"
+
+# The droplet address is 127.0.0.1 and the environment has no port, so ssh finds the port of
+# the VM and the operator key in this block.
+cat >>"$work/ssh_config" <<EOF
+
+Host 127.0.0.1
+  Port $ssh_port
+  User deploy
+  IdentityFile $work/id_ed25519
+  IdentitiesOnly yes
+EOF
+
+droplet_count() {
+  curl -fsS -m 10 "$do_url/debug/state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["droplets"])'
+}
+# pinned_keys prints the ssh-ed25519 keys of [env.do] in spinup.toml, one for each line.
+pinned_keys() {
+  awk '/^\[env\.do\]/ {on=1; next} /^\[/ {on=0} on' "$work/$app/spinup.toml" |
+    grep -oE 'ssh-ed25519 [A-Za-z0-9+/=]+' || true
+}
+if [[ "$(droplet_count)" != 0 ]]; then fail "the fake has a droplet before the run"; fi
+
+# The environment file of "do" is a copy of the staging file. A clean tree is a precondition.
+cp "$work/$app/deploy/environments/staging.toml" "$work/$app/deploy/environments/do.toml"
+commit "dind: add the do environment"
+
+export SPINUP_DO_API_BASE="$do_url" SPINUP_DO_OAUTH_BASE="$do_url"
+export DIGITALOCEAN_ACCESS_TOKEN="$do_token" SPINUP_CREDENTIALS_DIR="$work/creds"
+do_args=(deploy digital-ocean --env "do" --public-url "http://localhost:$http_port" --skip-build --tag "$rel3"
+  --no-recovery --yes --ssh-key "$work/id_ed25519.pub")
+
+sp do-up "${do_args[@]}" || { show_log do-up 60; fail "spinup deploy digital-ocean failed"; }
+expect_version "$rel3"
+if [[ "$(droplet_count)" != 1 ]]; then fail "the first run did not create exactly one droplet"; fi
+
+# spinup.toml pins one host key, and it is the key that the VM serves now.
+pinned="$(pinned_keys)"
+if [[ "$(printf '%s\n' "$pinned" | grep -c .)" -ne 1 ]]; then
+  fail "[env.do] must pin exactly one host key" "host_keys: ${pinned//$'\n'/ | }"
+fi
+vm_key="$(docker exec "$vm" cat /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $1 " " $2}')"
+injected="$(awk '{print $1 " " $2}' "$work/injected_host_key.pub")"
+[[ "$pinned" == "$vm_key" ]] || fail "the pinned host key is not the key of the VM" "pinned: $pinned" "vm:     $vm_key"
+[[ "$vm_key" != "$injected" ]] || fail "the host key was not rotated: the VM still serves the injected key"
+served="$(ssh-keyscan -t ed25519 -p "$ssh_port" 127.0.0.1 2>/dev/null | awk '{print $2 " " $3}')"
+[[ "$served" == "$vm_key" ]] || fail "sshd does not serve the rotated host key" "served: $served" "file:   $vm_key"
+echo "    host key rotated and pinned: ${vm_key:0:40}..."
+
+# A second run finds the droplet by its tag and creates nothing.
+sp do-up-2 "${do_args[@]}" || { show_log do-up-2 60; fail "the second spinup deploy digital-ocean failed"; }
+if [[ "$(droplet_count)" != 1 ]]; then fail "the second run changed the number of droplets"; fi
+expect_version "$rel3"
+[[ "$(pinned_keys)" == "$vm_key" ]] || fail "the second run changed the pinned host key" "pinned: $(pinned_keys)"
+echo "    the second run created nothing"
+
+# destroy deletes the droplet from the fake. The VM stays.
+CI=1 sp do-destroy deploy digital-ocean destroy --env "do" --i-know --yes ||
+  { show_log do-destroy; fail "spinup deploy digital-ocean destroy failed"; }
+if [[ "$(droplet_count)" != 0 ]]; then fail "destroy left the droplet in the fake"; fi
+echo "    destroy removed the droplet"
+unset SPINUP_DO_API_BASE SPINUP_DO_OAUTH_BASE DIGITALOCEAN_ACCESS_TOKEN SPINUP_CREDENTIALS_DIR
 
 printf '\nrun.sh: PASS (releases %s, %s, %s)\n' "$rel1" "$rel2" "$rel3"
