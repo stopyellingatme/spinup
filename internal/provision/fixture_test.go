@@ -132,15 +132,55 @@ type vmFake struct {
 	calls   [][]string
 	closes  int
 	dials   int
+	// rotated, next and served emulate /usr/local/sbin/spinup-host-key (ADR 0017 §6).
+	rotated      bool
+	next, served string
+}
+
+// fakeHostKey returns a valid ssh-ed25519 public key line whose key bytes are all b.
+func fakeHostKey(b byte) string {
+	blob := []byte{0, 0, 0, 11}
+	blob = append(blob, "ssh-ed25519"...)
+	blob = append(blob, 0, 0, 0, 32)
+	blob = append(blob, bytes.Repeat([]byte{b}, 32)...)
+	return "ssh-ed25519 " + base64.StdEncoding.EncodeToString(blob)
+}
+
+// hostKeyTool answers the spinup-host-key commands. ok is false for other commands.
+func (v *vmFake) hostKeyTool(argv []string) (stdout string, ok bool) {
+	if len(argv) != 4 || argv[0] != "sudo" || argv[2] != hostKeyTool {
+		return "", false
+	}
+	switch argv[3] {
+	case "status":
+		if v.rotated {
+			return "rotated\n", true
+		}
+		return "pending\n", true
+	case "next":
+		if v.next == "" {
+			v.next = fakeHostKey(byte(0x40 + v.dials%16))
+		}
+		return v.next + "\n", true
+	case "activate":
+		if v.next != "" {
+			v.served, v.next, v.rotated = v.next, "", true
+		}
+		return v.served + "\n", true
+	}
+	return "", false
 }
 
 func (v *vmFake) Run(_ context.Context, c remote.Cmd) (runexec.Result, error) {
 	v.mu.Lock()
 	v.calls = append(v.calls, c.Argv)
 	h := v.handler
+	tool, isTool := v.hostKeyTool(c.Argv)
 	v.mu.Unlock()
 	stdout, stderr, code, err := "", "", 0, error(nil)
-	if h != nil {
+	if isTool {
+		stdout = tool
+	} else if h != nil {
 		stdout, stderr, code, err = h(c.Argv)
 	}
 	if c.Stdout != nil {

@@ -39,8 +39,13 @@ func TestUpHappyPath(t *testing.T) {
 	if cfg.DefaultEnv != "production" {
 		t.Errorf("default_env = %q", cfg.DefaultEnv)
 	}
-	if len(f.atCreate) != 1 || f.atCreate[0] != env.HostKeys[0] {
-		t.Errorf("host_keys at create = %v, want %v", f.atCreate, env.HostKeys)
+	// The injected key is pinned before the create. The rotation then replaces it with the key
+	// that the VM made, so only that key stays pinned.
+	if len(f.atCreate) != 1 || f.atCreate[0] == env.HostKeys[0] {
+		t.Errorf("host_keys at create = %v, final = %v; want one injected key, then a new key", f.atCreate, env.HostKeys)
+	}
+	if !f.vm.rotated || env.HostKeys[0] != f.vm.served {
+		t.Errorf("rotation: rotated = %v, served = %q, pinned = %v", f.vm.rotated, f.vm.served, env.HostKeys)
 	}
 	text := f.configText()
 	for _, want := range []string{"# Project settings. Keep this comment.", "# The staging environment stays as it is.", `host = "198.51.100.5"`} {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -210,7 +211,18 @@ func tomlValue(value any) ([]byte, error) {
 	_, raw, _ := bytes.Cut(encoded, []byte("="))
 	return bytes.TrimSpace(raw), nil
 }
-func tomlKey(key string) string { encoded, _ := json.Marshal(key); return string(encoded) }
+
+// tomlKey writes a bare key when TOML allows one, else a quoted key.
+func tomlKey(key string) string {
+	if bareKey.MatchString(key) {
+		return key
+	}
+	encoded, _ := json.Marshal(key)
+	return string(encoded)
+}
+
+var bareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
 func newline(src []byte) string {
 	if bytes.Contains(src, []byte("\r\n")) {
 		return "\r\n"

@@ -102,8 +102,19 @@ func TestTOMLInsertKeepsFollowingTableComment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[x]\nb = 2\n\"n\" = 'v'\n\n# about y\n[y]\nc = 3\n"
+	want := "[x]\nb = 2\nn = 'v'\n\n# about y\n[y]\nc = 3\n"
 	if string(out) != want {
 		t.Fatalf("output:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+func TestTOMLNewTableUsesBareKeys(t *testing.T) {
+	got, err := SetTOML([]byte("name = \"app\"\n"), []string{"env", "production", "digital ocean"}, "droplet_id", int64(7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "name = \"app\"\n[env.production.\"digital ocean\"]\ndroplet_id = 7\n"
+	if string(got) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
