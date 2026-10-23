@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stub of cloud-init for the dind VM: the VM has no cloud-init, and the droplet setup is done by on-create.sh.
+case "$*" in
+  *status*) echo "status: done" ;;
+esac
+exit 0

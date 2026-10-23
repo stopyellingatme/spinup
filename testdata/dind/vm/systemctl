@@ -1,0 +1,12 @@
+#!/bin/sh
+# Shim of systemctl for the dind VM (Alpine has no systemd). It maps the ssh.service reload and restart to a HUP of sshd.
+case "$*" in
+  "reload ssh.service" | "restart ssh.service" | "reload sshd.service" | "restart sshd.service")
+    pid="$(cat /run/sshd.pid 2>/dev/null || cat /var/run/sshd.pid)"
+    exec kill -HUP "$pid"
+    ;;
+  *)
+    echo "systemctl shim: unsupported: $*" >&2
+    exit 1
+    ;;
+esac

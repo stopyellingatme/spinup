@@ -13,6 +13,8 @@ The files are in `testdata/dind/vm/`.
 - The `deploy` user has UID 1000, passwordless sudo, and membership of the `docker` group.
 - SSH permits only key login for `deploy`. Each run makes a new key pair.
 - `entrypoint.sh` starts `sshd` and then `dockerd`.
+- `cloud-init` is a stub in `/usr/bin`. It prints `status: done` and exits 0.
+- `systemctl` is a shim in `/usr/bin`. It turns `reload ssh.service` and `restart ssh.service` into a HUP of `sshd`.
 
 The script builds the image once for each run. The build needs the network for `apk`.
 The VM runs privileged. It publishes SSH and HTTP on free ports of `127.0.0.1`.
@@ -38,6 +40,19 @@ Then it tests the commands:
 | 5 | `deploy` while another process holds the lock | The deploy exits 5 and names the owner. `deploy unlock --force` removes the lock. |
 | 6 | `deploy` after `secrets set` of a new name | Each secret file has mode 0600 and the owner `deploy`. The value is not in a release file. |
 
+Step 7 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
+
+1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.
+2. The suite adds a `Host 127.0.0.1` block to the `ssh_config`, with the port of the VM and the operator key. The droplet address is `127.0.0.1`, and the new environment has no port.
+3. The suite copies `deploy/environments/staging.toml` to `do.toml` and commits it.
+4. The suite runs `spinup deploy digital-ocean --env do --public-url http://localhost:<port> --skip-build --tag <release> --no-recovery --yes --ssh-key <key>`. The environment holds `SPINUP_DO_API_BASE` and `SPINUP_DO_OAUTH_BASE` (the fake), `DIGITALOCEAN_ACCESS_TOKEN` (the static token), and `SPINUP_CREDENTIALS_DIR`. No browser sign-in runs.
+5. When the fake creates a droplet, it parses the user data and runs `testdata/dind/on-create.sh`. The script installs the injected host key, `/usr/local/sbin/spinup-host-key`, and its sudoers rule on the VM, and makes `sshd` use only the ed25519 key.
+6. The suite checks `/version`. It checks that `[env.do]` in `spinup.toml` pins exactly one host key. This key is the key that the VM serves now, and it is not the injected key.
+7. A second run must create no droplet.
+8. `spinup deploy digital-ocean destroy --env do --i-know --yes` (with `CI=1`) must remove the droplet from the fake.
+
+The step needs `ssh-keyscan` and the `go` toolchain, in addition to the tools of the other steps. The trap stops the fake, because the script keeps its process ID in `pids`.
+
 `testdata/dind/fixtures/broken-readyz.patch` makes the release of step 3.
 It adds a readiness check that always fails. `/healthz` still answers, so only the readiness check of the deploy stops the release.
 
@@ -57,7 +72,7 @@ bash testdata/dind/run.sh
 | `DIND_KEEP=1` | Keep the work directory and its logs. The trap still removes the VM. |
 | `GO=<path>` | Use this `go` binary. |
 
-The script also needs `git`, `ssh`, `ssh-keygen`, `sops`, `age-keygen`, `curl`, and `python3`.
+The script also needs `git`, `ssh`, `ssh-keygen`, `ssh-keyscan`, `sops`, `age-keygen`, `curl`, and `python3`.
 Run `spinup tools install` to get `sops` and `age`.
 
 ## Limits
