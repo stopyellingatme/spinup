@@ -15,7 +15,7 @@ This page shows the layout of the app and how it talks to the Go API.
 | `web/components.json` | scaffold | The shadcn-svelte settings. The aliases use `#lib`. |
 | `web/src/app.html`, `app.css`, `app.d.ts` | scaffold | The page template, the Tailwind CSS entry with the theme, and the app types. |
 | `web/src/env.ts` | scaffold | The server environment variables (`API_URL`). |
-| `web/src/hooks.server.ts` | scaffold | Loads the user from the API and sends API requests to Go. |
+| `web/src/hooks.server.ts` | scaffold | Loads the user from the API and sends API requests to Go, with the cookie and the client address. |
 | `web/src/lib/utils.ts` | scaffold | `cn()` and the helper types of the shadcn-svelte components. |
 | `web/src/lib/api/client.ts` | scaffold | The typed `openapi-fetch` client. |
 | `web/src/lib/api/schema.d.ts` | seed | The API types. `spinup g client` writes this file. |
@@ -157,10 +157,16 @@ Thus the session cookie of the API is a first-party cookie, and the CSRF checks 
 - In development, the Vite dev server sends `/api` to `API_URL`.
 - In production, Caddy sends `/api/*` to Go and all other paths to Node.
 - On the server, `handleFetch` in `hooks.server.ts` sends `${PUBLIC_ORIGIN}/api/*` requests to `API_URL`. It adds the `cookie` header of the browser request only to these requests.
+- `handleFetch` also adds the client address to these requests, as the `X-Forwarded-For` header. The Go API uses it to limit the auth routes for each client.
+  It deletes any `X-Forwarded-For` header from the browser first.
+  It adds the address only when the `ADDRESS_HEADER` variable is set.
+  If `getClientAddress()` fails, it sends no header and logs one warning for each process.
 
 ```console
 $ grep -o "'/api': { target: apiURL, xfwd: true }" web/vite.config.js
 '/api': { target: apiURL, xfwd: true }
+$ grep -o 'ADDRESS_HEADER: .*' deploy/compose.yml
+ADDRESS_HEADER: X-Forwarded-For
 ```
 
 ## The signed-in user
@@ -179,6 +185,7 @@ If the API is not available, `handle` logs the error and continues with no user.
 | `API_URL` | run time | `http://localhost:8080` | The address where server-side code and the dev proxy reach Go. |
 | `PORT`, `HOST` | run time | `3000`, `0.0.0.0` | The listen address of `node build`. |
 | `BODY_SIZE_LIMIT`, `SHUTDOWN_TIMEOUT` | run time | `1M`, `20` | The request body limit and the graceful shutdown time in seconds. |
+| `ADDRESS_HEADER`, `XFF_DEPTH` | run time | unset, `1` | The header with the client address and the number of proxies that wrote it. `deploy/compose.yml` sets them for the `web` service. In development, leave `ADDRESS_HEADER` unset. |
 
 adapter-node does not read `ORIGIN` at run time.
 If the public URL changes, build the image again with `--build-arg PUBLIC_ORIGIN=<url>`.

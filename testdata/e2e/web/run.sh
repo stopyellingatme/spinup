@@ -120,8 +120,11 @@ echo "==> start the API on $api_url"
 (cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" SPINUP_API_DOCS=true exec ./api.bin >"$work/logs/api.log" 2>&1) &
 pids+=($!)
 echo "==> start the web app on $origin"
+# ADDRESS_HEADER and XFF_DEPTH are the production values of compose.yml. hooks.server.ts then sends
+# the client address of a browser request to the API (ratelimit.spec.ts sends a public one). A
+# request without the header gets no client address, and the hook warns once.
 PORT="$web_port" HOST=127.0.0.1 PUBLIC_ORIGIN="$origin" API_URL="$api_url" \
-  node build >"$work/logs/web.log" 2>&1 &
+  ADDRESS_HEADER=X-Forwarded-For XFF_DEPTH=1 node build >"$work/logs/web.log" 2>&1 &
 pids+=($!)
 
 wait_for "$api_url/healthz" "the API"

@@ -82,6 +82,11 @@ services:
     environment:
       # The API of the same color. The build bakes PUBLIC_ORIGIN into the image (ADR 0002 rule 2).
       API_URL: http://api-${SPINUP_COLOR}:8080
+      # Caddy writes the client address to X-Forwarded-For. With XFF_DEPTH 1, adapter-node reads the
+      # last entry, which is the one that Caddy wrote. hooks.server.ts sends it to the API, which
+      # limits the auth routes for each client. Behind a CDN, set XFF_DEPTH to 2 (docs/deploy.md).
+      ADDRESS_HEADER: X-Forwarded-For
+      XFF_DEPTH: "1"
 [[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: [[ .app_name ]]-web
