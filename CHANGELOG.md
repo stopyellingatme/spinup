@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- M13: Add `spinup deploy digital-ocean`. Sign in with a browser, create the droplet, firewall, DNS record, host key pin, and secrets, then deploy. Add the `login`, `logout`, `status`, and `destroy` subcommands.
 - M0: Establish the Go CLI, kit, manifests, templates, and checks for deterministic output.
 - M1: Generate Go APIs and PostgreSQL migrations. Add build commands, database commands, and documentation checks.
 - M2: Track generated files with a lock file. Add upgrades with a three-way merge and template caches.

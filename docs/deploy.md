@@ -3,6 +3,7 @@
 The `deploy` pack gives a new app the files that a VM needs to run it in production.
 `spinup new` adds the pack by default. The `--modules` default is `ci,deploy`.
 The pack requires the `api` pack. It also works for an API-only app.
+To create the server too, use `spinup deploy digital-ocean`. See `docs/deploy-digitalocean.md`.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive

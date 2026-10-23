@@ -39,5 +39,6 @@ spinup deploy [flags]
 
 ## Subcommands
 
+- [`spinup deploy digital-ocean`](deploy-digital-ocean.md) — Create a DigitalOcean droplet for the app and deploy to it
 - [`spinup deploy status`](deploy-status.md) — Show the current release, the deploy lock, and the last deploy journal
 - [`spinup deploy unlock`](deploy-unlock.md) — Remove the deploy lock of an environment
