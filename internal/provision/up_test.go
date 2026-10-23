@@ -401,10 +401,17 @@ func TestUpRefusesNonUbuntu(t *testing.T) {
 
 func TestUpRefusesSkipBuildWhenURLChanges(t *testing.T) {
 	f := newFixture(t, nil)
+	writeFile(t, f.root, "deploy/Dockerfile.web", "FROM scratch\n")
 	f.opts.Deploy.SkipBuild = true
 	ue := uiErr(t, f.up())
 	if !strings.Contains(ue.What, "--skip-build") {
 		t.Errorf("error = %+v", ue)
+	}
+	// An API-only app has no web image, so it can reuse its images with a new URL.
+	g := newFixture(t, nil)
+	g.opts.Deploy.SkipBuild = true
+	if err := g.up(); err != nil {
+		t.Errorf("API-only --skip-build: %v", err)
 	}
 }
 

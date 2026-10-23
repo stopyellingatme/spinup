@@ -81,7 +81,8 @@ func (r *run) preflight(ctx context.Context) error {
 	if !strings.HasPrefix(r.image, "ubuntu-") {
 		return fail("use the image "+r.image, "the cloud-init template supports Ubuntu images only", "pass --image with an ubuntu-* slug such as "+def.Image)
 	}
-	if r.o.Deploy.SkipBuild && r.publicURLWillChange() {
+	// Only the web image holds PUBLIC_ORIGIN. An API-only app can reuse its images.
+	if r.o.Deploy.SkipBuild && r.hasWebImage() && r.publicURLWillChange() {
 		return fail("use --skip-build", "the public URL changes, and the web image holds PUBLIC_ORIGIN", "run the command again without --skip-build")
 	}
 	defSize := def.SizeDefault
@@ -220,4 +221,10 @@ func (r *run) checkSize(ctx context.Context) error {
 
 func money(monthly, hourly float64) string {
 	return fmt.Sprintf("$%.2f/month ($%.5f/hour)", monthly, hourly)
+}
+
+// hasWebImage reports whether the app builds a web image (deploy/Dockerfile.web).
+func (r *run) hasWebImage() bool {
+	_, err := os.Stat(filepath.Join(r.root, "deploy", "Dockerfile.web"))
+	return err == nil
 }

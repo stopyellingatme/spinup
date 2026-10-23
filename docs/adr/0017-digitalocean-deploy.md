@@ -130,7 +130,7 @@ Any failure after step 5 prints the droplet, its price for each hour, and the de
 
 - Without `--domain`, `public_url` is `https://<a-b-c-d>.sslip.io` (the `ip_dns` pin). Caddy gets a Let's Encrypt certificate at once.
 - With `--domain`, spinup finds the zone in DigitalOcean DNS by the longest suffix. It creates or updates the A record (TTL 300). When DigitalOcean does not hold the zone, spinup prints the record and waits for it to resolve, up to `--dns-timeout` (10 minutes). spinup warns about an AAAA record that points to a different host.
-- A change of the domain needs a new web image, because the image holds `PUBLIC_ORIGIN`. spinup refuses `--skip-build` when the domain changes.
+- A change of the domain needs a new web image, because the image holds `PUBLIC_ORIGIN`. When the app has a web image, spinup refuses `--skip-build` if the public URL changes.
 - sslip.io is probably not on the Public Suffix List. All its users share one Let's Encrypt limit. `nip.io` is the fallback.
 
 ## 9. Secrets
