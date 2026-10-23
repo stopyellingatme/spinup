@@ -3,11 +3,16 @@ package remote
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -110,7 +115,21 @@ func New(h Host, r runexec.Runner, o Options) Runner {
 		s.args = append(s.args, "-p", strconv.Itoa(h.Port))
 	}
 	s.args = append(s.args, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
-	if o.AcceptNewHostKey {
+	if len(h.HostKeys) > 0 {
+		// The pin wins over AcceptNewHostKey.
+		pin, err := writePinFile(dir, h)
+		if err != nil {
+			s.err = err
+			return s
+		}
+		s.args = append(s.args,
+			"-o", "UserKnownHostsFile="+strings.ReplaceAll(pin, "%", "%%"),
+			"-o", "GlobalKnownHostsFile=/dev/null",
+			"-o", "StrictHostKeyChecking=yes",
+			"-o", "UpdateHostKeys=no",
+			"-o", "CheckHostIP=no",
+			"-o", "HostKeyAlgorithms=ssh-ed25519")
+	} else if o.AcceptNewHostKey {
 		s.args = append(s.args, "-o", "StrictHostKeyChecking=accept-new")
 	}
 	// SPINUP_SSH_CONFIG points ssh at another config file (ssh -F), for test VMs and CI.
@@ -118,6 +137,84 @@ func New(h Host, r runexec.Runner, o Options) Runner {
 		s.args = append([]string{"-F", config}, s.args...)
 	}
 	return s
+}
+
+// IsHostKeyError reports whether SSH stderr shows a host key failure.
+// It matches the OpenSSH messages for a changed key, a failed check, and a missing ED25519 key.
+// Provisioning uses it to treat a mismatch as fatal and never retry it.
+func IsHostKeyError(stderr string) bool {
+	for _, m := range []string{
+		"REMOTE HOST IDENTIFICATION HAS CHANGED",
+		"Host key verification failed",
+		"No ED25519 host key is known",
+	} {
+		if strings.Contains(stderr, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeHostKey checks one "ssh-ed25519 <base64>" key and drops any comment.
+func normalizeHostKey(key string) (string, error) {
+	f := strings.Fields(key)
+	if len(f) < 2 || f[0] != "ssh-ed25519" {
+		return "", fmt.Errorf("the key is not in the form \"ssh-ed25519 <base64>\"")
+	}
+	blob, err := base64.StdEncoding.DecodeString(f[1])
+	if err != nil {
+		return "", fmt.Errorf("the key is not valid base64")
+	}
+	// Wire format: string "ssh-ed25519", then string key of 32 bytes.
+	const name = "ssh-ed25519"
+	if len(blob) != 4+len(name)+4+32 ||
+		binary.BigEndian.Uint32(blob) != uint32(len(name)) || string(blob[4:4+len(name)]) != name ||
+		binary.BigEndian.Uint32(blob[4+len(name):]) != 32 {
+		return "", fmt.Errorf("the key data is not an ed25519 public key")
+	}
+	return name + " " + f[1], nil
+}
+
+// writePinFile writes the known_hosts file for the pinned keys and returns its path.
+// It writes the file atomically and only when the content differs.
+func writePinFile(dir string, h Host) (string, error) {
+	keys := make([]string, 0, len(h.HostKeys))
+	for _, k := range h.HostKeys {
+		n, err := normalizeHostKey(k)
+		if err != nil {
+			return "", fmt.Errorf("invalid host key for environment %q: %w\nTry: fix host_keys in spinup.toml", h.Name, err)
+		}
+		keys = append(keys, n)
+	}
+	sort.Strings(keys)
+	sum := sha256.Sum256([]byte(strings.Join(keys, "\n")))
+	path := filepath.Join(dir, "known_hosts-"+hex.EncodeToString(sum[:])[:16])
+	var content strings.Builder
+	for _, k := range keys {
+		content.WriteString("* " + k + "\n")
+	}
+	if old, err := os.ReadFile(path); err == nil && string(old) == content.String() {
+		return path, nil
+	}
+	tmp, err := os.CreateTemp(dir, "known_hosts.tmp.")
+	if err != nil {
+		return "", fmt.Errorf("write the host key pin file: %w\nTry: check that the user cache directory is writable", err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	_, werr := tmp.WriteString(content.String())
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Chmod(tmp.Name(), 0600)
+	}
+	if werr == nil {
+		werr = os.Rename(tmp.Name(), path)
+	}
+	if werr != nil {
+		return "", fmt.Errorf("write the host key pin file: %w\nTry: check that the user cache directory is writable", werr)
+	}
+	return path, nil
 }
 
 // Quote quotes one argument for a remote POSIX shell, including empty arguments.
