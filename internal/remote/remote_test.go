@@ -31,7 +31,7 @@ func TestHostFromEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := HostFromEnv(tt.env)
-			if (err != nil) != tt.bad || !tt.bad && got != tt.want {
+			if (err != nil) != tt.bad || !tt.bad && !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("HostFromEnv = %#v, %v", got, err)
 			}
 		})

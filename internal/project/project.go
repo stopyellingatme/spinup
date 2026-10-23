@@ -38,6 +38,9 @@ type Env struct {
 	// Transport moves images to the host: "ssh" (default, docker save | docker load) or
 	// "registry" (push, then pull by digest). See ADR 0009 §4.
 	Transport string
+	// HostKeys pins the SSH host keys of the VM ("ssh-ed25519 AAAA..."). Provisioning writes it
+	// (ADR 0017). When it is empty, SSH uses known_hosts.
+	HostKeys []string `toml:"host_keys"`
 }
 
 // Plugin defines a configured plugin.

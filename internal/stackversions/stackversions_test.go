@@ -152,3 +152,13 @@ func TestLookupAndFormatHelpers(t *testing.T) {
 		})
 	}
 }
+
+func TestEmbeddedDigitalOceanDefaults(t *testing.T) {
+	t.Parallel()
+	do := MustLoad().DigitalOcean
+	for name, value := range map[string]string{"image": do.Image, "region": do.Region, "size_production": do.SizeProduction, "size_default": do.SizeDefault, "ip_dns": do.IPDNS} {
+		if strings.TrimSpace(value) == "" {
+			t.Errorf("digitalocean.%s is empty in the embedded manifest", name)
+		}
+	}
+}

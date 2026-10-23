@@ -21,12 +21,15 @@ import (
 type Host struct {
 	Name, Address, User string
 	Port                int
+	// HostKeys pins the host keys ("ssh-ed25519 AAAA...") of the VM. When it is set, SSH trusts
+	// only these keys and ignores known_hosts and --accept-new-host-key (ADR 0017).
+	HostKeys []string
 }
 
 // HostFromEnv validates the destination. A zero port leaves the port to the SSH config
 // (which defaults to 22), so a Port line in ~/.ssh/config or SPINUP_SSH_CONFIG wins.
 func HostFromEnv(env project.Env) (Host, error) {
-	h := Host{Name: env.Name, Address: env.Host, User: env.User, Port: env.Port}
+	h := Host{Name: env.Name, Address: env.Host, User: env.User, Port: env.Port, HostKeys: env.HostKeys}
 	return h, validateHost(h)
 }
 

@@ -19,6 +19,25 @@ import (
 // requiredSecrets are the secrets that the deploy pack reads (docs/deploy.md).
 var requiredSecrets = []string{"DATABASE_URL", "POSTGRES_PASSWORD"}
 
+// RequiredSecrets returns the secret names that a deploy of the project needs: the deploy pack
+// secrets, plus GRAFANA_ADMIN_PASSWORD when the monitoring stack is active. Provisioning uses it
+// to generate the missing values (ADR 0017).
+func RequiredSecrets(root string, config *project.Config) ([]string, error) {
+	m, err := loadMonitoring(root, config)
+	if err != nil {
+		return nil, err
+	}
+	return requiredFor(m), nil
+}
+
+func requiredFor(m monitoringStack) []string {
+	need := slices.Clone(requiredSecrets)
+	if m.skip == "" {
+		need = append(need, "GRAFANA_ADMIN_PASSWORD")
+	}
+	return need
+}
+
 // local is the result of the preflight: the project, the environment, and the commit.
 type local struct {
 	root       string
@@ -132,11 +151,7 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	if l.secrets, err = d.Decrypt(ctx, root, env.Name); err != nil {
 		return nil, preflightError("the secrets of "+env.Name+" cannot be decrypted: "+stripTry(err.Error()), "run spinup secrets init --env "+env.Name+", or check the key in ~/.config/spinup/keys")
 	}
-	need := slices.Clone(requiredSecrets)
-	if l.monitoring.skip == "" {
-		need = append(need, "GRAFANA_ADMIN_PASSWORD")
-	}
-	for _, name := range need {
+	for _, name := range requiredFor(l.monitoring) {
 		if _, ok := l.secrets[name]; !ok {
 			return nil, preflightError("the secret "+name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name)
 		}

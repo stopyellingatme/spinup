@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -165,6 +166,19 @@ func readPublicKey(path string) (string, error) {
 
 func invalidKey() error {
 	return fmt.Errorf("read operator SSH key: expected one public key without authorized_keys options\nTry: pass --ssh-key <public-key-file>")
+}
+
+// ReadPublicKey reads one operator public key from path ("" means ~/.ssh/id_ed25519.pub).
+func ReadPublicKey(path string) (string, error) { return readPublicKey(path) }
+
+// CloudInit returns the rendered deploy/cloud-init/user-data.yaml of the app at root, with the
+// deploy user's public key in place of the SPINUP_DEPLOY_SSH_KEY placeholder.
+func CloudInit(root, key string) ([]byte, error) {
+	var b bytes.Buffer
+	if err := printCloudInit(root, key, &b); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 func printCloudInit(root, key string, out io.Writer) error {

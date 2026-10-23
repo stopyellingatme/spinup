@@ -76,6 +76,19 @@ type Stack struct {
 	Images    map[string]Image  `yaml:"images"`
 	Binaries  map[string]Binary `yaml:"binaries"`
 	Actions   map[string]Action `yaml:"actions"`
+	// DigitalOcean holds the droplet defaults of `spinup deploy digital-ocean` (ADR 0017).
+	DigitalOcean DigitalOcean `yaml:"digitalocean"`
+}
+
+// DigitalOcean holds the defaults for droplets that spinup creates. Validate does not require it:
+// template archives made before ADR 0017 have no digitalocean section. Provisioning reads the
+// manifest compiled into the CLI.
+type DigitalOcean struct {
+	Image          string `yaml:"image"`
+	Region         string `yaml:"region"`
+	SizeProduction string `yaml:"size_production"`
+	SizeDefault    string `yaml:"size_default"`
+	IPDNS          string `yaml:"ip_dns"`
 }
 
 // Parse decodes and validates a stack version manifest.
