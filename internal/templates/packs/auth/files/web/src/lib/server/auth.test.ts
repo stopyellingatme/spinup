@@ -121,6 +121,9 @@ describe('postAuth', () => {
 
 		const busy = await postAuth(reply(response(503, [], { detail: 'The server is busy. Try again in a moment.' })), cookies, '/api/auth/login', {});
 		expect(busy).toEqual({ ok: false, status: 503, errors: { form: 'The server is busy. Try again in a moment.' } });
+
+		const limited = await postAuth(reply(response(429, [], { detail: 'Too many sign-in attempts from your network. Try again in 12 seconds.' })), cookies, '/api/auth/login', {});
+		expect(limited).toEqual({ ok: false, status: 429, errors: { form: 'Too many sign-in attempts from your network. Try again in 12 seconds.' } });
 	});
 
 	it('never throws when the API is down', async () => {

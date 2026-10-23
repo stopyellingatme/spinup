@@ -22,6 +22,10 @@
 #   	}
 #   }
 {
+	# X-Forwarded-For: reverse_proxy sets it to the address of the peer of Caddy. It drops the value
+	# of a client that is not trusted. The app reads it to limit the auth routes for each client.
+	# Do not add trusted_proxies unless a CDN is in front. For the CDN recipe, see docs/deploy.md
+	# (Client addresses behind a CDN).
 	# The admin API listens inside the container only.
 	admin localhost:2019
 	# Requests that the old config started have 10 s to finish after a reload.

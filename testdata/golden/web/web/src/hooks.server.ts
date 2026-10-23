@@ -38,12 +38,32 @@ export const handle: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-// Rewrite `${PUBLIC_ORIGIN}/api/...` to the Go API, and send the browser cookie only there.
+// The API limits the auth routes for each client. Node is the TCP peer of the API, so this hook
+// passes the client address on. ADDRESS_HEADER is the adapter-node setting that names the header
+// of the reverse proxy. Without it, getClientAddress() returns the address of the proxy, and all
+// users would share one limit. Thus the hook sends the address only when ADDRESS_HEADER is set.
+const forwardClient = Boolean(process.env.ADDRESS_HEADER);
+let warnedNoAddress = false;
+
+// Rewrite `${PUBLIC_ORIGIN}/api/...` to the Go API. Send the browser cookie and the client
+// address only there. A header from the browser is never passed on.
 export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
 	if (request.url.startsWith(publicAPI)) {
 		request = new Request(api + request.url.slice(__PUBLIC_ORIGIN__.length), request);
 		const cookie = event.request.headers.get('cookie');
 		if (cookie) request.headers.set('cookie', cookie);
+		request.headers.delete('x-forwarded-for');
+		if (forwardClient) {
+			try {
+				request.headers.set('x-forwarded-for', event.getClientAddress());
+			} catch (err) {
+				// The request did not come through the proxy, or XFF_DEPTH is too large.
+				if (!warnedNoAddress) {
+					warnedNoAddress = true;
+					console.warn('ratelimit: no client address for the API request, so it has no X-Forwarded-For:', err);
+				}
+			}
+		}
 	}
 	return fetch(request);
 };
