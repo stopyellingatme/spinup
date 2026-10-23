@@ -163,7 +163,7 @@ The database on the droplet is lost, so run `spinup backup` first.
 - **HTTP 403.** The token lacks a scope. The message names the scope. Sign in again with `spinup deploy digital-ocean login`, or create a token with that scope.
 - **HTTP 401.** The token expired or DigitalOcean revoked it. Sign in again.
 - **Wrong team.** The token belongs to another team than the environment. Sign in to the team that owns the environment.
-- **The sign-in is not available in this build.** Use a personal access token, or set `SPINUP_DO_CLIENT_ID`.
+- **The sign-in is not available in this build.** A build without a registered client ID has no browser sign-in. Use a personal access token, or set `SPINUP_DO_CLIENT_ID`.
 
 ## Costs
 

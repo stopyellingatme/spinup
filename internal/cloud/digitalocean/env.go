@@ -8,10 +8,10 @@ import (
 	"strings"
 )
 
-// DefaultClientID is the OAuth client ID of spinup. It is empty until the
-// maintainers register the client with scripts/do-register-client.sh. A public
-// client ID is not a secret. SPINUP_DO_CLIENT_ID overrides it.
-const DefaultClientID = ""
+// DefaultClientID is the OAuth client ID of spinup, a public client that the maintainers
+// registered with scripts/do-register-client.sh on 2026-10-23. A public client ID is not a
+// secret. SPINUP_DO_CLIENT_ID overrides it.
+const DefaultClientID = "2dfe39adee98fc5e3eaf5266e1b554daf47e2ef1b96dc47983fafe04e7637ce1"
 
 // OAuth endpoints (ADR 0017 section 2).
 const (

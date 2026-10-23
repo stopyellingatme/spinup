@@ -49,13 +49,6 @@ stdout 'removed'
 ! exec spinup deploy digital-ocean status
 stderr 'Try:'
 
-# A build with no client ID has no browser sign-in.
-env SPINUP_DO_CLIENT_ID=
-! exec spinup deploy digital-ocean login
-stderr 'the browser sign-in is not available in this build'
-stderr 'Try: export DIGITALOCEAN_ACCESS_TOKEN=<a personal access token>'
-env SPINUP_DO_CLIENT_ID=spinup-test-client
-
 # Outside a project the main command and destroy fail with a Try line.
 env DIGITALOCEAN_ACCESS_TOKEN=static-test-token
 ! exec spinup deploy digital-ocean --no-recovery
