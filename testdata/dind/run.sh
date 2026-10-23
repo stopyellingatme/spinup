@@ -477,7 +477,7 @@ vm_key="$(docker exec "$vm" cat /etc/ssh/ssh_host_ed25519_key.pub | awk '{print 
 injected="$(awk '{print $1 " " $2}' "$work/injected_host_key.pub")"
 [[ "$pinned" == "$vm_key" ]] || fail "the pinned host key is not the key of the VM" "pinned: $pinned" "vm:     $vm_key"
 [[ "$vm_key" != "$injected" ]] || fail "the host key was not rotated: the VM still serves the injected key"
-served="$(ssh-keyscan -t ed25519 -p "$ssh_port" 127.0.0.1 2>/dev/null | awk '{print $2 " " $3}')"
+served="$(ssh-keyscan -t ed25519 -p "$ssh_port" 127.0.0.1 2>/dev/null | grep -v '^#' | awk '{print $2 " " $3}')"
 [[ "$served" == "$vm_key" ]] || fail "sshd does not serve the rotated host key" "served: $served" "file:   $vm_key"
 echo "    host key rotated and pinned: ${vm_key:0:40}..."
 

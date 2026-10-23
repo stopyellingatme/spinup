@@ -13,7 +13,7 @@ case "$*" in
     fi
     i=0
     while [ "$i" -lt 50 ]; do
-      if ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null | awk '{print $3}' | grep -qxF "$want"; then
+      if ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null | grep -v '^#' | awk '{print $3}' | grep -qxF "$want"; then
         exit 0
       fi
       i=$((i + 1))
