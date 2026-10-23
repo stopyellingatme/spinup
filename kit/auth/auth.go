@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"runtime"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexedwards/scs/pgxstore"
@@ -68,6 +71,12 @@ type options struct {
 	hashConcurrent int
 	hashWaiting    int
 	hashWait       time.Duration
+
+	rates      RateLimits
+	proxies    []string
+	proxiesSet bool
+	lookup     func(string) (string, bool) // the environment; tests replace it
+	sweep      time.Duration
 }
 
 // WithSecureCookie sets the Secure attribute of the session cookie. The default is
@@ -126,6 +135,9 @@ type Auth struct {
 	threshold int
 	window    time.Duration
 	now       func() time.Time
+	limits    *limiter // nil: no rate limit
+	proxies   proxySet
+	warnedAt  atomic.Int64
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -145,9 +157,14 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	// CPU, and every request that needs the database queues behind them.
 	slots := max(1, runtime.GOMAXPROCS(0)/10)
 	o := options{secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
-		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait}
+		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait,
+		lookup: os.LookupEnv, sweep: logSweepInterval}
 	for _, opt := range opts {
 		opt(&o)
+	}
+	settings, err := loadRateSettings(o.lookup)
+	if err != nil {
+		return nil, err
 	}
 	switch {
 	case o.lifetime <= 0:
@@ -158,6 +175,21 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		return nil, fmt.Errorf("auth: cannot start: the hash limits need at least 1 slot, 0 or more waiting requests, and a positive wait, got %d, %d, and %s\nTry: correct the values of auth.WithHashLimits", o.hashConcurrent, o.hashWaiting, o.hashWait)
 	case o.threshold < 1 || o.window <= 0:
 		return nil, fmt.Errorf("auth: cannot start: the lockout needs a threshold of at least 1 and a positive window, got %d and %s\nTry: correct the values of auth.WithLockout", o.threshold, o.window)
+	}
+	rates, clients, err := resolveRates(o.rates, settings)
+	if err != nil {
+		return nil, err
+	}
+	trusted := o.proxies
+	if !o.proxiesSet {
+		trusted = []string{"private"}
+		if settings.Proxies != "" {
+			trusted = strings.Split(settings.Proxies, ",")
+		}
+	}
+	proxies, err := parseProxySet(trusted)
+	if err != nil {
+		return nil, err
 	}
 	if o.logger == nil {
 		o.logger = slog.Default()
@@ -170,6 +202,7 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		threshold: o.threshold,
 		window:    o.window,
 		now:       o.now,
+		proxies:   proxies,
 		stop:      make(chan struct{}),
 		done:      make(chan struct{}),
 	}
@@ -202,7 +235,15 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	_, _ = rand.Read(secret[:])
 	a.dummy = hashPassword(a.params, hex.EncodeToString(secret[:]))
 
-	go a.cleanupLoop(o.cleanup)
+	allOff := true
+	for _, l := range rates {
+		allOff = allOff && l.Off
+	}
+	if !allOff {
+		a.limits = newLimiter(rates, clients, runtime.GOMAXPROCS(0))
+	}
+
+	go a.cleanupLoop(o.cleanup, o.sweep)
 	return a, nil
 }
 
@@ -218,9 +259,22 @@ func (a *Auth) Close(ctx context.Context) error {
 	}
 }
 
-func (a *Auth) cleanupLoop(interval time.Duration) {
+// cleanupLoop deletes expired rows every interval, and sweeps the rate limit table
+// and logs the refusals every sweep. A zero interval or no rate limit turns that part off.
+func (a *Auth) cleanupLoop(interval, sweep time.Duration) {
 	defer close(a.done)
-	if interval <= 0 {
+	var dbTick, sweepTick <-chan time.Time
+	if interval > 0 {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		dbTick = ticker.C
+	}
+	if a.limits != nil && sweep > 0 {
+		ticker := time.NewTicker(sweep)
+		defer ticker.Stop()
+		sweepTick = ticker.C
+	}
+	if dbTick == nil && sweepTick == nil {
 		<-a.stop
 		return
 	}
@@ -231,18 +285,19 @@ func (a *Auth) cleanupLoop(interval time.Duration) {
 		<-a.stop
 		cancel()
 	}()
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 	for {
 		select {
 		case <-a.stop:
 			return
-		case <-ticker.C:
+		case <-dbTick:
 			ctx, cancelRun := context.WithTimeout(stopped, time.Minute)
 			if err := a.deleteExpired(ctx); err != nil && stopped.Err() == nil {
 				a.logger.WarnContext(ctx, "auth: cannot delete expired sessions and login attempts", "error", err)
 			}
 			cancelRun()
+		case <-sweepTick:
+			a.limits.sweep(a.now())
+			a.logRejections()
 		}
 	}
 }
@@ -252,6 +307,7 @@ type contextKey int
 const (
 	userContextKey contextKey = iota
 	installedContextKey
+	limitContextKey
 )
 
 // sessionUserKey is the session key that holds the user ID (int64).
@@ -266,6 +322,9 @@ func UserFrom(ctx context.Context) (User, bool) {
 
 // Middleware returns the middleware that Routes and RequireUser need. In order, it:
 //   - sets Content-Security-Policy to [DefaultCSP] when the response has none,
+//   - answers 429 with Retry-After to a client that used up its rate limit for a
+//     login, registration, password reset, or OIDC callback request, before any
+//     session or database work (see [RateLimits]),
 //   - rejects unsafe requests (not GET, HEAD, or OPTIONS) that a browser marks as
 //     cross-site or same-site with Sec-Fetch-Site, or whose Origin differs from the
 //     Host and the trusted origins, with a 403 problem,
@@ -279,6 +338,10 @@ func (a *Auth) Middleware() httpx.Middleware {
 				w.Header().Set("Content-Security-Policy", DefaultCSP)
 			}
 			r = r.WithContext(context.WithValue(r.Context(), installedContextKey, true))
+			r, ok := a.allow(w, r)
+			if !ok {
+				return
+			}
 			inner.ServeHTTP(&guardWriter{ResponseWriter: w}, r)
 		})
 	}

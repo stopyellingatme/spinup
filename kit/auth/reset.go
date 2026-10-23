@@ -84,8 +84,8 @@ func (a *Auth) ResetRoutes(mux *http.ServeMux, opts ...ResetOption) error {
 		return fmt.Errorf("auth: cannot enable password reset: %w\nTry: check MAIL_FROM and the reset templates", err)
 	}
 	h := &resetHandler{auth: a, opts: o, requests: make(chan string, 64)}
-	mux.Handle("POST /api/auth/reset/request", a.endpoint(h.request))
-	mux.Handle("POST /api/auth/reset/confirm", a.endpoint(h.confirm))
+	mux.Handle("POST "+pathResetRequest, a.endpoint(h.request))
+	mux.Handle("POST "+pathResetConfirm, a.endpoint(h.confirm))
 	go h.deliverLoop()
 	return nil
 }
@@ -100,6 +100,7 @@ func (h *resetHandler) request(w http.ResponseWriter, r *http.Request) {
 	if err := httpx.DecodeJSON(r, &in); err == nil {
 		if email, ok := normalizeEmail(in.Email); ok {
 			// The direct peer can be the shared web tier. Limit by email and globally.
+			// Middleware already limits each client.
 			allowed, err := h.auth.reserveResetRequest(r.Context(), email, h.auth.now())
 			if err == nil && allowed {
 				select {

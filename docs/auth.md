@@ -108,8 +108,8 @@ export const home: string = '/';
 
 | Route | Body | Success | Errors |
 | --- | --- | --- | --- |
-| `POST /api/auth/register` | `{"email","password"}` | 201 `{"user":{"id","email"}}` and the session cookie | 409 (email taken), 422, 503 (busy) |
-| `POST /api/auth/login` | `{"email","password"}` | 200 `{"user":{"id","email"}}` and a new session cookie | 401, 422, 429, 503 (busy) |
+| `POST /api/auth/register` | `{"email","password"}` | 201 `{"user":{"id","email"}}` and the session cookie | 409 (email taken), 422, 429 (rate limit), 503 (busy) |
+| `POST /api/auth/login` | `{"email","password"}` | 200 `{"user":{"id","email"}}` and a new session cookie | 401, 422, 429 (lockout or rate limit), 503 (busy) |
 | `POST /api/auth/logout` | none | 204, and the cookie is cleared | |
 | `GET /api/session` | none | 200 `{"user":{"id","email"}}` | 401 |
 
@@ -189,7 +189,98 @@ The result must be a bare address that `net/mail` accepts, with a maximum of 254
 - A successful login clears the failures of the email.
 - `auth.WithLockout(threshold, window)` changes the values.
 
-An attacker who knows an email can lock it. Add rate limits by IP address at the proxy if this is a risk.
+An attacker who knows an email can lock it. The rate limit for each client (next section) does not prevent this. One client can send the 5 failed logins that lock an email, because the burst is larger than 5. A captcha or an unlock link can reduce this risk. The kit does not have them.
+
+### Rate limits for each client
+
+kit `auth` limits the requests that cost the most for each client.
+`authn.Middleware()` does the check before the cross-origin check, the session load, and every query.
+A client that is over its limit gets 429 with `Retry-After`.
+The 429 request does not touch the database.
+The detail text says how long to wait, for example `Too many sign-in attempts from your network. Try again in 12 seconds.`
+The login and registration forms show this text.
+
+Each class has its own limit.
+Burst requests pass at once. After that, one request passes each Every.
+
+| Class | Route | Burst | Every |
+| --- | --- | --- | --- |
+| `login` | `POST /api/auth/login` | 20 | 3 s |
+| `register` | `POST /api/auth/register` | 20 | 20 s |
+| `reset_request` | `POST /api/auth/reset/request` | 10 | 30 s |
+| `reset_confirm` | `POST /api/auth/reset/confirm` | 10 | 30 s |
+| `oidc_callback` | `GET /api/auth/oidc/<provider>/callback` | 100 | 1 s |
+
+- Logout, `GET /api/session`, the provider list, and the OIDC start route have no limit.
+- A refused OIDC callback answers a redirect to `/login?error=rate_limited`, because the callback is a browser navigation.
+- A request that gets 503 from the hash queue gives its token back.
+- One client uses at most about 7% of one CPU with the default login, registration, and reset limits. Without the limit, one client can use all of it.
+
+#### Which address is the client
+
+- If the TCP peer is not trusted, the peer is the client. The API ignores `X-Forwarded-For`.
+- If the TCP peer is trusted, it is a proxy. The client is the first `X-Forwarded-For` entry from the right that is not trusted. A client cannot choose this entry, because the proxy writes it.
+- Caddy replaces `X-Forwarded-For` with the address of its peer. The web service passes the client address on to the API with the same header (`ADDRESS_HEADER=X-Forwarded-For` in `deploy/compose.yml`).
+- A request from a local process (loopback) has no limit. `spinup dev`, tests, and health checks use loopback.
+- A trusted proxy that does not tell the client address goes into one shared bucket for each class. The bucket is large, and it is not unlimited. The API writes a warning to the log when this happens. The warning has the `Try:` hint.
+- An IPv4 client has its own bucket. An IPv6 client has a bucket for its /64 network and a bucket for its /48 network. The /48 bucket has 8 times the budget.
+
+#### Settings
+
+Set these variables in the environment of the API.
+The kit does not read them from a `.env` file.
+
+| Variable | Value | Default |
+| --- | --- | --- |
+| `AUTH_RATE_LIMIT` | `on` or `off`. `off` turns every class off. | `on` |
+| `AUTH_RATE_LIMIT_LOGIN`, `_REGISTER`, `_RESET_REQUEST`, `_RESET_CONFIRM`, `_OIDC_CALLBACK` | `off`, or `burst=<n>,every=<duration>`. Each key is optional. | see the table above |
+| `AUTH_RATE_LIMIT_CLIENTS` | The number of clients to keep in memory, 1024 to 4194304. | `65536` (about 5 MB) |
+| `AUTH_TRUSTED_PROXIES` | A comma list of CIDRs, addresses, and the words `private`, `loopback`, and `none`. | `private` |
+
+- `private` is loopback, RFC 1918, `fc00::/7`, `100.64.0.0/10`, `169.254.0.0/16`, and `fe80::/10`.
+- A value that does not parse stops the start of the API. The error names the variable and has a `Try:` line.
+- In code, `auth.WithRateLimits(auth.RateLimits{Login: auth.Limit{Burst: 60, Every: time.Second}})` and `auth.WithTrustedProxies("private", "203.0.113.0/24")` set the same values. A value in code wins over the environment. The environment wins over the default.
+- A non-zero `Burst` or `Every` in code turns the class on again, also when `AUTH_RATE_LIMIT=off`.
+
+For Compose, set the variables in `deploy/compose.override.yml`. The generated `api` service has an explicit list of variables, so the shell of the VM does not reach it:
+
+```yaml
+services:
+  api:
+    environment:
+      AUTH_RATE_LIMIT_LOGIN: burst=60,every=1s
+      AUTH_TRUSTED_PROXIES: private,203.0.113.0/24
+```
+
+#### Choose the values
+
+Many users can share one address, for example an office or a mobile network.
+With the default `login` limit, one address passes 20 logins at once and then 20 each minute.
+That is 40 in the first minute, 120 in 5 minutes, and 220 in 10 minutes.
+A session lasts 7 days, so a user logs in about once each week.
+If a site needs more, raise the limit.
+Use this formula to find the CPU share: `CPU share = (60 / every in seconds) x 0.16 / CPUs`.
+For example, `burst=60,every=1s` uses about 16% of one CPU at full rate.
+An intranet app has private client addresses.
+Set `AUTH_TRUSTED_PROXIES=172.16.0.0/12` to trust only the Docker networks.
+
+#### A CDN in front of Caddy
+
+A CDN sends the client address in a header, and Caddy adds the address of the CDN.
+Make three changes:
+
+1. Set `trusted_proxies` in Caddy to the CDN ranges.
+2. Add the CDN ranges to `AUTH_TRUSTED_PROXIES`, for example `private,<CDN ranges>`.
+3. Set `XFF_DEPTH=2` on the web service.
+
+#### Limits of the rate limit
+
+- Each API process has its own counters. With 2 replicas, a client can pass about twice the numbers. The CPU share of the client for each replica stays the same. Use a firewall or a CDN for an exact global limit.
+- The limit stops expensive work, not a flood of cheap requests. A refused request still costs the access log and the response. Use a firewall or a CDN to stop that flood.
+- The counters are empty after a restart.
+- A proxy with a public address that is not in `AUTH_TRUSTED_PROXIES` makes all users share one bucket. Add the proxy to the list.
+- The API trusts a private address that sends `X-Forwarded-For`. Do not publish the API port. If you must, set `AUTH_TRUSTED_PROXIES` to the proxy addresses only.
+- The API logs one warning each minute with the number of refused requests for each class. The counter `auth.rate_limited` has the attribute `class`. The log never has an address.
 
 ### Cross-site requests
 
@@ -213,6 +304,7 @@ The middleware sets `Content-Security-Policy: default-src 'none'; frame-ancestor
 
 The form actions post to the API with the `fetch` of the action.
 `handleFetch` in `hooks.server.ts` sends these requests to `API_URL` with the browser cookie.
+It also sends the client address in `X-Forwarded-For` for the rate limit, when `ADDRESS_HEADER` is set.
 The `Set-Cookie` header of a server-side fetch does not go to the browser by itself.
 Thus `forwardSessionCookie()` reads `res.headers.getSetCookie()` and calls `cookies.set()` with the same attributes (ADR 0002 rule 7).
 

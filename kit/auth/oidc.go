@@ -106,7 +106,7 @@ func (a *Auth) oidcRoutes(mux *http.ServeMux) {
 	}
 	mux.Handle("GET /api/auth/oidc/providers", a.endpoint(h.list))
 	mux.Handle("GET /api/auth/oidc/{provider}/start", a.endpoint(h.start))
-	mux.Handle("GET /api/auth/oidc/{provider}/callback", a.endpoint(h.callback))
+	mux.Handle(patternOIDCCallback, a.endpoint(h.callback))
 }
 
 func loadOIDCProvider(name string) *oidcProvider {

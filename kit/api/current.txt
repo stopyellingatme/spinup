@@ -35,6 +35,15 @@ kit/auth const DefaultLockoutWindow = 15 * time.Minute
 kit/auth const MaxPasswordLength = 512
 kit/auth const MinPasswordLength = 12
 kit/auth const ResetLifetime = time.Hour
+kit/auth field Limit.Burst int
+kit/auth field Limit.Every time.Duration
+kit/auth field Limit.Off bool
+kit/auth field RateLimits.Clients int
+kit/auth field RateLimits.Login Limit
+kit/auth field RateLimits.OIDCCallback Limit
+kit/auth field RateLimits.Register Limit
+kit/auth field RateLimits.ResetConfirm Limit
+kit/auth field RateLimits.ResetRequest Limit
 kit/auth field ResetData.URL string
 kit/auth field User.Email string
 kit/auth field User.ID int64
@@ -47,11 +56,13 @@ kit/auth func WithLifetime(time.Duration) Option
 kit/auth func WithLockout(int, time.Duration) Option
 kit/auth func WithLogger(*slog.Logger) Option
 kit/auth func WithMailer(mail.Mailer) ResetOption
+kit/auth func WithRateLimits(RateLimits) Option
 kit/auth func WithResetFrom(string) ResetOption
 kit/auth func WithResetTemplates(fs.FS) ResetOption
 kit/auth func WithResetURL(string) ResetOption
 kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
+kit/auth func WithTrustedProxies(...string) Option
 kit/auth func WithUser(context.Context, User) context.Context
 kit/auth ptrmethod Auth.Close(context.Context) error
 kit/auth ptrmethod Auth.Middleware() httpx.Middleware
@@ -59,7 +70,9 @@ kit/auth ptrmethod Auth.RequireUser(http.Handler) http.Handler
 kit/auth ptrmethod Auth.ResetRoutes(*http.ServeMux, ...ResetOption) error
 kit/auth ptrmethod Auth.Routes(*http.ServeMux)
 kit/auth type Auth struct
+kit/auth type Limit struct
 kit/auth type Option func(*options)
+kit/auth type RateLimits struct
 kit/auth type ResetData struct
 kit/auth type ResetOption func(*resetOptions)
 kit/auth type User struct

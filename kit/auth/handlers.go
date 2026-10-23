@@ -30,7 +30,7 @@ type userResponse struct {
 
 // Routes registers the auth endpoints (ADR 0008 §3). They need Middleware.
 //
-//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 409, 422, 503
+//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 409, 422, 429, 503
 //	POST /api/auth/login     {"email","password"} -> 200 {"user"}, 401, 422, 429, 503
 //	POST /api/auth/logout                         -> 204
 //	GET  /api/session                             -> 200 {"user"}, 401
@@ -38,10 +38,13 @@ type userResponse struct {
 // Errors are problem details. A 422 problem lists field errors for "email" and
 // "password". Register and login set the session cookie with a new token.
 // When every password hash slot is busy, they answer 503 with Retry-After.
+// A 429 from login is either the lockout of one email or the rate limit of one
+// client. Middleware applies the rate limit to register, login, the password
+// reset routes, and the OIDC callback (see [RateLimits]).
 func (a *Auth) Routes(mux *http.ServeMux) {
 	a.oidcRoutes(mux)
-	mux.Handle("POST /api/auth/register", a.endpoint(a.register))
-	mux.Handle("POST /api/auth/login", a.endpoint(a.login))
+	mux.Handle("POST "+pathRegister, a.endpoint(a.register))
+	mux.Handle("POST "+pathLogin, a.endpoint(a.login))
 	mux.Handle("POST /api/auth/logout", a.endpoint(a.logout))
 	mux.Handle("GET /api/session", a.endpoint(a.session))
 }
@@ -125,7 +128,7 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	// logins that the queue refuses never waits for, or holds, a pool connection.
 	leave, err := a.slots.admit()
 	if err != nil {
-		busy(w, r)
+		a.busy(w, r)
 		return
 	}
 	defer leave()
@@ -242,14 +245,16 @@ func (a *Auth) rehash(ctx context.Context, user User, old, password string) {
 // hashFailed answers an error from the hash slots. A busy queue gets 503.
 func (a *Auth) hashFailed(w http.ResponseWriter, r *http.Request, what string, err error) {
 	if errors.Is(err, errHashBusy) {
-		busy(w, r)
+		a.busy(w, r)
 		return
 	}
 	a.internalError(w, r, what, err)
 }
 
 // busy answers 503 with Retry-After when every hash slot and queue place is taken.
-func busy(w http.ResponseWriter, r *http.Request) {
+// The request did no password work, so it gives its rate limit tokens back.
+func (a *Auth) busy(w http.ResponseWriter, r *http.Request) {
+	a.refundLimit(r)
 	w.Header().Set("Retry-After", "1")
 	httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusServiceUnavailable, Detail: "The server is busy. Try again in a moment."})
 }
