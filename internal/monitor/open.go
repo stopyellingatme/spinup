@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime"
 	"strconv"
 	"time"
 
+	"github.com/stopyellingatme/spinup/internal/browser"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
@@ -100,11 +100,7 @@ func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) 
 	url := "http://" + address
 	fmt.Fprintf(o.Out, "%s\nPress Ctrl-C to close the tunnel.\n", url)
 	if !o.NoBrowser {
-		name := "xdg-open"
-		if runtime.GOOS == "darwin" {
-			name = "open"
-		}
-		if _, err = runner.Run(ctx, runexec.Cmd{Name: name, Args: []string{url}, Timeout: 10 * time.Second}); err != nil {
+		if err = browser.Open(ctx, runner, url); err != nil {
 			fmt.Fprintln(o.ErrOut, "Cannot open the browser. Open the printed URL manually.")
 		}
 	}
