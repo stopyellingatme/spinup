@@ -27,7 +27,7 @@ Each class has its own buckets. A flood of one class does not block another clas
 
 - Not limited: `POST /api/auth/logout`, `GET /api/session`, `GET /api/auth/oidc/providers`, and `GET /api/auth/oidc/{provider}/start`. The web hooks call `GET /api/session` on every page. The `start` route does AES-GCM and a redirect, and no outbound call.
 - The algorithm is GCRA with one `int64` for each bucket. Burst requests pass at once, and then one request each Every.
-- A request that passes the check takes one token, also when it later fails validation. A refused request takes no token. A request that the hash queue refuses with 503 gives its tokens back.
+- A request that passes the check takes one token, also when it later fails validation. A refused request takes no token. A request that the hash queue refuses with 503 returns its tokens.
 
 ## 3. The client address
 
@@ -60,7 +60,7 @@ Each class has its own buckets. A flood of one class does not block another clas
 
 ## 5. The 429 answer
 
-- Problem JSON with `Retry-After` (whole seconds, at least 1) and `Cache-Control: no-store`. The `detail` ends with `Try again in N seconds.` and names the class: sign-in attempts, sign-up attempts, or password reset requests.
+- Problem JSON with `Retry-After` (whole seconds, at least 1) and `Cache-Control: no-store`. The `detail` ends with `Try again in N seconds.` and names the class: sign-in attempts, sign-up attempts, password reset requests, or password reset attempts.
 - The text has no address and no key.
 - The `login` route also answers 429 for the lockout of one email. The status and `type` are the same, and the `detail` text differs.
 - The OIDC callback is a browser navigation, so a JSON page would end the flow. A refused callback answers `303` to `/login?error=rate_limited` with `Retry-After`. It does not clear the flow cookie. The login page of the auth pack does not read the `error` parameter yet.
@@ -69,7 +69,8 @@ Each class has its own buckets. A flood of one class does not block another clas
 ## 6. Web and deploy
 
 - `handleFetch` in `hooks.server.ts` deletes any inbound `X-Forwarded-For` on API requests. It sets `X-Forwarded-For` to `event.getClientAddress()` only when `ADDRESS_HEADER` is set. Node is the TCP peer of the API for form actions, so without this every web user would share the address of Node.
-- The generated `compose.yml` sets `ADDRESS_HEADER=X-Forwarded-For` on the web service. An old `compose.yml` with a new hook, or the reverse, does not lock anybody out: the API sees no client address from Node, and the infrastructure bucket applies.
+- The generated `compose.yml` sets `ADDRESS_HEADER=X-Forwarded-For` on the web service.
+- An old `compose.yml` with a new hook, or the reverse, gives the API no client address from Node. Then all web form requests share the infrastructure bucket. One flood through the web forms can make the login fail for all web users until the bucket refills.
 
 ## 7. Replicas and limits of this design
 
@@ -78,6 +79,9 @@ Each class has its own buckets. A flood of one class does not block another clas
 - The limit does not prevent a targeted lockout. An attacker who knows an email can lock it with 5 failed logins from one client.
 - A CDN in front of Caddy needs three changes: `trusted_proxies` in Caddy with the CDN ranges, the CDN ranges added to `AUTH_TRUSTED_PROXIES`, and `XFF_DEPTH=2` on the web service.
 - A proxy with a public address that `AUTH_TRUSTED_PROXIES` does not list makes all users share one bucket.
+- The generated Docker network has no IPv6, so Docker shows every IPv6 client as the bridge gateway. All IPv6 clients then share the infrastructure bucket. The bucket bounds the CPU, but one IPv6 flood can make the login fail for every IPv6 user.
+- A provider that gives each customer a /56 network in a shared /48 network lets one customer empty the /48 bucket of its neighbors.
+- An API-only app with OIDC has no `/login` page, so a refused callback goes to a 404 page.
 
 ## 8. Follow-ups
 

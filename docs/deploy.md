@@ -136,15 +136,17 @@ The switch steps are in ADR 0003: start the new color with `up -d --wait`, check
 The Go API limits the auth routes for each client address (`login`, `register`, password reset, and the OIDC callback).
 It needs the real address of the client, not the address of a proxy.
 Caddy sets the `X-Forwarded-For` header to the address of its own peer.
-Caddy has no `trusted_proxies` setting, so it drops the header value of a client that it does not trust.
+The generated Caddyfile has no `trusted_proxies` setting, so Caddy drops a forged header value from a client.
 
 - A request from the browser to `/api/*` goes through Caddy to the API. The API reads the address from `X-Forwarded-For`.
 - A form action of the web app goes from Node to the API. `compose.yml` sets `ADDRESS_HEADER: X-Forwarded-For` and `XFF_DEPTH: "1"` on the `web` service.
   Node then reads the last entry, which Caddy wrote. `handleFetch` in `hooks.server.ts` sends it to the API.
 - The API trusts the header only when the peer is in `AUTH_TRUSTED_PROXIES`. The default is the private address ranges.
 
-Without `ADDRESS_HEADER`, the web form requests have no client address and the API does not limit them.
-An old `compose.yml` does this. Run `spinup upgrade` to get the new file.
+Without `ADDRESS_HEADER`, the web form requests have no client address.
+The API then puts all of them in one shared bucket for each class.
+One flood through the web forms can then make the login fail for every web user until the bucket refills.
+An old `compose.yml` has this problem. Run `spinup upgrade` to get the new file.
 
 ### Client addresses behind a CDN
 
@@ -164,6 +166,8 @@ Do these three steps:
    ```
 
    Caddy then appends the address of the CDN to `X-Forwarded-For` and keeps the client address that the CDN wrote.
+   `deploy/Caddyfile` is a managed file, and `Caddyfile.d/*.caddy` cannot hold global options.
+   `spinup upgrade` shows a conflict in this file when the template changes. Keep this block when you resolve the conflict.
 2. Set `AUTH_TRUSTED_PROXIES` for the `api` service in `deploy/compose.override.yml` to `private` and the CDN ranges.
    For example: `AUTH_TRUSTED_PROXIES: private,<CDN ranges>`.
 3. Set `XFF_DEPTH: "2"` for the `web` service in `deploy/compose.override.yml`.

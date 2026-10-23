@@ -99,6 +99,10 @@ type client struct {
 func (p proxySet) resolve(r *http.Request) client {
 	peer, ok := peerAddr(r.RemoteAddr)
 	if !ok {
+		if r.RemoteAddr != "" && r.RemoteAddr != "@" {
+			// An unknown listener wrapper: do not guess, and do not exempt it.
+			return client{kind: kindInfra}
+		}
 		// A unix socket has no IP address. Its peer is a local process.
 		peer = netip.MustParseAddr("127.0.0.1")
 	}

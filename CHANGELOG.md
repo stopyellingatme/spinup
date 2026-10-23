@@ -17,6 +17,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - M6: Add OpenTelemetry, metrics, logs, traces, dashboards, alerts, and monitoring commands.
 - M7: Verify and restore backups. Add PostgreSQL maintenance, remote checks, dependency updates, and recovery drills.
 - M8: Generate GitHub workflows and browser checks. Add release archives, signatures, SBOMs, provenance, an installer, Homebrew, and the CI image.
+- kit `auth` limits the auth routes for each client address (ADR 0016). The routes are login, registration, password reset, and the OIDC callback. A client that is over its limit gets 429 with `Retry-After`, before any database work. `AUTH_RATE_LIMIT`, `AUTH_RATE_LIMIT_<CLASS>`, `AUTH_TRUSTED_PROXIES`, `auth.WithRateLimits`, and `auth.WithTrustedProxies` change the limits. Loopback clients have no limit.
+- The web `handleFetch` sends the client address to the API in `X-Forwarded-For`, and the deploy `compose.yml` sets `ADDRESS_HEADER` on the web service. Run `spinup upgrade` so that web form logins count for each client and not for the web server.
 
 ### Changed
 

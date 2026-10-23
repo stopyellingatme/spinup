@@ -213,14 +213,14 @@ Burst requests pass at once. After that, one request passes each Every.
 
 - Logout, `GET /api/session`, the provider list, and the OIDC start route have no limit.
 - A refused OIDC callback answers a redirect to `/login?error=rate_limited`, because the callback is a browser navigation.
-- A request that gets 503 from the hash queue gives its token back.
-- One client uses at most about 7% of one CPU with the default login, registration, and reset limits. Without the limit, one client can use all of it.
+- A request that gets 503 from the hash queue returns its token.
+- After its burst, one client uses at most about 7% of one CPU with the default login, registration, and reset limits. The burst itself costs about 8 CPU-seconds. An IPv6 client that uses many /64 networks of one /48 network can use 8 times this share. Without the limit, one client can use all of the CPU.
 
 #### Which address is the client
 
 - If the TCP peer is not trusted, the peer is the client. The API ignores `X-Forwarded-For`.
 - If the TCP peer is trusted, it is a proxy. The client is the first `X-Forwarded-For` entry from the right that is not trusted. A client cannot choose this entry, because the proxy writes it.
-- Caddy replaces `X-Forwarded-For` with the address of its peer. The web service passes the client address on to the API with the same header (`ADDRESS_HEADER=X-Forwarded-For` in `deploy/compose.yml`).
+- Caddy replaces `X-Forwarded-For` with the address of its peer. The web service sends the client address to the API in the same header (`ADDRESS_HEADER=X-Forwarded-For` in `deploy/compose.yml`).
 - A request from a local process (loopback) has no limit. `spinup dev`, tests, and health checks use loopback.
 - A trusted proxy that does not tell the client address goes into one shared bucket for each class. The bucket is large, and it is not unlimited. The API writes a warning to the log when this happens. The warning has the `Try:` hint.
 - An IPv4 client has its own bucket. An IPv6 client has a bucket for its /64 network and a bucket for its /48 network. The /48 bucket has 8 times the budget.
@@ -259,7 +259,7 @@ With the default `login` limit, one address passes 20 logins at once and then 20
 That is 40 in the first minute, 120 in 5 minutes, and 220 in 10 minutes.
 A session lasts 7 days, so a user logs in about once each week.
 If a site needs more, raise the limit.
-Use this formula to find the CPU share: `CPU share = (60 / every in seconds) x 0.16 / CPUs`.
+Use this formula to find the CPU share: `CPU share = (1 / every in seconds) x 0.16 / CPUs`.
 For example, `burst=60,every=1s` uses about 16% of one CPU at full rate.
 An intranet app has private client addresses.
 Set `AUTH_TRUSTED_PROXIES=172.16.0.0/12` to trust only the Docker networks.
@@ -278,6 +278,8 @@ Make three changes:
 - Each API process has its own counters. With 2 replicas, a client can pass about twice the numbers. The CPU share of the client for each replica stays the same. Use a firewall or a CDN for an exact global limit.
 - The limit stops expensive work, not a flood of cheap requests. A refused request still costs the access log and the response. Use a firewall or a CDN to stop that flood.
 - The counters are empty after a restart.
+- The generated Docker network has no IPv6. Docker then shows an IPv6 client to Caddy as the address of the bridge gateway. All IPv6 clients then share the infrastructure bucket, and one IPv6 flood can make the login fail for every IPv6 user. To give each IPv6 client its own bucket, turn on IPv6 in Docker and on the `app` network. spinup does not test this setup yet.
+- Some providers give each customer a /56 network inside a shared /48 network. One customer can then empty the /48 bucket for the other customers of that /48 network.
 - A proxy with a public address that is not in `AUTH_TRUSTED_PROXIES` makes all users share one bucket. Add the proxy to the list.
 - The API trusts a private address that sends `X-Forwarded-For`. Do not publish the API port. If you must, set `AUTH_TRUSTED_PROXIES` to the proxy addresses only.
 - The API logs one warning each minute with the number of refused requests for each class. The counter `auth.rate_limited` has the attribute `class`. The log never has an address.

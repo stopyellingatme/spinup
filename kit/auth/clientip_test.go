@@ -81,6 +81,8 @@ func TestResolveClient(t *testing.T) {
 		{"more than 16 entries", private, "10.0.0.2:1", []string{"203.0.113.5, " + many}, kindInfra, ""},
 		{"none limits loopback", none, "127.0.0.1:9000", []string{"198.51.100.1"}, kindAddr, "127.0.0.1"},
 		{"unix socket peer is loopback", private, "@", nil, kindExempt, ""},
+		{"empty peer is a unix socket", private, "", nil, kindExempt, ""},
+		{"unparsable peer is not exempt", private, "proxy.internal", nil, kindInfra, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
