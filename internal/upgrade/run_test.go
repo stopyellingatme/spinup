@@ -315,12 +315,17 @@ func TestRunMissingBase(t *testing.T) {
 	for _, edited := range []bool{false, true} {
 		t.Run(map[bool]string{false: "unchanged", true: "edited"}[edited], func(t *testing.T) {
 			t.Parallel()
-			r, _ := runFixture(t, edited)
+			r, root := runFixture(t, edited)
 			delete(r.Source.(chainSource), "0.1.0")
 			err := r.Run(context.Background(), Options{To: "0.2.0", Yes: true, NoVerify: true})
 			if edited {
-				if err == nil || !strings.Contains(err.Error(), "file.txt") {
+				// The old version is unavailable, so the run must stop before it writes a
+				// whole-file conflict against an empty base.
+				if err == nil || !strings.Contains(err.Error(), "file.txt") || !strings.Contains(err.Error(), "no merge base") || !strings.Contains(err.Error(), "Try: run spinup cache warm 0.1.0") {
 					t.Fatalf("error=%v", err)
+				}
+				if got, readErr := os.ReadFile(filepath.Join(root, "file.txt")); readErr != nil || strings.Contains(string(got), "<<<<<<<") {
+					t.Fatalf("file.txt=%q err=%v", got, readErr)
 				}
 			} else if err != nil {
 				t.Fatal(err)

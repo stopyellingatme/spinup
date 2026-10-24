@@ -154,6 +154,9 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err != nil {
 			return nil, err
 		}
+		if err := requireBase(plan, from, lock.TemplateVersion); err != nil {
+			return nil, err
+		}
 		if change != nil {
 			if err := change.editPlan(temp, plan); err != nil {
 				return nil, err

@@ -366,3 +366,22 @@ func generatorTemplate(name string) bool {
 	parts := strings.SplitN(name, "/", 4)
 	return len(parts) == 4 && parts[0] == "plugin" && (parts[2] == "@gen" || parts[2] == "@exec" || parts[2] == "gen")
 }
+
+// requireBase rejects a plan that merged changed files against an empty base because the old
+// template version could not be loaded. Such a merge turns each changed file into a whole-file
+// conflict, and the conflict hides the real difference between the two template versions.
+func requireBase(plan *Plan, old *templates.Version, from string) error {
+	if old != nil || plan == nil {
+		return nil
+	}
+	var names []string
+	for _, file := range plan.Files {
+		if file.Action == ActionConflict && file.Reason == "no base version" {
+			names = append(names, file.Path)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return fmt.Errorf("plan upgrade: template version %s is unavailable, so %d changed files have no merge base: %s\nTry: run spinup cache warm %s, or set SPINUP_TEMPLATES_DIR to a directory that holds that version", from, len(names), strings.Join(names, ", "), from)
+}

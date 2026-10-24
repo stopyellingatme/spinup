@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stopyellingatme/spinup/internal/exec"
@@ -115,4 +116,16 @@ func TestApplyKeepsCurrentKitReplace(t *testing.T) {
 			t.Fatalf("calls = %d", n)
 		}
 	})
+}
+
+func TestApplyRefusesConflictedGoMod(t *testing.T) {
+	t.Setenv("SPINUP_KIT_REPLACE", "")
+	s := phaseStep(t)
+	writeAPIMod(t, s.Worktree, "\n<<<<<<< api/go.mod (yours)\nrequire a v1.0.0\n||||||| api/go.mod (base)\n=======\nrequire a v1.1.0\n>>>>>>> api/go.mod (new template)\n")
+	// The fake runner has no expectation, so any go command fails the test.
+	err := phaseApply(context.Background(), s)
+	if err == nil || !strings.Contains(err.Error(), "conflict markers") || !strings.Contains(err.Error(), "Try: ") {
+		t.Fatalf("error=%v", err)
+	}
+	s.Runner.(*exec.Fake).AssertDone(t)
 }

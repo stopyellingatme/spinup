@@ -33,7 +33,7 @@ The lock gains `packs`: the template packs of the app in render order. `spinup n
 - The state file `.spinup/upgrade.json` (in the main checkout) records the chain, the current step, the worktree, and the status. `--continue` and `--abort` read it. `--abort` removes the worktree and deletes the branch, after confirmation.
 - Chaining: when the app is more than one minor behind, each step goes to the latest patch of the next minor, and the last step goes to `--to` (default: the newest loadable version). Each step makes its commits on the branch.
 - When the step finishes with no conflict markers, the CLI prints `git merge spinup/upgrade-<to>` as the next step. Conflicts exit 3 (unless `--commit-conflicts`). The user resolves them in the worktree and runs `spinup upgrade --continue`.
-- When the OLD version cannot be loaded, the planner still works: unchanged files (disk hash equals lock hash) take NEW, and changed files merge against an empty base, so they become conflicts with the reason `no base version`.
+- When the OLD version cannot be loaded, `BuildPlan` still works: unchanged files (disk hash equals lock hash) take NEW, and changed files merge against an empty base, so they become conflicts with the reason `no base version`. The runner (`Run` and `--plan`) does not accept such a plan. It fails before it writes, names the files, and ends with `Try: run spinup cache warm <version>, or set SPINUP_TEMPLATES_DIR ...`, because a whole-file conflict hides the real difference.
 - `SPINUP_KIT_REPLACE`: when it is set, the Apply phase adds the kit `replace` directive to `api/go.mod` again, as `spinup new` does.
 
 ## 5. Codemods and kit notes

@@ -346,6 +346,9 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			if err != nil {
 				return err
 			}
+			if err := requireBase(step.Plan, step.From, state.Lock.TemplateVersion); err != nil {
+				return err
+			}
 			if state.Module != nil {
 				if err := state.Module.editPlan(step.Worktree, step.Plan); err != nil {
 					return err

@@ -1,6 +1,7 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,9 @@ const kitModule = "github.com/stopyellingatme/spinup/kit"
 func phaseApply(ctx context.Context, s *Step) error {
 	hasAPI, err := phaseHasAPI(s)
 	if err != nil || !hasAPI {
+		return err
+	}
+	if err := refuseConflictedGoMod(s); err != nil {
 		return err
 	}
 	replace := os.Getenv("SPINUP_KIT_REPLACE")
@@ -76,6 +80,29 @@ func currentKitReplace(s *Step) (string, string, error) {
 		return dir, "", err
 	}
 	return dir, target, nil
+}
+
+// refuseConflictedGoMod stops before go mod edit when the merge left conflict markers in api/go.mod.
+// The go command cannot parse the file, and its error does not say that the merge caused the failure.
+func refuseConflictedGoMod(s *Step) error {
+	data, err := os.ReadFile(filepath.Join(s.Worktree, "api", "go.mod"))
+	if err != nil {
+		return fmt.Errorf("read api/go.mod: %w\nTry: check the upgrade worktree permissions", err)
+	}
+	if !hasConflictMarkers(data) {
+		return nil
+	}
+	return fmt.Errorf("api/go.mod in %s has merge conflict markers\nTry: resolve the conflict in that file, then run spinup upgrade --continue or --abort", filepath.Join(s.Worktree, "api", "go.mod"))
+}
+
+// hasConflictMarkers reports a line that starts a git conflict block.
+func hasConflictMarkers(data []byte) bool {
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		if bytes.HasPrefix(line, []byte("<<<<<<< ")) {
+			return true
+		}
+	}
+	return false
 }
 
 func phaseHasAPI(s *Step) (bool, error) {
