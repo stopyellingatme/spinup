@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- CI: Narrow the Windows job. It builds and vets every package for Windows and tests only the packages that `scripts/ci/windows-packages.sh` selects. `scripts/ci/windows-excluded.txt` gives the reason for each excluded package. Skip Unix-only tests on Windows. Fix the local kit replace check for rooted paths and the Git root check of `spinup upgrade` for forward-slash paths on Windows.
 - M14: Add the global flag `--confirm-env <name>`. It answers the typed confirmation of a protected environment without a terminal. The value must equal the environment name. A different value fails and never starts a prompt. `--yes` with `CI=true` still works (ADR 0018).
 - M14: Render the kit version of generated apps from the kit pin in `stackversions.yaml`. The release check fails when the pin differs from the CLI in major or minor version. Add a test for the action pins in workflows. Add `scripts/do-live-test.sh` for the DigitalOcean live test.
 - M13: Add `spinup deploy digital-ocean`. Sign in with a browser, create the droplet, firewall, DNS record, host key pin, and secrets, then deploy. Add the `login`, `logout`, `status`, and `destroy` subcommands.

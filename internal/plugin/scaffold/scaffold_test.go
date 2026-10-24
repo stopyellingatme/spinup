@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -24,8 +25,13 @@ func TestCreate(t *testing.T) {
 				}
 			}
 			if kind == "exec" {
+				// A rooted path is not absolute on Windows, so Create joins it to the directory.
+				wantSDK := "/local/sdk"
+				if !filepath.IsAbs(wantSDK) {
+					wantSDK = filepath.Join(root, wantSDK)
+				}
 				data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
-				if err != nil || !strings.Contains(string(data), `=> "/local/sdk"`) {
+				if err != nil || !strings.Contains(string(data), "=> "+strconv.Quote(wantSDK)) {
 					t.Fatalf("go.mod = %s, %v", data, err)
 				}
 			}

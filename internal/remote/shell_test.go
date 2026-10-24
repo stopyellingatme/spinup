@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -22,6 +23,9 @@ func (shellTransport) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, e
 }
 
 func TestShellQuotingAndUpload(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a file name with a newline; Windows does not allow it")
+	}
 	t.Parallel()
 	ctx := context.Background()
 	r := New(Host{Address: "vm"}, shellTransport{}, Options{CacheDir: shortCache(t)})
@@ -42,7 +46,7 @@ func TestShellQuotingAndUpload(t *testing.T) {
 			t.Fatalf("upload = %q, %v", got, err)
 		}
 		info, err := os.Stat(path)
-		if err != nil || info.Mode().Perm() != 0640 {
+		if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0640) {
 			t.Fatalf("upload mode = %v, %v", info, err)
 		}
 	}

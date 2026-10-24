@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -116,7 +117,7 @@ func TestRunActions(t *testing.T) {
 					t.Fatalf("identical file was recorded: %+v", lock.Files)
 				}
 				info, _ := os.Stat(filepath.Join(root, "api/same.txt"))
-				if info.Mode().Perm() != 0644 {
+				if runtime.GOOS != "windows" && info.Mode().Perm() != 0644 {
 					t.Fatal("identical content changed mode")
 				}
 			}
@@ -230,7 +231,7 @@ func TestPostSteps(t *testing.T) {
 				}
 				fake.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("tool stdout", "tool stderr", code)
 				if !tc.fail {
-					fake.Expect("gofmt", "-w", "internal/x.go").Return("", "", 0)
+					fake.Expect("gofmt", "-w", filepath.Join("internal", "x.go")).Return("", "", 0)
 				}
 			}
 			g := generator(vfs.File{Path: "api/internal/x.go", Data: []byte("package x\n"), Class: "scaffold"}, vfs.File{Path: "api/q.sql", Class: "scaffold"})
@@ -388,7 +389,7 @@ func TestGofmtPostStep(t *testing.T) {
 			root := rootForTest(t)
 			fake := &exec.Fake{}
 			if tc.fail {
-				fake.Expect("gofmt", "-w", "internal/x.go").Return("", "invalid Go syntax", 1)
+				fake.Expect("gofmt", "-w", filepath.Join("internal", "x.go")).Return("", "invalid Go syntax", 1)
 			}
 			g := generator()
 			g.Run = func(context.Context, gen.Input) (*gen.Output, error) {

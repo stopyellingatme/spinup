@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -211,7 +212,7 @@ func TestInitPermissionsAndRecovery(t *testing.T) {
 		mode os.FileMode
 	}{{key, 0600}, {filepath.Dir(key), 0700}, {filepath.Join(root, "secrets/staging.enc.yaml"), 0600}} {
 		info, err := os.Stat(tt.path)
-		if err != nil || info.Mode().Perm() != tt.mode {
+		if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != tt.mode) {
 			t.Fatalf("permissions for %s: %v, %v", tt.path, info, err)
 		}
 	}

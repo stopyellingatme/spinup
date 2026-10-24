@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -181,7 +182,7 @@ esac
 				t.Fatalf("install: %v\n%s", err, result.Stderr)
 			}
 			info, err := os.Stat(installed)
-			if err != nil || info.Mode().Perm() != 0755 {
+			if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 				t.Fatalf("installed binary mode: %v, %v", info, err)
 			}
 			output, err := os.ReadFile(filepath.Join(dir, "github-output"))
@@ -242,7 +243,7 @@ fi
 			if err != nil {
 				t.Fatalf("upgrade: %v\n%s", err, result.Stderr)
 			}
-			expected := "path=" + filepath.Join(dir, ".spinup/upgrade/1.4.0") + "\n"
+			expected := "path=" + dir + "/.spinup/upgrade/1.4.0\n"
 			if mode == "current" {
 				expected = "path=.\n"
 			}
@@ -287,7 +288,7 @@ func TestWorkflowKeys(t *testing.T) {
 					t.Fatalf("%s = %q, %v", path, data, err)
 				}
 				info, err := os.Stat(filepath.Join(dir, path))
-				if err != nil || info.Mode().Perm() != 0600 {
+				if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 					t.Fatalf("%s mode: %v, %v", path, info, err)
 				}
 				if bytes.Contains(append(result.Stdout, result.Stderr...), []byte(strings.TrimSpace(want))) {
@@ -313,6 +314,9 @@ func TestWorkflowKeys(t *testing.T) {
 }
 
 func TestSetupSpinupShellcheck(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs shellcheck; not installed on the Windows runner")
+	}
 	t.Parallel()
 	script := workflowRun(t, ".github/actions/setup-spinup/action.yml", "install")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,7 @@ func TestPluginNewFlags(t *testing.T) {
 		t.Fatalf("metadata = %s, %v", data, err)
 	}
 	data, err = os.ReadFile(filepath.Join(result.Path, "go.mod"))
-	if err != nil || !strings.Contains(string(data), filepath.Join(root, "sdk")) {
+	if err != nil || !strings.Contains(string(data), strconv.Quote(filepath.Join(root, "sdk"))) {
 		t.Fatalf("go.mod = %s, %v", data, err)
 	}
 }

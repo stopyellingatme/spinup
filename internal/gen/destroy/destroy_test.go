@@ -215,7 +215,7 @@ func TestPostSteps(t *testing.T) {
 	fake := &exec.Fake{}
 	fake.Expect("go", "tool", "-modfile=tools.mod", "oapi-codegen").Return("", "", 0)
 	fake.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("", "", 0)
-	fake.Expect("gofmt", "-w", "internal/routes/routes_gen.go").Return("", "", 0)
+	fake.Expect("gofmt", "-w", filepath.Join("internal", "routes", "routes_gen.go")).Return("", "", 0)
 	if err := Run(context.Background(), Options{Root: root, Kind: "resource", Name: "todo"}, fake); err != nil {
 		t.Fatal(err)
 	}
