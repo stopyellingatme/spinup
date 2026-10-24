@@ -52,6 +52,11 @@ func SetTOML(src []byte, table []string, key string, value any) ([]byte, error) 
 		if offset > 0 && src[offset-1] != '\n' {
 			insertion = append([]byte(newline(src)), insertion...)
 		}
+		// A new table header gets one blank line before it, but never two,
+		// and none at the start of a file.
+		if !location.tableFound && offset > 0 && strings.TrimSpace(string(src)) != "" && !endsWithBlankLine(src) {
+			insertion = append([]byte(newline(src)), insertion...)
+		}
 		out = splice(src, offset, offset, insertion)
 	}
 	if _, _, err := locateTOML(out, table, key); err != nil {
@@ -257,4 +262,9 @@ func equalTOML(existing, value any) bool {
 		return true
 	}
 	return reflect.DeepEqual(existing, value)
+}
+
+// endsWithBlankLine reports whether src ends with an empty line.
+func endsWithBlankLine(src []byte) bool {
+	return bytes.HasSuffix(src, []byte("\n\n")) || bytes.HasSuffix(src, []byte("\n\r\n"))
 }

@@ -121,8 +121,21 @@ func TestStatusJSON(t *testing.T) {
 	if err := json.Unmarshal(f.out.Bytes(), &rep); err != nil {
 		t.Fatal(err)
 	}
-	if rep.Account.Email != "dev@example.com" || rep.Account.Team != "team-1" || rep.Droplet.IPv4 != "203.0.113.10" || rep.Droplet.Status != "active" || !rep.Firewall.Found || len(rep.Drift) != 0 || rep.Config.HostKeys != 1 {
+	if rep.Account.Email != "dev@example.com" || rep.Account.Team != "team-1" || rep.Account.TeamName != "Team One" || rep.Droplet.IPv4 != "203.0.113.10" || rep.Droplet.Status != "active" || !rep.Firewall.Found || len(rep.Drift) != 0 || rep.Config.HostKeys != 1 {
 		t.Errorf("report = %+v", rep)
+	}
+}
+
+func TestStatusShowsTeamNameAndUUID(t *testing.T) {
+	f := provisioned(t)
+	if err := Status(context.Background(), f.opts, f.deps); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.out.String(), "Account: dev@example.com, team Team One (team-1)\n") {
+		t.Errorf("status = %q", f.out.String())
+	}
+	if got := TeamLabel("", "team-1"); got != "team-1" {
+		t.Errorf("TeamLabel without a name = %q", got)
 	}
 }
 

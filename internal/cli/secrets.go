@@ -11,7 +11,7 @@ import (
 func init() { Register(GroupOperate, newSecrets) }
 
 func secretsOptions(app *App, c *cobra.Command) secrets.Options {
-	return secrets.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, Yes: app.Flags.Yes, CI: os.Getenv("CI") != "", Interactive: app.UI.Interactive(), DryRun: app.Flags.DryRun, In: c.InOrStdin(), Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}
+	return secrets.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, Yes: app.Flags.Yes, CI: os.Getenv("CI") != "", ConfirmName: app.Flags.ConfirmEnv, Interactive: app.UI.Interactive(), DryRun: app.Flags.DryRun, In: c.InOrStdin(), Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}
 }
 
 // secretsSubcommands allows deployment units to register additional operations.

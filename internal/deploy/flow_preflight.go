@@ -159,7 +159,7 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 
 	if confirm {
 		if err := project.ConfirmProtected(env, "deploy", o.Confirm); err != nil {
-			return nil, &ui.Error{What: "Deploy not confirmed", Why: stripTry(err.Error()), Try: "type the environment name, or pass --yes in CI"}
+			return nil, &ui.Error{What: "Deploy not confirmed", Why: stripTry(err.Error()), Try: "pass --confirm-env " + env.Name + ", type the environment name, or pass --yes in CI"}
 		}
 	}
 	return l, nil

@@ -13,6 +13,7 @@ spinup secrets push [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--accept-new-host-key` | `false` | trust the host key on the first connection |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

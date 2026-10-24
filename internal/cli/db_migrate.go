@@ -15,7 +15,7 @@ func newDBMigrate(app *App) *cobra.Command {
 		if len(args) > 0 {
 			sub = args[0]
 		}
-		return db.Migrate(c.Context(), db.Options{Dir: app.Flags.Dir, Sub: sub, Env: app.Flags.Env, IKnow: know, Interactive: app.UI.Interactive(), Yes: app.Flags.Yes, CI: os.Getenv("CI") != "", DryRun: app.Flags.DryRun, In: c.InOrStdin(), Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}, exec.OSRunner{})
+		return db.Migrate(c.Context(), db.Options{Dir: app.Flags.Dir, Sub: sub, Env: app.Flags.Env, IKnow: know, Interactive: app.UI.Interactive(), Yes: app.Flags.Yes, CI: os.Getenv("CI") != "", ConfirmName: app.Flags.ConfirmEnv, DryRun: app.Flags.DryRun, In: c.InOrStdin(), Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}, exec.OSRunner{})
 	}}
 	c.Flags().BoolVar(&know, "i-know", false, "acknowledge that down can lose data")
 	return c

@@ -97,7 +97,8 @@ Wait for cloud-init to finish before you deploy the app.
 
 Run `spinup infra destroy --env staging --i-know` to remove the resources, including the volume and its data.
 For a protected environment, type the environment name when prompted.
-In CI, a protected environment also requires `--yes`.
+Without a terminal, pass `--confirm-env <env>` with the environment name in place of the typed name.
+In CI, `CI=true` with `--yes` also works.
 Without a terminal, every destroy operation requires `--yes`.
 The `--i-know` flag is always required for destruction.
 

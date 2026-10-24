@@ -108,12 +108,31 @@ func TestTOMLInsertKeepsFollowingTableComment(t *testing.T) {
 	}
 }
 
+func TestTOMLNewTableBlankLine(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct{ src, want string }{
+		"empty file":        {"", "[a]\nk = 1\n"},
+		"after a key":       {"x = 1\n", "x = 1\n\n[a]\nk = 1\n"},
+		"blank line exists": {"x = 1\n\n", "x = 1\n\n[a]\nk = 1\n"},
+		"no final newline":  {"x = 1", "x = 1\n\n[a]\nk = 1\n"},
+		"after a table":     {"[b]\ny = 2\n", "[b]\ny = 2\n\n[a]\nk = 1\n"},
+	} {
+		got, err := SetTOML([]byte(tc.src), []string{"a"}, "k", int64(1))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if string(got) != tc.want {
+			t.Errorf("%s: got %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
 func TestTOMLNewTableUsesBareKeys(t *testing.T) {
 	got, err := SetTOML([]byte("name = \"app\"\n"), []string{"env", "production", "digital ocean"}, "droplet_id", int64(7))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "name = \"app\"\n[env.production.\"digital ocean\"]\ndroplet_id = 7\n"
+	want := "name = \"app\"\n\n[env.production.\"digital ocean\"]\ndroplet_id = 7\n"
 	if string(got) != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}

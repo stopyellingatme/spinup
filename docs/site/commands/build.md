@@ -12,6 +12,7 @@ spinup build [flags]
 
 | Flag | Default | Description |
 | --- | --- | --- |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

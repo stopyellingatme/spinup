@@ -30,7 +30,7 @@ func Destroy(ctx context.Context, o Options, d Deps) error {
 	env.Name = b.env
 	env.Protected = true
 	if err := project.ConfirmProtected(env, "destroy the DigitalOcean resources", o.Confirm); err != nil {
-		return failWrap("confirm the destroy", err, "type the environment name in a terminal, or pass --yes in CI")
+		return failWrap("confirm the destroy", err, "pass --confirm-env "+env.Name+", type the environment name in a terminal, or pass --yes in CI")
 	}
 	acct, err := d.Cloud.Account(ctx)
 	if err != nil {

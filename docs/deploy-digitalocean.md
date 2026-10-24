@@ -150,7 +150,8 @@ Add the global `--json` flag for JSON output.
 
 Run `spinup deploy digital-ocean destroy --i-know`.
 Type the environment name when spinup asks.
-In CI, set `CI=true` and pass `--yes` in place of the typed name.
+Without a terminal, pass `--confirm-env <env>` with the environment name in place of the typed name.
+In CI, `CI=true` with `--yes` also works.
 The command deletes the droplet, the firewall, and the A record that points at the droplet.
 It deletes only resources with the tag of the environment and the IDs in `spinup.toml`.
 Then it deletes the tags `spinup:<app>:<env>` and `spinup` when no resource has them.

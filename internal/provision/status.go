@@ -26,6 +26,8 @@ type Report struct {
 type ReportAccount struct {
 	Email string `json:"email"`
 	Team  string `json:"team"`
+	// TeamName is the display name of the team. It is empty for a personal account.
+	TeamName string `json:"team_name,omitempty"`
 }
 
 // ReportConfig is the environment in spinup.toml.
@@ -85,7 +87,7 @@ func Status(ctx context.Context, o Options, d Deps) error {
 		return failWrap("read the DigitalOcean account", err, "run spinup deploy digital-ocean login")
 	}
 	rep := Report{Env: b.env, Drift: []string{}}
-	rep.Account = ReportAccount{Email: acct.Email, Team: accountTeam(acct)}
+	rep.Account = ReportAccount{Email: acct.Email, Team: accountTeam(acct), TeamName: accountTeamName(acct)}
 	st := b.st
 	rep.Config = ReportConfig{
 		Host: b.envCfg.Host, User: b.envCfg.User, PublicURL: b.envCfg.PublicURL, HostKeys: len(b.envCfg.HostKeys),
@@ -190,7 +192,7 @@ func printReport(o Options, rep Report) {
 		}
 	}
 	say("Environment: %s", rep.Env)
-	say("Account: %s (team %s)", rep.Account.Email, rep.Account.Team)
+	say("Account: %s, team %s", rep.Account.Email, TeamLabel(rep.Account.TeamName, rep.Account.Team))
 	c := rep.Config
 	say("Config: host %s, user %s, public URL %s, %d pinned host key(s)", dash(c.Host), dash(c.User), dash(c.PublicURL), c.HostKeys)
 	if rep.Droplet != nil {
@@ -222,6 +224,14 @@ func printReport(o Options, rep Report) {
 	if len(rep.Drift) == 0 {
 		say("No drift.")
 	}
+}
+
+// TeamLabel writes a team as "<name> (<uuid>)", or as the UUID when the team has no name.
+func TeamLabel(name, uuid string) string {
+	if name == "" {
+		return uuid
+	}
+	return name + " (" + uuid + ")"
 }
 
 func dash(s string) string {

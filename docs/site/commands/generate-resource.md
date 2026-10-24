@@ -13,6 +13,7 @@ spinup generate resource <name> <field:type>... [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--api-only` | `false` | skip the parts that other packs register, such as web pages |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--diff` | `false` | show unified diffs without writing |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |

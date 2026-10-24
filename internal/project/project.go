@@ -232,15 +232,27 @@ type Confirm struct {
 	Interactive bool
 	Yes         bool
 	CI          bool
+	// Name is the value of --confirm-env. It answers the typed confirmation
+	// without a terminal when it equals the environment name.
+	Name string
 }
 
 // ConfirmProtected confirms an action that targets a protected environment.
 func ConfirmProtected(env Env, action string, c Confirm) error {
-	if !env.Protected || (c.Yes && c.CI) {
+	if !env.Protected {
+		return nil
+	}
+	if c.Name != "" {
+		if c.Name != env.Name {
+			return fmt.Errorf("cannot %s in protected environment %q: --confirm-env has the value %q. Try: pass --confirm-env %s", action, env.Name, c.Name, env.Name)
+		}
+		return nil
+	}
+	if c.Yes && c.CI {
 		return nil
 	}
 	if !c.Interactive {
-		return fmt.Errorf("cannot %s in protected environment %q. Try: re-run in a terminal, or pass --yes in CI", action, env.Name)
+		return fmt.Errorf("cannot %s in protected environment %q. Try: pass --confirm-env %s, re-run in a terminal, or pass --yes in CI", action, env.Name, env.Name)
 	}
 	if c.In == nil {
 		return errors.New("read confirmation: input is nil")

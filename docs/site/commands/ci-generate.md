@@ -12,6 +12,7 @@ spinup ci generate [flags]
 
 | Flag | Default | Description |
 | --- | --- | --- |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--diff` | `false` | show unified diffs without writing |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |

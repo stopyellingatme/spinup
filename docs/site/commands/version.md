@@ -13,6 +13,7 @@ spinup version [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--check` | `false` | check for a newer stable release |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

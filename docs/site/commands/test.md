@@ -13,6 +13,7 @@ spinup test [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--api` | `true` | run API tests (default) |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--contract` | `false` | run contract tests (M4) |
 | `--cover` | `false` | report Go test coverage |
 | `-C, --dir` | `` | run in this project directory |

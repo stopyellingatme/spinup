@@ -301,7 +301,7 @@ func newDOStatus(app *App) *cobra.Command {
 					"account":      map[string]string{"email": acct.Email, "team": team, "team_name": name},
 				})
 			}
-			_, _ = fmt.Fprintf(out, "Account: %s (team %s)\n", acct.Email, firstNonEmpty(name, team))
+			_, _ = fmt.Fprintf(out, "Account: %s, team %s\n", acct.Email, provision.TeamLabel(name, team))
 			_, _ = fmt.Fprintln(out, "No spinup project found, so no environment is shown.")
 			return nil
 		},

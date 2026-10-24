@@ -1,11 +1,8 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/stopyellingatme/spinup/internal/backup"
-	"github.com/stopyellingatme/spinup/internal/project"
 )
 
 func init() { registerBackup(newBackupRestore) }
@@ -21,7 +18,7 @@ func newBackupRestore(app *App) *cobra.Command {
 		o.Options = backupOptions(app, c)
 		o.Target = target
 		o.Plan = o.Plan || app.Flags.DryRun
-		o.Confirm = project.Confirm{In: c.InOrStdin(), Out: c.ErrOrStderr(), Interactive: app.UI.Interactive(), Yes: app.Flags.Yes, CI: os.Getenv("CI") != ""}
+		o.Confirm = confirmFor(app, c)
 		return backup.Restore(c.Context(), o)
 	}}
 	backupTargetFlags(c, &label, &at)

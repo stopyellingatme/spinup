@@ -175,8 +175,21 @@ func normalizeHostKey(key string) (string, error) {
 	return name + " " + f[1], nil
 }
 
+// pinFileName returns the file name of the pin file of one host.
+// The name depends on the user, the address, and the port, never on the keys.
+// A change of the pinned keys then replaces the file and leaves no old file.
+func pinFileName(h Host) string {
+	port := h.Port
+	if port == 0 {
+		port = 22
+	}
+	sum := sha256.Sum256([]byte(h.User + "@" + h.Address + ":" + strconv.Itoa(port)))
+	return "known_hosts-" + hex.EncodeToString(sum[:])[:16]
+}
+
 // writePinFile writes the known_hosts file for the pinned keys and returns its path.
-// It writes the file atomically and only when the content differs.
+// It replaces the file atomically (temp file and rename) and only when the content differs.
+// Two processes that pin the same host write the same content, so the last rename wins safely.
 func writePinFile(dir string, h Host) (string, error) {
 	keys := make([]string, 0, len(h.HostKeys))
 	for _, k := range h.HostKeys {
@@ -187,8 +200,7 @@ func writePinFile(dir string, h Host) (string, error) {
 		keys = append(keys, n)
 	}
 	sort.Strings(keys)
-	sum := sha256.Sum256([]byte(strings.Join(keys, "\n")))
-	path := filepath.Join(dir, "known_hosts-"+hex.EncodeToString(sum[:])[:16])
+	path := filepath.Join(dir, pinFileName(h))
 	var content strings.Builder
 	for _, k := range keys {
 		content.WriteString("* " + k + "\n")

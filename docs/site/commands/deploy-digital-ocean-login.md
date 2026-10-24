@@ -17,6 +17,7 @@ spinup deploy digital-ocean login [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--accept-new-host-key` | `false` | accept the SSH host key of a new VM |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

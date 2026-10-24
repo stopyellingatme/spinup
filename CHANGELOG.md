@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- M14: Add the global flag `--confirm-env <name>`. It answers the typed confirmation of a protected environment without a terminal. The value must equal the environment name. A different value fails and never starts a prompt. `--yes` with `CI=true` still works (ADR 0018).
 - M13: Add `spinup deploy digital-ocean`. Sign in with a browser, create the droplet, firewall, DNS record, host key pin, and secrets, then deploy. Add the `login`, `logout`, `status`, and `destroy` subcommands.
 - M0: Establish the Go CLI, kit, manifests, templates, and checks for deterministic output.
 - M1: Generate Go APIs and PostgreSQL migrations. Add build commands, database commands, and documentation checks.
@@ -23,6 +24,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- M14: `spinup deploy digital-ocean status` shows the team as `<name> (<uuid>)` with an environment and without one. The JSON output has `account.team_name` as well as `account.team`.
+- M14: The SSH pin cache keeps one `known_hosts-<hash>` file for each user, host, and port. A change of the pinned keys replaces the file atomically. Old files from earlier versions stay unused in the cache directory.
+- M14: `codemod.SetTOML` writes one blank line before a table header that it appends.
 - Load test fixes: the database pool holds 20 connections by default (`db.DefaultMaxConns`), and `DATABASE_MAX_CONNS` changes the size. Login, registration, and password reset answer 503 with `Retry-After` when the password hash queue is full (`auth.WithHashLimits`). A login takes its queue place before its database work. One hash runs for each 10 CPUs (at least 1), so a login burst cannot starve the other routes.
 
 - The resource list page costs less to render. The page renders one actions menu (`row-menu.svelte`) outside the rows. Each row has a plain button for the menu and inline icons. The row checkbox is a submit button that works without JavaScript. The toggle form keeps the page number. In the load test, a page view of 20 rows used 1.8 ms of Node CPU, not 4.4 ms (60% less).

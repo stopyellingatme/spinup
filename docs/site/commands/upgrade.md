@@ -15,6 +15,7 @@ spinup upgrade [flags]
 | `--abort` | `false` | remove an upgrade worktree and branch |
 | `--allow-dirty` | `false` | allow changes in the main checkout |
 | `--commit-conflicts` | `false` | commit conflict markers and continue |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--continue` | `false` | continue an upgrade after resolving conflicts |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |

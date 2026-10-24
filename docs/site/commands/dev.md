@@ -13,6 +13,7 @@ spinup dev [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--api-port` | `8080` | preferred API port |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--down` | `false` | stop Docker infrastructure on exit |
 | `--dry-run` | `false` | show changes without writing |
