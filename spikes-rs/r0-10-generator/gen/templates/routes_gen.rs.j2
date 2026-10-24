@@ -1,0 +1,23 @@
+//! The routes of the generated resources. spinup owns this file: `spinup g
+//! resource` writes one line per resource, sorted.
+
+use sqlx::PgPool;
+use utoipa_axum::router::OpenApiRouter;
+[% if resources %]
+
+use crate::handlers;
+[% endif %]
+
+/// Merges the routes of each resource. Each line is independent of the
+/// others, so the layout does not depend on the number of resources.
+pub fn routes() -> OpenApiRouter<PgPool> {
+[% if resources %]
+    let mut router = OpenApiRouter::new();
+[% for r in resources %]
+    router = router.merge(handlers::[[ r.plural ]]::routes());
+[% endfor %]
+    router
+[% else %]
+    OpenApiRouter::new()
+[% endif %]
+}
