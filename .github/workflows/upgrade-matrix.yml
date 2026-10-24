@@ -44,9 +44,19 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.27.x
-      - name: Cache dependencies for generated apps
-        working-directory: kit
-        run: go mod download
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+            testdata/golden/**/go.sum
+            testdata/golden/**/tools.sum
+            testdata/corpus/**/go.sum
+            testdata/corpus/**/tools.sum
+      # The upgrade tests run go mod tidy offline in frozen corpus apps.
+      - name: Prepare the test machine
+        uses: ./.github/actions/prepare-tests
+        with:
+          tools: actionlint
+          warm: go
       - name: Measure upgrade coverage
         run: go test -coverprofile=cover.out ./internal/merge/... ./internal/upgrade/... ./internal/manifest/... ./internal/migrate/...
       - name: Require 70 percent in each package

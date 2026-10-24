@@ -9,7 +9,8 @@
 # Environment:
 #   SPINUP_CI_PREFIX   tool and cache directory (default $HOME/.spinup-ci)
 #   SPINUP_PNPM_STORE  pnpm store directory (default $SPINUP_CI_PREFIX/pnpm/store)
-#   SPINUP_PNPM_CACHE  pnpm metadata cache (default $SPINUP_CI_PREFIX/pnpm/cache)
+# The pnpm metadata cache stays at the pnpm default (~/.cache/pnpm on Linux,
+# ~/Library/Caches/pnpm on macOS), because the test harness does not pass a cache directory.
 # In GitHub Actions the script writes the pnpm directories to GITHUB_ENV and
 # adds scripts/bin to GITHUB_PATH for the next steps.
 set -euo pipefail
@@ -17,7 +18,6 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 prefix=${SPINUP_CI_PREFIX:-$HOME/.spinup-ci}
 store=${SPINUP_PNPM_STORE:-$prefix/pnpm/store}
-cache=${SPINUP_PNPM_CACHE:-$prefix/pnpm/cache}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -64,15 +64,17 @@ warm_go() {
   done < <(find "$root/testdata/golden" "$root/testdata/corpus" -name go.mod -not -path '*/node_modules/*' | sort)
 }
 
-# warm_pnpm_lock fetches the packages of one pnpm lockfile into the store.
+# warm_pnpm_lock installs one pnpm lockfile online. "pnpm fetch" fills only the store, but an
+# offline install also checks the lockfile against the supply-chain policy, which needs the
+# full package metadata in the cache. An online install writes both.
 warm_pnpm_lock() { # directory with pnpm-lock.yaml and package.json
   local dir=$1 copy
   copy=$(mktemp -d "$work/web.XXXXXX")
   for file in package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc; do
     [[ -f $dir/$file ]] && cp "$dir/$file" "$copy/$file"
   done
-  echo "warm-cache: pnpm store for ${dir#"$root"/}"
-  (cd "$copy" && "$root/scripts/bin/pnpm" fetch --store-dir "$store" --config.cache-dir="$cache")
+  echo "warm-cache: pnpm store and metadata for ${dir#"$root"/}"
+  (cd "$copy" && "$root/scripts/bin/pnpm" install --frozen-lockfile --ignore-scripts --silent --store-dir "$store")
 }
 
 # warm_pnpm_metadata fills the pnpm metadata cache for the packages that tests install
@@ -84,7 +86,7 @@ warm_pnpm_metadata() {
   copy=$(mktemp -d "$work/meta.XXXXXX")
   printf '{"name":"warm","private":true,"type":"module","dependencies":{"zod":"%s"}}\n' "$zod" >"$copy/package.json"
   echo "warm-cache: pnpm metadata for zod $zod"
-  (cd "$copy" && "$root/scripts/bin/pnpm" install --silent --store-dir "$store" --config.cache-dir="$cache")
+  (cd "$copy" && "$root/scripts/bin/pnpm" install --silent --store-dir "$store")
 }
 
 warm_bun() {
@@ -104,7 +106,7 @@ warm_bun() {
 warm_node() {
   command -v node >/dev/null 2>&1 || die "node is not on PATH" "set up Node 24 before this step"
   command -v corepack >/dev/null 2>&1 || die "corepack is not on PATH" "use Node 24, which includes corepack"
-  mkdir -p "$store" "$cache"
+  mkdir -p "$store"
   # This downloads the pinned pnpm binary into the corepack cache.
   "$root/scripts/bin/pnpm" --version
   local lock
@@ -129,7 +131,6 @@ if [[ -n ${GITHUB_ENV:-} ]]; then
   {
     printf 'SPINUP_PNPM_STORE=%s\n' "$store"
     printf 'npm_config_store_dir=%s\n' "$store"
-    printf 'npm_config_cache_dir=%s\n' "$cache"
   } >>"$GITHUB_ENV"
 fi
 if [[ -n ${GITHUB_PATH:-} ]]; then

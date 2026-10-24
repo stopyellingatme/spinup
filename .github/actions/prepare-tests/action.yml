@@ -29,6 +29,8 @@ runs:
       with:
         path: |
           ~/.spinup-ci/pnpm
+          ~/.cache/pnpm
+          ~/Library/Caches/pnpm
           ~/.bun/install/cache
           ~/.cache/node/corepack
         key: tests-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('testdata/golden/**/pnpm-lock.yaml', 'testdata/golden/**/bun.lock', 'scripts/ci/warm-cache.sh', 'internal/stackversions/stackversions.yaml') }}

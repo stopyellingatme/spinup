@@ -7,6 +7,7 @@
 backup                  # flock and sh scripts, Unix file modes
 backup/pgdump           # sh scripts, Unix file modes
 backup/walg             # needs /bin/sh
+ci                      # setup-spinup prints mixed path separators; generated scripts expect Unix modes
 cli                     # runs sh, ssh, git, and shellcheck flows; server commands need WSL2
 deploy                  # sh scripts, ln -sfn, Unix file modes
 devloop                 # spinup dev needs Unix process groups
@@ -20,3 +21,4 @@ plugin/rpc              # builds plugin test binaries without the .exe suffix
 server                  # server commands require WSL2 on Windows
 templates               # generated app goldens, pnpm, sh, and server bootstrap
 testutil/scripttest     # txtar scripts use sh, git, and pnpm; the run is too slow
+upgrade                 # the Git root check fails on 8.3 short temp paths (RUNNER~1); Unix file modes; offline matrix
