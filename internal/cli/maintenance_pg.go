@@ -1,11 +1,8 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/stopyellingatme/spinup/internal/maintain/pg"
-	"github.com/stopyellingatme/spinup/internal/project"
 )
 
 func init() {
@@ -25,7 +22,7 @@ func newMaintenancePG(app *App, major bool) *cobra.Command {
 		opts.Dir, opts.Env = app.Flags.Dir, app.Flags.Env
 		opts.Plan = opts.Plan || app.Flags.DryRun
 		opts.Out, opts.ErrOut = c.OutOrStdout(), c.ErrOrStderr()
-		opts.Confirm = project.Confirm{In: c.InOrStdin(), Out: c.ErrOrStderr(), Interactive: app.UI.Interactive(), Yes: app.Flags.Yes, CI: os.Getenv("CI") != ""}
+		opts.Confirm = confirmFor(app, c)
 		return pg.Run(c.Context(), opts, pg.Deps{})
 	}}
 	c.Flags().BoolVar(&o.Plan, "plan", false, "print the steps without changes")

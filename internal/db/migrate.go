@@ -18,8 +18,10 @@ import (
 type Options struct {
 	Dir, Sub, Env                       string
 	IKnow, Interactive, Yes, CI, DryRun bool
-	In                                  io.Reader
-	Out, ErrOut                         io.Writer
+	// ConfirmName is the value of --confirm-env.
+	ConfirmName string
+	In          io.Reader
+	Out, ErrOut io.Writer
 }
 
 // Migrate runs the app's migration command and preserves its exit status.
@@ -47,7 +49,7 @@ func Migrate(ctx context.Context, o Options, runner run.Runner) error {
 			return migrateError(err)
 		}
 		if o.Sub == "down" {
-			if err := project.ConfirmProtected(env, "db migrate "+o.Sub, project.Confirm{In: o.In, Out: o.Out, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI}); err != nil {
+			if err := project.ConfirmProtected(env, "db migrate "+o.Sub, project.Confirm{In: o.In, Out: o.Out, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, Name: o.ConfirmName}); err != nil {
 				return migrateError(err)
 			}
 		}

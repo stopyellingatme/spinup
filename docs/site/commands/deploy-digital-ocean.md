@@ -19,6 +19,7 @@ spinup deploy digital-ocean [flags]
 | `--accept-new-host-key` | `false` | accept the SSH host key of a new VM |
 | `--allow-destructive` | `false` | deploy migrations that db lint reports as unsafe |
 | `--allow-dirty` | `false` | deploy with uncommitted changes |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dns-timeout` | `10m0s` | time to wait for a DNS record that DigitalOcean does not hold |
 | `--domain` | `` | host name of the app (DigitalOcean DNS, or an external record that you create) |

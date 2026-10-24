@@ -13,6 +13,7 @@ spinup check [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--allow-behind` | `false` | allow a newer loadable template version |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

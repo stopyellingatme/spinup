@@ -158,7 +158,13 @@ func TestConfirmProtected(t *testing.T) {
 	}{
 		{name: "not protected", env: Env{Name: "dev"}},
 		{name: "ci approval", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Yes: true, CI: true}},
-		{name: "not interactive", env: Env{Name: "prod", Protected: true}, confirm: Confirm{}, wantErr: "Try: re-run in a terminal, or pass --yes in CI"},
+		{name: "not interactive", env: Env{Name: "prod", Protected: true}, confirm: Confirm{}, wantErr: "Try: pass --confirm-env prod, re-run in a terminal, or pass --yes in CI"},
+		{name: "flag match without terminal", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Name: "prod"}},
+		{name: "flag match with yes and CI", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Name: "prod", Yes: true, CI: true}},
+		{name: "flag differs", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Name: "dev"}, wantErr: "Try: pass --confirm-env prod"},
+		{name: "flag differs names the value", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Name: "dev"}, wantErr: `--confirm-env has the value "dev"`},
+		{name: "flag differs with yes and CI", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Name: "dev", Yes: true, CI: true}, wantErr: "Try: pass --confirm-env prod"},
+		{name: "flag on an unprotected environment", env: Env{Name: "dev"}, confirm: Confirm{Name: "other"}},
 		{name: "typed match", env: Env{Name: "prod", Host: "example.test", Protected: true}, confirm: Confirm{Interactive: true, In: strings.NewReader("prod\n")}},
 		{name: "typed mismatch", env: Env{Name: "prod", Protected: true}, confirm: Confirm{Interactive: true, In: strings.NewReader("dev\n")}, wantErr: "confirmation did not match"},
 	}

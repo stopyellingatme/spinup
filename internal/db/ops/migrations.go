@@ -122,7 +122,7 @@ func Status(ctx context.Context, o Options, runner run.Runner) error {
 }
 
 func migrateOptions(o Options, sub string) db.Options {
-	return db.Options{Dir: o.Dir, Sub: sub, Env: o.Env, IKnow: o.IKnow, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, DryRun: o.DryRun, In: o.In, Out: o.Out, ErrOut: o.ErrOut}
+	return db.Options{Dir: o.Dir, Sub: sub, Env: o.Env, IKnow: o.IKnow, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, ConfirmName: o.ConfirmName, DryRun: o.DryRun, In: o.In, Out: o.Out, ErrOut: o.ErrOut}
 }
 
 // Redo rolls back the most recent migration and applies it again, through

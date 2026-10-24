@@ -38,6 +38,7 @@ var groupTitles = map[Group]string{
 // GlobalFlags holds the persistent flags of the root command.
 type GlobalFlags struct {
 	Dir, Env       string
+	ConfirmEnv     string
 	Yes            bool
 	NonInteractive bool
 	JSON           bool
@@ -109,6 +110,7 @@ func newRoot(app *App, in io.Reader, out, errOut io.Writer, entered *bool) *cobr
 	pf.StringVarP(&f.Dir, "dir", "C", "", "run in this project directory")
 	pf.StringVar(&f.Env, "env", "", "target environment")
 	pf.BoolVarP(&f.Yes, "yes", "y", false, "answer yes to prompts")
+	pf.StringVar(&f.ConfirmEnv, "confirm-env", "", "type the protected environment name without a terminal")
 	pf.BoolVar(&f.NonInteractive, "non-interactive", false, "never prompt")
 	pf.BoolVar(&f.JSON, "json", false, "write JSON output")
 	pf.BoolVar(&f.DryRun, "dry-run", false, "show changes without writing")

@@ -17,6 +17,7 @@ spinup module add <name>... [flags]
 | `--auth-oidc` | `false` | Enable OpenID Connect sign-in? |
 | `--ci-deploy-on-push` | `false` | Deploy the default environment on pushes to main |
 | `--commit-conflicts` | `false` | commit conflict markers and continue |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--continue` | `false` | continue the recorded module addition |
 | `--db-version` | `18` | PostgreSQL major version |
 | `-C, --dir` | `` | run in this project directory |

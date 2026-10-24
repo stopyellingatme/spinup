@@ -13,6 +13,7 @@ spinup maintenance pg-major-upgrade [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--cleanup` | `false` | remove the retained old volume after a completed upgrade |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

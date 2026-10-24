@@ -16,6 +16,7 @@ spinup new <name> [flags]
 | `--api-only` | `false` | create only the Go API |
 | `--auth-oidc` | `false` | Enable OpenID Connect sign-in? |
 | `--ci-deploy-on-push` | `false` | Deploy the default environment on pushes to main |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--db-version` | `18` | PostgreSQL major version |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |

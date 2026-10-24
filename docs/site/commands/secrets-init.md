@@ -13,6 +13,7 @@ spinup secrets init [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--ci-recipient` | `` | age recipient for CI |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

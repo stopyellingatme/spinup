@@ -75,6 +75,22 @@ func TestProtectedAndEditGuards(t *testing.T) {
 	}
 }
 
+func TestConfirmNameAnswersProtectedGuard(t *testing.T) {
+	t.Parallel()
+	root := fixture(t)
+	f := &runexec.Fake{}
+	for _, operation := range []func(context.Context, Options, runexec.Runner) error{Rotate, Rekey} {
+		err := operation(context.Background(), Options{Dir: root, Env: "production", ConfirmName: "staging"}, f)
+		if err == nil || !strings.Contains(err.Error(), "confirm secrets change") {
+			t.Fatalf("wrong name = %v", err)
+		}
+		err = operation(context.Background(), Options{Dir: root, Env: "production", ConfirmName: "production", DryRun: true}, f)
+		if err != nil && strings.Contains(err.Error(), "confirm secrets change") {
+			t.Fatalf("right name = %v", err)
+		}
+	}
+}
+
 func TestParseValues(t *testing.T) {
 	t.Parallel()
 	for _, data := range []string{`{"NAME":"value"}`, `{}`, `{"NAME":1}`, `{"NAME":{"nested":"value"}}`, `{"../bad":"value"}`, `{"NAME":"value","NAME":"other"}`, `{"NAME":"value"} {}`} {

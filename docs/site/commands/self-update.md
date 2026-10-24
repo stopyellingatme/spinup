@@ -14,6 +14,7 @@ spinup self-update [flags]
 | --- | --- | --- |
 | `--channel` | `stable` | release channel: stable or next |
 | `--check` | `false` | check for a release without installing it |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

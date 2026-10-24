@@ -13,6 +13,7 @@ spinup maintenance pg-upgrade-in-place [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--cleanup` | `false` | remove the old data directory after verification |
+| `--confirm-env` | `` | type the protected environment name without a terminal |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |

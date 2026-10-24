@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -18,7 +16,7 @@ func deployOptions(app *App, c *cobra.Command) deploy.Options {
 	return deploy.Options{
 		Dir: app.Flags.Dir, Env: app.Flags.Env, JSON: app.Flags.JSON,
 		Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr(),
-		Confirm: project.Confirm{In: c.InOrStdin(), Out: c.ErrOrStderr(), Interactive: app.UI.Interactive(), Yes: app.Flags.Yes, CI: os.Getenv("CI") != ""},
+		Confirm: confirmFor(app, c),
 	}
 }
 

@@ -184,6 +184,14 @@ func accountTeam(a digitalocean.Account) string {
 	return a.UUID
 }
 
+// accountTeamName returns the display name of the team of the account.
+func accountTeamName(a digitalocean.Account) string {
+	if a.Team != nil {
+		return a.Team.Name
+	}
+	return ""
+}
+
 // checkSize checks the size against the region and the resource limits of the environment.
 func (r *run) checkSize(ctx context.Context) error {
 	sizes, err := r.d.Cloud.Sizes(ctx)

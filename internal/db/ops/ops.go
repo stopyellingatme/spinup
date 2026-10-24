@@ -46,6 +46,8 @@ type Options struct {
 	Yes bool
 	// CI is true when the CI environment variable is set.
 	CI bool
+	// ConfirmName is the value of --confirm-env.
+	ConfirmName string
 	// DryRun prints the commands without running them. Guards still apply.
 	DryRun bool
 	// In is the prompt input and the stdin of interactive commands.
@@ -55,7 +57,7 @@ type Options struct {
 }
 
 func (o Options) confirm() project.Confirm {
-	return project.Confirm{In: o.In, Out: o.Out, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI}
+	return project.Confirm{In: o.In, Out: o.Out, Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, Name: o.ConfirmName}
 }
 
 // loadProject finds the project root and reads spinup.toml.

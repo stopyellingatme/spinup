@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
@@ -44,7 +45,7 @@ func TestPinnedArgsAndFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256([]byte(k1 + "\n" + k2))
+	sum := sha256.Sum256([]byte("deploy@vm:22"))
 	file := filepath.Join(cache, "spinup", "ssh", "known_hosts-"+hex.EncodeToString(sum[:])[:16])
 	want := []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + filepath.Join(cache, "spinup", "ssh", "%C"), "-o", "ControlPersist=60s",
 		"-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
@@ -161,5 +162,89 @@ func TestIsHostKeyError(t *testing.T) {
 		if got := IsHostKeyError(s); got != want {
 			t.Errorf("IsHostKeyError(%q) = %v", s, got)
 		}
+	}
+}
+
+func pinFiles(t *testing.T, cache string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(cache, "spinup", "ssh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "known_hosts") {
+			names = append(names, e.Name())
+		}
+	}
+	return names
+}
+
+func TestPinFilePerHostAndPort(t *testing.T) {
+	cache := shortCache(t)
+	key := testKey(6)
+	for _, h := range []Host{
+		{Name: "a", Address: "vm1", User: "deploy", HostKeys: []string{key}},
+		{Name: "a", Address: "vm1", User: "deploy", Port: 22, HostKeys: []string{key}},
+		{Name: "b", Address: "vm1", User: "deploy", Port: 2222, HostKeys: []string{key}},
+		{Name: "c", Address: "vm2", User: "deploy", HostKeys: []string{key}},
+		{Name: "d", Address: "vm1", User: "other", HostKeys: []string{key}},
+	} {
+		if _, err := runArgs(t, h, Options{CacheDir: cache}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Port 0 and port 22 share a file. The other four hosts each have their own.
+	if got := pinFiles(t, cache); len(got) != 4 {
+		t.Fatalf("pin files = %v, want 4", got)
+	}
+}
+
+func TestPinFileReplacedWhenKeysChange(t *testing.T) {
+	cache := shortCache(t)
+	h := Host{Name: "prod", Address: "vm", User: "deploy", HostKeys: []string{testKey(7)}}
+	if _, err := runArgs(t, h, Options{CacheDir: cache}); err != nil {
+		t.Fatal(err)
+	}
+	h.HostKeys = []string{testKey(8), testKey(9)}
+	if _, err := runArgs(t, h, Options{CacheDir: cache}); err != nil {
+		t.Fatal(err)
+	}
+	files := pinFiles(t, cache)
+	if len(files) != 1 {
+		t.Fatalf("pin files = %v, want 1", files)
+	}
+	data, err := os.ReadFile(filepath.Join(cache, "spinup", "ssh", files[0]))
+	want := "* " + testKey(8) + "\n* " + testKey(9) + "\n"
+	if err != nil || string(data) != want {
+		t.Fatalf("content = %q, %v", data, err)
+	}
+}
+
+func TestPinFileConcurrent(t *testing.T) {
+	cache := shortCache(t)
+	h := Host{Name: "prod", Address: "vm", User: "deploy", HostKeys: []string{testKey(10)}}
+	var wg sync.WaitGroup
+	errs := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			f := &runexec.Fake{}
+			f.Expect("ssh").Return("", "", 0)
+			r := New(h, f, Options{CacheDir: cache})
+			_, err := r.Run(context.Background(), Cmd{Argv: []string{"true"}})
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := pinFiles(t, cache); len(got) != 1 {
+		t.Fatalf("pin files = %v, want 1", got)
 	}
 }

@@ -26,8 +26,10 @@ type Options struct {
 	Dir, Env                                 string
 	RecoveryRecipient, CIRecipient           string
 	NoRecovery, Interactive, Yes, CI, DryRun bool
-	In                                       io.Reader
-	Out, ErrOut                              io.Writer
+	// ConfirmName is the value of --confirm-env.
+	ConfirmName string
+	In          io.Reader
+	Out, ErrOut io.Writer
 }
 
 type environment struct {
@@ -213,8 +215,8 @@ func changeKeys(ctx context.Context, o Options, r runexec.Runner, action string)
 	if err != nil {
 		return err
 	}
-	if err = project.ConfirmProtected(e.config, "change secrets keys", project.Confirm{Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, In: o.In, Out: o.ErrOut}); err != nil {
-		return problem("confirm secrets change", "protected environment confirmation failed", "run in a terminal or pass --yes in CI")
+	if err = project.ConfirmProtected(e.config, "change secrets keys", project.Confirm{Interactive: o.Interactive, Yes: o.Yes, CI: o.CI, In: o.In, Out: o.ErrOut, Name: o.ConfirmName}); err != nil {
+		return problem("confirm secrets change", "protected environment confirmation failed", "pass --confirm-env <env>, run in a terminal, or pass --yes in CI")
 	}
 	if err = e.requireFile(); err != nil {
 		return err
