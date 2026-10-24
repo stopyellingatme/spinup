@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -152,10 +153,15 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	w.Header().Set("x-request-id", randHex(8))
+	// The real API sends its limits on every answer.
+	w.Header().Set("ratelimit-limit", "5000")
+	w.Header().Set("ratelimit-remaining", "4999")
+	w.Header().Set("ratelimit-reset", strconv.FormatInt(s.o.Now().Add(time.Hour).Unix(), 10))
 	s.requests = append(s.requests, Request{r.Method, r.URL.RequestURI()})
 	if s.rateLimited > 0 {
 		s.rateLimited--
 		w.Header().Set("Retry-After", "1")
+		w.Header().Set("ratelimit-remaining", "0")
 		apiError(w, 429, "too_many_requests", "rate limit reached")
 		return
 	}
@@ -190,7 +196,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func apiError(w http.ResponseWriter, status int, id, msg string) {
-	writeJSON(w, status, map[string]string{"id": id, "message": msg})
+	body := map[string]string{"id": id, "message": msg}
+	if rid := w.Header().Get("x-request-id"); rid != "" {
+		body["request_id"] = rid
+	}
+	writeJSON(w, status, body)
 }
 
 func notFound(w http.ResponseWriter) {

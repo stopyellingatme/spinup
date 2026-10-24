@@ -29,6 +29,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- M14: `dofake` follows more rules of the DigitalOcean API: name rules for tags, droplets, and firewalls, firewall rule checks, the pending firewall status, `0` for all ports, a duplicate tag, rate limit headers, and `request_id` in error bodies. `spinup deploy digital-ocean` refuses an environment name that ends with a dash, because DigitalOcean refuses the droplet name.
+
 - The web pack `app.css` defines the shadcn-svelte variants `data-open:`, `data-closed:`, `data-checked:`, `data-unchecked:`, `data-disabled:`, `data-active:`, `data-horizontal:`, and `data-vertical:`. Before this change, the checkbox had no checked fill, and the menus had no open and close animation.
 
 ### Breaking

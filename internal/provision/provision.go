@@ -28,7 +28,8 @@ const DefaultEnvName = "production"
 // deployUser is the SSH user that cloud-init creates on the droplet.
 const deployUser = "deploy"
 
-var envNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+// The environment name ends the droplet name, and DigitalOcean refuses a droplet name that ends with a dash.
+var envNamePattern = regexp.MustCompile(`^[a-z]([a-z0-9-]*[a-z0-9])?$`)
 
 // Options are the inputs of spinup deploy digital-ocean and its subcommands.
 type Options struct {

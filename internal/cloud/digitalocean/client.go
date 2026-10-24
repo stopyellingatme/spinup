@@ -186,11 +186,15 @@ func (c *Client) once(ctx context.Context, method, target string, body []byte) (
 func parseError(status int, hdr http.Header, data []byte, method, target string) error {
 	e := &APIError{Status: status, Method: method, Path: pathOnly(target), RequestID: hdr.Get("x-request-id")}
 	var body struct {
-		ID      string `json:"id"`
-		Message string `json:"message"`
+		ID        string `json:"id"`
+		Message   string `json:"message"`
+		RequestID string `json:"request_id"`
 	}
 	if json.Unmarshal(data, &body) == nil {
 		e.ID, e.Message = body.ID, body.Message
+		if e.RequestID == "" {
+			e.RequestID = body.RequestID
+		}
 	}
 	return e
 }
