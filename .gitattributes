@@ -1,0 +1,10 @@
+# Check out text files with LF on every platform. Golden files, txtar scripts, lockfiles,
+# and the kit API file compare bytes, so a CRLF checkout on Windows breaks them.
+* text=auto eol=lf
+
+# Binary files.
+*.gz binary
+*.zst binary
+*.png binary
+*.ico binary
+*.woff2 binary
