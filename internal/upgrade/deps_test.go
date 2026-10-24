@@ -68,7 +68,7 @@ func TestDepsPinsOnlyDirectLowerRequirements(t *testing.T) {
 		{"Path":"example.com/pre","Version":"v1.0.0-rc.1"},
 		{"Path":"`+phaseKit+`","Version":"v0.1.0"}]}`, "", 0)
 	commands := []string{"go mod edit -json"}
-	for _, pin := range []string{"example.com/a@v1.10.0", "example.com/pre@v1.0.0", "example.com/z@v1.3.0", phaseKit + "@v0.2.0"} {
+	for _, pin := range []string{"example.com/a@v1.10.0", "example.com/pre@v1.0.0", "example.com/z@v1.3.0", phaseKit + "@v9.0.0"} {
 		fake.Expect("go", "mod", "edit", "-require="+pin)
 		commands = append(commands, "go mod edit -require="+pin)
 	}
@@ -79,7 +79,7 @@ func TestDepsPinsOnlyDirectLowerRequirements(t *testing.T) {
 	if err := phaseDeps(context.Background(), s); err != nil {
 		t.Fatal(err)
 	}
-	if s.Lock.Kit.Module != phaseKit || s.Lock.Kit.Version != "v0.2.0" {
+	if s.Lock.Kit.Module != phaseKit || s.Lock.Kit.Version != "v9.0.0" {
 		t.Fatalf("kit lock=%+v", s.Lock.Kit)
 	}
 	dirs := make([]string, len(commands))

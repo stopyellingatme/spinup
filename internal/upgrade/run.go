@@ -346,7 +346,7 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			if err != nil {
 				return err
 			}
-			if err := requireBase(step.Plan, step.From, state.Lock.TemplateVersion); err != nil {
+			if err := requireBase(step.Plan, step.From, step.Plan.From); err != nil {
 				return err
 			}
 			if state.Module != nil {
@@ -487,6 +487,10 @@ func callPhase(ctx context.Context, phase func(context.Context, *Step) error, st
 	return nil
 }
 func phaseError(name string, err error) error {
+	// Keep the Try line of the inner error, so the message has one Try line.
+	if strings.Contains(err.Error(), "\nTry: ") {
+		return fmt.Errorf("upgrade %s failed: %w", name, err)
+	}
 	return fmt.Errorf("upgrade %s failed: %w\nTry: correct the failure, then run spinup upgrade --continue or --abort", name, err)
 }
 

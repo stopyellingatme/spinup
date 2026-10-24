@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -101,22 +102,11 @@ func goDeps(ctx context.Context, s *Step) error {
 			}
 		}
 	}
-	version, err := compat.ParseVersion(s.To.Version)
-	if err != nil {
-		return fmt.Errorf("select kit version: %w\nTry: choose a valid target template version", err)
+	if err := raiseKitRequire(ctx, s, requires[kitModule]); err != nil {
+		return err
 	}
-	// Pin only: raise the kit to the step's version, never lower it (resolution 8).
-	raiseKit := version.Pre == ""
-	if raiseKit && requires[kitModule] != "" {
-		current, err := dependencyVersion(requires[kitModule])
-		raiseKit = err != nil || current.Compare(version) < 0
-	}
-	if raiseKit {
-		if err := requirePin(ctx, s, kitModule, requires[kitModule], version.String()); err != nil {
-			return err
-		}
-		s.Lock.Kit.Module = kitModule
-		s.Lock.Kit.Version = version.String()
+	if err := raiseGoDirective(ctx, s); err != nil {
+		return err
 	}
 	if _, err := phaseGo(ctx, s, "mod", "tidy"); err != nil {
 		return fmt.Errorf("update dependencies with go mod tidy: %w\nTry: rerun with network access, or pass --no-verify and fix go.mod by hand", err)
@@ -135,4 +125,95 @@ func requirePin(ctx context.Context, s *Step, module, from, to string) error {
 		return err
 	}
 	return phasePrint(s, "Dependency %s: %s -> %s\n", module, from, to)
+}
+
+// raiseKitRequire raises the kit to the higher of the template version (a release only) and the
+// kit pin of the target stack. It never lowers the kit (resolution 8).
+func raiseKitRequire(ctx context.Context, s *Step, current string) error {
+	version, err := compat.ParseVersion(s.To.Version)
+	if err != nil {
+		return fmt.Errorf("select kit version: %w\nTry: choose a valid target template version", err)
+	}
+	var target *compat.Version
+	if version.Pre == "" {
+		target = &version
+	}
+	if s.To.Stack != nil && s.To.Stack.GoModules[kitModule] != "" {
+		pin, err := dependencyVersion(s.To.Stack.GoModules[kitModule])
+		if err != nil {
+			return fmt.Errorf("compare dependency pin %s: %w\nTry: repair the target stack versions", kitModule, err)
+		}
+		if target == nil || target.Compare(pin) < 0 {
+			target = &pin
+		}
+	}
+	if target == nil {
+		return nil
+	}
+	if current != "" {
+		have, err := dependencyVersion(current)
+		if err == nil && have.Compare(*target) >= 0 {
+			return nil
+		}
+	}
+	if err := requirePin(ctx, s, kitModule, current, target.String()); err != nil {
+		return err
+	}
+	s.Lock.Kit.Module = kitModule
+	s.Lock.Kit.Version = target.String()
+	return nil
+}
+
+var goDirective = regexp.MustCompile(`(?m)^go[ \t]+(\d+\.\d+(?:\.\d+)?)[ \t]*$`)
+
+// raiseGoDirective raises the go line of api/go.mod to the go line of the new render. The render is
+// the Data of the kept api/go.mod decision. It never lowers the line.
+func raiseGoDirective(ctx context.Context, s *Step) error {
+	if s.Plan == nil {
+		return nil
+	}
+	var render []byte
+	for _, file := range s.Plan.Files {
+		if file.Path == "api/go.mod" {
+			render = file.Data
+		}
+	}
+	want := goDirective.FindSubmatch(render)
+	if want == nil {
+		return nil
+	}
+	disk, err := os.ReadFile(filepath.Join(s.Worktree, "api", "go.mod"))
+	if err != nil {
+		return fmt.Errorf("read api/go.mod: %w\nTry: check the upgrade worktree permissions", err)
+	}
+	have := goDirective.FindSubmatch(disk)
+	target, err := goLanguageVersion(string(want[1]))
+	if err != nil {
+		return fmt.Errorf("read the go line of the new api/go.mod: %w\nTry: repair the go line in the template", err)
+	}
+	if have != nil {
+		current, err := goLanguageVersion(string(have[1]))
+		if err == nil && current.Compare(target) >= 0 {
+			return nil
+		}
+	}
+	if _, err := phaseGo(ctx, s, "mod", "edit", "-go="+string(want[1])); err != nil {
+		return err
+	}
+	return phasePrint(s, "Go version: %s -> %s\n", orNone(have), want[1])
+}
+
+func orNone(match [][]byte) string {
+	if match == nil {
+		return "none"
+	}
+	return string(match[1])
+}
+
+// goLanguageVersion parses a go line such as 1.26 or 1.26.0.
+func goLanguageVersion(v string) (compat.Version, error) {
+	if strings.Count(v, ".") == 1 {
+		v += ".0"
+	}
+	return compat.ParseVersion(v)
 }

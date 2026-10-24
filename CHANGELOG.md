@@ -39,6 +39,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Upgrade: Never merge `api/go.mod`, `api/go.sum`, `api/tools.mod`, or `api/tools.sum` as text. Keep the app file and let the dependency step raise the kit pin, the stack pins, and the `go` line. Keep the inner `Try:` line when an upgrade phase fails.
 - `spinup tools install` accepts the real age release archives. It keeps `age` and `age-keygen` and skips the other regular files under `age/`. It still refuses absolute paths, `..`, nested paths, links, devices, and duplicates.
 - The `--platform` default of `spinup plugin new` is empty and resolves to the current platform at run time. The generated command pages no longer depend on the machine.
 - M14: `dofake` follows more rules of the DigitalOcean API: name rules for tags, droplets, and firewalls, firewall rule checks, the pending firewall status, `0` for all ports, a duplicate tag, rate limit headers, and `request_id` in error bodies. `spinup deploy digital-ocean` refuses an environment name that ends with a dash, because DigitalOcean refuses the droplet name.

@@ -221,7 +221,11 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 			if tracked && !rendered {
 				d.Class, d.Template = entry.Class, entry.Template
 			}
-			d.Data = nil
+			// The dependency step reads the new render of a kept Go module file (goModKeepReason).
+			// writePlan never writes Data for a keep.
+			if d.Reason != goModKeepReason {
+				d.Data = nil
+			}
 		}
 		p.Files = append(p.Files, d)
 	}
@@ -306,6 +310,13 @@ func decidePlanTracked(ctx context.Context, in PlanInput, d FileDecision, entry 
 		d.Action, d.Reason = ActionKeep, "binary or large file changed on disk"
 		return d, nil
 	}
+	if !rename && goModuleFile(d.Path) {
+		// The app runs go mod tidy, so its require block differs from the render. A text merge
+		// conflicts whenever the template changes a require line. The dependency step applies
+		// the template changes with go mod edit instead.
+		d.Action, d.Reason = ActionKeep, goModKeepReason
+		return d, nil
+	}
 	if !rename && d.Class == manifest.Managed && in.ForceManaged {
 		d.Action, d.Reason = ActionOverwrite, "forced"
 		return d, nil
@@ -319,6 +330,18 @@ func decidePlanTracked(ctx context.Context, in PlanInput, d FileDecision, entry 
 		merged.Action = ActionRename
 	}
 	return merged, err
+}
+
+// goModKeepReason is the reason of a kept Go module file. The decision keeps the new render in Data.
+const goModKeepReason = "go.mod: the dependency step applies the template changes"
+
+// goModuleFile reports the Go module files that upgrades never merge as text.
+func goModuleFile(name string) bool {
+	switch name {
+	case "api/go.mod", "api/go.sum", "api/tools.mod", "api/tools.sum":
+		return true
+	}
+	return false
 }
 
 func planUnmergeable(inputs ...[]byte) bool {
