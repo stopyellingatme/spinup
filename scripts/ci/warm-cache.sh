@@ -7,8 +7,8 @@
 # This script downloads them. It never changes files in the repository.
 #
 # Environment:
-#   SPINUP_CI_PREFIX   tool and cache directory (default $HOME/.spinup-ci)
-#   SPINUP_PNPM_STORE  pnpm store directory (default $SPINUP_CI_PREFIX/pnpm/store)
+#   SPINUP_PNPM_STORE  pnpm store directory (default: the pnpm default store, see "pnpm store path")
+# Some tests run pnpm without --store-dir, so the default store must hold the packages.
 # The pnpm metadata cache stays at the pnpm default (~/.cache/pnpm on Linux,
 # ~/Library/Caches/pnpm on macOS), because the test harness does not pass a cache directory.
 # In GitHub Actions the script writes the pnpm directories to GITHUB_ENV and
@@ -16,8 +16,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
-prefix=${SPINUP_CI_PREFIX:-$HOME/.spinup-ci}
-store=${SPINUP_PNPM_STORE:-$prefix/pnpm/store}
+store=${SPINUP_PNPM_STORE:-}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -106,6 +105,12 @@ warm_bun() {
 warm_node() {
   command -v node >/dev/null 2>&1 || die "node is not on PATH" "set up Node 24 before this step"
   command -v corepack >/dev/null 2>&1 || die "corepack is not on PATH" "use Node 24, which includes corepack"
+  if [[ -z $store ]]; then
+    # "pnpm store path" ends with the store version (for example /v11). --store-dir takes the
+    # base directory, and pnpm adds the version itself.
+    store=$("$root/scripts/bin/pnpm" store path)
+    store=${store%/v[0-9]*}
+  fi
   mkdir -p "$store"
   # This downloads the pinned pnpm binary into the corepack cache.
   "$root/scripts/bin/pnpm" --version
@@ -129,8 +134,10 @@ done
 
 if [[ -n ${GITHUB_ENV:-} ]]; then
   {
-    printf 'SPINUP_PNPM_STORE=%s\n' "$store"
-    printf 'npm_config_store_dir=%s\n' "$store"
+    if [[ -n $store ]]; then
+      printf 'SPINUP_PNPM_STORE=%s\n' "$store"
+      printf 'npm_config_store_dir=%s\n' "$store"
+    fi
   } >>"$GITHUB_ENV"
 fi
 if [[ -n ${GITHUB_PATH:-} ]]; then

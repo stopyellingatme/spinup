@@ -223,6 +223,9 @@ func TestPinFileReplacedWhenKeysChange(t *testing.T) {
 }
 
 func TestPinFileConcurrent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Rename cannot replace a file that another process has open on Windows; remote commands need WSL2")
+	}
 	cache := shortCache(t)
 	h := Host{Name: "prod", Address: "vm", User: "deploy", HostKeys: []string{testKey(10)}}
 	var wg sync.WaitGroup
