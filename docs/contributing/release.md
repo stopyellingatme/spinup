@@ -5,6 +5,22 @@ Their major and minor versions must match when the kit changes.
 Patch versions can differ for independent releases.
 The tag workflow publishes matching versions for both modules.
 
+## The kit pin
+
+Generated apps require one kit version.
+`internal/stackversions/stackversions.yaml` holds it in `go_modules`, under `github.com/stopyellingatme/spinup/kit`.
+The `api` pack renders the require line from this pin with `[[ gomod "github.com/stopyellingatme/spinup/kit" ]]`.
+`scripts/bump-stack.sh` reads the same pin and keeps the template expression in `go.mod.tmpl`.
+
+After you push a kit tag, do these steps in the main loop:
+1. Set the kit pin to the new version.
+2. Run `scripts/bump-stack.sh`, so the pack `go.sum` gets the hash lines of the new kit version.
+3. Run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/templates -run PacksDigest` and review the digest.
+
+A pre-release kit tag has the form `kit/v0.1.0-alpha.<n>`.
+The number `<n>` is the commit count, as `make install` uses.
+The release check fails when the major or minor version of the kit pin differs from the CLI candidate.
+
 ## Prepare the signing key
 
 Create the key pair once:
