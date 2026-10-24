@@ -1,0 +1,328 @@
+{
+  "date": "2026-10-24",
+  "machine": "Darwin 25.4.0 arm64",
+  "rust": "1.99.1",
+  "cargo_build_jobs": 4,
+  "goreleaser_parallelism": 1,
+  "observations": {
+    "rust-six": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish",
+        "--parallelism=1"
+      ],
+      "exit": 1,
+      "seconds": 0.844,
+      "uptime_before": "16:53  20 users, load averages: 10.30 10.69 12.43",
+      "uptime_after": "16:53  20 users, load averages: 10.30 10.69 12.43"
+    },
+    "rust-six-guarded": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish",
+        "--parallelism=1"
+      ],
+      "exit": 1,
+      "seconds": 1.227,
+      "uptime_before": "16:54  20 users, load averages: 7.26 9.80 12.00",
+      "uptime_after": "16:54  20 users, load averages: 7.26 9.80 12.00"
+    },
+    "x86_64-unknown-linux-musl": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/x86_64-unknown-linux-musl.yaml"
+      ],
+      "exit": 0,
+      "seconds": 51.118,
+      "uptime_before": "16:56  20 users, load averages: 10.07 10.22 11.89",
+      "uptime_after": "16:57  20 users, load averages: 10.91 10.44 11.88"
+    },
+    "aarch64-unknown-linux-musl": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/aarch64-unknown-linux-musl.yaml"
+      ],
+      "exit": 0,
+      "seconds": 47.784,
+      "uptime_before": "16:57  20 users, load averages: 10.91 10.44 11.88",
+      "uptime_after": "16:58  20 users, load averages: 14.81 11.37 12.13"
+    },
+    "x86_64-apple-darwin": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/x86_64-apple-darwin.yaml"
+      ],
+      "exit": 0,
+      "seconds": 38.426,
+      "uptime_before": "16:58  20 users, load averages: 14.81 11.37 12.13",
+      "uptime_after": "16:58  20 users, load averages: 13.42 11.40 12.11"
+    },
+    "aarch64-apple-darwin": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/aarch64-apple-darwin.yaml"
+      ],
+      "exit": 0,
+      "seconds": 2.921,
+      "uptime_before": "16:58  20 users, load averages: 13.42 11.40 12.11",
+      "uptime_after": "16:58  20 users, load averages: 12.75 11.30 12.07"
+    },
+    "x86_64-pc-windows-gnu": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/x86_64-pc-windows-gnu.yaml"
+      ],
+      "exit": 0,
+      "seconds": 45.356,
+      "uptime_before": "16:58  20 users, load averages: 12.75 11.30 12.07",
+      "uptime_after": "16:59  20 users, load averages: 11.66 11.27 12.02"
+    },
+    "aarch64-pc-windows-gnullvm": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/aarch64-pc-windows-gnullvm.yaml"
+      ],
+      "exit": 1,
+      "seconds": 0.556,
+      "uptime_before": "16:59  20 users, load averages: 11.66 11.27 12.02",
+      "uptime_after": "16:59  20 users, load averages: 11.66 11.27 12.02"
+    },
+    "installed": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1",
+        "--config",
+        "evidence/installed.yaml"
+      ],
+      "exit": 0,
+      "seconds": 13.734,
+      "uptime_before": "17:00  20 users, load averages: 8.94 10.62 11.74",
+      "uptime_after": "17:00  20 users, load averages: 10.13 10.80 11.79"
+    },
+    "snapshot-sign-attempt": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish",
+        "--parallelism=1",
+        "--config",
+        "evidence/aarch64-apple-darwin.yaml"
+      ],
+      "exit": 1,
+      "seconds": 6.866,
+      "uptime_before": "16:55  20 users, load averages: 11.01 10.35 12.02",
+      "uptime_after": "16:55  20 users, load averages: 11.25 10.41 12.03"
+    },
+    "prebuilt-rejected": {
+      "command": [
+        "goreleaser",
+        "check",
+        "--config",
+        "evidence/prebuilt.yaml"
+      ],
+      "exit": 1,
+      "seconds": 0.035,
+      "uptime_before": "16:58  20 users, load averages: 12.76 11.24 12.06",
+      "uptime_after": "16:58  20 users, load averages: 12.76 11.24 12.06"
+    },
+    "verify-available": {
+      "command": [
+        "python3",
+        "verify.py"
+      ],
+      "exit": 0,
+      "seconds": 0.136,
+      "uptime_before": "17:00  20 users, load averages: 10.13 10.80 11.79",
+      "uptime_after": "17:00  20 users, load averages: 10.13 10.80 11.79"
+    },
+    "verify-acceptance": {
+      "command": [
+        "python3",
+        "verify.py",
+        "--require-six"
+      ],
+      "exit": 1,
+      "seconds": 0.138,
+      "uptime_before": "17:00  20 users, load averages: 10.13 10.80 11.79",
+      "uptime_after": "17:00  20 users, load averages: 10.13 10.80 11.79"
+    },
+    "darwin-amd64-self-check": {
+      "command": [
+        "target/x86_64-apple-darwin/release/spinup",
+        "--self-check"
+      ],
+      "exit": 0,
+      "seconds": 2.354,
+      "uptime_before": "16:59  20 users, load averages: 12.81 11.46 12.10",
+      "uptime_after": "16:59  20 users, load averages: 12.18 11.35 12.06"
+    },
+    "darwin-arm64-self-check": {
+      "command": [
+        "target/aarch64-apple-darwin/release/spinup",
+        "--self-check"
+      ],
+      "exit": 0,
+      "seconds": 0.192,
+      "uptime_before": "16:59  20 users, load averages: 12.18 11.35 12.06",
+      "uptime_after": "16:59  20 users, load averages: 12.18 11.35 12.06"
+    },
+    "spike-check": {
+      "command": [
+        "bash",
+        "../../scripts/rust/spike-check.sh",
+        "r0-14"
+      ],
+      "exit": 0,
+      "seconds": 11.595,
+      "uptime_before": "17:02  20 users, load averages: 7.85 9.92 11.34",
+      "uptime_after": "17:02  20 users, load averages: 8.98 10.10 11.39"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 3.574,
+      "uptime_before": "17:02  20 users, load averages: 8.98 10.10 11.39",
+      "uptime_after": "17:02  20 users, load averages: 8.66 10.01 11.35"
+    },
+    "full-final": {
+      "command": [
+        "goreleaser",
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign",
+        "--parallelism=1"
+      ],
+      "exit": 1,
+      "seconds": 1.334,
+      "uptime_before": "17:03  20 users, load averages: 12.13 10.19 11.25",
+      "uptime_after": "17:03  20 users, load averages: 12.13 10.19 11.25"
+    }
+  },
+  "artifacts": {
+    "archives": 5,
+    "missing": [
+      "spinup_0.0.0-r0.14_windows_arm64.zip"
+    ],
+    "results": [
+      {
+        "archive": "spinup_0.0.0-r0.14_darwin_amd64.tar.gz",
+        "archive_bytes": 1368439,
+        "contents": [
+          "CHANGELOG.md",
+          "README.md",
+          "spinup"
+        ],
+        "license_present": false,
+        "sbom_packages": 38,
+        "checksums_verified": 10
+      },
+      {
+        "archive": "spinup_0.0.0-r0.14_darwin_arm64.tar.gz",
+        "archive_bytes": 1234243,
+        "contents": [
+          "CHANGELOG.md",
+          "README.md",
+          "spinup"
+        ],
+        "license_present": false,
+        "sbom_packages": 38,
+        "checksums_verified": 10
+      },
+      {
+        "archive": "spinup_0.0.0-r0.14_linux_amd64.tar.gz",
+        "archive_bytes": 1450373,
+        "contents": [
+          "CHANGELOG.md",
+          "README.md",
+          "spinup"
+        ],
+        "license_present": false,
+        "sbom_packages": 38,
+        "checksums_verified": 10
+      },
+      {
+        "archive": "spinup_0.0.0-r0.14_linux_arm64.tar.gz",
+        "archive_bytes": 1321146,
+        "contents": [
+          "CHANGELOG.md",
+          "README.md",
+          "spinup"
+        ],
+        "license_present": false,
+        "sbom_packages": 38,
+        "checksums_verified": 10
+      },
+      {
+        "archive": "spinup_0.0.0-r0.14_windows_amd64.zip",
+        "archive_bytes": 1439432,
+        "contents": [
+          "CHANGELOG.md",
+          "README.md",
+          "spinup.exe"
+        ],
+        "license_present": false,
+        "sbom_packages": 42,
+        "checksums_verified": 10
+      }
+    ]
+  }
+}
