@@ -1,0 +1,15 @@
+# Rust toolchain for the spinup rewrite (docs/design/rust-plan.md §3).
+# Lanes set RUSTUP_TOOLCHAIN=1.99.1 and never install a toolchain.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy", "llvm-tools"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "aarch64-unknown-linux-musl",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-pc-windows-gnu",
+]
+profile = "minimal"

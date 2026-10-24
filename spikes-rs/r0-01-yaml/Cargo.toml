@@ -1,0 +1,21 @@
+[package]
+name = "r0-01-yaml"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+similar = "3.2.1"
+tree-sitter = "0.27.1"
+tree-sitter-yaml = "0.7.2"
+walkdir = "2.5.0"
+yaml-edit = "0.3.5"
+yaml_serde = "0.10.7"
+yamlpatch = "1.31.1"
+yamlpath = "1.31.1"
