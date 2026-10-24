@@ -1,0 +1,142 @@
+[
+  {
+    "setup": "regular",
+    "path": "dir/file",
+    "delete": false,
+    "diff_ok": true,
+    "apply_ok": true
+  },
+  {
+    "setup": "regular",
+    "path": "dir/file",
+    "delete": true,
+    "diff_ok": true,
+    "apply_ok": true
+  },
+  {
+    "setup": "final-inside",
+    "path": "link",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "final-inside",
+    "path": "link",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "final-outside",
+    "path": "link",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "final-outside",
+    "path": "link",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "final-missing",
+    "path": "link",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "final-missing",
+    "path": "link",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "parent-outside",
+    "path": "link/file",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "parent-outside",
+    "path": "link/file",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "parent-inside",
+    "path": "link/file",
+    "delete": false,
+    "diff_ok": true,
+    "apply_ok": false
+  },
+  {
+    "setup": "parent-inside",
+    "path": "link/file",
+    "delete": true,
+    "diff_ok": true,
+    "apply_ok": true
+  },
+  {
+    "setup": "parent-absolute-inside",
+    "path": "link/file",
+    "delete": false,
+    "diff_ok": true,
+    "apply_ok": false
+  },
+  {
+    "setup": "parent-absolute-inside",
+    "path": "link/file",
+    "delete": true,
+    "diff_ok": true,
+    "apply_ok": true
+  },
+  {
+    "setup": "case-file",
+    "path": "dir/FILE",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "case-file",
+    "path": "dir/FILE",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "case-parent",
+    "path": "Dir/new",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "case-parent",
+    "path": "Dir/new",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "case-kelvin",
+    "path": "dir/K.txt",
+    "delete": false,
+    "diff_ok": false,
+    "apply_ok": false
+  },
+  {
+    "setup": "case-kelvin",
+    "path": "dir/K.txt",
+    "delete": true,
+    "diff_ok": false,
+    "apply_ok": false
+  }
+]

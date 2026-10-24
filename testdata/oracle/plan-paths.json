@@ -1,0 +1,43 @@
+[
+  {
+    "paths": [
+      "README.md",
+      "readme.md"
+    ],
+    "valid": false
+  },
+  {
+    "paths": [
+      "dir/K.txt",
+      "dir/K.txt"
+    ],
+    "valid": false
+  },
+  {
+    "paths": [
+      "dir//file",
+      "dir/file"
+    ],
+    "valid": false
+  },
+  {
+    "paths": [
+      "same",
+      "same"
+    ],
+    "valid": false
+  },
+  {
+    "paths": [
+      "a",
+      "b"
+    ],
+    "valid": true
+  },
+  {
+    "paths": [
+      "../escape"
+    ],
+    "valid": false
+  }
+]

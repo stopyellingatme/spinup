@@ -349,12 +349,23 @@ dependencies = [
  "cap-std",
  "ed25519-dalek",
  "hex",
+ "r0-05-paths",
  "serde",
  "serde_json",
  "sha2",
  "tar",
  "walkdir",
  "zstd",
+]
+
+[[package]]
+name = "r0-05-paths"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "cap-std",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

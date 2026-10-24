@@ -1,0 +1,222 @@
+[
+  {
+    "name": "nil collections",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": null,
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {},
+      "stack_versions": {},
+      "plugins": null,
+      "files": {},
+      "tombstones": null,
+      "orphans": null,
+      "applied_migrations": null
+    },
+    "expected": "{\n  \"answers\": {},\n  \"applied_migrations\": [],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {},\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [],\n  \"packs\": [],\n  \"plugins\": [],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": []\n}\n"
+  },
+  {
+    "name": "empty collections",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": [],
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {},
+      "stack_versions": {},
+      "plugins": [],
+      "files": {},
+      "tombstones": [],
+      "orphans": [],
+      "applied_migrations": []
+    },
+    "expected": "{\n  \"answers\": {},\n  \"applied_migrations\": [],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {},\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [],\n  \"packs\": [],\n  \"plugins\": [],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": []\n}\n"
+  },
+  {
+    "name": "html and unicode",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": null,
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {
+        "a": "line\u2028paragraph\u2029é界😀\b\f\n\r\t\u0000",
+        "z": "\u003c\u003e\u0026"
+      },
+      "stack_versions": {},
+      "plugins": null,
+      "files": {},
+      "tombstones": null,
+      "orphans": null,
+      "applied_migrations": null
+    },
+    "expected": "{\n  \"answers\": {\n    \"a\": \"line\\u2028paragraph\\u2029é界😀\\b\\f\\n\\r\\t\\u0000\",\n    \"z\": \"\\u003c\\u003e\\u0026\"\n  },\n  \"applied_migrations\": [],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {},\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [],\n  \"packs\": [],\n  \"plugins\": [],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": []\n}\n"
+  },
+  {
+    "name": "number precision",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": null,
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {
+        "0": 9007199254740993,
+        "1": 18446744073709551616,
+        "2": 1234567890123456789012345678901234567890,
+        "3": -0,
+        "4": 1.2300,
+        "5": 1e+30,
+        "6": 1E-30,
+        "7": 0.000000000000000000001
+      },
+      "stack_versions": {},
+      "plugins": null,
+      "files": {},
+      "tombstones": null,
+      "orphans": null,
+      "applied_migrations": null
+    },
+    "expected": "{\n  \"answers\": {\n    \"0\": 9007199254740993,\n    \"1\": 18446744073709551616,\n    \"2\": 1234567890123456789012345678901234567890,\n    \"3\": -0,\n    \"4\": 1.2300,\n    \"5\": 1e+30,\n    \"6\": 1E-30,\n    \"7\": 0.000000000000000000001\n  },\n  \"applied_migrations\": [],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {},\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [],\n  \"packs\": [],\n  \"plugins\": [],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": []\n}\n"
+  },
+  {
+    "name": "collection order",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": [
+        "web",
+        "base",
+        "api"
+      ],
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {},
+      "stack_versions": {},
+      "plugins": [
+        {
+          "name": "z",
+          "version": "1",
+          "sha256": "",
+          "api": 0
+        },
+        {
+          "name": "a",
+          "version": "2",
+          "sha256": "",
+          "api": 2
+        },
+        {
+          "name": "a",
+          "version": "1",
+          "sha256": "",
+          "api": 1
+        },
+        {
+          "name": "a",
+          "version": "1",
+          "sha256": "",
+          "api": 0
+        }
+      ],
+      "files": {},
+      "tombstones": [
+        "z.txt",
+        "a.txt",
+        "z.txt"
+      ],
+      "orphans": [
+        "z.txt",
+        "a.txt",
+        "a.txt"
+      ],
+      "applied_migrations": [
+        "0002",
+        "0001",
+        "0002"
+      ]
+    },
+    "expected": "{\n  \"answers\": {},\n  \"applied_migrations\": [\n    \"0001\",\n    \"0002\"\n  ],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {},\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [\n    \"a.txt\",\n    \"z.txt\"\n  ],\n  \"packs\": [\n    \"web\",\n    \"base\",\n    \"api\"\n  ],\n  \"plugins\": [\n    {\n      \"api\": 0,\n      \"name\": \"a\",\n      \"sha256\": \"\",\n      \"version\": \"1\"\n    },\n    {\n      \"api\": 1,\n      \"name\": \"a\",\n      \"sha256\": \"\",\n      \"version\": \"1\"\n    },\n    {\n      \"api\": 2,\n      \"name\": \"a\",\n      \"sha256\": \"\",\n      \"version\": \"2\"\n    },\n    {\n      \"api\": 0,\n      \"name\": \"z\",\n      \"sha256\": \"\",\n      \"version\": \"1\"\n    }\n  ],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": [\n    \"a.txt\",\n    \"z.txt\"\n  ]\n}\n"
+  },
+  {
+    "name": "nested values and file fields",
+    "input": {
+      "schema": 2,
+      "cli_version": "",
+      "template_version": "",
+      "packs": null,
+      "min_cli": "",
+      "kit": {
+        "module": "",
+        "version": ""
+      },
+      "behavior_version": 0,
+      "formatter_go": "",
+      "answers": {
+        "empty": [],
+        "list": [
+          null,
+          true,
+          false,
+          {
+            "a": "\u0026",
+            "z": 0
+          }
+        ],
+        "null": null,
+        "object": {}
+      },
+      "stack_versions": {},
+      "plugins": null,
+      "files": {
+        "a.txt": {
+          "class": "managed",
+          "template": "base/a.tmpl",
+          "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "mode": "0644"
+        },
+        "z.txt": {
+          "class": "seed"
+        }
+      },
+      "tombstones": null,
+      "orphans": null,
+      "applied_migrations": null
+    },
+    "expected": "{\n  \"answers\": {\n    \"empty\": [],\n    \"list\": [\n      null,\n      true,\n      false,\n      {\n        \"a\": \"\\u0026\",\n        \"z\": 0\n      }\n    ],\n    \"null\": null,\n    \"object\": {}\n  },\n  \"applied_migrations\": [],\n  \"behavior_version\": 0,\n  \"cli_version\": \"\",\n  \"files\": {\n    \"a.txt\": {\n      \"class\": \"managed\",\n      \"hash\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"mode\": \"0644\",\n      \"template\": \"base/a.tmpl\"\n    },\n    \"z.txt\": {\n      \"class\": \"seed\"\n    }\n  },\n  \"formatter_go\": \"\",\n  \"kit\": {\n    \"module\": \"\",\n    \"version\": \"\"\n  },\n  \"min_cli\": \"\",\n  \"orphans\": [],\n  \"packs\": [],\n  \"plugins\": [],\n  \"schema\": 2,\n  \"stack_versions\": {},\n  \"template_version\": \"\",\n  \"tombstones\": []\n}\n"
+  }
+]
