@@ -397,7 +397,7 @@ func TestGofmtPostStep(t *testing.T) {
 			}
 			_, err := Run(context.Background(), g, nil, nil, Options{Root: root, Runner: fake})
 			if tc.fail {
-				if err == nil || !strings.Contains(err.Error(), "invalid Go syntax") || !strings.HasSuffix(err.Error(), "Try: run gofmt -w "+filepath.FromSlash("internal/x.go")+" in api/ by hand") {
+				if err == nil || !strings.Contains(err.Error(), "invalid Go syntax") || !gofmtTry(err.Error()) {
 					t.Fatalf("err=%v", err)
 				}
 			} else if err != nil {
@@ -463,4 +463,13 @@ func TestEditsUpdateSeedFile(t *testing.T) {
 	if _, err := Run(context.Background(), generator(file), nil, nil, Options{Root: root}); err == nil {
 		t.Fatal("updated a seed file without Edits or --force")
 	}
+}
+
+// gofmtTry reports whether msg ends with the Try line of the gofmt post-step. On Windows the
+// command line quotes the path, because the path has a backslash.
+func gofmtTry(msg string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.HasSuffix(msg, `Try: run gofmt -w 'internal\x.go' in api/ by hand`)
+	}
+	return strings.HasSuffix(msg, "Try: run gofmt -w internal/x.go in api/ by hand")
 }

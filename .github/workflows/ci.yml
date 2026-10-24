@@ -59,8 +59,19 @@ jobs:
         uses: ./.github/actions/prepare-tests
       - name: Test the CLI with the race detector
         run: go test -race ./...
+      # The kit tests need PostgreSQL. Linux runners start it in Docker (testcontainers).
+      # macOS runners have no Docker, so this step starts PostgreSQL 18 from Homebrew.
+      - name: Start PostgreSQL on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install --quiet postgresql@18
+          pg="$(brew --prefix postgresql@18)/bin"
+          "$pg/initdb" --pgdata="$RUNNER_TEMP/pg" --username=postgres --auth=trust >/dev/null
+          "$pg/pg_ctl" --pgdata="$RUNNER_TEMP/pg" --log="$RUNNER_TEMP/pg.log" --options="-p 5432 -k $RUNNER_TEMP" --wait start
+          echo "KIT_DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable" >> "$GITHUB_ENV"
       - name: Test the kit with the race detector
-        run: cd kit && go test -race ./...
+        run: cd kit && DATABASE_URL="${KIT_DATABASE_URL:-}" go test -race ./...
 
   windows:
     runs-on: windows-latest
