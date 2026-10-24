@@ -1,0 +1,20 @@
+# R0.9 verdict. spike-check.sh reads this file. R0.15 reads it, not the prose.
+spike = "r0-09"
+verdict = "go"        # go | soft | no-go
+# R0.9 has no numeric fields in its unit row. These numbers are for R0.15.
+web_pack_changes = 0               # rendered web/ equals the committed web/ (diff -r)
+schema_dts_diff_lines = 0          # openapi-typescript on the Rust spec vs the committed client
+playwright_suite_passed = 14       # of 14, testdata/e2e/web, in 3 of 3 runs
+playwright_smoke_passed = 2        # of 2, web/e2e/smoke.spec.ts, in 3 of 3 runs
+suite_s_rust = 17.3                # run 2, LGTM on, load1 9.4 to 8.1 (runs 1 and 3: 18.7, 18.6 s)
+suite_s_go = 13.7                  # testdata/e2e/web/run.sh, load1 7.1 to 6.2
+ratelimit_test_s_rust = 6.3        # run 2 (6.8 s in run 3). Go: 4.0 s. One argon2id hash per login.
+ratelimit_test_s_go = 4.0
+adr0002_cookie_ssr = "pass"
+adr0002_form_action_csrf = "pass"  # cross-site 403, no Origin 403, same origin ok. Rust API cross-origin check 403.
+traceparent_tempo = "pass"         # grafana/otel-lgtm 0.36.0: API server span is a child of a demo-web span (4 and 2 traces)
+session_cookie_max_age = 604799    # Go sends 604800 (finding)
+tests = 109                        # spike-check: cargo test --workspace, all pass
+debug_build_s = 99.4               # clean, todo-api, load1 11.9 to 14.4
+debug_binary_mb = 67.6
+packages_normal = 288
