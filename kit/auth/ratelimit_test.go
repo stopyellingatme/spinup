@@ -637,16 +637,16 @@ func TestRateLimitSweepAndLog(t *testing.T) {
 	send(t, h, "POST", pathLogin, "203.0.113.5:4000")
 	send(t, h, "POST", pathLogin, "203.0.113.5:4000") // refused
 	clk.Add(10 * time.Minute)
+	// The sweep resets the counters before it writes the log line, so wait for the line too.
+	logged := func() string { mu.Lock(); defer mu.Unlock(); return logs.String() }
 	deadline := time.Now().Add(5 * time.Second)
-	for a.limits.size() != 0 || a.limits.rejected[classLogin].Load() != 0 {
+	for a.limits.size() != 0 || a.limits.rejected[classLogin].Load() != 0 || !strings.Contains(logged(), "rate limited requests") {
 		if time.Now().After(deadline) {
-			t.Fatalf("the sweep did not run: %d entries, %d refusals", a.limits.size(), a.limits.rejected[classLogin].Load())
+			t.Fatalf("the sweep did not run: %d entries, %d refusals, log %q", a.limits.size(), a.limits.rejected[classLogin].Load(), logged())
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	out := logs.String()
+	out := logged()
 	if !strings.Contains(out, "rate limited requests in the last minute") || !strings.Contains(out, "login=1") || !strings.Contains(out, "try=") {
 		t.Errorf("log = %q", out)
 	}
