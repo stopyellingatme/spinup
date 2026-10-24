@@ -226,6 +226,17 @@ func localKitTarget(data string) (string, bool) {
 	return "", false
 }
 
+// KitReplaceTarget returns the local kit replace path of go.mod in apiDir as written.
+// It reports false when there is no local kit replace.
+func KitReplaceTarget(apiDir string) (string, bool, error) {
+	data, err := os.ReadFile(filepath.Join(apiDir, "go.mod"))
+	if err != nil {
+		return "", false, &ui.Error{What: "Cannot read the kit replace", Why: err.Error(), Try: "check api/go.mod and run the command again", Err: err}
+	}
+	target, ok := localKitTarget(string(data))
+	return target, ok, nil
+}
+
 // KitReplaceDir returns the absolute kit directory when go.mod in apiDir replaces the kit
 // with a local path. A relative path is relative to apiDir. It reports false when there is
 // no local replace. It fails when the directory does not exist.

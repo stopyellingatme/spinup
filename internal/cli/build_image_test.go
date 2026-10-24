@@ -10,7 +10,13 @@ import (
 func TestBuildImageDryRun(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if err := os.Mkdir(filepath.Join(root, "api"), 0755); err != nil {
+	for _, dir := range []string{"api", "deploy"} {
+		if err := os.Mkdir(filepath.Join(root, dir), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The web image exists only with deploy/Dockerfile.web.
+	if err := os.WriteFile(filepath.Join(root, "deploy", "Dockerfile.web"), []byte("FROM scratch\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "spinup.toml"), []byte("[app]\nname = 'todo'\n"), 0644); err != nil {

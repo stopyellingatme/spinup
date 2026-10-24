@@ -55,6 +55,30 @@ func TestApplyKeepsCurrentKitReplace(t *testing.T) {
 		}
 		fake.AssertDone(t)
 	})
+	t.Run("relative replace inside the repository keeps its text", func(t *testing.T) {
+		t.Setenv("SPINUP_KIT_REPLACE", "")
+		s := phaseStep(t)
+		main := s.Worktree
+		if err := os.Mkdir(filepath.Join(main, "kit"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		writeAPIMod(t, main, "\nreplace "+phaseKit+" => ../kit\n")
+		work := filepath.Join(main, ".spinup", "upgrade", "0.2.0")
+		// The worktree checks out the same repository, so it has its own kit directory.
+		for _, dir := range []string{"api", "kit"} {
+			if err := os.MkdirAll(filepath.Join(work, dir), 0755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeAPIMod(t, work, "")
+		s.Worktree = work
+		fake := s.Runner.(*exec.Fake)
+		fake.Expect("go", "mod", "edit", "-replace="+phaseKit+"=../kit")
+		if err := phaseApply(context.Background(), s); err != nil {
+			t.Fatal(err)
+		}
+		fake.AssertDone(t)
+	})
 	t.Run("env set wins over the current replace", func(t *testing.T) {
 		envKit := t.TempDir()
 		t.Setenv("SPINUP_KIT_REPLACE", envKit)

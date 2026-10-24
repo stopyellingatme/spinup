@@ -57,7 +57,7 @@ for tool in jq curl openssl "$spinup_bin"; do
 done
 [[ -d "$app_dir" ]] || die "the app directory $app_dir does not exist" "pass the directory of a spinup project"
 [[ -f "$token_file" ]] || die "no stored sign-in at $token_file" "run: $spinup_bin deploy digital-ocean login"
-[[ -r /dev/tty ]] || die "there is no terminal for the confirmation" "run the script in a terminal"
+{ : </dev/tty; } 2>/dev/null || die "there is no terminal for the confirmation" "run the script in a terminal"
 
 work=$(mktemp -d)
 created=0

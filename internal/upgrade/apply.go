@@ -21,10 +21,22 @@ func phaseApply(ctx context.Context, s *Step) error {
 	replace := os.Getenv("SPINUP_KIT_REPLACE")
 	if replace == "" {
 		// The variable wins when it is set. Without it, keep the replace of the current api/go.mod.
-		replace, err = currentKitReplace(s)
-		if err != nil || replace == "" {
+		dir, rel, err := currentKitReplace(s)
+		if err != nil || dir == "" {
 			return err
 		}
+		if rel != "" {
+			// The worktree is a checkout of the same repository. A relative path to a directory
+			// in the repository resolves there too, so the text of the replace stays as it is.
+			if info, err := os.Stat(filepath.Join(s.Worktree, "api", filepath.FromSlash(rel))); err == nil && info.IsDir() {
+				_, err = phaseGo(ctx, s, "mod", "edit", "-replace="+kitModule+"="+rel)
+				return err
+			}
+			if s.Out != nil {
+				_, _ = fmt.Fprintf(s.Out, "Warning: the kit replace %s points outside the repository, so the upgrade writes the absolute path %s. Write %s again in api/go.mod after the merge.\n", rel, filepath.ToSlash(dir), rel)
+			}
+		}
+		replace = dir
 	}
 	replace, err = filepath.Abs(replace)
 	if err != nil {
@@ -43,10 +55,11 @@ func phaseApply(ctx context.Context, s *Step) error {
 }
 
 // currentKitReplace returns the kit directory that the current api/go.mod replaces, or "".
+// It also returns the path as written when that path is relative.
 // The upgrade worktree is <root>/.spinup/upgrade/<version>. A relative replace path is
 // relative to the api directory of the main checkout, so the function reads that go.mod.
 // A replace to a missing directory is an error, because go mod tidy would fail on it.
-func currentKitReplace(s *Step) (string, error) {
+func currentKitReplace(s *Step) (string, string, error) {
 	api := filepath.Join(s.Worktree, "api")
 	if state := filepath.Dir(filepath.Dir(s.Worktree)); filepath.Base(state) == ".spinup" {
 		main := filepath.Join(filepath.Dir(state), "api")
@@ -56,9 +69,13 @@ func currentKitReplace(s *Step) (string, error) {
 	}
 	dir, ok, err := build.KitReplaceDir(api)
 	if err != nil || !ok {
-		return "", err
+		return "", "", err
 	}
-	return dir, nil
+	target, _, err := build.KitReplaceTarget(api)
+	if err != nil || filepath.IsAbs(filepath.FromSlash(target)) {
+		return dir, "", err
+	}
+	return dir, target, nil
 }
 
 func phaseHasAPI(s *Step) (bool, error) {
