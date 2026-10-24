@@ -6,7 +6,7 @@ We want our own CLI, similar to go-buffalo. It creates and operates a complete s
 
 Buffalo failed mostly on maintenance cost. It owned too many tools (an ORM, a migration DSL, an asset pipeline, and a plugin `PATH` scan), and generated apps had no safe upgrade path. This plan avoids those errors. We own only the glue and delegate every tool. The upgrade engine is a first-class part from the start.
 
-The directory `/Users/king/Documents/code/spinup` is empty and is not a git repository. We build the CLI with the `/orchestrate` skill. One orchestrate run builds one milestone (M0 to M10).
+The project directory is empty and is not a git repository. We build the CLI with the `/orchestrate` skill. One orchestrate run builds one milestone (M0 to M10).
 
 How this plan was made:
 1. One workflow did the research, wrote 3 independent designs, merged them, and ran a critic.

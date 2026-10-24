@@ -15,3 +15,20 @@ node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# secrets and local credentials: never commit these
+.env
+.env.*
+!.env.example
+*.age
+*.key
+*.pem
+*.p12
+*.pfx
+*.tfstate
+*.tfstate.*
+*.dec.yaml
+credentials/
+
+# local agent state
+.claude/

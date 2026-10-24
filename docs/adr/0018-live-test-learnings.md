@@ -19,7 +19,7 @@ The test passed, but it showed these problems:
 4. **Gaps in the fake API.** The real API has two rules that `dofake` did not model.
    A firewall refuses a tag that does not exist.
    Destroy also left two empty tags in the account.
-   Both are fixed (`5d165fc`, `885dc5f`), but there can be more such gaps.
+   Both are fixed (`61f3b93`, `71c9e3b`), but there can be more such gaps.
 5. **Small defects:**
    - `status --env` shows the team UUID, but `status` with no environment shows the team name.
    - The SSH cache writes one `known_hosts-<hash>` file for each set of pinned keys, and it never removes old files.
