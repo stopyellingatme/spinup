@@ -1,0 +1,218 @@
+[
+  {
+    "name": "go-build-lint",
+    "command": [
+      "make",
+      "build",
+      "lint"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5",
+    "started_utc": "2026-10-24T21:45:40.269347+00:00",
+    "elapsed_s": 18.295,
+    "exit_code": 0,
+    "load1_before": 7.646484375,
+    "load1_after": 9.67626953125,
+    "uptime_before": "16:45  20 users, load averages: 7.65 10.51 13.38",
+    "uptime_after": "16:45  20 users, load averages: 9.68 10.82 13.45"
+  },
+  {
+    "name": "linux-path-check",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "r0-05-paths",
+      "--all-targets",
+      "--target",
+      "x86_64-unknown-linux-gnu",
+      "--offline",
+      "--locked"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:45:53.505963+00:00",
+    "elapsed_s": 6.817,
+    "exit_code": 0,
+    "load1_before": 10.08349609375,
+    "load1_after": 10.0224609375,
+    "uptime_before": "16:45  20 users, load averages: 10.08 10.92 13.50",
+    "uptime_after": "16:46  20 users, load averages: 10.02 10.88 13.45"
+  },
+  {
+    "name": "windows-path-check",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "r0-05-paths",
+      "--all-targets",
+      "--target",
+      "x86_64-pc-windows-gnu",
+      "--offline",
+      "--locked"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:46:13.834376+00:00",
+    "elapsed_s": 3.851,
+    "exit_code": 0,
+    "load1_before": 11.599609375,
+    "load1_after": 11.599609375,
+    "uptime_before": "16:46  20 users, load averages: 11.60 11.19 13.52",
+    "uptime_after": "16:46  20 users, load averages: 11.60 11.19 13.52"
+  },
+  {
+    "name": "go-build-lint-final",
+    "command": [
+      "make",
+      "build",
+      "lint"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5",
+    "started_utc": "2026-10-24T21:47:12.672131+00:00",
+    "elapsed_s": 7.044,
+    "exit_code": 0,
+    "load1_before": 12.2109375,
+    "load1_after": 11.71044921875,
+    "uptime_before": "16:47  20 users, load averages: 12.21 11.59 13.53",
+    "uptime_after": "16:47  20 users, load averages: 11.71 11.50 13.47"
+  },
+  {
+    "name": "rust-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:47:31.762096+00:00",
+    "elapsed_s": 7.927,
+    "exit_code": 0,
+    "load1_before": 11.96923828125,
+    "load1_after": 12.38671875,
+    "uptime_before": "16:47  20 users, load averages: 11.97 11.57 13.47",
+    "uptime_after": "16:47  20 users, load averages: 12.39 11.67 13.48"
+  },
+  {
+    "name": "rust-archive-write",
+    "command": [
+      "cargo",
+      "run",
+      "--bin",
+      "write-archive",
+      "--offline",
+      "--locked",
+      "--",
+      "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.5/r0-05-rust.tar.zst"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:48:21.370879+00:00",
+    "elapsed_s": 1.777,
+    "exit_code": 0,
+    "load1_before": 13.962890625,
+    "load1_after": 13.962890625,
+    "uptime_before": "16:48  20 users, load averages: 13.96 12.19 13.59",
+    "uptime_after": "16:48  20 users, load averages: 13.96 12.19 13.59"
+  },
+  {
+    "name": "go-oracle-and-rust-archive",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "./internal/oracle/...",
+      "-count=2",
+      "-update",
+      "-rust-archive",
+      "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.5/r0-05-rust.tar.zst"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5",
+    "started_utc": "2026-10-24T21:48:40.925708+00:00",
+    "elapsed_s": 5.196,
+    "exit_code": 0,
+    "load1_before": 12.22412109375,
+    "load1_after": 13.9677734375,
+    "uptime_before": "16:48  20 users, load averages: 12.22 11.90 13.46",
+    "uptime_after": "16:48  20 users, load averages: 13.97 12.27 13.58"
+  },
+  {
+    "name": "linux-path-check-final",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "r0-05-paths",
+      "--all-targets",
+      "--target",
+      "x86_64-unknown-linux-gnu",
+      "--offline",
+      "--locked"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:49:23.679990+00:00",
+    "elapsed_s": 0.619,
+    "exit_code": 0,
+    "load1_before": 11.88916015625,
+    "load1_after": 12.61865234375,
+    "uptime_before": "16:49  20 users, load averages: 11.89 11.90 13.39",
+    "uptime_after": "16:49  20 users, load averages: 12.62 12.05 13.43"
+  },
+  {
+    "name": "windows-path-check-final",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "r0-05-paths",
+      "--all-targets",
+      "--target",
+      "x86_64-pc-windows-gnu",
+      "--offline",
+      "--locked"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5/spikes-rs/r0-05-interop",
+    "started_utc": "2026-10-24T21:49:24.358876+00:00",
+    "elapsed_s": 0.591,
+    "exit_code": 0,
+    "load1_before": 12.61865234375,
+    "load1_after": 12.61865234375,
+    "uptime_before": "16:49  20 users, load averages: 12.62 12.05 13.43",
+    "uptime_after": "16:49  20 users, load averages: 12.62 12.05 13.43"
+  },
+  {
+    "name": "spike-check",
+    "command": [
+      "scripts/rust/spike-check.sh",
+      "r0-05"
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5",
+    "started_utc": "2026-10-24T21:49:24.859150+00:00",
+    "elapsed_s": 2.321,
+    "exit_code": 0,
+    "load1_before": 12.61865234375,
+    "load1_after": 12.61865234375,
+    "uptime_before": "16:49  20 users, load averages: 12.62 12.05 13.43",
+    "uptime_after": "16:49  20 users, load averages: 12.62 12.05 13.43"
+  },
+  {
+    "name": "go-oracle-frozen",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "./internal/oracle/..."
+    ],
+    "cwd": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.5",
+    "started_utc": "2026-10-24T21:50:30.676272+00:00",
+    "elapsed_s": 3.521,
+    "exit_code": 0,
+    "load1_before": 10.26904296875,
+    "load1_after": 9.7666015625,
+    "uptime_before": "16:50  20 users, load averages: 10.27 11.55 13.14",
+    "uptime_after": "16:50  20 users, load averages: 9.77 11.43 13.09"
+  }
+]
