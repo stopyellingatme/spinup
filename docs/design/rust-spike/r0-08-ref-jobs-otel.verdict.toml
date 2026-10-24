@@ -1,0 +1,20 @@
+# R0.8 verdict. spike-check.sh reads this file. R0.15 reads it, not the prose.
+spike = "r0-08"
+verdict = "go"        # go | soft | no-go
+# R0.8 has no numeric fields in its unit row. These numbers are for R0.15.
+chaos_jobs = 10000
+chaos_kills = 50
+chaos_lost_jobs = 0                # both runs
+chaos_completed_twice = 0          # both runs
+chaos_duplicate_effects = 56       # run 2 (run 1: 66). Only after a kill: at-least-once.
+chaos_retry_time_violations = 0    # retry_at = failure + 100 ms x attempt^2, next attempt after retry_at
+chaos_run_s = 24.2                 # run 2, debug, load1 7.9 to 10.8 (run 1: 29.8 s, load1 11.6 to 13.7)
+chaos_baseline_no_kills_s = 12.7   # about 790 jobs/s, 2 workers x 8 slots, debug
+metric_names_match_pack = true     # in-memory exporter plus the Prometheus conversion rules
+otlp_http_export = "pass"          # fake collector: traces, metrics, logs (protobuf)
+grafana_red_panel = "pass"         # grafana/otel-lgtm 0.36.0 (pinned digest), 7 of 9 queries have data, the 2 empty ones need 5xx traffic
+added_packages = 27                # 199 to 226
+added_clean_debug_build_s = 2.3    # 43.3 to 45.6 s, load1 12.7 to 18.9
+added_clean_release_build_s = 6.8  # 80.0 to 86.8 s
+added_release_binary_mb = 4.0      # 11.3 to 15.3 MB (stripped 8.8 to 11.7 MB)
+added_debug_binary_mb = 14.4       # 34.6 to 49.0 MB

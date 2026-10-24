@@ -6,3 +6,33 @@ members = ["kit", "todo-api"]
 edition = "2024"
 rust-version = "1.99"
 publish = false
+
+[workspace.dependencies]
+anyhow = "1.0.104"
+axum = { version = "0.8.9", features = ["macros"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+fastrand = "2.5.0"
+futures = "0.3.34"
+http-body-util = "0.1.5"
+opentelemetry = { version = "0.33.1", features = ["trace", "metrics", "logs"] }
+opentelemetry-appender-tracing = "0.33.1"
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
+opentelemetry-proto = { version = "0.33.1", default-features = false, features = ["gen-tonic-messages", "trace", "metrics", "logs"] }
+# The batch processors and the periodic reader run as tokio tasks, because the
+# reqwest client of the OTLP HTTP exporter needs the tokio reactor.
+opentelemetry_sdk = { version = "0.33.1", features = ["rt-tokio", "trace", "metrics", "logs", "experimental_trace_batch_span_processor_with_async_runtime", "experimental_metrics_periodicreader_with_async_runtime", "experimental_logs_batch_log_processor_with_async_runtime"] }
+prost = "0.14.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+serde_urlencoded = "0.7.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json", "derive"] }
+time = { version = "0.3.55", features = ["serde", "serde-human-readable", "formatting", "parsing", "macros"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tower = { version = "0.5.3", features = ["util"] }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.34.0"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+utoipa = { version = "6.0.0", features = ["yaml", "uuid", "time", "axum_extras"] }
+utoipa-axum = "0.3.0"
+uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
