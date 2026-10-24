@@ -1,0 +1,42 @@
+name: Prepare the test machine
+description: >-
+  Set up Node, install the pinned CI tools (actionlint, shellcheck, bun), and fill the
+  Go module cache, the pnpm store, and the bun cache that offline tests need.
+  Run this step after actions/checkout and actions/setup-go.
+
+inputs:
+  tools:
+    description: Space separated tools for scripts/ci/install-tools.sh.
+    default: actionlint shellcheck bun
+  warm:
+    description: Targets for scripts/ci/warm-cache.sh (go, node, or both).
+    default: go node
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: "24"
+    - name: Install the CI tools
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      # TOOLS holds a short list of known names. The shell splits it into words on purpose.
+      run: scripts/ci/install-tools.sh $TOOLS
+    - name: Restore the pnpm and bun caches
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.spinup-ci/pnpm
+          ~/.bun/install/cache
+          ~/.cache/node/corepack
+        key: tests-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('testdata/golden/**/pnpm-lock.yaml', 'testdata/golden/**/bun.lock', 'scripts/ci/warm-cache.sh', 'internal/stackversions/stackversions.yaml') }}
+        restore-keys: |
+          tests-${{ runner.os }}-${{ runner.arch }}-
+    - name: Fill the module, pnpm, and bun caches
+      shell: bash
+      env:
+        WARM: ${{ inputs.warm }}
+      # WARM holds the words go and node. The shell splits it into words on purpose.
+      run: scripts/ci/warm-cache.sh $WARM

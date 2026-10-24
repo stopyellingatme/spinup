@@ -23,9 +23,15 @@ jobs:
           cache-dependency-path: |
             go.sum
             kit/go.sum
-      - name: Cache dependencies for generated apps
-        working-directory: kit
-        run: go mod download
+            testdata/golden/**/go.sum
+            testdata/golden/**/tools.sum
+            testdata/corpus/**/go.sum
+            testdata/corpus/**/tools.sum
+      - name: Prepare the test machine
+        uses: ./.github/actions/prepare-tests
+        with:
+          tools: actionlint
+          warm: go
       - name: Upgrade frozen apps and build the results
         run: SPINUP_MATRIX_BUILD=1 go test -race -run 'Matrix|LockSchema' ./internal/upgrade/
       - name: Require template migration decisions

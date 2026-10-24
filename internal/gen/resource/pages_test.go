@@ -456,6 +456,16 @@ func TestPageNames(t *testing.T) {
 	}
 }
 
+// skipOrFailInCI skips a test whose tool is missing on a developer machine. When CI is set,
+// a missing tool is a CI setup error, so the test fails and CI stays meaningful.
+func skipOrFailInCI(t *testing.T, reason string) {
+	t.Helper()
+	if os.Getenv("CI") != "" {
+		t.Fatalf("%s\nTry: set up Node 24 in the CI job (scripts/ci/warm-cache.sh needs it)", reason)
+	}
+	t.Skip(reason)
+}
+
 // TestPageSchemaRoundTrip runs schema.ts in Node with the zod version of the web
 // pack: the form values of an item pass the schema and convert back to the
 // same API body, and invalid values get their messages.
@@ -463,7 +473,7 @@ func TestPageSchemaRoundTrip(t *testing.T) {
 	t.Parallel()
 	node, err := runexec.LookPath("node")
 	if err != nil {
-		t.Skip("node is not on PATH: put Node 24 on PATH (the Makefile does)")
+		skipOrFailInCI(t, "node is not on PATH: put Node 24 on PATH (the Makefile does)")
 	}
 	// The repository wrapper runs the pinned pnpm through corepack. A global pnpm of another
 	// version has no offline metadata for the pinned packages.
@@ -472,7 +482,7 @@ func TestPageSchemaRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := runexec.LookPath("corepack"); err != nil {
-		t.Skip("corepack is not on PATH: put Node 24 on PATH (the Makefile does)")
+		skipOrFailInCI(t, "corepack is not on PATH: put Node 24 on PATH (the Makefile does)")
 	}
 	root := webApp(t)
 	plan := planTodo(t, root, "title:string", "done:bool", "count:int", "size:bigint?", "ratio:float", "price:decimal?",

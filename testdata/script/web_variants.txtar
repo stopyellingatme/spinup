@@ -64,7 +64,7 @@ cd ../..
 
 exec spinup new pnpmhey --module example.com/pnpmhey --api-client heyapi --no-git --non-interactive
 cd pnpmhey/web
-exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_HOME/Library/pnpm/store
+exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_STORE
 exec pnpm check
 stdout '(?i)\b0 errors\b'
 cd ..

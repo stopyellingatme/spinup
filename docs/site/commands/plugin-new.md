@@ -22,7 +22,7 @@ spinup plugin new <name> [flags]
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--out` | `` | destination directory (default ./<name>) |
-| `--platform` | `darwin-arm64` | executable target as GOOS-GOARCH |
+| `--platform` | `` | executable target as GOOS-GOARCH (default: the current platform) |
 | `--sdk-path` | `` | local plugin-sdk directory for an executable plugin |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
