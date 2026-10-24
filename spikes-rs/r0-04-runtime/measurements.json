@@ -1,0 +1,302 @@
+{
+  "machine": {
+    "uname": "Darwin macbookpro.lan 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:30:44 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T6000 arm64",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "jobs": "4",
+    "rustc_wrapper": "unset"
+  },
+  "release": {
+    "sync-cli": {
+      "clean": {
+        "seconds": 15.581,
+        "uptime_before": "16:30  20 users, load averages: 13.23 14.76 14.61",
+        "uptime_after": "16:30  20 users, load averages: 11.96 14.41 14.49",
+        "exit_code": 0,
+        "command": "cargo build --release -p sync-cli --bin sync-cli --offline --locked"
+      },
+      "warm": {
+        "seconds": 4.288,
+        "uptime_before": "16:30  20 users, load averages: 11.96 14.41 14.49",
+        "uptime_after": "16:30  20 users, load averages: 11.65 14.31 14.45",
+        "exit_code": 0,
+        "command": "cargo build --release -p sync-cli --bin sync-cli --offline --locked"
+      },
+      "stripped_bytes": 1921600,
+      "file": "Mach-O 64-bit executable arm64",
+      "nm_defined_lines": 1
+    },
+    "async-cli": {
+      "clean": {
+        "seconds": 39.939,
+        "uptime_before": "16:34  20 users, load averages: 20.83 19.10 16.49",
+        "uptime_after": "16:34  20 users, load averages: 16.10 18.10 16.24",
+        "exit_code": 0,
+        "command": "cargo build --release -p async-cli --bin async-cli --offline --locked"
+      },
+      "warm": {
+        "seconds": 5.837,
+        "uptime_before": "16:34  20 users, load averages: 16.10 18.10 16.24",
+        "uptime_after": "16:34  20 users, load averages: 16.57 18.17 16.27",
+        "exit_code": 0,
+        "command": "cargo build --release -p async-cli --bin async-cli --offline --locked"
+      },
+      "stripped_bytes": 3838320,
+      "file": "Mach-O 64-bit executable arm64",
+      "nm_defined_lines": 1
+    }
+  },
+  "cross": [
+    {
+      "target": "aarch64-apple-darwin",
+      "package": "sync-cli",
+      "exit_code": 0,
+      "command": "cargo check -p sync-cli --target aarch64-apple-darwin --offline --locked",
+      "errors": []
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "package": "async-cli",
+      "exit_code": 0,
+      "command": "cargo check -p async-cli --target aarch64-apple-darwin --offline --locked",
+      "errors": []
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "package": "sync-cli",
+      "exit_code": 0,
+      "command": "cargo check -p sync-cli --target x86_64-apple-darwin --offline --locked",
+      "errors": []
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "package": "async-cli",
+      "exit_code": 0,
+      "command": "cargo check -p async-cli --target x86_64-apple-darwin --offline --locked",
+      "errors": []
+    },
+    {
+      "target": "x86_64-unknown-linux-musl",
+      "package": "sync-cli",
+      "exit_code": 101,
+      "command": "cargo check -p sync-cli --target x86_64-unknown-linux-musl --offline --locked",
+      "errors": [
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "error: failed to run custom build command for `ring v0.17.14`",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "x86_64-unknown-linux-musl",
+      "package": "async-cli",
+      "exit_code": 101,
+      "command": "cargo check -p async-cli --target x86_64-unknown-linux-musl --offline --locked",
+      "errors": [
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: \"failed to find tool \\\"x86_64-linux-musl-gcc\\\": No such file or directory (os error 2)\" }).",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: \"failed to find tool \\\"x86_64-linux-musl-gcc\\\": No such file or directory (os error 2)\" }).",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"x86_64-linux-musl-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "aarch64-unknown-linux-musl",
+      "package": "sync-cli",
+      "exit_code": 101,
+      "command": "cargo check -p sync-cli --target aarch64-unknown-linux-musl --offline --locked",
+      "errors": [
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "error: failed to run custom build command for `ring v0.17.14`",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "aarch64-unknown-linux-musl",
+      "package": "async-cli",
+      "exit_code": 101,
+      "command": "cargo check -p async-cli --target aarch64-unknown-linux-musl --offline --locked",
+      "errors": [
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: \"failed to find tool \\\"aarch64-linux-musl-gcc\\\": No such file or directory (os error 2)\" }).",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: \"failed to find tool \\\"aarch64-linux-musl-gcc\\\": No such file or directory (os error 2)\" }).",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"aarch64-linux-musl-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "x86_64-pc-windows-gnu",
+      "package": "sync-cli",
+      "exit_code": 101,
+      "command": "cargo check -p sync-cli --target x86_64-pc-windows-gnu --offline --locked",
+      "errors": [
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "error: failed to run custom build command for `ring v0.17.14`",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "x86_64-pc-windows-gnu",
+      "package": "async-cli",
+      "exit_code": 101,
+      "command": "cargo check -p async-cli --target x86_64-pc-windows-gnu --offline --locked",
+      "errors": [
+        "  cargo:warning=Compilation of 'builtin_swap_check.c' failed - Err(Error { kind: ToolNotFound, message: \"failed to find tool \\\"x86_64-w64-mingw32-gcc\\\": No such file or directory (os error 2)\" }).",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)",
+        "  Failed to compile jitterentropy: ToolNotFound: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "aarch64-pc-windows-gnullvm",
+      "package": "sync-cli",
+      "exit_code": 101,
+      "command": "cargo check -p sync-cli --target aarch64-pc-windows-gnullvm --offline --locked",
+      "errors": [
+        "error: could not compile `cfg-if` (lib) due to 1 previous error",
+        "error: could not compile `zeroize` (lib) due to 1 previous error",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "warning: ring@0.17.14: Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "error: failed to run custom build command for `ring v0.17.14`",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)",
+        "  error occurred in cc-rs: failed to find tool \"aarch64-w64-mingw32-clang\": No such file or directory (os error 2)"
+      ]
+    },
+    {
+      "target": "aarch64-pc-windows-gnullvm",
+      "package": "async-cli",
+      "exit_code": 101,
+      "command": "cargo check -p async-cli --target aarch64-pc-windows-gnullvm --offline --locked",
+      "errors": [
+        "error[E0463]: can't find crate for `core`",
+        "For more information about this error, try `rustc --explain E0463`.",
+        "error: could not compile `stable_deref_trait` (lib) due to 1 previous error",
+        "error: could not compile `windows-link` (lib) due to 1 previous error",
+        "error: could not compile `zerofrom` (lib) due to 1 previous error",
+        "error: could not compile `bytes` (lib) due to 1 previous error"
+      ]
+    }
+  ],
+  "lines": {
+    "common": {
+      "physical": 160,
+      "nonblank_noncomment": 142
+    },
+    "sync-cli": {
+      "physical": 246,
+      "nonblank_noncomment": 240
+    },
+    "async-cli": {
+      "physical": 182,
+      "nonblank_noncomment": 176
+    }
+  },
+  "cross_zig": [
+    {
+      "target": "x86_64-unknown-linux-musl",
+      "package": "sync-cli",
+      "exit_code": 0,
+      "command": "cargo check -p sync-cli --target x86_64-unknown-linux-musl --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "x86_64-linux-musl",
+      "errors": []
+    },
+    {
+      "target": "x86_64-unknown-linux-musl",
+      "package": "async-cli",
+      "exit_code": 0,
+      "command": "cargo check -p async-cli --target x86_64-unknown-linux-musl --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "x86_64-linux-musl",
+      "errors": []
+    },
+    {
+      "target": "aarch64-unknown-linux-musl",
+      "package": "sync-cli",
+      "exit_code": 0,
+      "command": "cargo check -p sync-cli --target aarch64-unknown-linux-musl --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "aarch64-linux-musl",
+      "errors": []
+    },
+    {
+      "target": "aarch64-unknown-linux-musl",
+      "package": "async-cli",
+      "exit_code": 0,
+      "command": "cargo check -p async-cli --target aarch64-unknown-linux-musl --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "aarch64-linux-musl",
+      "errors": []
+    },
+    {
+      "target": "x86_64-pc-windows-gnu",
+      "package": "sync-cli",
+      "exit_code": 0,
+      "command": "cargo check -p sync-cli --target x86_64-pc-windows-gnu --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "x86_64-windows-gnu",
+      "errors": []
+    },
+    {
+      "target": "x86_64-pc-windows-gnu",
+      "package": "async-cli",
+      "exit_code": 0,
+      "command": "cargo check -p async-cli --target x86_64-pc-windows-gnu --offline --locked",
+      "cc": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.4/spikes-rs/r0-04-runtime/zig-cc.py",
+      "ar": "zig ar",
+      "zig_target": "x86_64-windows-gnu",
+      "errors": []
+    }
+  ]
+}
