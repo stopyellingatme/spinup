@@ -35,6 +35,7 @@ Read these before you change anything:
 - The M12 contracts (resource ownership, the API reference, navigation and home, the sign-in flow, resource pages with superforms) are in `docs/adr/0015-m12-contracts.md`. The vendored Scalar bundle `kit/apidocs/assets/` is a shared file (main loop only).
 - The auth rate limit contract (endpoints, classes, client addresses, trusted proxies, the 429 answer) is in `docs/adr/0016-auth-rate-limit.md`.
 - The DigitalOcean deploy contract (commands, the browser sign-in and token store, the API client, resources and tags, host key pins, provisioning steps, sslip.io, secret generation) is in `docs/adr/0017-digitalocean-deploy.md`.
+- The changes from the first live DigitalOcean test (the public repository and the kit pin, the local kit build context, the kit replace on upgrade, `--confirm-env`, the fake API rules, the live test script) are in `docs/adr/0018-live-test-learnings.md`.
 
 ## Commands
 

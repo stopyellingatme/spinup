@@ -28,6 +28,7 @@ go_modules:
   golang.org/x/term: v0.47.0
 
   # kit and generated API
+  github.com/stopyellingatme/spinup/kit: v0.1.0   # the kit tag that generated apps require (ADR 0018); bump after each kit tag push
   github.com/oapi-codegen/oapi-codegen/v2: v2.8.0
   github.com/oapi-codegen/runtime: v1.7.0       # the only runtime import of generated strict servers (no embedded spec, ADR 0007)
   github.com/jackc/pgx/v5: v5.11.0        # above the CVE-2026-41889 fix (5.9.2); pin explicitly, pgxstore wants 5.5.4
