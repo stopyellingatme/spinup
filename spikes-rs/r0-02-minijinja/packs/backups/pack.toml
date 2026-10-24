@@ -1,0 +1,24 @@
+name = "backups"
+description = "Continuous PostgreSQL backups with pgBackRest: full, differential, and WAL to encrypted S3-compatible storage."
+requires = ["deploy"]
+
+# The pgBackRest configuration. spinup backup now and the pre-deploy backup upload it to
+# /opt/<app>/backups/pgbackrest.conf. The repository options and keys come from the
+# PGBACKREST_* secrets, never from this file.
+[[files]]
+path = "deploy/pgbackrest/pgbackrest.conf"
+source = "files/deploy/pgbackrest/pgbackrest.conf.tmpl"
+class = "managed"
+
+# The Compose override of compose.edge.yml for Postgres: WAL archiving, the secrets, the
+# configuration mount, and a network with outbound access to the S3 endpoint.
+[[files]]
+path = "deploy/compose.backups.yml"
+source = "files/deploy/compose.backups.yml.tmpl"
+class = "managed"
+
+# Both overrides are generated. The deployer selects exactly one by backend.
+[[files]]
+path = "deploy/compose.backups-walg.yml"
+source = "files/deploy/compose.backups-walg.yml.tmpl"
+class = "managed"

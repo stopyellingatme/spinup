@@ -1,0 +1,3212 @@
+[
+  {
+    "name": "base",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "app_name": "todo",
+      "db_version": "18",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ]
+    },
+    "files": [
+      {
+        "pack": "base",
+        "source": "files/spinup.toml.tmpl",
+        "path": "spinup.toml",
+        "mode": "0644"
+      },
+      {
+        "pack": "base",
+        "source": "files/.gitattributes",
+        "path": ".gitattributes",
+        "mode": "0644"
+      },
+      {
+        "pack": "base",
+        "source": "files/.gitignore",
+        "path": ".gitignore",
+        "mode": "0644"
+      },
+      {
+        "pack": "base",
+        "source": "files/.env.example",
+        "path": ".env.example",
+        "mode": "0644"
+      },
+      {
+        "pack": "base",
+        "source": "files/README.md.tmpl",
+        "path": "README.md",
+        "mode": "0644"
+      },
+      {
+        "pack": "base",
+        "source": "files/renovate.json.tmpl",
+        "path": "renovate.json",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/vite.config.js",
+        "path": "web/vite.config.js",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/tsconfig.json",
+        "path": "web/tsconfig.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/gitignore",
+        "path": "web/.gitignore",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/dockerignore",
+        "path": "web/.dockerignore",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/components.json",
+        "path": "web/components.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.html.tmpl",
+        "path": "web/src/app.html",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.css",
+        "path": "web/src/app.css",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.d.ts",
+        "path": "web/src/app.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/env.ts",
+        "path": "web/src/env.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/hooks.server.ts",
+        "path": "web/src/hooks.server.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/utils.ts",
+        "path": "web/src/lib/utils.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+layout.svelte.tmpl",
+        "path": "web/src/routes/+layout.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+layout.server.ts",
+        "path": "web/src/routes/+layout.server.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+page.svelte.tmpl",
+        "path": "web/src/routes/+page.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/healthz/+server.ts",
+        "path": "web/src/routes/healthz/+server.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/deploy/Dockerfile.web.tmpl",
+        "path": "deploy/Dockerfile.web",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/playwright.config.ts.tmpl",
+        "path": "web/playwright.config.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/e2e/smoke.spec.ts.tmpl",
+        "path": "web/e2e/smoke.spec.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/button/button.svelte",
+        "path": "web/src/lib/components/ui/button/button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/button/index.ts",
+        "path": "web/src/lib/components/ui/button/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-action.svelte",
+        "path": "web/src/lib/components/ui/card/card-action.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-content.svelte",
+        "path": "web/src/lib/components/ui/card/card-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-description.svelte",
+        "path": "web/src/lib/components/ui/card/card-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-footer.svelte",
+        "path": "web/src/lib/components/ui/card/card-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-header.svelte",
+        "path": "web/src/lib/components/ui/card/card-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-title.svelte",
+        "path": "web/src/lib/components/ui/card/card-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card.svelte",
+        "path": "web/src/lib/components/ui/card/card.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/index.ts",
+        "path": "web/src/lib/components/ui/card/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/input/index.ts",
+        "path": "web/src/lib/components/ui/input/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/input/input.svelte",
+        "path": "web/src/lib/components/ui/input/input.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/label/index.ts",
+        "path": "web/src/lib/components/ui/label/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/label/label.svelte",
+        "path": "web/src/lib/components/ui/label/label.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/index.ts",
+        "path": "web/src/lib/components/ui/alert-dialog/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/badge/badge.svelte",
+        "path": "web/src/lib/components/ui/badge/badge.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/badge/index.ts",
+        "path": "web/src/lib/components/ui/badge/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/checkbox/checkbox.svelte",
+        "path": "web/src/lib/components/ui/checkbox/checkbox.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/checkbox/index.ts",
+        "path": "web/src/lib/components/ui/checkbox/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/index.ts",
+        "path": "web/src/lib/components/ui/dropdown-menu/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/index.ts",
+        "path": "web/src/lib/components/ui/pagination/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-content.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-ellipsis.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-ellipsis.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-item.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-link.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-link.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-next-button.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-next-button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-next.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-next.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-prev-button.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-prev-button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-previous.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-previous.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/separator/index.ts",
+        "path": "web/src/lib/components/ui/separator/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/separator/separator.svelte",
+        "path": "web/src/lib/components/ui/separator/separator.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/index.ts",
+        "path": "web/src/lib/components/ui/sheet/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-close.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-close.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-content.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-description.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-footer.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-header.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-overlay.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-overlay.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-portal.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-title.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-trigger.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/skeleton/index.ts",
+        "path": "web/src/lib/components/ui/skeleton/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/skeleton/skeleton.svelte",
+        "path": "web/src/lib/components/ui/skeleton/skeleton.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sonner/index.ts",
+        "path": "web/src/lib/components/ui/sonner/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sonner/sonner.svelte",
+        "path": "web/src/lib/components/ui/sonner/sonner.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/index.ts",
+        "path": "web/src/lib/components/ui/table/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-body.svelte",
+        "path": "web/src/lib/components/ui/table/table-body.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-caption.svelte",
+        "path": "web/src/lib/components/ui/table/table-caption.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-cell.svelte",
+        "path": "web/src/lib/components/ui/table/table-cell.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-footer.svelte",
+        "path": "web/src/lib/components/ui/table/table-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-head.svelte",
+        "path": "web/src/lib/components/ui/table/table-head.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-header.svelte",
+        "path": "web/src/lib/components/ui/table/table-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-row.svelte",
+        "path": "web/src/lib/components/ui/table/table-row.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table.svelte",
+        "path": "web/src/lib/components/ui/table/table.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/nav.gen.ts",
+        "path": "web/src/lib/nav.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/app-sidebar.svelte",
+        "path": "web/src/lib/components/app/app-sidebar.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/top-bar.svelte",
+        "path": "web/src/lib/components/app/top-bar.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/page-header.svelte",
+        "path": "web/src/lib/components/app/page-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/field.svelte",
+        "path": "web/src/lib/components/app/field.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/row-menu.svelte",
+        "path": "web/src/lib/components/app/row-menu.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+error.svelte",
+        "path": "web/src/routes/+error.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/instrumentation.server.ts",
+        "path": "web/src/instrumentation.server.ts",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/node-pnpm-openapi-fetch",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/deploy/Dockerfile.web.tmpl",
+        "path": "deploy/Dockerfile.web",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/node-pnpm-heyapi",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "heyapi",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/deploy/Dockerfile.web.tmpl",
+        "path": "deploy/Dockerfile.web",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/api.ts",
+        "path": "[[ \"web/src/lib/api/client.ts\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/index.ts",
+        "path": "web/src/lib/api/client/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/types.gen.ts",
+        "path": "web/src/lib/api/client/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/utils.gen.ts",
+        "path": "web/src/lib/api/client/client/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/auth.gen.ts",
+        "path": "web/src/lib/api/client/core/auth.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/bodySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/bodySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/params.gen.ts",
+        "path": "web/src/lib/api/client/core/params.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/pathSerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/pathSerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/queryKeySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/queryKeySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/serverSentEvents.gen.ts",
+        "path": "web/src/lib/api/client/core/serverSentEvents.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/types.gen.ts",
+        "path": "web/src/lib/api/client/core/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/utils.gen.ts",
+        "path": "web/src/lib/api/client/core/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/index.ts",
+        "path": "web/src/lib/api/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/sdk.gen.ts",
+        "path": "web/src/lib/api/client/sdk.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/types.gen.ts",
+        "path": "web/src/lib/api/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/node-bun-openapi-fetch",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "bun",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/deploy/Dockerfile.web.tmpl",
+        "path": "deploy/Dockerfile.web",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/bun.lock",
+        "path": "web/bun.lock",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/node-bun-heyapi",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "heyapi",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "bun",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/deploy/Dockerfile.web.tmpl",
+        "path": "deploy/Dockerfile.web",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/bun.lock",
+        "path": "web/bun.lock",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/api.ts",
+        "path": "[[ \"web/src/lib/api/client.ts\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/index.ts",
+        "path": "web/src/lib/api/client/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/types.gen.ts",
+        "path": "web/src/lib/api/client/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/utils.gen.ts",
+        "path": "web/src/lib/api/client/client/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/auth.gen.ts",
+        "path": "web/src/lib/api/client/core/auth.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/bodySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/bodySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/params.gen.ts",
+        "path": "web/src/lib/api/client/core/params.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/pathSerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/pathSerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/queryKeySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/queryKeySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/serverSentEvents.gen.ts",
+        "path": "web/src/lib/api/client/core/serverSentEvents.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/types.gen.ts",
+        "path": "web/src/lib/api/client/core/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/utils.gen.ts",
+        "path": "web/src/lib/api/client/core/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/index.ts",
+        "path": "web/src/lib/api/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/sdk.gen.ts",
+        "path": "web/src/lib/api/client/sdk.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/types.gen.ts",
+        "path": "web/src/lib/api/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/embed-pnpm-openapi-fetch",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "embed",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/embed-pnpm-heyapi",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "heyapi",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "embed",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/api.ts",
+        "path": "[[ \"web/src/lib/api/client.ts\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/index.ts",
+        "path": "web/src/lib/api/client/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/types.gen.ts",
+        "path": "web/src/lib/api/client/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/utils.gen.ts",
+        "path": "web/src/lib/api/client/client/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/auth.gen.ts",
+        "path": "web/src/lib/api/client/core/auth.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/bodySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/bodySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/params.gen.ts",
+        "path": "web/src/lib/api/client/core/params.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/pathSerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/pathSerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/queryKeySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/queryKeySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/serverSentEvents.gen.ts",
+        "path": "web/src/lib/api/client/core/serverSentEvents.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/types.gen.ts",
+        "path": "web/src/lib/api/client/core/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/utils.gen.ts",
+        "path": "web/src/lib/api/client/core/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/index.ts",
+        "path": "web/src/lib/api/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/sdk.gen.ts",
+        "path": "web/src/lib/api/client/sdk.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/types.gen.ts",
+        "path": "web/src/lib/api/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/embed-bun-openapi-fetch",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "embed",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "bun",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/bun.lock",
+        "path": "web/bun.lock",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-variants/embed-bun-heyapi",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "heyapi",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "embed",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "bun",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/bun.lock",
+        "path": "web/bun.lock",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/api.ts",
+        "path": "[[ \"web/src/lib/api/client.ts\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/index.ts",
+        "path": "web/src/lib/api/client/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/types.gen.ts",
+        "path": "web/src/lib/api/client/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client/utils.gen.ts",
+        "path": "web/src/lib/api/client/client/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/client.gen.ts",
+        "path": "web/src/lib/api/client/client.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/auth.gen.ts",
+        "path": "web/src/lib/api/client/core/auth.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/bodySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/bodySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/params.gen.ts",
+        "path": "web/src/lib/api/client/core/params.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/pathSerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/pathSerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/queryKeySerializer.gen.ts",
+        "path": "web/src/lib/api/client/core/queryKeySerializer.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/serverSentEvents.gen.ts",
+        "path": "web/src/lib/api/client/core/serverSentEvents.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/types.gen.ts",
+        "path": "web/src/lib/api/client/core/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/core/utils.gen.ts",
+        "path": "web/src/lib/api/client/core/utils.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/index.ts",
+        "path": "web/src/lib/api/client/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/sdk.gen.ts",
+        "path": "web/src/lib/api/client/sdk.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "variants/client/types.gen.ts",
+        "path": "web/src/lib/api/client/types.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "web-embed",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "embed",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/tsconfig.json",
+        "path": "web/tsconfig.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/gitignore",
+        "path": "web/.gitignore",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/dockerignore",
+        "path": "web/.dockerignore",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/components.json",
+        "path": "web/components.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.html.tmpl",
+        "path": "web/src/app.html",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.css",
+        "path": "web/src/app.css",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/app.d.ts",
+        "path": "web/src/app.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/env.ts",
+        "path": "web/src/env.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/utils.ts",
+        "path": "web/src/lib/utils.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/client.ts",
+        "path": "web/src/lib/api/client.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/api/schema.d.ts",
+        "path": "web/src/lib/api/schema.d.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+page.svelte.tmpl",
+        "path": "web/src/routes/+page.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/package.json.tmpl",
+        "path": "web/package.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-lock.yaml",
+        "path": "web/pnpm-lock.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/pnpm-workspace.yaml",
+        "path": "web/pnpm-workspace.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/playwright.config.ts.tmpl",
+        "path": "web/playwright.config.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/e2e/smoke.spec.ts.tmpl",
+        "path": "web/e2e/smoke.spec.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "embed/vite.config.js",
+        "path": "[[ \"web/vite.config.js\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "embed/layout.ts",
+        "path": "[[ \"web/src/routes/+layout.ts\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+layout.svelte.tmpl",
+        "path": "[[ \"web/src/routes/+layout.svelte\" ]]",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/button/button.svelte",
+        "path": "web/src/lib/components/ui/button/button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/button/index.ts",
+        "path": "web/src/lib/components/ui/button/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-action.svelte",
+        "path": "web/src/lib/components/ui/card/card-action.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-content.svelte",
+        "path": "web/src/lib/components/ui/card/card-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-description.svelte",
+        "path": "web/src/lib/components/ui/card/card-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-footer.svelte",
+        "path": "web/src/lib/components/ui/card/card-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-header.svelte",
+        "path": "web/src/lib/components/ui/card/card-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card-title.svelte",
+        "path": "web/src/lib/components/ui/card/card-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/card.svelte",
+        "path": "web/src/lib/components/ui/card/card.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/card/index.ts",
+        "path": "web/src/lib/components/ui/card/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/input/index.ts",
+        "path": "web/src/lib/components/ui/input/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/input/input.svelte",
+        "path": "web/src/lib/components/ui/input/input.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/label/index.ts",
+        "path": "web/src/lib/components/ui/label/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/label/label.svelte",
+        "path": "web/src/lib/components/ui/label/label.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-action.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-cancel.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-media.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/alert-dialog.svelte",
+        "path": "web/src/lib/components/ui/alert-dialog/alert-dialog.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/alert-dialog/index.ts",
+        "path": "web/src/lib/components/ui/alert-dialog/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/badge/badge.svelte",
+        "path": "web/src/lib/components/ui/badge/badge.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/badge/index.ts",
+        "path": "web/src/lib/components/ui/badge/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/checkbox/checkbox.svelte",
+        "path": "web/src/lib/components/ui/checkbox/checkbox.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/checkbox/index.ts",
+        "path": "web/src/lib/components/ui/checkbox/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-checkbox-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group-heading.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-label.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-group.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-separator.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-shortcut.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-sub.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte",
+        "path": "web/src/lib/components/ui/dropdown-menu/dropdown-menu.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/dropdown-menu/index.ts",
+        "path": "web/src/lib/components/ui/dropdown-menu/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/index.ts",
+        "path": "web/src/lib/components/ui/pagination/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-content.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-ellipsis.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-ellipsis.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-item.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-item.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-link.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-link.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-next-button.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-next-button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-next.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-next.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-prev-button.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-prev-button.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination-previous.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination-previous.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/pagination/pagination.svelte",
+        "path": "web/src/lib/components/ui/pagination/pagination.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/separator/index.ts",
+        "path": "web/src/lib/components/ui/separator/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/separator/separator.svelte",
+        "path": "web/src/lib/components/ui/separator/separator.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/index.ts",
+        "path": "web/src/lib/components/ui/sheet/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-close.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-close.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-content.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-content.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-description.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-description.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-footer.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-header.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-overlay.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-overlay.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-portal.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-portal.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-title.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-title.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet-trigger.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet-trigger.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sheet/sheet.svelte",
+        "path": "web/src/lib/components/ui/sheet/sheet.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/skeleton/index.ts",
+        "path": "web/src/lib/components/ui/skeleton/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/skeleton/skeleton.svelte",
+        "path": "web/src/lib/components/ui/skeleton/skeleton.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sonner/index.ts",
+        "path": "web/src/lib/components/ui/sonner/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/sonner/sonner.svelte",
+        "path": "web/src/lib/components/ui/sonner/sonner.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/index.ts",
+        "path": "web/src/lib/components/ui/table/index.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-body.svelte",
+        "path": "web/src/lib/components/ui/table/table-body.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-caption.svelte",
+        "path": "web/src/lib/components/ui/table/table-caption.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-cell.svelte",
+        "path": "web/src/lib/components/ui/table/table-cell.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-footer.svelte",
+        "path": "web/src/lib/components/ui/table/table-footer.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-head.svelte",
+        "path": "web/src/lib/components/ui/table/table-head.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-header.svelte",
+        "path": "web/src/lib/components/ui/table/table-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table-row.svelte",
+        "path": "web/src/lib/components/ui/table/table-row.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/ui/table/table.svelte",
+        "path": "web/src/lib/components/ui/table/table.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/nav.gen.ts",
+        "path": "web/src/lib/nav.gen.ts",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/app-sidebar.svelte",
+        "path": "web/src/lib/components/app/app-sidebar.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/top-bar.svelte",
+        "path": "web/src/lib/components/app/top-bar.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/page-header.svelte",
+        "path": "web/src/lib/components/app/page-header.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/field.svelte",
+        "path": "web/src/lib/components/app/field.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/lib/components/app/row-menu.svelte",
+        "path": "web/src/lib/components/app/row-menu.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/src/routes/+error.svelte",
+        "path": "web/src/routes/+error.svelte",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.yml.tmpl",
+        "path": "deploy/compose.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.override.yml",
+        "path": "deploy/compose.override.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.edge.yml.tmpl",
+        "path": "deploy/compose.edge.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Caddyfile.tmpl",
+        "path": "deploy/Caddyfile",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Caddyfile.d/.gitkeep",
+        "path": "deploy/Caddyfile.d/.gitkeep",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Dockerfile.postgres.tmpl",
+        "path": "deploy/Dockerfile.postgres",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/postgres/postgresql.conf",
+        "path": "deploy/postgres/postgresql.conf",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/postgres/conf.d/.gitkeep",
+        "path": "deploy/postgres/conf.d/.gitkeep",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/environments/staging.toml.tmpl",
+        "path": "deploy/environments/staging.toml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/environments/production.toml.tmpl",
+        "path": "deploy/environments/production.toml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/cloud-init/user-data.yaml.tmpl",
+        "path": "deploy/cloud-init/user-data.yaml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "ci/api-only",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "module": "example.com/todo",
+      "modules": [
+        "ci"
+      ]
+    },
+    "files": [
+      {
+        "pack": "ci",
+        "source": "files/.github/actions/setup-spinup/action.yml",
+        "path": ".github/actions/setup-spinup/action.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/upgrade-check.yml.tmpl",
+        "path": ".github/workflows/upgrade-check.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "ci/full",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy",
+        "backups"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "ci",
+        "source": "files/.github/actions/setup-spinup/action.yml",
+        "path": ".github/actions/setup-spinup/action.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/deploy.yml.tmpl",
+        "path": ".github/workflows/deploy.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/backup-verify.yml.tmpl",
+        "path": ".github/workflows/backup-verify.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/upgrade-check.yml.tmpl",
+        "path": ".github/workflows/upgrade-check.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "ci/deploy-on-push",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "ci_deploy_on_push": true,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy",
+        "backups"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "ci",
+        "source": "files/.github/actions/setup-spinup/action.yml",
+        "path": ".github/actions/setup-spinup/action.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/ci.yml.tmpl",
+        "path": ".github/workflows/ci.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/deploy.yml.tmpl",
+        "path": ".github/workflows/deploy.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/backup-verify.yml.tmpl",
+        "path": ".github/workflows/backup-verify.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "ci",
+        "source": "files/.github/workflows/upgrade-check.yml.tmpl",
+        "path": ".github/workflows/upgrade-check.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/.github/workflows/e2e.yml.tmpl",
+        "path": ".github/workflows/e2e.yml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "ci/web-scaffold/no-auth",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/vite.config.js",
+        "path": "web/vite.config.js",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/e2e/smoke.spec.ts.tmpl",
+        "path": "web/e2e/smoke.spec.ts",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "ci/web-scaffold/auth",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "auth_oidc": false,
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "auth"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "web",
+        "source": "files/web/vite.config.js",
+        "path": "web/vite.config.js",
+        "mode": "0644"
+      },
+      {
+        "pack": "web",
+        "source": "files/web/e2e/smoke.spec.ts.tmpl",
+        "path": "web/e2e/smoke.spec.ts",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "deploy",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.yml.tmpl",
+        "path": "deploy/compose.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.override.yml",
+        "path": "deploy/compose.override.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/compose.edge.yml.tmpl",
+        "path": "deploy/compose.edge.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Caddyfile.tmpl",
+        "path": "deploy/Caddyfile",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Caddyfile.d/.gitkeep",
+        "path": "deploy/Caddyfile.d/.gitkeep",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/Dockerfile.postgres.tmpl",
+        "path": "deploy/Dockerfile.postgres",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/postgres/postgresql.conf",
+        "path": "deploy/postgres/postgresql.conf",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/postgres/conf.d/.gitkeep",
+        "path": "deploy/postgres/conf.d/.gitkeep",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/environments/staging.toml.tmpl",
+        "path": "deploy/environments/staging.toml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/environments/production.toml.tmpl",
+        "path": "deploy/environments/production.toml",
+        "mode": "0644"
+      },
+      {
+        "pack": "deploy",
+        "source": "files/deploy/cloud-init/user-data.yaml.tmpl",
+        "path": "deploy/cloud-init/user-data.yaml",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "monitoring/lite",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy",
+        "monitoring"
+      ],
+      "monitoring_profile": "lite",
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/compose.monitoring.yml.tmpl",
+        "path": "monitoring/compose.monitoring.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/alloy/config.alloy.tmpl",
+        "path": "monitoring/alloy/config.alloy",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/loki/loki.yml",
+        "path": "monitoring/loki/loki.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/prometheus.yml.tmpl",
+        "path": "monitoring/prometheus/prometheus.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/app.yml",
+        "path": "monitoring/prometheus/rules/app.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/stack.yml",
+        "path": "monitoring/prometheus/rules/stack.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/alerts/custom.yml",
+        "path": "monitoring/alerts/custom.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/entrypoint.sh",
+        "path": "monitoring/grafana/entrypoint.sh",
+        "mode": "0755"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/datasources/datasources.yml.tmpl",
+        "path": "monitoring/grafana/provisioning/datasources/datasources.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/dashboards/dashboards.yml",
+        "path": "monitoring/grafana/provisioning/dashboards/dashboards.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/alerting/rules.yml",
+        "path": "monitoring/grafana/provisioning/alerting/rules.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/http-red.json",
+        "path": "monitoring/grafana/dashboards/stack/http-red.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/go-runtime.json",
+        "path": "monitoring/grafana/dashboards/stack/go-runtime.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/caddy.json",
+        "path": "monitoring/grafana/dashboards/stack/caddy.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/backups.json.tmpl",
+        "path": "monitoring/grafana/dashboards/stack/backups.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/deploys.json",
+        "path": "monitoring/grafana/dashboards/stack/deploys.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/custom/.gitkeep",
+        "path": "monitoring/grafana/dashboards/custom/.gitkeep",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "monitoring/full",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy",
+        "monitoring"
+      ],
+      "monitoring_profile": "full",
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/compose.monitoring.yml.tmpl",
+        "path": "monitoring/compose.monitoring.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/alloy/config.alloy.tmpl",
+        "path": "monitoring/alloy/config.alloy",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/loki/loki.yml",
+        "path": "monitoring/loki/loki.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/tempo/tempo.yml",
+        "path": "monitoring/tempo/tempo.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/prometheus.yml.tmpl",
+        "path": "monitoring/prometheus/prometheus.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/app.yml",
+        "path": "monitoring/prometheus/rules/app.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/stack.yml",
+        "path": "monitoring/prometheus/rules/stack.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/host.yml",
+        "path": "monitoring/prometheus/rules/host.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/postgres.yml",
+        "path": "monitoring/prometheus/rules/postgres.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/prometheus/rules/certs.yml",
+        "path": "monitoring/prometheus/rules/certs.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/alerts/custom.yml",
+        "path": "monitoring/alerts/custom.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/blackbox/blackbox.yml",
+        "path": "monitoring/blackbox/blackbox.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/entrypoint.sh",
+        "path": "monitoring/grafana/entrypoint.sh",
+        "mode": "0755"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/datasources/datasources.yml.tmpl",
+        "path": "monitoring/grafana/provisioning/datasources/datasources.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/dashboards/dashboards.yml",
+        "path": "monitoring/grafana/provisioning/dashboards/dashboards.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/provisioning/alerting/rules.yml",
+        "path": "monitoring/grafana/provisioning/alerting/rules.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/http-red.json",
+        "path": "monitoring/grafana/dashboards/stack/http-red.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/go-runtime.json",
+        "path": "monitoring/grafana/dashboards/stack/go-runtime.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/caddy.json",
+        "path": "monitoring/grafana/dashboards/stack/caddy.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/backups.json.tmpl",
+        "path": "monitoring/grafana/dashboards/stack/backups.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/deploys.json",
+        "path": "monitoring/grafana/dashboards/stack/deploys.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/custom/.gitkeep",
+        "path": "monitoring/grafana/dashboards/custom/.gitkeep",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/vendor/node-exporter-full.json",
+        "path": "monitoring/grafana/dashboards/stack/vendor/node-exporter-full.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/vendor/postgresql.json",
+        "path": "monitoring/grafana/dashboards/stack/vendor/postgresql.json",
+        "mode": "0644"
+      },
+      {
+        "pack": "monitoring",
+        "source": "files/monitoring/grafana/dashboards/stack/vendor/cadvisor.json",
+        "path": "monitoring/grafana/dashboards/stack/vendor/cadvisor.json",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "backups",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "api_client": "openapi-fetch",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "deploy",
+        "backups"
+      ],
+      "package_manager": "pnpm",
+      "shadcn_registry": "1.7.0"
+    },
+    "files": [
+      {
+        "pack": "backups",
+        "source": "files/deploy/pgbackrest/pgbackrest.conf.tmpl",
+        "path": "deploy/pgbackrest/pgbackrest.conf",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/compose.backups.yml.tmpl",
+        "path": "deploy/compose.backups.yml",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-full.service.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-full.service",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-full.timer.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-full.timer",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-diff.service.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-diff.service",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-diff.timer.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-diff.timer",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-verify.service.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-verify.service",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/systemd/backup-verify.timer.tmpl",
+        "path": "deploy/systemd/spinup-[[ data.app_name ]]-backup-verify.timer",
+        "mode": "0644"
+      },
+      {
+        "pack": "backups",
+        "source": "files/deploy/backups/run.sh.tmpl",
+        "path": "deploy/backups/run.sh",
+        "mode": "0755"
+      }
+    ]
+  },
+  {
+    "name": "secrets",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "ci",
+        "secrets"
+      ]
+    },
+    "files": [
+      {
+        "pack": "secrets",
+        "source": "files/.sops.yaml",
+        "path": ".sops.yaml",
+        "mode": "0644"
+      },
+      {
+        "pack": "secrets",
+        "source": "files/secrets/.gitkeep",
+        "path": "secrets/.gitkeep",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "tofu",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "app_name": "todo",
+      "db_version": "18",
+      "frontend_mode": "node",
+      "module": "example.com/todo",
+      "modules": [
+        "deploy",
+        "tofu"
+      ]
+    },
+    "files": [
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/versions.tf.tmpl",
+        "path": "versions.tf",
+        "mode": "0644"
+      },
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/main.tf",
+        "path": "main.tf",
+        "mode": "0644"
+      },
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/variables.tf.tmpl",
+        "path": "variables.tf",
+        "mode": "0644"
+      },
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/outputs.tf",
+        "path": "outputs.tf",
+        "mode": "0644"
+      },
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/terraform.tfvars.example",
+        "path": "terraform.tfvars.example",
+        "mode": "0644"
+      },
+      {
+        "pack": "tofu",
+        "source": "files/deploy/infra/tofu/.gitignore",
+        "path": ".gitignore",
+        "mode": "0644"
+      }
+    ]
+  },
+  {
+    "name": "_sample",
+    "answers": {
+      "TemplateVersion": "0.0.0-test",
+      "app_name": "demo",
+      "auth": true,
+      "db": "postgres",
+      "greeting": "Hello",
+      "module": "example.com/todo",
+      "modules": [
+        "jobs",
+        "mail"
+      ]
+    },
+    "files": [
+      {
+        "pack": "_sample",
+        "source": "files/api/cmd/main.go.tmpl",
+        "path": "api/cmd/[[ data.app_name ]]/main.go",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/versions.txt.tmpl",
+        "path": "versions.txt",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/README.md",
+        "path": "README.md",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/database.txt.tmpl",
+        "path": "database.txt",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/auth.txt.tmpl",
+        "path": "auth.txt",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/jobs.txt.tmpl",
+        "path": "jobs.txt",
+        "mode": "0644"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/start.sh.tmpl",
+        "path": "scripts/start.sh",
+        "mode": "0755"
+      },
+      {
+        "pack": "_sample",
+        "source": "files/greeting.txt.tmpl",
+        "path": "greeting.txt",
+        "mode": "0644"
+      }
+    ]
+  }
+]

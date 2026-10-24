@@ -1,0 +1,33 @@
+name = "tofu"
+description = "OpenTofu infrastructure for a Hetzner Cloud VM."
+requires = ["deploy"]
+
+[[files]]
+path = "deploy/infra/tofu/versions.tf"
+source = "files/deploy/infra/tofu/versions.tf.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/infra/tofu/main.tf"
+source = "files/deploy/infra/tofu/main.tf"
+class = "managed"
+
+[[files]]
+path = "deploy/infra/tofu/variables.tf"
+source = "files/deploy/infra/tofu/variables.tf.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/infra/tofu/outputs.tf"
+source = "files/deploy/infra/tofu/outputs.tf"
+class = "managed"
+
+[[files]]
+path = "deploy/infra/tofu/terraform.tfvars.example"
+source = "files/deploy/infra/tofu/terraform.tfvars.example"
+class = "seed"
+
+[[files]]
+path = "deploy/infra/tofu/.gitignore"
+source = "files/deploy/infra/tofu/.gitignore"
+class = "managed"
