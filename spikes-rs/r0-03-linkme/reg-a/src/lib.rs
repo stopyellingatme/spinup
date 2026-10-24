@@ -1,7 +1,8 @@
-//! Spike r0-03-linkme, member reg-a. The lane replaces this stub.
+//! This crate exports no callable symbols.
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn stub() {}
-}
+#[cfg(feature = "linkme")]
+#[linkme::distributed_slice(registry::ENTRIES)]
+static ENTRY: registry::Entry = registry::Entry { id: "reg-a" };
+
+#[cfg(feature = "inventory")]
+inventory::submit! { registry::Entry { id: "reg-a" } }
