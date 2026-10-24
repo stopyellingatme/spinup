@@ -1,0 +1,22 @@
+package jobs
+
+import (
+	"context"
+	"testing"
+
+	"[[ data.Module ]]/api/db/migrations"
+	"github.com/stopyellingatme/spinup/kit/jobs"
+	"github.com/stopyellingatme/spinup/kit/testkit"
+)
+
+func Test[[ data.Pascal ]](t *testing.T) {
+	if got := ([[ data.Pascal ]]Args{}).Kind(); got != "[[ data.Snake ]]" {
+		t.Fatalf("Kind() = %q, want [[ data.Snake ]]", got)
+	}
+	pool := testkit.DBWithMigrations(t, migrations.FS)
+	work := [[ data.Pascal ]](Deps{DB: pool})
+	job := jobs.Job[[ "[" ]][[ data.Pascal ]]Args]{ID: 1, Args: [[ data.Pascal ]]Args{}, Attempt: 1}
+	if err := work(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+}

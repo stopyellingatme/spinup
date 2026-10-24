@@ -1,0 +1,26 @@
+# The API also needs the frontend default when rendered without the web pack.
+[[questions]]
+key = "frontend_mode"
+prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the Go binary)"
+type = "enum"
+choices = ["node", "embed"]
+default = "node"
+
+
+[[files]]
+path = "api/internal/webdist/embed.go"
+source = "embed/embed.go.tmpl"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "api/internal/webdist/stub.go"
+source = "embed/stub.go.tmpl"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "api/internal/webdist/.gitignore"
+source = "embed/gitignore"
+class = "managed"
+when = "frontend_mode == 'embed'"

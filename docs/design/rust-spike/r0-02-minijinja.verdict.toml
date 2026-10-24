@@ -1,0 +1,14 @@
+spike = "r0-02"
+verdict = "go"
+pack_templates = 74
+inline_templates = 22
+compiled_templates = 96
+helper_cases = 91
+golden_cases = 23
+golden_files = 462
+equal_files = 461
+unequal_files = 1
+equal_percent = 99.78354978354979
+base_equal_percent = 100.0
+web_equal_percent = 100.0
+web_variants_equal_percent = 100.0
