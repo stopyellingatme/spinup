@@ -22,8 +22,6 @@ root=$(git rev-parse --show-toplevel)
 sv="$root/internal/stackversions/stackversions.yaml"
 out="$root/internal/templates/packs/api/files/api"
 mode="${BUMP_STACK_MODE:-seed}"
-# The kit version that generated apps require. Minors move in lockstep with the CLI.
-kit_version="${BUMP_STACK_KIT_VERSION:-v0.1.0}"
 kit_module=github.com/stopyellingatme/spinup/kit
 placeholder=spinup.invalid/app/api
 
@@ -43,11 +41,26 @@ pin() {
   }
 }
 
+# The kit version that generated apps require (ADR 0018). It comes from the kit pin in
+# stackversions.yaml. BUMP_STACK_KIT_VERSION overrides it for one run (a trial of a new tag).
+# The pack renders the require line with the template expression, so the literal version never
+# stays in go.mod.tmpl (see finish).
+kit_version="${BUMP_STACK_KIT_VERSION:-$(pin go_modules "$kit_module")}"
+
 # finish <dir> <go.mod target> <go.sum target> writes the module files as pack sources.
 # The module line becomes a template, and the local kit replace directive is dropped.
+# The kit require line keeps the template expression for the kit pin, not the literal version.
 finish() {
   (cd "$1" && go mod edit -dropreplace="$kit_module" 2>/dev/null || true)
-  sed "s#^module .*#module [[ .module ]]/api#" "$1/go.mod" > "$2"
+  sed -E \
+    -e "s#^module .*#module [[ .module ]]/api#" \
+    -e "s#^([[:space:]]*${kit_module//./\\.}) v[^[:space:]]+#\\1 [[ gomod \"${kit_module}\" ]]#" \
+    "$1/go.mod" > "$2"
+  if [[ "$2" == */go.mod.tmpl ]] && ! grep -q "^[[:space:]]*${kit_module//./\\.} \[\[ gomod " "$2"; then
+    echo "bump-stack: $2 has no kit require line with the gomod expression" >&2
+    echo "Try: restore '$kit_module [[ gomod \"$kit_module\" ]]' in the require block by hand" >&2
+    exit 1
+  fi
   cp "$1/go.sum" "$3"
   if grep -q '^toolchain ' "$2"; then
     echo "bump-stack: $2 has a toolchain line; a pinned module needs a newer Go than 1.26.0" >&2

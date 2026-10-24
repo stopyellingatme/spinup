@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - M14: Add the global flag `--confirm-env <name>`. It answers the typed confirmation of a protected environment without a terminal. The value must equal the environment name. A different value fails and never starts a prompt. `--yes` with `CI=true` still works (ADR 0018).
+- M14: Render the kit version of generated apps from the kit pin in `stackversions.yaml`. The release check fails when the pin differs from the CLI in major or minor version. Add a test for the action pins in workflows. Add `scripts/do-live-test.sh` for the DigitalOcean live test.
 - M13: Add `spinup deploy digital-ocean`. Sign in with a browser, create the droplet, firewall, DNS record, host key pin, and secrets, then deploy. Add the `login`, `logout`, `status`, and `destroy` subcommands.
 - M0: Establish the Go CLI, kit, manifests, templates, and checks for deterministic output.
 - M1: Generate Go APIs and PostgreSQL migrations. Add build commands, database commands, and documentation checks.

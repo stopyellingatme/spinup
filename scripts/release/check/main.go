@@ -15,6 +15,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/compat"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/stackversions"
 	"github.com/stopyellingatme/spinup/internal/templates/store"
 )
 
@@ -52,6 +53,9 @@ func check(root, version, kitVersion string, snapshot, tagged bool) error {
 		return err
 	}
 	if _, err := compat.ParseVersion(kitVersion); err != nil {
+		return err
+	}
+	if err := checkKitPin(root, version); err != nil {
 		return err
 	}
 	status, err := git(root, "status", "--porcelain")
@@ -143,6 +147,37 @@ func check(root, version, kitVersion string, snapshot, tagged bool) error {
 		if !matched {
 			return errors.New("template signing key does not match store.TrustedKeys")
 		}
+	}
+	return nil
+}
+
+// kitModule is the key of the kit pin in stackversions.yaml (ADR 0018 decision 1).
+const kitModule = "github.com/stopyellingatme/spinup/kit"
+
+// checkKitPin fails when the kit pin differs from the CLI candidate in major or minor version.
+func checkKitPin(root, version string) error {
+	data, err := os.ReadFile(filepath.Join(root, "internal", "stackversions", "stackversions.yaml"))
+	if err != nil {
+		return fmt.Errorf("cannot read the kit pin: %w\nTry: restore internal/stackversions/stackversions.yaml", err)
+	}
+	stack, err := stackversions.Parse(data)
+	if err != nil {
+		return fmt.Errorf("cannot read the kit pin: %w\nTry: fix internal/stackversions/stackversions.yaml", err)
+	}
+	pin, err := stack.GoModule(kitModule)
+	if err != nil {
+		return fmt.Errorf("cannot read the kit pin: %w\nTry: add %s to go_modules in internal/stackversions/stackversions.yaml", err, kitModule)
+	}
+	cli, err := compat.ParseVersion(version)
+	if err != nil {
+		return err
+	}
+	kit, err := compat.ParseVersion(pin)
+	if err != nil {
+		return fmt.Errorf("kit pin %q is not a version: %w\nTry: set the kit pin in stackversions.yaml to v%d.%d.0", pin, err, cli.Major, cli.Minor)
+	}
+	if cli.Major != kit.Major || cli.Minor != kit.Minor {
+		return fmt.Errorf("kit pin %s in stackversions.yaml differs in major and minor version from CLI %s\nTry: push the tag kit/v%d.%d.0, then set the kit pin to v%d.%d.0 and update the pack go.sum", pin, version, cli.Major, cli.Minor, cli.Major, cli.Minor)
 	}
 	return nil
 }

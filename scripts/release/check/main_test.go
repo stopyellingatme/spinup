@@ -36,6 +36,9 @@ func TestReleaseChecks(t *testing.T) {
 		}},
 		{name: "changed kit mismatched minor", kit: "0.7.3", want: "major and minor", prepare: changedKit},
 		{name: "changed kit independent patch", kit: "0.8.3", prepare: changedKit},
+		{name: "kit pin mismatched minor", want: "kit pin", prepare: func(t *testing.T, root string) { writePin(t, root, "v0.7.0"); commit(t, root) }},
+		{name: "kit pin pre-release same minor", prepare: func(t *testing.T, root string) { writePin(t, root, "v0.8.0-alpha.12"); commit(t, root) }},
+		{name: "kit pin missing", want: "kit pin", prepare: func(t *testing.T, root string) { writePin(t, root, ""); commit(t, root) }},
 		{name: "unchanged kit independent release", kit: "0.7.3", prepare: func(t *testing.T, root string) { gitTest(t, root, "tag", "kit/v0.7.0") }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -46,6 +49,7 @@ func TestReleaseChecks(t *testing.T) {
 			gitTest(t, root, "config", "user.name", "Release Test")
 			write(t, root, "CHANGELOG.md", "## [0.8.0-rc.1] - 2026-10-15\n")
 			write(t, root, "kit/file", "kit")
+			writePin(t, root, "v0.8.0")
 			commit(t, root)
 			if test.prepare != nil {
 				test.prepare(t, root)
@@ -64,6 +68,15 @@ func TestReleaseChecks(t *testing.T) {
 			}
 		})
 	}
+}
+
+func writePin(t *testing.T, root, version string) {
+	t.Helper()
+	content := "schema: 1\nverified: today\ngo:\n  toolchain: go1.27.2\n  min: '1.26'\ngo_modules:\n  example.com/other: v1.0.0\n"
+	if version != "" {
+		content += "  github.com/stopyellingatme/spinup/kit: " + version + "\n"
+	}
+	write(t, root, "internal/stackversions/stackversions.yaml", content)
 }
 
 func changedKit(t *testing.T, root string) {
