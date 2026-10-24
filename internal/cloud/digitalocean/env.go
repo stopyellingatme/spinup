@@ -30,7 +30,7 @@ var Scopes = []string{
 	"droplet:create", "droplet:read", "droplet:delete",
 	"ssh_key:create", "ssh_key:read",
 	"firewall:create", "firewall:read", "firewall:update", "firewall:delete",
-	"tag:create", "tag:read",
+	"tag:create", "tag:read", "tag:delete",
 	"domain:read", "domain:create", "domain:update", "domain:delete",
 }
 

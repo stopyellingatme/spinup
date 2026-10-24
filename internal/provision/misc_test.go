@@ -3,11 +3,14 @@ package provision
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/stopyellingatme/spinup/internal/cloud/digitalocean"
 	"github.com/stopyellingatme/spinup/internal/project"
+	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
 func TestMakeValuesGeneratesOnlyMissing(t *testing.T) {
@@ -230,6 +233,10 @@ func TestDestroyDeletesOnlyMatchingResources(t *testing.T) {
 	if len(f.srv.SSHKeys()) != 1 {
 		t.Error("deleted the SSH key")
 	}
+	// The second droplet still has the tags, so they stay.
+	if tags := f.srv.Tags(); len(tags) != 2 {
+		t.Errorf("tags = %v, want the environment tag and spinup", tags)
+	}
 	for _, want := range []string{"database on the droplet is lost", "spinup backup", "Not deleted"} {
 		if !strings.Contains(f.err.String(), want) {
 			t.Errorf("ErrOut lacks %q:\n%s", want, f.err.String())
@@ -335,6 +342,9 @@ func TestDestroyAfterAnUpThatStoppedEarly(t *testing.T) {
 	if len(f.srv.Droplets()) != 0 || len(f.srv.Firewalls()) != 0 {
 		t.Errorf("droplets = %d, firewalls = %d, want 0 and 0", len(f.srv.Droplets()), len(f.srv.Firewalls()))
 	}
+	if tags := f.srv.Tags(); len(tags) != 0 {
+		t.Errorf("tags = %v, want none: destroy deletes the empty tags", tags)
+	}
 
 	// The create fails after the firewall exists. spinup.toml has no firewall_id.
 	g := newFixture(t, nil)
@@ -352,5 +362,38 @@ func TestDestroyAfterAnUpThatStoppedEarly(t *testing.T) {
 	}
 	if len(g.srv.Firewalls()) != 0 {
 		t.Error("destroy must delete the firewall of the environment by its name and tag")
+	}
+}
+
+func TestDestroyKeepsTagsWithoutTheDeleteScope(t *testing.T) {
+	// A token from before the tag:delete scope gets HTTP 403. Destroy warns and finishes.
+	f := newFixture(t, nil)
+	if err := f.up(); err != nil {
+		t.Fatal(err)
+	}
+	f.srv.FailNext("DELETE", "/v2/tags/", 403, 2)
+	f.opts.IKnow = true
+	f.opts.Confirm = project.Confirm{Yes: true, CI: true}
+	if err := Destroy(context.Background(), f.opts, f.deps); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.srv.Droplets()) != 0 || len(f.srv.Tags()) != 2 {
+		t.Errorf("droplets = %d, tags = %v", len(f.srv.Droplets()), f.srv.Tags())
+	}
+	if !strings.Contains(f.err.String(), "tag:delete") {
+		t.Errorf("ErrOut lacks the scope hint:\n%s", f.err.String())
+	}
+}
+
+func TestFailWrapKeepsOneTryLine(t *testing.T) {
+	var ue *ui.Error
+	err := failWrap("confirm the destroy", errors.New(`cannot destroy in protected environment "staging". Try: re-run in a terminal`), "type the environment name")
+	if !errors.As(err, &ue) || strings.Contains(ue.Why, "Try:") || ue.Try != "type the environment name" {
+		t.Fatalf("a plain error: %+v", ue)
+	}
+	api := &digitalocean.APIError{Status: 403, Method: "GET", Path: "/v2/x"}
+	err = failWrap("read x", api, "run the command again")
+	if !errors.As(err, &ue) || strings.Contains(ue.Why, "Try:") || "Try: "+ue.Try != api.Try() {
+		t.Errorf("an API error keeps its own Try line: %+v", ue)
 	}
 }

@@ -2,10 +2,13 @@ package provision
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/stopyellingatme/spinup/internal/cloud/digitalocean"
 	"github.com/stopyellingatme/spinup/internal/project"
 )
 
@@ -73,6 +76,9 @@ func Destroy(ctx context.Context, o Options, d Deps) error {
 		b.say("No droplet matches droplet_id in spinup.toml.")
 	}
 	if err := b.destroyFirewall(ctx); err != nil {
+		return err
+	}
+	if err := b.destroyTags(ctx); err != nil {
 		return err
 	}
 	b.say("Kept the account SSH key.")
@@ -150,4 +156,35 @@ func (b *base) cleanConfig() error {
 	}
 	edits = append(edits, del(doT, "droplet_id"), del(doT, "firewall_id"))
 	return editConfig(b.root, edits)
+}
+
+// destroyTags deletes the environment tag and the shared spinup tag when no resource has them.
+// A token from before the tag:delete scope cannot delete a tag. Then the tags stay, with a warning.
+func (b *base) destroyTags(ctx context.Context) error {
+	for _, name := range []string{b.tag(), "spinup"} {
+		t, err := b.d.Cloud.TagByName(ctx, name)
+		if err != nil {
+			return failWrap("look up the tag "+name, err, "run the command again")
+		}
+		if t == nil {
+			continue
+		}
+		if t.Resources.Count > 0 {
+			if name == b.tag() {
+				b.warn("Not deleted: %d resources still have the tag %s.", t.Resources.Count, name)
+			}
+			continue
+		}
+		err = b.d.Cloud.DeleteTag(ctx, name)
+		var ae *digitalocean.APIError
+		if errors.As(err, &ae) && ae.Status == http.StatusForbidden {
+			b.warn("Not deleted: the tag %s. The token has no tag:delete scope. Run spinup deploy digital-ocean login, then run destroy again.", name)
+			continue
+		}
+		if err != nil {
+			return failWrap("delete the tag "+name, err, "run the command again")
+		}
+		b.say("Deleted the tag %s.", name)
+	}
+	return nil
 }

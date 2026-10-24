@@ -460,7 +460,23 @@ func (s *Server) tagRoutes(w http.ResponseWriter, m string, rest []string, body 
 			notFound(w)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"tag": map[string]any{"name": rest[0]}})
+		n := 0
+		for _, d := range s.droplets {
+			if slices.Contains(d.Tags, rest[0]) {
+				n++
+			}
+		}
+		writeJSON(w, 200, map[string]any{"tag": map[string]any{"name": rest[0], "resources": map[string]any{"count": n}}})
+	case len(rest) == 1 && m == "DELETE":
+		if !slices.Contains(s.tags, rest[0]) {
+			notFound(w)
+			return
+		}
+		s.tags = slices.DeleteFunc(s.tags, func(t string) bool { return t == rest[0] })
+		for _, d := range s.droplets {
+			d.Tags = slices.DeleteFunc(d.Tags, func(t string) bool { return t == rest[0] })
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		notFound(w)
 	}

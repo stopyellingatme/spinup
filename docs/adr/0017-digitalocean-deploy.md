@@ -22,7 +22,7 @@ spinup deploy digital-ocean destroy --i-know
 - The command also accepts the deploy flags `--allow-dirty`, `--allow-destructive`, `--skip-build`, `--tag`, `--platform`, `--health-timeout`, `--no-auto-rollback`. One helper, `addDeployFlags`, defines them for both commands.
 - Before it creates a droplet, the command asks for the price once ("Create droplet s-2vcpu-4gb in nyc3 for $24.00/month?"). `--yes` answers it. With no TTY and no `--yes`, the command fails and names `--yes`.
 - The command refuses `--offline`.
-- `destroy` requires `--i-know`, and the user types the environment name. It deletes only the resources that have the environment tag and the IDs in `spinup.toml`. It keeps the account SSH key, the local secrets, and the age key. It deletes the A record only when the record points at the droplet. It says that the database is lost and names `spinup backup`.
+- `destroy` requires `--i-know`, and the user types the environment name. It deletes only the resources that have the environment tag and the IDs in `spinup.toml`. It keeps the account SSH key, the local secrets, and the age key. It deletes the A record only when the record points at the droplet. It deletes the tags `spinup:<app>:<env>` and `spinup` when no resource has them. It says that the database is lost and names `spinup backup`.
 
 ## 2. Sign-in
 
@@ -65,7 +65,7 @@ Token store:
 - Defaults are in `stackversions.yaml` (`digitalocean:`). A production environment uses `size_production` (`s-2vcpu-4gb`), because `production.toml` gives postgres `cpus = "2.0"`. Other environments use `size_default` (`s-1vcpu-2gb`).
 - Size check: vCPUs ≥ the largest `cpus` value in `deploy/environments/<env>.toml`, and memory ≥ 2 GiB.
 - Only Ubuntu images are accepted. The cloud-init template is Ubuntu only.
-- Scopes: `account:read regions:read sizes:read image:read actions:read droplet:create droplet:read droplet:delete ssh_key:create ssh_key:read firewall:create firewall:read firewall:update firewall:delete tag:create tag:read domain:read domain:create domain:update domain:delete`. The live sign-in on 2026-10-23 accepted these strings. DigitalOcean also granted `snapshot:read` and `vpc:read`, and it issued a refresh token to the public client.
+- Scopes: `account:read regions:read sizes:read image:read actions:read droplet:create droplet:read droplet:delete ssh_key:create ssh_key:read firewall:create firewall:read firewall:update firewall:delete tag:create tag:read tag:delete domain:read domain:create domain:update domain:delete`. The live sign-in on 2026-10-23 accepted these strings. DigitalOcean also granted `snapshot:read` and `vpc:read`, and it issued a refresh token to the public client. `tag:delete` came after that test: destroy deletes the empty tags `spinup:<app>:<env>` and `spinup`. With a token from before the change, destroy keeps the tags and tells the user to sign in again.
 
 ## 5. spinup.toml
 

@@ -181,8 +181,19 @@ func fail(what, why, try string) error {
 }
 
 // failWrap makes a user-facing error that wraps err.
+// failWrap keeps one Try line. It removes the Try line of err from the reason. The Try line of
+// an API error names the cause (sign in again, a missing scope), so it replaces try.
 func failWrap(what string, err error, try string) error {
-	return &ui.Error{What: what, Why: err.Error(), Try: try, Err: err}
+	why := err.Error()
+	if i := strings.Index(why, "Try:"); i >= 0 {
+		inner := strings.TrimSpace(why[i+len("Try:"):])
+		why = strings.TrimRight(why[:i], " .\n")
+		var ae *digitalocean.APIError
+		if errors.As(err, &ae) && inner != "" {
+			try = inner
+		}
+	}
+	return &ui.Error{What: what, Why: why, Try: try, Err: err}
 }
 
 // base holds what every command of this package reads first.
