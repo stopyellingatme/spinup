@@ -272,10 +272,10 @@ func RunPage(ctx context.Context, runner exec.Runner, page Page, env Env) []Fail
 				continue
 			}
 			result, err := runner.Run(ctx, exec.Cmd{
-				Name:    "bash",
-				Args:    []string{"-c", "exec 2>&1\n" + step.Command},
-				Dir:     current,
-				Env:     commandEnv(env, directory),
+				Name: "bash",
+				Args: []string{"-c", "exec 2>&1\n" + step.Command},
+				Dir:  current,
+				Env:  commandEnv(env, directory),
 				// A generator run builds and tests a generated app. Slow CI runners need more than two minutes.
 				Timeout: 5 * time.Minute,
 			})
