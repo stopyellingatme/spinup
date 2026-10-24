@@ -26,6 +26,11 @@ func Destroy(ctx context.Context, o Options, d Deps) error {
 	if err := b.load(); err != nil {
 		return err
 	}
+	unlock, err := b.lockEnv()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	env := b.envCfg
 	env.Name = b.env
 	env.Protected = true

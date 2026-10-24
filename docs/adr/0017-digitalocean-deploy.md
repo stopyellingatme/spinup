@@ -146,3 +146,7 @@ Any failure after step 5 prints the droplet, its price for each hour, and the de
 - testscript `deploy_digitalocean` runs the fake in the harness and signs in with `SPINUP_BROWSER=curl -fsSL`.
 - dind: a `dofake` binary gives the dind VM as the droplet.
 - A live test on a real account runs after the merge. It needs approval for each paid step.
+
+## Addendum (2026-10-24): one run at a time
+
+The second live test showed that two provisioning runs on one droplet race in `spinup-host-key next`: `ssh-keygen` asks to overwrite the `.next` key on stdout, gets no answer, and exits 1. Up and destroy now take an exclusive lock on `.spinup/provision-<env>.lock` (flock on Unix, an exclusive create on Windows), and a second run fails at once. `spinup-host-key` serializes `next` and `activate` with a `mkdir` lock in `/var/lib/spinup`, and removes a lock older than two minutes. A failed command on the droplet now shows its stdout in the error.

@@ -160,6 +160,7 @@ The database on the droplet is lost, so run `spinup backup` first.
 
 ## Troubleshooting
 
+- **Another run works on the environment.** Only one `deploy digital-ocean` or `destroy` run can work on an environment at a time. The lock is `.spinup/provision-<env>.lock` in the project. Wait until the other run ends.
 - **cloud-init failed.** The command prints the errors and the line `Try: spinup deploy digital-ocean --recreate`. This deletes the droplet and creates a new one. If a release exists, add `--i-know`.
 - **Host key mismatch.** Someone replaced the droplet, or something else answers at the address. Check the droplet in the DigitalOcean console. Then run `--recreate` if you need a new droplet.
 - **HTTP 422 on create.** The droplet limit of the account is full. Delete a droplet or ask DigitalOcean to raise the limit.

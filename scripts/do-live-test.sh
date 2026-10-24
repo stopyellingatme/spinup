@@ -118,7 +118,10 @@ ask "The next step creates a droplet and a firewall that cost money."
 step "1. Provision, then kill -9 during the droplet wait"
 log1="$work/run1.log"
 created=1
-sp deploy digital-ocean --skip-deploy ${provision_flags[@]+"${provision_flags[@]}"} >"$log1" 2>&1 </dev/null &
+# Start the binary itself, not the sp function: $! of a function is a subshell, and kill -9 of
+# the subshell leaves spinup running, so two runs would race on the droplet.
+"$spinup_bin" -C "$app_dir" --env "$env_name" deploy digital-ocean --skip-deploy \
+  ${provision_flags[@]+"${provision_flags[@]}"} >"$log1" 2>&1 </dev/null &
 child=$!
 waited=0
 until grep -q "Created the droplet" "$log1"; do

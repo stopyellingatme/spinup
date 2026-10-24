@@ -25,6 +25,27 @@ print_key() {
   awk '{ print $1 " " $2; exit }' "$1"
 }
 
+# lock serializes next and activate, so two spinup runs cannot race on the key files.
+# A lock older than two minutes is left by a run that died, so the tool removes it.
+lock() {
+  dir="$state/host-key.lock"
+  mkdir -p "$state"
+  tries=0
+  until mkdir "$dir" 2>/dev/null; do
+    if [ -n "$(find "$dir" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+      rmdir "$dir" 2>/dev/null || true
+      continue
+    fi
+    tries=$((tries + 1))
+    if [ "$tries" -ge 60 ]; then
+      echo "spinup-host-key: another run holds $dir" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  trap 'rmdir "$dir" 2>/dev/null || true' EXIT
+}
+
 reload_sshd() {
   if [ -n "${SPINUP_HOSTKEY_RELOAD:-}" ]; then
     "$SPINUP_HOSTKEY_RELOAD"
@@ -35,13 +56,16 @@ reload_sshd() {
 
 case "${1:-}" in
   next)
-    if [ ! -e "$key.next" ]; then
-      rm -f "$key.next.pub"
-      ssh-keygen -q -t ed25519 -N '' -C '' -f "$key.next"
+    lock
+    if [ ! -s "$key.next" ] || [ ! -s "$key.next.pub" ]; then
+      # Remove a partial pair, also a dangling link, so ssh-keygen never asks to overwrite.
+      rm -f "$key.next" "$key.next.pub"
+      ssh-keygen -q -t ed25519 -N '' -C '' -f "$key.next" </dev/null
     fi
     print_key "$key.next.pub"
     ;;
   activate)
+    lock
     if [ -e "$key.next" ]; then
       chmod 0600 "$key.next"
       chmod 0644 "$key.next.pub"

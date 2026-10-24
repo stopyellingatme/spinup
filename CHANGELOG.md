@@ -38,6 +38,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The resource list page costs less to render. The page renders one actions menu (`row-menu.svelte`) outside the rows. Each row has a plain button for the menu and inline icons. The row checkbox is a submit button that works without JavaScript. The toggle form keeps the page number. In the load test, a page view of 20 rows used 1.8 ms of Node CPU, not 4.4 ms (60% less).
 
 ### Fixed
+- `spinup deploy digital-ocean`: only one provisioning or destroy run works on an environment at a time, and `spinup-host-key` serializes `next` and `activate`. Two runs raced in the host key rotation. A failed command on the droplet shows its stdout.
 
 - Upgrade: Never merge `api/go.mod` or `api/go.sum` as text. Keep the app file and let the dependency step raise the kit pin, the stack pins, and the `go` line. A require of the unpublished placeholder kit `v0.1.0` moves to the kit pin. Keep the inner `Try:` line when an upgrade phase fails.
 - `spinup tools install` accepts the real age release archives. It keeps `age` and `age-keygen` and skips the other regular files under `age/`. It still refuses absolute paths, `..`, nested paths, links, devices, and duplicates.

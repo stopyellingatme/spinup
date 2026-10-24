@@ -9,6 +9,7 @@ import (
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
+	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
 const (
@@ -35,7 +36,15 @@ func (r *run) run(ctx context.Context, argv ...string) (string, error) {
 		if remote.IsHostKeyError(diag) {
 			return "", hostKeyMismatch()
 		}
-		return "", failWrap("run a command on the droplet", err, "run the command again")
+		// The error already holds stderr. A tool can also print the cause on stdout (ssh-keygen
+		// asks "Overwrite (y/n)?" there), so the error keeps stdout too. The commands here print
+		// status text and public keys only. spinup sends secrets on stdin, never in argv.
+		wrapped := failWrap("run a command on the droplet", err, "run the command again")
+		var ue *ui.Error
+		if text := strings.TrimSpace(out); text != "" && errors.As(wrapped, &ue) {
+			ue.Why += "\nstdout: " + clip(text)
+		}
+		return "", wrapped
 	}
 	return out, nil
 }

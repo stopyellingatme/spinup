@@ -23,6 +23,13 @@ func Up(ctx context.Context, o Options, d Deps) (err error) {
 	if err = r.preflight(ctx); err != nil {
 		return err
 	}
+	if !r.o.Plan {
+		unlock, lerr := r.lockEnv()
+		if lerr != nil {
+			return lerr
+		}
+		defer unlock()
+	}
 	if err = r.account(ctx); err != nil {
 		return err
 	}
