@@ -1,0 +1,21 @@
+# R0.7 verdict. spike-check.sh reads this file. R0.15 reads it, not the prose.
+spike = "r0-07"
+verdict = "go"
+oidc_crate = "oauth2+jsonwebtoken"
+jsonwebtoken_backend = "rust_crypto"    # aws_lc_rs blocked offline: untrusted 0.7.1
+cargo_deny = "ok"                       # advisories bans licenses, offline
+deny_ignores = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0387"]
+go_ratelimit_tables_pass = true
+txtar_texts_equal = true
+cookie_contract = true
+release_binary_bytes_r06 = 11312144
+release_binary_bytes_r07 = 18396416
+release_binary_added_mb = 7.1
+clean_release_build_s_r06 = 87.3
+clean_release_build_s_r07 = 117.9
+clean_debug_build_s_r06 = 39.6
+clean_debug_build_s_r07 = 83.0
+load1_during_builds = [12.3, 27.8]
+argon2_ms_rust_release = 98
+argon2_ms_go = 54
+tests = 91
