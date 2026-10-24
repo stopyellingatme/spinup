@@ -1,0 +1,85 @@
+version: 2
+project_name: spinup
+dist: dist/rust
+
+env:
+  - CARGO_NET_OFFLINE=true
+  - CARGO_BUILD_JOBS=4
+  - SYFT_CHECK_FOR_APP_UPDATE=false
+  # Refuse implicit target installation in the offline spike.
+  - PATH={{ .Env.PWD }}/tools:{{ .Env.PATH }}
+
+git:
+  ignore_tags: ["kit/*"]
+
+builds:
+  - id: spinup
+    builder: rust
+    tool: cargo
+    command: zigbuild
+    binary: spinup
+    targets:
+      - x86_64-unknown-linux-musl
+      - aarch64-unknown-linux-musl
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+      - x86_64-pc-windows-gnu
+      - aarch64-pc-windows-gnullvm
+    flags: [--release, --offline, --locked, --package=cli-skel, --bin=spinup]
+    hooks:
+      post:
+        - cmd: 'python3 audit.py "{{ .Target }}" "{{ .Path }}"'
+          output: true
+    env:
+      - SPINUP_VERSION={{ .Version }}
+      - MACOSX_DEPLOYMENT_TARGET=13.0
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - src: ../../scripts/release/README.md
+        strip_parent: true
+      - src: ../../CHANGELOG.md
+        strip_parent: true
+      - src: ../../LICENSE*
+        strip_parent: true
+
+binary_signs:
+  - cmd: cosign
+    artifacts: binary
+    signature: "${artifact}.sigstore.json"
+    args: [sign-blob, --yes, --bundle, "${signature}", "${artifact}"]
+
+sboms:
+  - artifacts: binary
+    cmd: syft
+    env:
+      - SYFT_CHECK_FOR_APP_UPDATE=false
+      - SYFT_CACHE_DIR=
+      - SYFT_GOLANG_SEARCH_REMOTE_LICENSES=false
+      - SYFT_GOLANG_USE_PACKAGES_LIB=false
+    documents: ["spinup_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sbom.json"]
+    args: [scan, "file:${artifact}", --output, "spdx-json=${document}"]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: [sign-blob, --yes, --bundle, "${signature}", "${artifact}"]
+
+snapshot:
+  version_template: "0.0.0-r0.14"
+changelog:
+  disable: true
+release:
+  github:
+    owner: stopyellingatme
+    name: spinup
