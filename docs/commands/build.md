@@ -36,8 +36,11 @@ go build -trimpath -ldflags '-X main.version=v0.1.0' -o bin/api ./cmd/api
 The `web` target fails because M1 has no web pack.
 The `all` target builds the available API and reports its choice.
 A missing Go or Docker executable produces an error with installation guidance.
-An image build fails when `api/go.mod` replaces the kit with a local directory.
-Remove the replacement and use a published kit version before an image build.
+If `api/go.mod` replaces the kit with a local directory, an image build passes that directory to Docker buildx as `--build-context kit=<absolute directory>`.
+A relative replace path is relative to `api/`.
+The deploy build does the same.
+If the directory does not exist, the build fails with a `Try:` line.
+Without a local kit replace, the build uses the published kit version.
 If project discovery fails, pass `--dir` with the application directory.
 
 ## Images and push

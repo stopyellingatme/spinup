@@ -47,8 +47,13 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 			o.Targets = []string{"api"}
 		}
 	}
-	if err := rejectLocalKitReplace(o.Root); err != nil {
-		return nil, err
+	kitDir := ""
+	if o.hasTarget("api") {
+		var err error
+		kitDir, _, err = KitReplaceDir(filepath.Join(o.Root, "api"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	owner := ""
@@ -73,7 +78,7 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 		if o.Push {
 			ref = strings.TrimSuffix(o.Registry, "/") + "/" + owner + "/" + ref
 		}
-		digest, err := buildImage(ctx, r, o, target, ref, embed)
+		digest, err := buildImage(ctx, r, o, target, ref, embed, kitDir)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +87,7 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 	return images, nil
 }
 
-func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref string, embed bool) (string, error) {
+func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref string, embed bool, kitDir string) (string, error) {
 	args := []string{"buildx", "build", "--platform", o.Platform, "-f", "deploy/Dockerfile." + target, "-t", ref, "--build-arg"}
 	if target == "api" {
 		args = append(args, "VERSION="+o.Tag)
@@ -91,6 +96,10 @@ func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref s
 	}
 	if target == "api" && embed {
 		args = append(args, "--build-context", "web=web")
+	}
+	if target == "api" && kitDir != "" {
+		// A local kit replace is outside the context. BuildKit gets it as the context kit.
+		args = append(args, "--build-context", "kit="+kitDir)
 	}
 	if !o.Push {
 		args = append(args, "--load", target)
@@ -122,15 +131,13 @@ func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref s
 	return digest, nil
 }
 
-func rejectLocalKitReplace(root string) error {
-	data, err := os.ReadFile(filepath.Join(root, "api", "go.mod"))
-	if err != nil {
-		return &ui.Error{What: "Cannot build the API image", Why: err.Error(), Try: "check api/go.mod and run spinup build again", Err: err}
+func (o ImageOptions) hasTarget(name string) bool {
+	for _, t := range o.Targets {
+		if t == name {
+			return true
+		}
 	}
-	if localKitReplace(string(data)) {
-		return &ui.Error{What: "Cannot build the API image", Why: "a local kit replace is outside the Docker build context", Try: "remove the local kit replace from api/go.mod and use a published kit version"}
-	}
-	return nil
+	return false
 }
 
 func moduleOwner(path string) (string, error) {

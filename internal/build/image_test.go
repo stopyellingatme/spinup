@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
@@ -69,15 +68,6 @@ func TestBuildImages(t *testing.T) {
 				t.Fatalf("web args = %#v", calls[1].Args)
 			}
 		})
-	}
-}
-
-func TestBuildImagesRejectsLocalKitReplace(t *testing.T) {
-	t.Parallel()
-	root := imageProject(t, "module github.com/acme/todo/api\nreplace github.com/stopyellingatme/spinup/kit => ../kit\n")
-	_, err := BuildImages(context.Background(), &metadataRunner{}, ImageOptions{Root: root, App: "todo", Tag: "v1"})
-	if err == nil || !strings.Contains(errorText(err), "Try:") {
-		t.Fatalf("error = %v", err)
 	}
 }
 

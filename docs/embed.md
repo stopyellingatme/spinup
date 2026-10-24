@@ -47,7 +47,7 @@ The command supplies `--build-context web=web` to Docker buildx.
 The Docker template builds the static app with the selected package manager.
 It embeds the static app in the API image.
 Deploy uses the same API image build.
-A local kit replace must be removed before an image build.
+A local kit replace is passed to the image build as the build context `kit`.
 
 <!-- doctest: skip -->
 ```console

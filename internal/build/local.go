@@ -185,6 +185,12 @@ func buildError(err error) error {
 
 // localKitReplace recognizes single-line and grouped Go replace directives.
 func localKitReplace(data string) bool {
+	_, ok := localKitTarget(data)
+	return ok
+}
+
+// localKitTarget returns the local path that a replace directive gives to the kit.
+func localKitTarget(data string) (string, bool) {
 	scanner := bufio.NewScanner(strings.NewReader(data))
 	group := false
 	for scanner.Scan() {
@@ -212,10 +218,38 @@ func localKitReplace(data string) bool {
 			if field == "=>" && i+1 < len(fields) {
 				target := strings.Trim(fields[i+1], "\"`")
 				if filepath.IsAbs(target) || strings.HasPrefix(target, ".") || strings.Contains(target, ":") || strings.HasPrefix(target, "\\") {
-					return true
+					return target, true
 				}
 			}
 		}
 	}
-	return false
+	return "", false
+}
+
+// KitReplaceDir returns the absolute kit directory when go.mod in apiDir replaces the kit
+// with a local path. A relative path is relative to apiDir. It reports false when there is
+// no local replace. It fails when the directory does not exist.
+func KitReplaceDir(apiDir string) (string, bool, error) {
+	data, err := os.ReadFile(filepath.Join(apiDir, "go.mod"))
+	if err != nil {
+		return "", false, &ui.Error{What: "Cannot read the kit replace", Why: err.Error(), Try: "check api/go.mod and run the command again", Err: err}
+	}
+	target, ok := localKitTarget(string(data))
+	if !ok {
+		return "", false, nil
+	}
+	dir := filepath.FromSlash(target)
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(apiDir, dir)
+	}
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		return "", false, &ui.Error{What: "Cannot resolve the kit replace", Why: err.Error(), Try: "fix the replace path in api/go.mod", Err: err}
+	}
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		why := "the directory " + dir + " does not exist or is not a directory"
+		return "", false, &ui.Error{What: "Cannot use the local kit replace in api/go.mod", Why: why, Try: "point the replace at the kit directory or remove it and use a published kit version", Err: err}
+	}
+	return dir, true, nil
 }
