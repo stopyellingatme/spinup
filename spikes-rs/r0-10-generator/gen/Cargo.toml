@@ -5,19 +5,16 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+# `gen` is a reserved keyword in edition 2024, so the library has another name.
+[lib]
+name = "spinup_gen"
+
 [dependencies]
-anyhow = "1.0.104"
+anyhow.workspace = true
 hex = "0.4.3"
-minijinja = { version = "3.0.3", features = ["builtins", "json", "loop_controls", "macros", "serde", "preserve_order", "urlencode"] }
+minijinja = { version = "3.0.3", features = ["builtins", "loop_controls", "serde"] }
 prettyplease = "0.3.0"
-proc-macro2 = "1.0.107"
-quote = "1.0.47"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.11.1"
-similar = "3.2.1"
 syn = { version = "3.0.9", features = ["full", "parsing", "printing"] }
-toml_edit = "0.25.17"
-tree-sitter = "0.27.1"
-tree-sitter-rust = "0.24.2"
-walkdir = "2.5.0"

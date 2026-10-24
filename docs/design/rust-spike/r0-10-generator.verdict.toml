@@ -1,0 +1,8 @@
+# R0.10 verdict. spike-check.sh reads this file. R0.15 reads it, not the prose.
+spike = "r0-10"
+verdict = "go"
+plan = "rustfmt"                     # C: one rustfmt process per generator run, hash after formatting
+post_steps = ["migrate", "sqlx-prepare", "build", "openapi-emit", "client"]
+stable_template_max_name_len = 9     # plan A breaks at a resource name of 10 characters
+rustfmt_ms_per_resource = 44         # median, load 13
+prettyplease_cargo_fmt_files_changed = 4

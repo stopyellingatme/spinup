@@ -1,0 +1,119 @@
+//! The [[ human ]] model. `spinup g resource` wrote this file. You may edit it.
+
+[% if enums %]
+use axum::http::StatusCode;
+use kit::{ApiError, Problem};
+[% else %]
+use kit::ApiError;
+[% endif %]
+use serde::{Deserialize, Serialize};
+[% if uses_date %]
+use time::{Date, OffsetDateTime};
+[% else %]
+use time::OffsetDateTime;
+[% endif %]
+use utoipa::ToSchema;
+[% for e in enums %]
+
+// The [[ e.human ]] of [[ article ]] [[ human ]]. Plain comments on schema
+// types keep the spec free of descriptions, as the Go spec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum [[ e.enum_type ]] {
+[% for v in e.variants %]
+    [[ v.name ]],
+[% endfor %]
+}
+
+impl [[ e.enum_type ]] {
+    /// The stored text of the value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+[% for v in e.variants %]
+            Self::[[ v.name ]] => "[[ v.value ]]",
+[% endfor %]
+        }
+    }
+
+    /// Parses the stored text. Other text is a 500: the CHECK constraint
+    /// allows only these values.
+    pub fn parse(s: &str) -> Result<Self, ApiError> {
+        match s {
+[% for v in e.variants %]
+            "[[ v.value ]]" => Ok(Self::[[ v.name ]]),
+[% endfor %]
+            _ => Err(ApiError::from(Problem::status(
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ))),
+        }
+    }
+}
+[% endfor %]
+
+#[derive([[ derives ]])]
+pub struct [[ type ]] {
+    pub id: i64,
+[% for f in fields %]
+[% if f.nullable %]
+    #[schema(required = true)]
+[% endif %]
+[% if f.enum_type %]
+    #[schema(inline)]
+[% endif %]
+[% if f.serde_with %]
+    #[serde(with = "[[ f.serde_with ]]")]
+[% endif %]
+    pub [[ f.name ]]: [[ f.rust_type ]],
+[% endfor %]
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive([[ derives ]])]
+pub struct [[ type ]]Input {
+[% for f in fields %]
+[% if f.nullable %]
+    #[serde(default)]
+[% endif %]
+[% if f.enum_type %]
+    #[schema(inline)]
+[% endif %]
+[% if f.serde_with %]
+    #[serde(with = "[[ f.serde_with ]]")]
+[% endif %]
+    pub [[ f.name ]]: [[ f.rust_type ]],
+[% endfor %]
+}
+
+#[derive([[ derives ]])]
+pub struct [[ type ]]List {
+    pub items: Vec<[[ type ]]>,
+    pub total: i64,
+}
+
+/// A row of the [[ table ]] table.
+pub struct [[ type ]]Row {
+    pub id: i64,
+[% for f in fields %]
+    pub [[ f.name ]]: [[ f.row_type ]],
+[% endfor %]
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+impl TryFrom<[[ type ]]Row> for [[ type ]] {
+    type Error = ApiError;
+
+    fn try_from(row: [[ type ]]Row) -> Result<Self, ApiError> {
+        Ok(Self {
+            id: row.id,
+[% for f in fields %]
+            [[ f.name ]]: [[ f.from_row ]],
+[% endfor %]
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+    }
+}
