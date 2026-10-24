@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,6 +44,18 @@ type Record struct {
 	Data string
 	TTL  int
 }
+
+// Name rules from the DigitalOcean OpenAPI specification.
+var (
+	tagNamePattern      = regexp.MustCompile(`^[a-zA-Z0-9_\-:]+$`)
+	firewallNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]+$`)
+	dropletNamePattern  = regexp.MustCompile(`^[a-zA-Z0-9]?[a-z0-9A-Z.\-]*[a-z0-9A-Z]$`)
+	portPattern         = regexp.MustCompile(`^\d{1,5}(-\d{1,5})?$`)
+)
+
+const maxTagName = 255
+
+func validTagName(n string) bool { return len(n) <= maxTagName && tagNamePattern.MatchString(n) }
 
 type dropletState struct {
 	Droplet
@@ -407,6 +420,9 @@ func (s *Server) createDroplet(w http.ResponseWriter, body []byte) {
 	case d.Name == "" || d.Image == "":
 		apiError(w, 422, "unprocessable_entity", "Name and image are required")
 		return
+	case !dropletNamePattern.MatchString(d.Name):
+		apiError(w, 422, "unprocessable_entity", "Only valid hostname characters are allowed. (a-z, A-Z, 0-9, . and -)")
+		return
 	case regions[d.Region] == "":
 		apiError(w, 422, "unprocessable_entity", "Region is invalid")
 		return
@@ -420,6 +436,12 @@ func (s *Server) createDroplet(w http.ResponseWriter, body []byte) {
 	for _, ref := range d.SSHKeys {
 		if s.findKey(ref) == nil {
 			apiError(w, 422, "unprocessable_entity", "You specified an invalid SSH Key")
+			return
+		}
+	}
+	for _, t := range d.Tags {
+		if !validTagName(t) {
+			apiError(w, 422, "unprocessable_entity", "tag name "+t+" is invalid: use letters, numbers, colons, dashes, and underscores")
 			return
 		}
 	}
@@ -451,6 +473,14 @@ func (s *Server) tagRoutes(w http.ResponseWriter, m string, rest []string, body 
 		name := str(req, "name")
 		if name == "" {
 			apiError(w, 422, "unprocessable_entity", "name is required")
+			return
+		}
+		switch {
+		case !validTagName(name):
+			apiError(w, 422, "unprocessable_entity", "tag name is invalid: use letters, numbers, colons, dashes, and underscores, up to 255 characters")
+			return
+		case slices.Contains(s.tags, name):
+			apiError(w, 422, "unprocessable_entity", "tag already exists")
 			return
 		}
 		s.addTag(name)
@@ -494,7 +524,8 @@ func (s *Server) firewallRoutes(w http.ResponseWriter, r *http.Request, rest []s
 	case len(rest) == 0 && m == "GET":
 		items := make([]any, 0, len(s.firewalls))
 		for _, f := range s.firewalls {
-			items = append(items, f)
+			items = append(items, clone(f))
+			f["status"] = "succeeded"
 		}
 		s.paginate(w, r, "firewalls", items)
 	case len(rest) == 0 && m == "POST", len(rest) == 1 && m == "PUT":
@@ -502,8 +533,12 @@ func (s *Server) firewallRoutes(w http.ResponseWriter, r *http.Request, rest []s
 		if !ok {
 			return
 		}
-		if str(req, "name") == "" {
-			apiError(w, 422, "unprocessable_entity", "name is required")
+		if !firewallNamePattern.MatchString(str(req, "name")) {
+			apiError(w, 422, "unprocessable_entity", "name must begin with a letter or digit and hold only letters, digits, periods, and dashes")
+			return
+		}
+		if msg := checkRules(req); msg != "" {
+			apiError(w, 422, "unprocessable_entity", msg)
 			return
 		}
 		// The real API refuses a firewall with a tag that does not exist.
@@ -513,11 +548,15 @@ func (s *Server) firewallRoutes(w http.ResponseWriter, r *http.Request, rest []s
 				return
 			}
 		}
-		fw := map[string]any{"name": req["name"], "status": "succeeded"}
+		// A change is pending until the next read, as in the real API.
+		fw := map[string]any{"name": req["name"], "status": "waiting"}
 		for _, k := range []string{"tags", "droplet_ids", "inbound_rules", "outbound_rules"} {
-			if req[k] == nil {
+			switch {
+			case req[k] == nil:
 				fw[k] = []any{}
-			} else {
+			case k == "inbound_rules" || k == "outbound_rules":
+				fw[k] = canonRules(req[k])
+			default:
 				fw[k] = req[k]
 			}
 		}
@@ -537,7 +576,8 @@ func (s *Server) firewallRoutes(w http.ResponseWriter, r *http.Request, rest []s
 		writeJSON(w, 200, map[string]any{"firewall": fw})
 	case len(rest) == 1 && m == "GET":
 		if i := s.findFirewall(rest[0]); i >= 0 {
-			writeJSON(w, 200, map[string]any{"firewall": s.firewalls[i]})
+			writeJSON(w, 200, map[string]any{"firewall": clone(s.firewalls[i])})
+			s.firewalls[i]["status"] = "succeeded"
 			return
 		}
 		notFound(w)
@@ -631,4 +671,46 @@ func (s *Server) domainRoutes(w http.ResponseWriter, r *http.Request, rest []str
 
 func recJSON(r Record) map[string]any {
 	return map[string]any{"id": r.ID, "type": r.Type, "name": r.Name, "data": r.Data, "ttl": r.TTL}
+}
+
+// checkRules validates the rules of a firewall body. It returns an error
+// message, or an empty string.
+func checkRules(req map[string]any) string {
+	for _, k := range []string{"inbound_rules", "outbound_rules"} {
+		rules, _ := req[k].([]any)
+		for _, x := range rules {
+			rule, _ := x.(map[string]any)
+			proto := str(rule, "protocol")
+			if !slices.Contains([]string{"tcp", "udp", "icmp"}, proto) {
+				return "protocol must be tcp, udp, or icmp"
+			}
+			ports := str(rule, "ports")
+			if proto == "icmp" {
+				continue
+			}
+			if ports != "" && ports != "all" && ports != "0" && !portPattern.MatchString(ports) {
+				return "ports must be a port, a range, or all"
+			}
+		}
+	}
+	return ""
+}
+
+// canonRules writes the ports of each rule as the real API answers them:
+// "0" for all ports and for ICMP.
+func canonRules(v any) any {
+	rules, _ := v.([]any)
+	out := make([]any, 0, len(rules))
+	for _, x := range rules {
+		rule, _ := x.(map[string]any)
+		c := map[string]any{}
+		for k, val := range rule {
+			c[k] = val
+		}
+		if p := str(rule, "ports"); p == "" || p == "all" || str(rule, "protocol") == "icmp" {
+			c["ports"] = "0"
+		}
+		out = append(out, c)
+	}
+	return out
 }
