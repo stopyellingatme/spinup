@@ -661,7 +661,7 @@ func writePGFile(t *testing.T, root, name, text string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(text), 0600); err != nil {
+	if err := runexec.WriteExecutable(path, []byte(text), 0600); err != nil {
 		t.Fatal(err)
 	}
 }

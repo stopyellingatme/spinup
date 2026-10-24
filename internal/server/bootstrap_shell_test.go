@@ -42,7 +42,7 @@ func TestSSHDValidationBeforeReload(t *testing.T) {
 				filepath.Join(dir, "sshd"):      "#!/bin/sh\nif [ \"$1\" = -t ]; then printf 'validate\\n' >> \"$EVENTS\"; exit \"$INVALID\"; fi\nprintf '%s' '" + safeSSHD + "'\n",
 				filepath.Join(dir, "systemctl"): "#!/bin/sh\nprintf 'reload\\n' >> \"$EVENTS\"\n",
 			} {
-				if err := os.WriteFile(path, []byte(data), 0700); err != nil {
+				if err := runexec.WriteExecutable(path, []byte(data), 0700); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -136,7 +136,7 @@ else
 fi
 `,
 			} {
-				if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
+				if err := runexec.WriteExecutable(filepath.Join(dir, name), []byte(script), 0700); err != nil {
 					t.Fatal(err)
 				}
 			}

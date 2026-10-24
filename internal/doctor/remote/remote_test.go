@@ -145,7 +145,7 @@ case "$1" in
  *) exit 1;;
 esac
 `
-			if err := os.WriteFile(filepath.Join(bin, "openssl"), []byte(script), 0o755); err != nil {
+			if err := runexec.WriteExecutable(filepath.Join(bin, "openssl"), []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}
 			vm := &shellRemote{env: []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "TRUST=" + trust}}

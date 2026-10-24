@@ -359,7 +359,7 @@ case "$*" in
  *) echo "unexpected docker: $*" >&2; exit 1;;
 esac
 `
-	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(fakeDocker), 0o755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(bin, "docker"), []byte(fakeDocker), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	vm := &remote.Fake{}

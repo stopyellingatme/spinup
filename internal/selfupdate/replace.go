@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 )
 
 const binaryLimit = 256 << 20
@@ -105,15 +107,13 @@ func replace(path string, binary []byte, goos string) error {
 	}
 	staged := f.Name()
 	defer os.Remove(staged)
-	if _, err = f.Write(binary); err == nil {
-		err = f.Chmod(0755)
-	}
-	if err == nil {
-		err = f.Sync()
-	}
+	err = f.Chmod(0755)
 	closeErr := f.Close()
 	if err == nil {
 		err = closeErr
+	}
+	if err == nil {
+		err = execx.WriteExecutable(staged, binary, 0755)
 	}
 	if err != nil {
 		return failure(err)

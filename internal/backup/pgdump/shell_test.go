@@ -12,7 +12,7 @@ import (
 
 func executable(t *testing.T, dir, name, script string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nset -eu\n"+script), 0o700); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(dir, name), []byte("#!/bin/sh\nset -eu\n"+script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 }

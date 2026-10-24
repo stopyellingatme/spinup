@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/plugin"
 )
 
@@ -19,7 +20,7 @@ func execFixture(t *testing.T, extra string) string {
 	if err := os.MkdirAll(filepath.Join(root, "bin"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, name), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+	if err := execx.WriteExecutable(filepath.Join(root, name), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "plugin.toml"))

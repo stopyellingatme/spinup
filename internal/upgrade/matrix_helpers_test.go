@@ -51,7 +51,7 @@ func matrixWrite(t *testing.T, path string, data []byte, mode fs.FileMode) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, data, mode); err != nil {
+	if err := exec.WriteExecutable(path, data, mode); err != nil {
 		t.Fatal(err)
 	}
 }

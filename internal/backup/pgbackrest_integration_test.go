@@ -25,7 +25,7 @@ func (l localVM) Run(ctx context.Context, c remote.Cmd) (runexec.Result, error) 
 
 func (l localVM) Upload(_ context.Context, data []byte, path string, mode fs.FileMode) error {
 	local := filepath.Join(l.opt, strings.TrimPrefix(path, "/opt/"+l.app+"/"))
-	return os.WriteFile(local, data, mode)
+	return runexec.WriteExecutable(local, data, mode)
 }
 
 func (l localVM) Close(context.Context) error { return nil }

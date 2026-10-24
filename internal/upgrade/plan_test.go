@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/merge"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
@@ -51,7 +52,7 @@ func writePlanFile(t *testing.T, root, name, data string, mode fs.FileMode) {
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(full, []byte(data), mode); err != nil {
+	if err := execx.WriteExecutable(full, []byte(data), mode); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(full, mode); err != nil {

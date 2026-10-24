@@ -133,7 +133,7 @@ func TestFailedInitializationTargetCanBeRemoved(t *testing.T) {
 		"gosu":   "#!/bin/sh\nshift\nexec \"$@\"\n",
 		"initdb": "#!/bin/sh\nprintf partial > \"$1/partial\"\nexit 42\n",
 	} {
-		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0700); err != nil {
+		if err := runexec.WriteExecutable(filepath.Join(bin, name), []byte(script), 0700); err != nil {
 			t.Fatal(err)
 		}
 	}

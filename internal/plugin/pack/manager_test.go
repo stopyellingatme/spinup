@@ -420,7 +420,7 @@ func (r *fixtureRunner) Run(_ context.Context, c execx.Cmd) (execx.Result, error
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return execx.Result{}, err
 			}
-			if err := os.WriteFile(path, file.Data, file.Mode); err != nil {
+			if err := execx.WriteExecutable(path, file.Data, file.Mode); err != nil {
 				return execx.Result{}, err
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 )
 
@@ -35,7 +36,7 @@ func TestPluginExecTrustFlags(t *testing.T) {
 				"plugins/hello/bin/hello":   "unused executable",
 			}
 			for path, data := range files {
-				if err := os.WriteFile(filepath.Join(root, path), []byte(data), 0755); err != nil {
+				if err := execx.WriteExecutable(filepath.Join(root, path), []byte(data), 0755); err != nil {
 					t.Fatal(err)
 				}
 			}

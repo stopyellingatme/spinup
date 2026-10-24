@@ -152,7 +152,7 @@ set -eu
 [ "$(cat "$2")" != 'old policy' ]
 [ "$INVALID" = false ]
 `
-			if err := os.WriteFile(filepath.Join(bin, "visudo"), []byte(validator), 0755); err != nil {
+			if err := runexec.WriteExecutable(filepath.Join(bin, "visudo"), []byte(validator), 0755); err != nil {
 				t.Fatal(err)
 			}
 			var script string

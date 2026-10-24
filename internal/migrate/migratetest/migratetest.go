@@ -141,7 +141,7 @@ func copyTree(t testing.TB, root string, source tree) {
 				t.Fatal(err)
 			}
 		} else {
-			if err := os.WriteFile(target, e.data, e.mode.Perm()); err != nil {
+			if err := exec.WriteExecutable(target, e.data, e.mode.Perm()); err != nil {
 				t.Fatal(err)
 			}
 		}

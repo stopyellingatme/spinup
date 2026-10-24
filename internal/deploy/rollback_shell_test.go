@@ -31,7 +31,7 @@ func TestRollbackConfigurationScript(t *testing.T) {
 			if valid {
 				validate = "exit 0"
 			}
-			if err := os.WriteFile(docker, []byte("#!/bin/sh\ncase $1 in\ncompose) echo caddy1;;\nexec) "+validate+";;\n*) exit 2;;\nesac\n"), 0700); err != nil {
+			if err := runexec.WriteExecutable(docker, []byte("#!/bin/sh\ncase $1 in\ncompose) echo caddy1;;\nexec) "+validate+";;\n*) exit 2;;\nesac\n"), 0700); err != nil {
 				t.Fatal(err)
 			}
 			script := strings.ReplaceAll(rollbackColorScript, "caddy=/opt/$3/caddy", "caddy="+remote.Quote(filepath.Join(root, "caddy")))

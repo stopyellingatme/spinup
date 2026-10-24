@@ -12,6 +12,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/rogpeppe/go-internal/diff"
+
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 )
 
 type entry struct {
@@ -99,7 +101,7 @@ func writeGolden(dir string, files tree) error {
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(target, file.data, file.mode); err != nil {
+		if err := execx.WriteExecutable(target, file.data, file.mode); err != nil {
 			return err
 		}
 		if err := os.Chmod(target, file.mode); err != nil {

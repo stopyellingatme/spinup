@@ -40,7 +40,7 @@ func write(t *testing.T, root, name, data string) {
 	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(p, []byte(data), 0600); err != nil {
+	if err := runexec.WriteExecutable(p, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -217,7 +217,7 @@ func TestUpgradeOrderAndFailures(t *testing.T) {
 				}
 			} else {
 				script := filepath.Join(t.TempDir(), "rollback.sh")
-				if err = os.WriteFile(script, rollback, 0700); err != nil {
+				if err = runexec.WriteExecutable(script, rollback, 0700); err != nil {
 					t.Fatal(err)
 				}
 				r, e := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "/bin/sh", Args: []string{script}, Env: []string{"PATH=/nonexistent"}})

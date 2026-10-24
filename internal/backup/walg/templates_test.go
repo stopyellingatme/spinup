@@ -49,7 +49,7 @@ func TestWALGTemplates(t *testing.T) {
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "run.sh")
-	if err := os.WriteFile(script, []byte(readTemplate(t, tree, "deploy/backups/run.sh")), 0700); err != nil {
+	if err := runexec.WriteExecutable(script, []byte(readTemplate(t, tree, "deploy/backups/run.sh")), 0700); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-n", script}}); err != nil {

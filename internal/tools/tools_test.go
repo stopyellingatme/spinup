@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
 )
 
@@ -103,7 +104,7 @@ func TestInstall(t *testing.T) {
 	t.Run("skips current version unless forced", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "sops")
-		if err := os.WriteFile(path, goodSOPS, 0755); err != nil {
+		if err := execx.WriteExecutable(path, goodSOPS, 0755); err != nil {
 			t.Fatal(err)
 		}
 		got, err := Install(context.Background(), Options{Names: []string{"sops"}, Dir: dir, GOOS: "linux", GOARCH: "amd64", BaseURL: baseURL, HTTPClient: client})

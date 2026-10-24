@@ -221,7 +221,7 @@ set -eu
 printf '%s\n' "$@" > "$TRACE"
 case " $* " in *' --no-expire-auto '*) ;; *) exit 17 ;; esac
 `
-	if err := os.WriteFile(filepath.Join(dir, "pgbackrest"), []byte(script), 0755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(dir, "pgbackrest"), []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
 	// Execute the exact sh -c payload used by Command against a real POSIX shell.

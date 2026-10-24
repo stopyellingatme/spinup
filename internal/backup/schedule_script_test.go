@@ -165,7 +165,7 @@ else:
     os.set_inheritable(f.fileno(), True)
     os.execvp(sys.argv[2], sys.argv[2:])
 `
-	if err := os.WriteFile(filepath.Join(bin, "flock"), []byte("#!"+python+"\n"+script), 0755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(bin, "flock"), []byte("#!"+python+"\n"+script), 0755); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -194,7 +194,7 @@ case "$1" in
 esac
 `,
 			} {
-				if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0755); err != nil {
+				if err := runexec.WriteExecutable(filepath.Join(bin, name), []byte(script), 0755); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -243,7 +243,7 @@ func scheduledTestFiles(t *testing.T) (string, []string) {
 	for _, f := range files {
 		if f.Path == "deploy/backups/run.sh" {
 			script := strings.ReplaceAll(string(f.Data), "/opt/$app", dir)
-			if err := os.WriteFile(filepath.Join(dir, "run.sh"), []byte(script), 0755); err != nil {
+			if err := runexec.WriteExecutable(filepath.Join(dir, "run.sh"), []byte(script), 0755); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -263,7 +263,7 @@ set -eu
 if [ -n "${LOCK_READY:-}" ] && [ "$1" = "$LOCK_MATCH" ]; then printf 'waiting\n' > "$LOCK_READY"; fi
 exec "$REAL_FLOCK" "$@"
 `
-	if err := os.WriteFile(filepath.Join(bin, "flock"), []byte(wrapper), 0755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(bin, "flock"), []byte(wrapper), 0755); err != nil {
 		t.Fatal(err)
 	}
 	return dir, []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "REAL_FLOCK=" + realFlock, "BASE=" + dir}
@@ -273,7 +273,7 @@ func TestMetricsWritersShareLock(t *testing.T) {
 	t.Parallel()
 	dir, env := scheduledTestFiles(t)
 	docker := "#!/bin/sh\nexit 0\n"
-	if err := os.WriteFile(filepath.Join(dir, "bin/docker"), []byte(docker), 0755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(dir, "bin/docker"), []byte(docker), 0755); err != nil {
 		t.Fatal(err)
 	}
 	script := `set -eu
@@ -330,7 +330,7 @@ case "$*" in
  *' info') printf '[{"backup":[{"type":"diff","info":{"size":42}}]}]' ;;
 esac
 `
-	if err := os.WriteFile(filepath.Join(dir, "bin/docker"), []byte(docker), 0755); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(dir, "bin/docker"), []byte(docker), 0755); err != nil {
 		t.Fatal(err)
 	}
 	script := `set -eu

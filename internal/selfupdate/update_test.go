@@ -99,7 +99,7 @@ func TestUpdate(t *testing.T) {
 			t.Parallel()
 			srv := fixture(t, tt.bad, tt.missing)
 			path := filepath.Join(t.TempDir(), "spinup")
-			if err := os.WriteFile(path, []byte("old"), 0755); err != nil {
+			if err := runexec.WriteExecutable(path, []byte("old"), 0755); err != nil {
 				t.Fatal(err)
 			}
 			runner := &fakeRunner{fail: tt.fail}
@@ -160,7 +160,7 @@ func TestExplicitDevelopmentUpdate(t *testing.T) {
 			t.Parallel()
 			srv := fixture(t, false, false)
 			path := filepath.Join(t.TempDir(), "spinup")
-			if err := os.WriteFile(path, []byte("old"), 0755); err != nil {
+			if err := runexec.WriteExecutable(path, []byte("old"), 0755); err != nil {
 				t.Fatal(err)
 			}
 			u := Updater{APIBase: srv.URL, DownloadBase: srv.URL + "/download", Client: srv.Client(), Executable: path, OS: "linux", Arch: "amd64", LookPath: func(string) (string, error) { return "", fmt.Errorf("absent") }}
@@ -179,7 +179,7 @@ func TestHomebrewSymlink(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(target, []byte("brew"), 0755); err != nil {
+	if err := runexec.WriteExecutable(target, []byte("brew"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "spinup")

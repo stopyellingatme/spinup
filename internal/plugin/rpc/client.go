@@ -80,7 +80,7 @@ func (c *Client) binary() (string, func(), error) {
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 	binary := filepath.Join(dir, filepath.Base(name))
-	if err := os.WriteFile(binary, data, 0700); err != nil {
+	if err := execx.WriteExecutable(binary, data, 0700); err != nil {
 		cleanup()
 		return "", nil, c.failure("stage binary", err)
 	}

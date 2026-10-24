@@ -154,7 +154,7 @@ func TestPlanPromtoolAvailability(t *testing.T) {
 			t.Setenv("SPINUP_ALERT_CHECK_EXIT", tt.exit)
 			if tt.available {
 				script := "#!/bin/sh\n[ \"$1\" = check ] && [ \"$2\" = rules ] || exit 2\nprintf '%s' \"$3\" > \"$SPINUP_ALERT_TEMP_PATH\"\n/bin/cat \"$3\" > \"$SPINUP_ALERT_TEMP_DATA\"\nexit \"$SPINUP_ALERT_CHECK_EXIT\"\n"
-				if err := os.WriteFile(filepath.Join(bin, "promtool"), []byte(script), 0o755); err != nil {
+				if err := exec.WriteExecutable(filepath.Join(bin, "promtool"), []byte(script), 0o755); err != nil {
 					t.Fatal(err)
 				}
 			}

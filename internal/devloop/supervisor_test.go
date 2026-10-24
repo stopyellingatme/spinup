@@ -246,7 +246,7 @@ func TestSupervisorGraceForDescendant(t *testing.T) {
 func TestSupervisorRelativeExecutable(t *testing.T) {
 	t.Parallel()
 	directory := t.TempDir()
-	if err := os.WriteFile(filepath.Join(directory, "helper"), []byte("#!/bin/sh\necho relative\n"), 0700); err != nil {
+	if err := exec.WriteExecutable(filepath.Join(directory, "helper"), []byte("#!/bin/sh\necho relative\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

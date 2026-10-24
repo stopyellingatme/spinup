@@ -99,7 +99,7 @@ func TestOSRunnerResolvesCommandDirectoryAndPath(t *testing.T) {
 			if err := os.Mkdir(bin, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(bin, "spinup-exec-test"), []byte("#!/bin/sh\nprintf '%s' \"$VALUE\"\n"), 0o700); err != nil {
+			if err := WriteExecutable(filepath.Join(bin, "spinup-exec-test"), []byte("#!/bin/sh\nprintf '%s' \"$VALUE\"\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			command := Cmd{Name: test.cmdName, Dir: dir, Env: []string{"VALUE=from-command-env"}}

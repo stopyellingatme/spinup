@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 )
 
 func TestCheckChannels(t *testing.T) {
@@ -71,7 +73,7 @@ func TestCheckDoesNotReplace(t *testing.T) {
 	t.Parallel()
 	srv := fixture(t, false, false)
 	path := filepath.Join(t.TempDir(), "spinup")
-	if err := os.WriteFile(path, []byte("old"), 0755); err != nil {
+	if err := execx.WriteExecutable(path, []byte("old"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	r, err := (Updater{APIBase: srv.URL, Client: srv.Client(), Executable: path}).Update(context.Background(), Options{Current: "1.0.0", Check: true})
@@ -112,7 +114,7 @@ func TestReplace(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
 			path := filepath.Join(dir, "spinup")
-			if err := os.WriteFile(path, []byte("old"), 0755); err != nil {
+			if err := execx.WriteExecutable(path, []byte("old"), 0755); err != nil {
 				t.Fatal(err)
 			}
 			if err := replace(path, []byte("new"), goos); err != nil {

@@ -524,14 +524,14 @@ exit 0
 				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(target, []byte(data), 0o700); err != nil {
+				if err := spexec.WriteExecutable(target, []byte(data), 0o700); err != nil {
 					t.Fatal(err)
 				}
 			}
 			script := readDeployFile(t, renderMonitoring(t, "lite"), "monitoring/grafana/entrypoint.sh")
 			script = strings.NewReplacer("/run/secrets", filepath.Join(root, "secrets"), "/etc/spinup/provisioning", filepath.Join(root, "source"), "/run.sh", filepath.Join(root, "server.sh")).Replace(script)
 			scriptPath := filepath.Join(root, "entrypoint.sh")
-			if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+			if err := spexec.WriteExecutable(scriptPath, []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			result, err := spexec.OSRunner{}.Run(t.Context(), spexec.Cmd{

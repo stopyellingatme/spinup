@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"go.yaml.in/yaml/v3"
+
+	execx "github.com/stopyellingatme/spinup/internal/exec"
 )
 
 const rotateSample = `#cloud-config
@@ -131,7 +133,7 @@ func TestRotationScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := filepath.Join(dir, "tool.sh")
-	if err := os.WriteFile(script, []byte(hostKeyScript), 0o755); err != nil {
+	if err := execx.WriteExecutable(script, []byte(hostKeyScript), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := exec.CommandContext(t.Context(), "ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "old", "-f", filepath.Join(etc, "ssh_host_ed25519_key")).CombinedOutput(); err != nil {

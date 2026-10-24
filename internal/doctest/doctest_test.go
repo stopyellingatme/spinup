@@ -71,7 +71,7 @@ func TestRunPage(t *testing.T) {
 	t.Parallel()
 	bin := t.TempDir()
 	script := filepath.Join(bin, "example")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf 'hello %s\\n' \"$1\"\n"), 0o755); err != nil {
+	if err := exec.WriteExecutable(script, []byte("#!/bin/sh\nprintf 'hello %s\\n' \"$1\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	page, err := Parse("scratch.md", []byte("```console\n$ mkdir child\n$ cd child\n$ example world\nhello world\n$ sh -c 'echo broken; exit 7'\nbroken\n[exit 7]\n```"))

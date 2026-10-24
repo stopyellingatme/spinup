@@ -37,7 +37,7 @@ func TestInPlaceRestoreShellRefusesSecondRestore(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(data, "original"), []byte("retain"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "wal-g"), []byte("#!/bin/sh\nset -eu\nprintf restored > \"$PGDATA/restored\"\n"), 0700); err != nil {
+	if err := runexec.WriteExecutable(filepath.Join(dir, "wal-g"), []byte("#!/bin/sh\nset -eu\nprintf restored > \"$PGDATA/restored\"\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	cmd := runexec.Cmd{Name: "/bin/sh", Args: []string{"-c", script, "walg", "base_000000010000000000000001", ""}, Env: []string{"PATH=" + dir + ":/usr/bin:/bin", "PGDATA=" + data, "WALG_S3_PREFIX=s3://test", "WALG_LIBSODIUM_KEY=test"}}
@@ -182,7 +182,7 @@ set -eu
 printf "shared_buffers = '128MB'\nrecovery_target_time = 'old'\nrestore_command = 'old'\n" > "$PGDATA/postgresql.auto.conf"
 touch "$PGDATA/standby.signal"
 `
-			if err := os.WriteFile(filepath.Join(dir, "wal-g"), []byte(exe), 0700); err != nil {
+			if err := runexec.WriteExecutable(filepath.Join(dir, "wal-g"), []byte(exe), 0700); err != nil {
 				t.Fatal(err)
 			}
 			_, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-eu", "-c", recoveryScript, "walg", "base_000000010000000000000001", at}, Env: []string{"PATH=" + dir + ":" + os.Getenv("PATH"), "PGDATA=" + data}})

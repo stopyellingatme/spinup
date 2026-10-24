@@ -284,16 +284,14 @@ func installBytes(data []byte, destination string) error {
 	}
 	name := temporary.Name()
 	defer os.Remove(name)
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("write binary: %w\nTry: check disk space and retry", err)
-	}
-	if err := temporary.Chmod(0755); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("set binary mode: %w\nTry: check the tools directory permissions", err)
-	}
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close binary: %w\nTry: check disk space and retry", err)
+	}
+	if err := os.Chmod(name, 0755); err != nil {
+		return fmt.Errorf("set binary mode: %w\nTry: check the tools directory permissions", err)
+	}
+	if err := exec.WriteExecutable(name, data, 0755); err != nil {
+		return fmt.Errorf("write binary: %w\nTry: check disk space and retry", err)
 	}
 	if err := os.Rename(name, destination); err != nil {
 		return fmt.Errorf("activate binary: %w\nTry: check the tools directory permissions", err)
