@@ -23,6 +23,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A local kit replace in `api/go.mod` now works for image builds (ADR 0018). `spinup build --image` and the deploy build pass the kit directory to Docker buildx as the build context `kit`, and `deploy/Dockerfile.api` uses it. Without the context, the build uses the published kit version. A replace to a missing directory fails with a `Try:` line. Run `spinup upgrade` to get the new Dockerfile.
+- `spinup upgrade` and `spinup module add` keep a local kit replace of the current `api/go.mod` when `SPINUP_KIT_REPLACE` is not set. The variable still wins when it is set. A replace to a missing directory stops the upgrade with a `Try:` line.
+
 - Load test fixes: the database pool holds 20 connections by default (`db.DefaultMaxConns`), and `DATABASE_MAX_CONNS` changes the size. Login, registration, and password reset answer 503 with `Retry-After` when the password hash queue is full (`auth.WithHashLimits`). A login takes its queue place before its database work. One hash runs for each 10 CPUs (at least 1), so a login burst cannot starve the other routes.
 
 - The resource list page costs less to render. The page renders one actions menu (`row-menu.svelte`) outside the rows. Each row has a plain button for the menu and inline icons. The row checkbox is a submit button that works without JavaScript. The toggle form keeps the page number. In the load test, a page view of 20 rows used 1.8 ms of Node CPU, not 4.4 ms (60% less).

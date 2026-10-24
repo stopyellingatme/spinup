@@ -60,6 +60,9 @@ Each codemod prints its ID and description.
 The lock records completed codemods to prevent repeated changes.
 
 If `SPINUP_KIT_REPLACE` is set, the upgrade restores the local kit replacement in `api/go.mod`.
+If the variable is not set, the upgrade keeps a local kit replace that the current `api/go.mod` has.
+If that replace points to a directory that does not exist, the upgrade stops with a `Try:` line.
+`spinup module add` follows the same rules.
 The upgrade increases direct Go requirements only when the target stack pins a higher version.
 The upgrade does not request higher versions for other Go requirements.
 For a release target, the kit requirement uses `v<target>`.

@@ -58,7 +58,7 @@ For local kit development, set `SPINUP_KIT_REPLACE` to the kit directory.
 The command adds an absolute `replace` directive to `api/go.mod` and prints a note.
 The lock hashes the modified file.
 
-Image builds require a published kit version without this local replacement.
+An image build passes the local kit directory to Docker as the build context `kit`.
 The CLI sends no telemetry.
 Set `SPINUP_NO_UPDATE_CHECK=1` to disable update checks.
 
