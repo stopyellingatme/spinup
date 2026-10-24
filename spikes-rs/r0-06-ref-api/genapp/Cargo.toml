@@ -1,0 +1,20 @@
+# The pack lock test: a generated app that depends on the kit by its
+# crates.io name. Before the kit is published, [patch.crates-io] points the
+# name at a path. Check: cargo build --locked --offline (in this directory).
+[workspace]
+
+[package]
+name = "genapp"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[dependencies]
+anyhow = "1.0.104"
+axum = "0.8.9"
+spinup-kit = "0.1.0"
+tokio = { version = "1.54.1", features = ["full"] }
+
+[patch.crates-io]
+spinup-kit = { path = "../kit" }
