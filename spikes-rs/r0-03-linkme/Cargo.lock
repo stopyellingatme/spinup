@@ -6,8 +6,9 @@ version = 4
 name = "app"
 version = "0.0.0"
 dependencies = [
- "inventory",
- "linkme",
+ "reg-a",
+ "reg-b",
+ "registry",
 ]
 
 [[package]]
@@ -63,6 +64,16 @@ version = "0.0.0"
 dependencies = [
  "inventory",
  "linkme",
+ "registry",
+]
+
+[[package]]
+name = "reg-b"
+version = "0.0.0"
+dependencies = [
+ "inventory",
+ "linkme",
+ "registry",
 ]
 
 [[package]]

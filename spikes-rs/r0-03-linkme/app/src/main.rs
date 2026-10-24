@@ -1,3 +1,7 @@
-//! Spike r0-03-linkme, member app. The lane replaces this stub.
+mod wire_gen;
 
-fn main() {}
+fn main() {
+    for id in registry::ids() {
+        println!("{id}");
+    }
+}
