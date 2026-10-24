@@ -37,9 +37,10 @@ exec spinup build --dry-run
 stdout 'pnpm --dir web install --frozen-lockfile'
 stdout 'pnpm --dir web build'
 stdout 'go build -tags embedweb'
-# Image previews need no Docker engine. Keep the local kit restriction.
-! exec spinup build --image --dry-run
-stderr 'local kit replace'
+# Image previews need no Docker engine. A local kit replace goes to Docker as the build context kit.
+exec spinup build --image --dry-run
+stdout '--build-context kit='
+stdout '--build-context web=web'
 cp api/go.mod api/go.mod.local
 exec sh $WORK/image-mod.sh
 exec spinup build --image --dry-run
