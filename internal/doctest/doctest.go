@@ -276,7 +276,8 @@ func RunPage(ctx context.Context, runner exec.Runner, page Page, env Env) []Fail
 				Args:    []string{"-c", "exec 2>&1\n" + step.Command},
 				Dir:     current,
 				Env:     commandEnv(env, directory),
-				Timeout: 2 * time.Minute,
+				// A generator run builds and tests a generated app. Slow CI runners need more than two minutes.
+				Timeout: 5 * time.Minute,
 			})
 			if result.ExitCode != step.WantExit {
 				failures = append(failures, Failure{Path: page.Path, Line: step.Line, Command: step.Command, Message: fmt.Sprintf("exit code: want %d, got %d", step.WantExit, result.ExitCode)})

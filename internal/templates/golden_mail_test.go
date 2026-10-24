@@ -168,7 +168,7 @@ func TestMailStandardWorkerDelivery(t *testing.T) {
 	}
 	result, err := (spexec.OSRunner{}).Run(t.Context(), spexec.Cmd{
 		Name: "go", Args: []string{"test", "-race", "-v", "./cmd/worker", "./internal/mail"},
-		Dir: filepath.Join(dir, "api"), Timeout: 2 * time.Minute,
+		Dir: filepath.Join(dir, "api"), Timeout: 5 * time.Minute, // a -race build is slow on CI runners
 		Env: []string{"GOWORK=" + filepath.Join(dir, "go.work"), "GOTOOLCHAIN=local", "GOFLAGS=-mod=readonly", "GOPROXY=off"},
 	})
 	if err != nil {
