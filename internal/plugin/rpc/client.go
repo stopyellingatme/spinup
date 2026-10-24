@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	execx "github.com/stopyellingatme/spinup/internal/exec"
@@ -141,7 +142,16 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 	exited := make(chan struct{})
 	var exitErr error
 	go func() {
-		_, exitErr = runner.Run(processCtx, execx.Cmd{Name: binary, Env: env, ReplaceEnv: true, Dir: c.Root, Stdin: input, Stdout: output, Stderr: diagnostic})
+		// A fork in another goroutine can still hold the write handle of the staged binary
+		// for a moment, so the start fails with ETXTBSY (golang/go#22315). The process did
+		// not start and read nothing, so a new start with the same pipes is safe.
+		for attempt := 0; ; attempt++ {
+			_, exitErr = runner.Run(processCtx, execx.Cmd{Name: binary, Env: env, ReplaceEnv: true, Dir: c.Root, Stdin: input, Stdout: output, Stderr: diagnostic})
+			if !errors.Is(exitErr, syscall.ETXTBSY) || attempt == 4 || processCtx.Err() != nil {
+				break
+			}
+			time.Sleep(time.Duration(10<<attempt) * time.Millisecond)
+		}
 		close(exited)
 	}()
 	// Always reap the process before removing its executable.
