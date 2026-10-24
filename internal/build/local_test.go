@@ -30,10 +30,12 @@ func TestLocal(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
-			if err := os.Mkdir(filepath.Join(root, "api"), 0755); err != nil {
-				t.Fatal(err)
+			for _, dir := range []string{"api", "deploy"} {
+				if err := os.Mkdir(filepath.Join(root, dir), 0755); err != nil {
+					t.Fatal(err)
+				}
 			}
-			for name, data := range map[string]string{"spinup.toml": "[app]\nname = 'todo'\n", "api/go.mod": "module example.com/todo/api\n" + tc.replace + "\n"} {
+			for name, data := range map[string]string{"spinup.toml": "[app]\nname = 'todo'\n", "api/go.mod": "module example.com/todo/api\n" + tc.replace + "\n", "deploy/Dockerfile.web": "FROM scratch\n"} {
 				if err := os.WriteFile(filepath.Join(root, name), []byte(data), 0644); err != nil {
 					t.Fatal(err)
 				}

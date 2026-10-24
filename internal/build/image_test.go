@@ -80,7 +80,30 @@ func imageProject(t *testing.T, mod string) string {
 	if err := os.WriteFile(filepath.Join(root, "api", "go.mod"), []byte(mod), 0644); err != nil {
 		t.Fatal(err)
 	}
+	// A web app has deploy/Dockerfile.web. TestBuildImagesAPIOnly removes it.
+	if err := os.MkdirAll(filepath.Join(root, "deploy"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "deploy", "Dockerfile.web"), []byte("FROM scratch\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	return root
+}
+
+func TestBuildImagesAPIOnly(t *testing.T) {
+	t.Parallel()
+	root := imageProject(t, "module github.com/acme/todo/api\n")
+	if err := os.Remove(filepath.Join(root, "deploy", "Dockerfile.web")); err != nil {
+		t.Fatal(err)
+	}
+	images := &metadataRunner{}
+	got, err := BuildImages(t.Context(), images, ImageOptions{Root: root, App: "todo", Tag: "v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Name != "todo-api" || len(images.calls) != 1 {
+		t.Fatalf("an app without deploy/Dockerfile.web builds only the API image: %+v, %d calls", got, len(images.calls))
+	}
 }
 
 type metadataRunner struct {

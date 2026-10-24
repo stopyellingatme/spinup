@@ -42,9 +42,10 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 	}
 	embed := embedsWeb(lock)
 	if len(o.Targets) == 0 {
-		o.Targets = []string{"api", "web"}
-		if embed {
-			o.Targets = []string{"api"}
+		o.Targets = []string{"api"}
+		// The deploy flow uses the same rule: a web image exists only with deploy/Dockerfile.web.
+		if _, err := os.Stat(filepath.Join(o.Root, "deploy", "Dockerfile.web")); err == nil && !embed {
+			o.Targets = append(o.Targets, "web")
 		}
 	}
 	kitDir := ""
