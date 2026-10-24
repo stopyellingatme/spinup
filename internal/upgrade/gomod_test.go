@@ -14,7 +14,7 @@ import (
 
 func TestPlanKeepsChangedGoModFiles(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"api/go.mod", "api/go.sum", "api/tools.mod", "api/tools.sum"} {
+	for _, name := range []string{"api/go.mod", "api/go.sum"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
@@ -88,13 +88,34 @@ func TestDepsKeepsHigherKitAndGoDirective(t *testing.T) {
 	s.To.Stack = &stackversions.Stack{GoModules: map[string]string{phaseKit: "v0.1.0-alpha.418"}}
 	s.Plan = &Plan{Files: []FileDecision{{Path: "api/go.mod", Action: ActionKeep, Data: []byte("module x\n\ngo 1.25\n")}}}
 	fake := s.Runner.(*exec.Fake)
-	fake.Expect("go", "mod", "edit", "-json").Return(`{"Require":[{"Path":"`+phaseKit+`","Version":"v0.1.0"}]}`, "", 0)
+	fake.Expect("go", "mod", "edit", "-json").Return(`{"Require":[{"Path":"`+phaseKit+`","Version":"v0.1.1"}]}`, "", 0)
 	fake.Expect("go", "mod", "tidy")
 	if err := phaseDeps(context.Background(), s); err != nil {
 		t.Fatal(err)
 	}
 	api := filepath.Join(s.Worktree, "api")
 	assertPhaseCalls(t, fake, []string{api, api}, "go mod edit -json", "go mod tidy")
+}
+
+func TestDepsReplacesThePlaceholderKit(t *testing.T) {
+	t.Parallel()
+	// Templates required the unpublished v0.1.0 before ADR 0018. It is higher than the pinned
+	// pre-release in semver, but it never existed, so the pin replaces it.
+	s := phaseStep(t)
+	s.To.Version = "0.1.0-alpha.428"
+	s.To.Stack = &stackversions.Stack{GoModules: map[string]string{phaseKit: "v0.1.0-alpha.418"}}
+	s.Plan = &Plan{Files: []FileDecision{{Path: "api/go.mod", Action: ActionKeep, Data: []byte("module x\n\ngo 1.26.0\n")}}}
+	fake := s.Runner.(*exec.Fake)
+	fake.Expect("go", "mod", "edit", "-json").Return(`{"Require":[{"Path":"`+phaseKit+`","Version":"v0.1.0"}]}`, "", 0)
+	fake.Expect("go", "mod", "edit", "-require="+phaseKit+"@v0.1.0-alpha.418")
+	fake.Expect("go", "mod", "tidy")
+	if err := phaseDeps(context.Background(), s); err != nil {
+		t.Fatal(err)
+	}
+	fake.AssertDone(t)
+	if s.Lock.Kit.Version != "v0.1.0-alpha.418" {
+		t.Fatalf("kit lock=%+v", s.Lock.Kit)
+	}
 }
 
 func TestPhaseErrorKeepsInnerTry(t *testing.T) {

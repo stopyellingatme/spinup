@@ -335,10 +335,13 @@ func decidePlanTracked(ctx context.Context, in PlanInput, d FileDecision, entry 
 // goModKeepReason is the reason of a kept Go module file. The decision keeps the new render in Data.
 const goModKeepReason = "go.mod: the dependency step applies the template changes"
 
-// goModuleFile reports the Go module files that upgrades never merge as text.
+// goModuleFile reports the Go module files that upgrades never merge as text. Apps run
+// go mod tidy, so a text merge of api/go.mod conflicts at every pin change. The dependency
+// step raises the pins instead. api/tools.mod and api/tools.sum still merge as text: apps
+// seldom change them, and no step applies their tool pins.
 func goModuleFile(name string) bool {
 	switch name {
-	case "api/go.mod", "api/go.sum", "api/tools.mod", "api/tools.sum":
+	case "api/go.mod", "api/go.sum":
 		return true
 	}
 	return false

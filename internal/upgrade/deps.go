@@ -150,7 +150,7 @@ func raiseKitRequire(ctx context.Context, s *Step, current string) error {
 	if target == nil {
 		return nil
 	}
-	if current != "" {
+	if current != "" && !placeholderKit(current, *target) {
 		have, err := dependencyVersion(current)
 		if err == nil && have.Compare(*target) >= 0 {
 			return nil
@@ -216,4 +216,12 @@ func goLanguageVersion(v string) (compat.Version, error) {
 		v += ".0"
 	}
 	return compat.ParseVersion(v)
+}
+
+// placeholderKit reports whether current is the kit version v0.1.0 that templates required
+// before the kit was published (ADR 0018). Nobody published v0.1.0, so an app that requires it
+// builds only with a local replace. A pre-release of v0.1.0 is lower in semver, so the
+// never-lower rule would keep the placeholder. The pin replaces it.
+func placeholderKit(current string, target compat.Version) bool {
+	return current == "v0.1.0" && target.Pre != "" && target.Major == 0 && target.Minor == 1 && target.Patch == 0
 }
