@@ -18,6 +18,8 @@
 #         SPINUP_DO_DEPLOY_ARGS        extra flags for the deploy runs (word split)
 #         SPINUP_DO_API                the API base (default https://api.digitalocean.com)
 #         SPINUP_DO_WAIT_SECONDS       the wait for each long step (default 600)
+#         SPINUP_DO_LIVE_YES=1         answer yes to the create and destroy questions (no terminal
+#                                      needed). Set it only after a person approved the cost.
 # The script never prints a token value.
 set -euo pipefail
 
@@ -57,7 +59,10 @@ for tool in jq curl openssl "$spinup_bin"; do
 done
 [[ -d "$app_dir" ]] || die "the app directory $app_dir does not exist" "pass the directory of a spinup project"
 [[ -f "$token_file" ]] || die "no stored sign-in at $token_file" "run: $spinup_bin deploy digital-ocean login"
-{ : </dev/tty; } 2>/dev/null || die "there is no terminal for the confirmation" "run the script in a terminal"
+if [[ "${SPINUP_DO_LIVE_YES:-}" != 1 ]]; then
+  { : </dev/tty; } 2>/dev/null || die "there is no terminal for the confirmation" \
+    "run the script in a terminal, or set SPINUP_DO_LIVE_YES=1 after a person approved the cost"
+fi
 
 work=$(mktemp -d)
 created=0
@@ -81,8 +86,13 @@ trap on_exit EXIT
 step() { echo; echo "== $1"; }
 
 # ask <question> reads "yes" from the terminal. Any other answer stops the script.
+# SPINUP_DO_LIVE_YES=1 answers yes.
 ask() {
   local answer
+  if [[ "${SPINUP_DO_LIVE_YES:-}" == 1 ]]; then
+    echo "$1 yes (SPINUP_DO_LIVE_YES=1)"
+    return
+  fi
   printf '%s Type yes to continue: ' "$1" >/dev/tty
   read -r answer </dev/tty || answer=
   [[ "$answer" == yes ]] || die "stopped: the answer was not yes" "run the script again and type yes"
@@ -167,7 +177,7 @@ env -u DIGITALOCEAN_ACCESS_TOKEN -u DIGITALOCEAN_TOKEN SPINUP_CREDENTIALS_DIR="$
 step "6. Public URL and certificate"
 public_url=$(awk -v tbl="[env.$env_name]" '
   /^\[/ { in_tbl = ($0 == tbl) }
-  in_tbl && $1 == "public_url" { gsub(/"/, "", $3); print $3; exit }' "$app_dir/spinup.toml")
+  in_tbl && $1 == "public_url" { gsub(/["\047]/, "", $3); print $3; exit }' "$app_dir/spinup.toml")
 [[ "$public_url" == https://* ]] || die "the public URL '$public_url' is empty or not https" \
   "check public_url in the [env.$env_name] table of spinup.toml"
 host=${public_url#https://}

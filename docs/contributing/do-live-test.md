@@ -20,7 +20,8 @@ The script then prints the destroy command. Run it.
 - A spinup project with the deploy pack and a clean git tree.
   An app that `spinup new` made is enough.
 - The tools `jq`, `curl`, `openssl`, `ssh`, `docker`, `sops`, and `age-keygen`.
-- A terminal. The script reads the answers from `/dev/tty`.
+- A terminal. The script reads the answers from `/dev/tty`. Without a terminal, set `SPINUP_DO_LIVE_YES=1` to answer yes. Set it only after a person approved the cost.
+- `--yes` in the provision flags and `SPINUP_DO_DEPLOY_ARGS=--yes`, because the provision and deploy runs have no terminal.
 
 ## Run the test
 
