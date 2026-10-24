@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -90,7 +91,7 @@ func TestInstallTofu(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if info.Mode().Perm() != 0755 {
+			if runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 				t.Errorf("mode = %o", info.Mode().Perm())
 			}
 		})

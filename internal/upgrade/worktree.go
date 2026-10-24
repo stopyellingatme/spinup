@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -34,10 +35,21 @@ func (r *Runner) checkRepository(ctx context.Context) error {
 		return err
 	}
 	top = strings.TrimSpace(top)
-	if top != r.Root {
+	if !sameDirectory(top, r.Root) {
 		return fmt.Errorf("upgrade repository %q: Git root is %q\nTry: run spinup upgrade at the project Git root", r.Root, top)
 	}
 	return nil
+}
+
+// sameDirectory reports whether two paths name the same directory.
+// Git prints forward slashes on Windows, so a text comparison is not enough.
+func sameDirectory(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	infoA, errA := os.Stat(a)
+	infoB, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(infoA, infoB)
 }
 
 func (r *Runner) checkIgnored(ctx context.Context, dir string) error {

@@ -77,8 +77,18 @@ jobs:
           cache-dependency-path: |
             go.sum
             kit/go.sum
-      - name: Test the internal packages
-        run: go test ./internal/...
+      # The whole CLI must compile on Windows, even the Unix-only packages.
+      - name: Vet every package for Windows
+        run: go vet ./... && (cd kit && go vet ./...)
+      - name: Build the CLI for Windows
+        run: go build -o /dev/null ./cmd/spinup
+      # Test only the packages that support Windows. The list and the reasons
+      # for each exclusion are in scripts/ci/windows-excluded.txt.
+      - name: Test the portable packages
+        run: |
+          packages="$(scripts/ci/windows-packages.sh)"
+          # shellcheck disable=SC2086
+          go test $packages
 
   golden:
     runs-on: ${{ matrix.os }}

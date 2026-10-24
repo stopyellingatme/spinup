@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -18,6 +19,9 @@ import (
 )
 
 func TestInstall(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs Unix file modes: Windows has no execute bit")
+	}
 	goodSOPS := []byte("#!/bin/sh\necho sops 3.13.3\n")
 	goodAge := tarGzip(t, map[string]string{"age/age": "#!/bin/sh\necho 1.3.2\n", "age/age-keygen": "#!/bin/sh\necho 1.3.2\n"})
 	hostileAge := tarGzip(t, map[string]string{"../escape": "no"})
@@ -47,7 +51,7 @@ func TestInstall(t *testing.T) {
 		}
 		for _, name := range []string{"sops", "age", "age-keygen"} {
 			info, statErr := os.Stat(filepath.Join(dir, name))
-			if statErr != nil || info.Mode().Perm() != 0755 {
+			if statErr != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0755) {
 				t.Fatalf("%s = %v, %v", name, info, statErr)
 			}
 		}

@@ -217,7 +217,7 @@ func localKitTarget(data string) (string, bool) {
 		for i, field := range fields {
 			if field == "=>" && i+1 < len(fields) {
 				target := strings.Trim(fields[i+1], "\"`")
-				if filepath.IsAbs(target) || strings.HasPrefix(target, ".") || strings.Contains(target, ":") || strings.HasPrefix(target, "\\") {
+				if filepath.IsAbs(target) || strings.HasPrefix(target, ".") || strings.HasPrefix(target, "/") || strings.Contains(target, ":") || strings.HasPrefix(target, "\\") {
 					return target, true
 				}
 			}

@@ -3,6 +3,7 @@ package pack
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -29,6 +30,9 @@ func TestTreeHash(t *testing.T) {
 	}
 	if first.hash() != second.hash() {
 		t.Fatal("line endings changed hash")
+	}
+	if runtime.GOOS == "windows" {
+		return // Windows has no execute bit, so a mode change cannot change the hash.
 	}
 	if err := os.Chmod(filepath.Join(b, "a"), 0755); err != nil {
 		t.Fatal(err)

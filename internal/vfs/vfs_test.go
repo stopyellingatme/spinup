@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -73,6 +74,9 @@ func TestPlan(t *testing.T) {
 }
 
 func TestDiff(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs Unix file modes: Windows has no mode-only change")
+	}
 	t.Parallel()
 	root := t.TempDir()
 	writeFile(t, root, "unchanged.txt", "same\n")
@@ -162,7 +166,7 @@ func TestApplyDryRunAndSuccess(t *testing.T) {
 		t.Fatalf("old.txt = %q", got)
 	}
 	info, err := os.Stat(filepath.Join(root, "old.txt"))
-	if err != nil || info.Mode().Perm() != 0o600 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("old.txt mode = %v, %v", info.Mode(), err)
 	}
 	if got := readFile(t, root, "nested/new.txt"); got != "created" {
@@ -200,7 +204,7 @@ func TestApplyRollsBack(t *testing.T) {
 	if statErr != nil {
 		t.Fatal(statErr)
 	}
-	if info.Mode().Perm() != 0o775 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o775 {
 		t.Fatalf("first.txt mode after rollback = %o; want 775", info.Mode().Perm())
 	}
 	if got := readFile(t, root, "second.txt"); got != "second" {

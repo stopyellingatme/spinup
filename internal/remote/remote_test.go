@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -74,7 +75,7 @@ func TestSSHArguments(t *testing.T) {
 				t.Fatalf("control path = %q", path)
 			}
 			info, e := os.Stat(filepath.Dir(path))
-			if e != nil || info.Mode().Perm() != 0700 {
+			if e != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0700) {
 				t.Fatalf("cache mode: %v, %v", info, e)
 			}
 			if err := r.Close(context.Background()); err != nil {

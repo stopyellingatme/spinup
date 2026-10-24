@@ -1,0 +1,22 @@
+# Packages that the Windows CI job does not test.
+# Format: <package path relative to ./internal/>  # <reason>
+# spinup does not promise full Windows support. Deploy, backup, ssh, and the
+# dev loop use Unix tools. Every package still compiles: the job runs
+# "go vet" and "go build" with GOOS=windows on the whole module.
+# Remove a line when the package passes on Windows.
+backup                  # flock and sh scripts, Unix file modes
+backup/pgdump           # sh scripts, Unix file modes
+backup/walg             # needs /bin/sh
+cli                     # runs sh, ssh, git, and shellcheck flows; server commands need WSL2
+deploy                  # sh scripts, ln -sfn, Unix file modes
+devloop                 # spinup dev needs Unix process groups
+doctest                 # runs the docs code blocks with Unix tools and a generated app
+gen/newapp              # needs a warm module cache for the generated app
+gen/openapi             # needs oapi-codegen from the module cache
+gen/resource            # golden trees for a generated app and pnpm
+maintain/pg             # sh scripts and a remote shell fake
+maintain/pgupgrade      # sh scripts
+plugin/rpc              # builds plugin test binaries without the .exe suffix
+server                  # server commands require WSL2 on Windows
+templates               # generated app goldens, pnpm, sh, and server bootstrap
+testutil/scripttest     # txtar scripts use sh, git, and pnpm; the run is too slow
