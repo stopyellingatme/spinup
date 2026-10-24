@@ -1,0 +1,8 @@
+# File comment.
+app: # Mapping comment.
+  name: 'old' # Name comment.
+other: true # Other comment.
+# List comment.
+# Item comment.
+
+# End comment.

@@ -1,0 +1,19 @@
+{
+  "id": "sops-03",
+  "family": "sops",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": true,
+      "op": "append",
+      "path": [
+        "creation_rules"
+      ],
+      "value": "path_regex: ^secrets/prod\\.enc\\.yaml$\nage: age1new\n"
+    }
+  ],
+  "comments": [
+    "# SOPS recipients"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "codemod-insert",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "new",
+        "child"
+      ],
+      "value": "value"
+    }
+  ],
+  "comments": [
+    "# File comment.",
+    "# Mapping comment.",
+    "# Name comment.",
+    "# List comment.",
+    "# Item comment.",
+    "# End comment.",
+    "# Other comment."
+  ]
+}

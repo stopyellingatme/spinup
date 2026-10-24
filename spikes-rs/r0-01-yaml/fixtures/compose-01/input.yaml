@@ -1,0 +1,10 @@
+# Compose image
+services:
+    postgres:
+        image: demo-postgres:17
+        environment:
+            PGDATA: /var/lib/postgresql/data/pgdata
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+volumes:
+    postgres_data: {}
