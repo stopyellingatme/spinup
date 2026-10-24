@@ -87,7 +87,7 @@ func (r operationRunner) Upload(ctx context.Context, data []byte, path string, m
 		return err
 	}
 	if strings.HasPrefix(path, op+"/") {
-		return os.WriteFile(filepath.Join(r.dir, strings.TrimPrefix(path, op+"/")), data, mode)
+		return runexec.WriteExecutable(filepath.Join(r.dir, strings.TrimPrefix(path, op+"/")), data, mode)
 	}
 	return nil
 }

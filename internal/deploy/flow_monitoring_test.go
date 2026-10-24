@@ -48,7 +48,7 @@ func monitoringFixture(t *testing.T, x *fx, profile, locked string, compose bool
 			if strings.HasSuffix(name, ".sh") {
 				mode = 0755
 			}
-			if err := os.WriteFile(p, []byte(data), mode); err != nil {
+			if err := runexec.WriteExecutable(p, []byte(data), mode); err != nil {
 				t.Fatal(err)
 			}
 		}

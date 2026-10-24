@@ -29,7 +29,7 @@ func (v localVM) Run(ctx context.Context, c remote.Cmd) (runexec.Result, error) 
 	return (runexec.OSRunner{}).Run(ctx, runexec.Cmd{Name: argv[0], Args: argv[1:], Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Redact: c.Redact, Timeout: c.Timeout})
 }
 func (v localVM) Upload(_ context.Context, data []byte, path string, mode fs.FileMode) error {
-	return os.WriteFile(v.path(path), data, mode)
+	return runexec.WriteExecutable(v.path(path), data, mode)
 }
 func (localVM) Close(context.Context) error { return nil }
 
