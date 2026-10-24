@@ -211,6 +211,28 @@ func nodeCaches() map[string]string {
 		return caches
 	}
 	caches["SPINUP_PNPM_HOME"] = home
+	// Scripts install offline from this pnpm store. CI sets SPINUP_PNPM_STORE (or
+	// npm_config_store_dir) to the store that scripts/ci/warm-cache.sh filled.
+	// Without them, use the default store of pnpm on this platform.
+	for _, key := range []string{"npm_config_store_dir", "npm_config_cache_dir"} {
+		if value := os.Getenv(key); value != "" {
+			caches[key] = value
+		}
+	}
+	switch {
+	case os.Getenv("SPINUP_PNPM_STORE") != "":
+		caches["SPINUP_PNPM_STORE"] = os.Getenv("SPINUP_PNPM_STORE")
+	case os.Getenv("npm_config_store_dir") != "":
+		caches["SPINUP_PNPM_STORE"] = os.Getenv("npm_config_store_dir")
+	case runtime.GOOS == "darwin":
+		caches["SPINUP_PNPM_STORE"] = filepath.Join(home, "Library", "pnpm", "store")
+	default:
+		data := os.Getenv("XDG_DATA_HOME")
+		if data == "" {
+			data = filepath.Join(home, ".local", "share")
+		}
+		caches["SPINUP_PNPM_STORE"] = filepath.Join(data, "pnpm", "store")
+	}
 	// The docker CLI finds its context (Docker Desktop's socket) through ~/.docker.
 	if value := os.Getenv("DOCKER_CONFIG"); value != "" {
 		caches["DOCKER_CONFIG"] = value

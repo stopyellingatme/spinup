@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- CI: Add `scripts/ci/install-tools.sh` (pinned and checksum-verified actionlint, shellcheck, and bun), `scripts/ci/warm-cache.sh` (Go modules, pnpm store, and bun cache for the offline tests), and the composite action `.github/actions/prepare-tests`. The `test`, `golden`, and `matrix` jobs use them.
 - M14: Add the global flag `--confirm-env <name>`. It answers the typed confirmation of a protected environment without a terminal. The value must equal the environment name. A different value fails and never starts a prompt. `--yes` with `CI=true` still works (ADR 0018).
 - M14: Render the kit version of generated apps from the kit pin in `stackversions.yaml`. The release check fails when the pin differs from the CLI in major or minor version. Add a test for the action pins in workflows. Add `scripts/do-live-test.sh` for the DigitalOcean live test.
 - M13: Add `spinup deploy digital-ocean`. Sign in with a browser, create the droplet, firewall, DNS record, host key pin, and secrets, then deploy. Add the `login`, `logout`, `status`, and `destroy` subcommands.
@@ -37,6 +38,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `spinup tools install` accepts the real age release archives. It keeps `age` and `age-keygen` and skips the other regular files under `age/`. It still refuses absolute paths, `..`, nested paths, links, devices, and duplicates.
+- The `--platform` default of `spinup plugin new` is empty and resolves to the current platform at run time. The generated command pages no longer depend on the machine.
 - M14: `dofake` follows more rules of the DigitalOcean API: name rules for tags, droplets, and firewalls, firewall rule checks, the pending firewall status, `0` for all ports, a duplicate tag, rate limit headers, and `request_id` in error bodies. `spinup deploy digital-ocean` refuses an environment name that ends with a dash, because DigitalOcean refuses the droplet name.
 
 - The web pack `app.css` defines the shadcn-svelte variants `data-open:`, `data-closed:`, `data-checked:`, `data-unchecked:`, `data-disabled:`, `data-active:`, `data-horizontal:`, and `data-vertical:`. Before this change, the checkbox had no checked fill, and the menus had no open and close animation.

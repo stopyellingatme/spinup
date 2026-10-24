@@ -15,6 +15,9 @@ func newPluginNew(app *App) *cobra.Command {
 	command := &cobra.Command{
 		Use: "new <name>", Short: "Create a declarative or executable plugin project", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
+			if platform == "" {
+				platform = runtime.GOOS + "-" + runtime.GOARCH
+			}
 			dir, err := scaffold.Create(scaffold.Options{Dir: app.Flags.Dir, Name: args[0], Kind: kind, Platform: platform, Out: out, SDKPath: sdkPath, DryRun: app.Flags.DryRun})
 			if err != nil {
 				return err
@@ -35,7 +38,7 @@ func newPluginNew(app *App) *cobra.Command {
 	}
 	command.Flags().StringVar(&kind, "kind", "pack", "plugin kind: pack or exec")
 	command.Flags().StringVar(&out, "out", "", "destination directory (default ./<name>)")
-	command.Flags().StringVar(&platform, "platform", runtime.GOOS+"-"+runtime.GOARCH, "executable target as GOOS-GOARCH")
+	command.Flags().StringVar(&platform, "platform", "", "executable target as GOOS-GOARCH (default: the current platform)")
 	command.Flags().StringVar(&sdkPath, "sdk-path", "", "local plugin-sdk directory for an executable plugin")
 	return command
 }

@@ -36,6 +36,8 @@ func TestDocsReference(t *testing.T) {
 }
 
 func TestDocsSiteIsCurrent(t *testing.T) {
+	// The --offline default reads SPINUP_OFFLINE. Clear it so the pages do not depend on the machine.
+	t.Setenv("SPINUP_OFFLINE", "")
 	var entered bool
 	app := &App{Flags: &GlobalFlags{}, UI: ui.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, ui.Options{})}
 	root := newRoot(app, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, &entered)

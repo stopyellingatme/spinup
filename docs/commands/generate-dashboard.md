@@ -36,6 +36,7 @@ $ spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_second
 ...
 Created 0, updated 1 files
 Next: spinup monitor alerts
+...
 $ spinup g alert HighErrors --expr 'up == 0'
 Error: generator "alert" failed: alert "HighErrors" already exists
   Try: choose another alert name

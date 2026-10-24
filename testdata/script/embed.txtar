@@ -61,7 +61,7 @@ stdout 'embedded-api:dev'
 cp api/go.mod.local api/go.mod
 rm api/go.mod.local
 cd web
-exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_HOME/Library/pnpm/store
+exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_STORE
 exec pnpm check
 stdout '(?i)\b0 errors\b'
 cd ..

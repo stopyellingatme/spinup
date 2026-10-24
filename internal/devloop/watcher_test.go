@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,23 +38,30 @@ func TestWatcherDebounceAndRecovery(t *testing.T) {
 	var out bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- (Watcher{Root: root, Interval: 10 * time.Millisecond, Debounce: 60 * time.Millisecond, Out: &out, Dispatch: func(_ context.Context, steps []gen.PostStep) error {
+		done <- (Watcher{Root: root, Interval: 10 * time.Millisecond, Debounce: 100 * time.Millisecond, Out: &out, Dispatch: func(_ context.Context, steps []gen.PostStep) error {
 			calls <- append([]gen.PostStep(nil), steps...)
 			return errors.New("test failure. Try: fix inputs")
 		}}).Run(ctx)
 	}()
-	time.Sleep(50 * time.Millisecond)
-	for range 3 {
-		writeInput(t, root, "api/db/queries/todos.sql", "select 123")
-		time.Sleep(15 * time.Millisecond)
-	}
-	select {
-	case steps := <-calls:
-		if !reflect.DeepEqual(steps, []gen.PostStep{gen.PostSQLC}) {
-			t.Fatal(steps)
+	// The watcher takes its first snapshot when the goroutine starts. A burst of
+	// writes before that moment would become the baseline. So repeat the burst
+	// until a dispatch arrives. Each burst has no sleep, so the writes join one
+	// debounce window. Each burst changes the file size, so the poll sees it.
+	var steps []gen.PostStep
+	deadline := time.After(10 * time.Second)
+	for size := 2; steps == nil; size += 3 {
+		for i := 0; i < 3; i++ {
+			writeInput(t, root, "api/db/queries/todos.sql", strings.Repeat("x", size+i))
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("SQL dispatch missing")
+		select {
+		case steps = <-calls:
+		case <-time.After(500 * time.Millisecond):
+		case <-deadline:
+			t.Fatal("SQL dispatch missing")
+		}
+	}
+	if !reflect.DeepEqual(steps, []gen.PostStep{gen.PostSQLC}) {
+		t.Fatal(steps)
 	}
 	writeInput(t, root, "api/openapi/paths/todos.yaml", "/todos: {}")
 	select {

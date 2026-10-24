@@ -319,6 +319,17 @@ func ageFiles(source, goos string) (map[string][]byte, error) {
 	}
 	return ageTarFiles(source)
 }
+
+// ageMember checks one archive entry name. The name must be a plain file
+// directly under age/. It returns the base name.
+func ageMember(name string) (string, bool) {
+	base, ok := strings.CutPrefix(name, "age/")
+	if !ok || base == "" || base == "." || base == ".." || strings.ContainsAny(base, "/\\\x00") {
+		return "", false
+	}
+	return base, true
+}
+
 func ageTarFiles(source string) (map[string][]byte, error) {
 	file, err := os.Open(source)
 	if err != nil {
@@ -332,6 +343,7 @@ func ageTarFiles(source string) (map[string][]byte, error) {
 	defer gz.Close()
 	reader := tar.NewReader(gz)
 	files := map[string][]byte{}
+	seen := map[string]bool{}
 	for {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
@@ -343,18 +355,22 @@ func ageTarFiles(source string) (map[string][]byte, error) {
 		if header.Typeflag == tar.TypeDir && (header.Name == "age" || header.Name == "age/") {
 			continue
 		}
-		if header.Typeflag != tar.TypeReg || (header.Name != "age/age" && header.Name != "age/age-keygen") {
+		base, ok := ageMember(header.Name)
+		if !ok || header.Typeflag != tar.TypeReg {
 			return nil, errors.New("release archive contains an unsafe path\nTry: check the pinned release asset")
 		}
-		name := strings.TrimPrefix(header.Name, "age/")
-		if _, ok := files[name]; ok {
+		if seen[base] {
 			return nil, errors.New("release archive contains duplicate binaries\nTry: check the pinned release asset")
+		}
+		seen[base] = true
+		if base != "age" && base != "age-keygen" {
+			continue
 		}
 		data, err := io.ReadAll(io.LimitReader(reader, maxDownloadSize+1))
 		if err != nil || int64(len(data)) != header.Size || len(data) > maxDownloadSize {
 			return nil, archiveError(err)
 		}
-		files[name] = data
+		files[base] = data
 	}
 	return requireAgeFiles(files)
 }
@@ -365,16 +381,22 @@ func ageZipFiles(source string) (map[string][]byte, error) {
 	}
 	defer archive.Close()
 	files := map[string][]byte{}
+	seen := map[string]bool{}
 	for _, file := range archive.File {
 		if file.FileInfo().IsDir() && file.Name == "age/" {
 			continue
 		}
-		if file.FileInfo().Mode()&os.ModeType != 0 || (file.Name != "age/age.exe" && file.Name != "age/age-keygen.exe") {
+		base, ok := ageMember(file.Name)
+		if !ok || file.FileInfo().Mode()&os.ModeType != 0 {
 			return nil, errors.New("release archive contains an unsafe path\nTry: check the pinned release asset")
 		}
-		name := strings.TrimSuffix(strings.TrimPrefix(file.Name, "age/"), ".exe")
-		if _, ok := files[name]; ok || file.UncompressedSize64 > maxDownloadSize {
+		if seen[base] || file.UncompressedSize64 > maxDownloadSize {
 			return nil, errors.New("release archive contains invalid binaries\nTry: check the pinned release asset")
+		}
+		seen[base] = true
+		name := strings.TrimSuffix(base, ".exe")
+		if (base != "age.exe" && base != "age-keygen.exe") || name == base {
+			continue
 		}
 		reader, err := file.Open()
 		if err != nil {
