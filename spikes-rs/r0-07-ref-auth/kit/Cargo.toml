@@ -1,43 +1,49 @@
 [package]
-name = "kit"
-version = "0.0.0"
+# The crates.io name of the kit. The generated app depends on it by this name.
+name = "spinup-kit"
+version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[lib]
+name = "kit"
+
+[features]
+# test-util exports the fake OIDC issuer and the SMTP stub for tests of other crates.
+test-util = []
+
 [dependencies]
-anyhow = "1.0.104"
-argon2 = "0.6.0"
-async-trait = "0.1.92"
-axum = { version = "0.8.9", features = ["macros"] }
-axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
-base64 = "0.23.1"
-bytes = "1.12.1"
-clap = { version = "4.6.7", features = ["derive", "env"] }
-dotenvy = "0.15.7"
-futures = "0.3.34"
-garde = { version = "0.23.0", features = ["derive", "email", "regex", "unicode"] }
-hex = "0.4.3"
-http-body-util = "0.1.5"
-jsonwebtoken = "11.1.0"
-lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1", "tokio1-rustls", "ring", "webpki-roots", "file-transport", "hostname"] }
-oauth2 = "5.0.0"
-openidconnect = "4.0.1"
-rand = "0.10.3"
-reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "form"] }
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
-sha2 = "0.11.1"
-sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json", "derive"] }
-thiserror = "2.0.21"
-time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
-tokio = { version = "1.54.1", features = ["full"] }
-tower = { version = "0.5.3", features = ["util"] }
-tower-http = { version = "0.7.1", features = ["trace", "request-id", "cors", "timeout", "limit", "util", "fs", "set-header"] }
-tower-sessions = "0.15.0"
-tower-sessions-core = "0.15.0"
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
-utoipa = { version = "6.0.0", features = ["yaml", "uuid", "time", "axum_extras", "preserve_order"] }
-utoipa-axum = "0.3.0"
-uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
+anyhow.workspace = true
+argon2.workspace = true
+async-trait.workspace = true
+aws-lc-rs.workspace = true
+axum.workspace = true
+base64.workspace = true
+form_urlencoded = "1.2.2"
+hex.workspace = true
+jsonwebtoken.workspace = true
+lettre.workspace = true
+oauth2.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+serde_urlencoded.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+subtle.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower-sessions.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+utoipa.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+# The integration tests use the fake OIDC issuer and the SMTP stub.
+spinup-kit = { path = ".", features = ["test-util"] }
+http-body-util.workspace = true
+tower.workspace = true
