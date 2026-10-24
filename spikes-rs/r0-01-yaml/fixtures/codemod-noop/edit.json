@@ -1,0 +1,23 @@
+{
+  "id": "codemod-noop",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "noop",
+      "path": [],
+      "value": ""
+    }
+  ],
+  "comments": [
+    "# File comment.",
+    "# Mapping comment.",
+    "# Name comment.",
+    "# List comment.",
+    "# Item comment.",
+    "# End comment.",
+    "# Other comment."
+  ]
+}

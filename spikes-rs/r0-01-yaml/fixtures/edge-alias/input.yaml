@@ -1,0 +1,3 @@
+# Anchor
+defaults: &defaults {name: old}
+app: *defaults

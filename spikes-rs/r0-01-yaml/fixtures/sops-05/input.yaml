@@ -1,0 +1,6 @@
+# SOPS recipients
+creation_rules:
+  - path_regex: ^secrets/prod\.enc\.yaml$
+    age: age1old
+  - path_regex: other/.*
+    age: age1other

@@ -1,0 +1,642 @@
+{
+  "alert-01": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "alert-01: tree-sitter splice: flow-to-block comment relocation needs policy"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 51; actual 206 bytes; expected 235 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "alert-01: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"groups\"), Index(0), Key(\"rules\")] }"
+    }
+  },
+  "alert-02": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "alert-03": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "alert-03: tree-sitter splice: flow append without block conversion is unsupported"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 74; actual 186 bytes; expected 186 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "alert-03: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"groups\")] }"
+    }
+  },
+  "alert-04": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 82; actual 220 bytes; expected 266 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "alert-04: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"groups\"), Index(1), Key(\"rules\")] }"
+    }
+  },
+  "codemod-delete": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 132 bytes; expected 147 bytes"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 132 bytes; expected 147 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 132 bytes; expected 147 bytes"
+    }
+  },
+  "codemod-insert": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "codemod-insert: tree-sitter splice: missing path component new"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "codemod-insert: yaml-edit: missing path component new"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "codemod-insert: yamlpath+yamlpatch: YAML query error: mapping has no key `new`: mapping has no key `new`"
+    }
+  },
+  "codemod-noop": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "codemod-set": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 48; actual 165 bytes; expected 167 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 48; actual 165 bytes; expected 167 bytes"
+    }
+  },
+  "compose-01": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "compose-01: tree-sitter splice: scalar-to-block replacement needs policy"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 0; actual 297 bytes; expected 287 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 0; actual 297 bytes; expected 287 bytes"
+    }
+  },
+  "compose-02": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 150 bytes; expected 141 bytes"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 150 bytes; expected 141 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 70; actual 150 bytes; expected 141 bytes"
+    }
+  },
+  "compose-03": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "compose-04": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "compose-04: tree-sitter splice: scalar-to-block replacement needs policy"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 0; actual 357 bytes; expected 344 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 0; actual 357 bytes; expected 344 bytes"
+    }
+  },
+  "edge-alias": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 30; actual 58 bytes; expected 56 bytes"
+    }
+  },
+  "edge-flow": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 13; actual 26 bytes; expected 39 bytes"
+    }
+  },
+  "edge-literal": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "edge-null": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "edge-null: tree-sitter splice: null value has no syntax node"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "edge-null: yaml-edit: set parent is not a mapping"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "edge-null: yamlpath+yamlpatch: Invalid operation: no existing mapping at Route { route: [Key(\"a\")] }"
+    }
+  },
+  "edge-replace": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 9; actual 41 bytes; expected 46 bytes"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 9; actual 30 bytes; expected 46 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "first unequal byte 9; actual 30 bytes; expected 46 bytes"
+    }
+  },
+  "edge-ssh": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "edge-unicode": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "rotation-01": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-01: tree-sitter splice: flow append without block conversion is unsupported"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 124; actual 2686 bytes; expected 2690 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-01: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"write_files\")] }"
+    }
+  },
+  "rotation-02": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 489; actual 3045 bytes; expected 3029 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 168; actual 3045 bytes; expected 3029 bytes"
+    }
+  },
+  "rotation-03": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-03: tree-sitter splice: null value has no syntax node"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-03: yaml-edit: append target is not a sequence"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-03: yamlpath+yamlpatch: Invalid operation: no existing sequence at Route { route: [Key(\"write_files\")] }"
+    }
+  },
+  "rotation-04": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-04: tree-sitter splice: flow append without block conversion is unsupported"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 511; actual 3058 bytes; expected 3042 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "rotation-04: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"runcmd\")] }"
+    }
+  },
+  "sops-01": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "sops-02": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "sops-03": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 33; actual 90 bytes; expected 93 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "sops-03: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"creation_rules\")] }"
+    }
+  },
+  "sops-04": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 85; actual 106 bytes; expected 108 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 85; actual 106 bytes; expected 108 bytes"
+    }
+  },
+  "sops-05": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "userdata-01": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-01: tree-sitter splice: flow append without block conversion is unsupported"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 124; actual 2798 bytes; expected 2802 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-01: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"write_files\")] }"
+    }
+  },
+  "userdata-02": {
+    "tree-sitter splice": {
+      "byte_equal": true,
+      "comments_kept": true,
+      "pass": true,
+      "detail": ""
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 489; actual 3157 bytes; expected 3141 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 168; actual 3157 bytes; expected 3141 bytes"
+    }
+  },
+  "userdata-03": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-03: tree-sitter splice: null value has no syntax node"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-03: yaml-edit: append target is not a sequence"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-03: yamlpath+yamlpatch: Invalid operation: no existing sequence at Route { route: [Key(\"write_files\")] }"
+    }
+  },
+  "userdata-04": {
+    "tree-sitter splice": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-04: tree-sitter splice: flow append without block conversion is unsupported"
+    },
+    "yaml-edit": {
+      "byte_equal": false,
+      "comments_kept": true,
+      "pass": false,
+      "detail": "first unequal byte 511; actual 3170 bytes; expected 3154 bytes"
+    },
+    "yamlpath+yamlpatch": {
+      "byte_equal": false,
+      "comments_kept": false,
+      "pass": false,
+      "detail": "userdata-04: yamlpath+yamlpatch: Invalid operation: append operation is not permitted against flow sequence route: Route { route: [Key(\"runcmd\")] }"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+# Custom alerts
+groups:
+  - name: custom
+    rules:
+      - alert: Existing # keep alert
+        expr: up == 0

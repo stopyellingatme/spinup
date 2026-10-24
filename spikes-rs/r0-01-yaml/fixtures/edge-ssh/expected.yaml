@@ -1,0 +1,4 @@
+#cloud-config
+users:
+  - ssh_authorized_keys:
+      - 'ssh-ed25519 AAAATEST operator # comment'
