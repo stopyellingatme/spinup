@@ -122,7 +122,7 @@ The loader merges `crates/spinup-packs/packs/<pack>/` (converted) with `crates/s
 | `spinup-merge` | `internal/merge` | exec, compat | R1 |
 | `spinup-doctor` | `internal/doctor` registry, `composelint`, `plainsecrets` | exec, manifest, project, ui, editors | R1 |
 | `spinup-plugin-api` | `internal/plugin/contract.go` and the `PluginSource` seam | manifest, vfs | R1 |
-| `spinup-migrate` | `internal/migrate`, `migratetest`, codemod 0001 | exec, manifest, stack, packs, editors, project | R1 |
+| `spinup-migrate` | `internal/migrate`, `migratetest`, codemod 0001 | compat, exec, manifest, stack, packs, editors, project | R1 |
 | `spinup-gen` | `internal/gen` contract, registry, run, fields, `Part` trait | vfs, manifest, exec, ui, project | R1 (contract, registry, run), R2 (fields, post-steps) |
 | `spinup-upgrade` | `internal/upgrade` | merge, migrate, render, tplstore, plugin-api, doctor, project, manifest, vfs, exec, compat, editors, ui | R1 (engine), R2 (cargo phases) |
 | `spinup-drift` | `internal/drift` | upgrade, doctor, tplstore, vfs | R1 |

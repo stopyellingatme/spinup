@@ -26,7 +26,7 @@
 "spinup-merge" = ["spinup-exec", "spinup-compat"]
 "spinup-doctor" = ["spinup-exec", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-editors"]
 "spinup-plugin-api" = ["spinup-manifest", "spinup-vfs"]
-"spinup-migrate" = ["spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
+"spinup-migrate" = ["spinup-compat", "spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
 "spinup-gen" = ["spinup-vfs", "spinup-manifest", "spinup-exec", "spinup-ui", "spinup-project"]
 "spinup-upgrade" = [
   "spinup-merge", "spinup-migrate", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",

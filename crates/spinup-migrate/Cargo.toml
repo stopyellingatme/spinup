@@ -12,6 +12,8 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+similar = { workspace = true }
+spinup-compat = { workspace = true }
 linkme = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

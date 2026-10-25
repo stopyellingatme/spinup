@@ -1219,6 +1219,8 @@ dependencies = [
  "linkme",
  "serde",
  "serde_json",
+ "similar",
+ "spinup-compat",
  "spinup-editors",
  "spinup-exec",
  "spinup-manifest",
