@@ -1,0 +1,8 @@
+#cloud-config
+write_files:
+  - path: /etc/motd
+    permissions: "0644"
+    content: |
+      Hello
+      World
+runcmd: [] # commands

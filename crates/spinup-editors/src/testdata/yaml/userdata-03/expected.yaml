@@ -1,0 +1,97 @@
+#cloud-config
+users:
+  - name: deploy
+write_files:
+  - path: /usr/local/sbin/spinup-host-key
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      # Rotates the SSH host key of this VM in two phases. Commands: next, activate, status.
+      set -eu
+      etc="${SPINUP_HOSTKEY_ETC:-/etc/ssh}"
+      state="${SPINUP_HOSTKEY_STATE:-/var/lib/spinup}"
+      key="$etc/ssh_host_ed25519_key"
+      marker="$state/host-key-rotated"
+
+      # print_key prints the public key as one line without the comment.
+      print_key() {
+        awk '{ print $1 " " $2; exit }' "$1"
+      }
+
+      # lock serializes next and activate, so two spinup runs cannot race on the key files.
+      # A lock older than two minutes is left by a run that died, so the tool removes it.
+      lock() {
+        dir="$state/host-key.lock"
+        mkdir -p "$state"
+        tries=0
+        until mkdir "$dir" 2>/dev/null; do
+          if [ -n "$(find "$dir" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+            rmdir "$dir" 2>/dev/null || true
+            continue
+          fi
+          tries=$((tries + 1))
+          if [ "$tries" -ge 60 ]; then
+            echo "spinup-host-key: another run holds $dir" >&2
+            exit 1
+          fi
+          sleep 1
+        done
+        trap 'rmdir "$dir" 2>/dev/null || true' EXIT
+      }
+
+      reload_sshd() {
+        if [ -n "${SPINUP_HOSTKEY_RELOAD:-}" ]; then
+          "$SPINUP_HOSTKEY_RELOAD"
+        else
+          systemctl reload ssh.service || systemctl restart ssh.service
+        fi
+      }
+
+      case "${1:-}" in
+        next)
+          lock
+          if [ ! -s "$key.next" ] || [ ! -s "$key.next.pub" ]; then
+            # Remove a partial pair, also a dangling link, so ssh-keygen never asks to overwrite.
+            rm -f "$key.next" "$key.next.pub"
+            ssh-keygen -q -t ed25519 -N '' -C '' -f "$key.next" </dev/null
+          fi
+          print_key "$key.next.pub"
+          ;;
+        activate)
+          lock
+          if [ -e "$key.next" ]; then
+            chmod 0600 "$key.next"
+            chmod 0644 "$key.next.pub"
+            mv -f "$key.next" "$key"
+            mv -f "$key.next.pub" "$key.pub"
+            reload_sshd
+            mkdir -p "$state"
+            touch "$marker"
+          fi
+          print_key "$key.pub"
+          ;;
+        status)
+          if [ -e "$marker" ]; then
+            echo rotated
+          else
+            echo pending
+          fi
+          ;;
+        *)
+          echo "usage: spinup-host-key next|activate|status" >&2
+          exit 2
+          ;;
+      esac
+  - path: /run/spinup-demo-hostkey-sudoers
+    owner: root:root
+    permissions: "0440"
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/local/sbin/spinup-host-key next, /usr/local/sbin/spinup-host-key activate, /usr/local/sbin/spinup-host-key status
+runcmd:
+  - [sh, -ec, "visudo -cf /run/spinup-demo-hostkey-sudoers && mv -f /run/spinup-demo-hostkey-sudoers /etc/sudoers.d/spinup-demo-hostkey"]
+ssh_keys:
+  ed25519_private: |
+    TEST PRIVATE KEY
+    SECOND LINE
+  ed25519_public: ssh-ed25519 AAAATEST demo

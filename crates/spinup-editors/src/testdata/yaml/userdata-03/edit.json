@@ -1,0 +1,43 @@
+{
+  "id": "userdata-03",
+  "family": "userdata",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "ssh_keys"
+      ],
+      "value": "ed25519_private: |\n  TEST PRIVATE KEY\n  SECOND LINE\ned25519_public: ssh-ed25519 AAAATEST demo\n"
+    },
+    {
+      "block": false,
+      "op": "append",
+      "path": [
+        "write_files"
+      ],
+      "value": "path: /usr/local/sbin/spinup-host-key\nowner: root:root\npermissions: \"0755\"\ncontent: |\n  #!/bin/sh\n  # Rotates the SSH host key of this VM in two phases. Commands: next, activate, status.\n  set -eu\n  etc=\"${SPINUP_HOSTKEY_ETC:-/etc/ssh}\"\n  state=\"${SPINUP_HOSTKEY_STATE:-/var/lib/spinup}\"\n  key=\"$etc/ssh_host_ed25519_key\"\n  marker=\"$state/host-key-rotated\"\n\n  # print_key prints the public key as one line without the comment.\n  print_key() {\n    awk '{ print $1 \" \" $2; exit }' \"$1\"\n  }\n\n  # lock serializes next and activate, so two spinup runs cannot race on the key files.\n  # A lock older than two minutes is left by a run that died, so the tool removes it.\n  lock() {\n    dir=\"$state/host-key.lock\"\n    mkdir -p \"$state\"\n    tries=0\n    until mkdir \"$dir\" 2\u003e/dev/null; do\n      if [ -n \"$(find \"$dir\" -maxdepth 0 -mmin +2 2\u003e/dev/null)\" ]; then\n        rmdir \"$dir\" 2\u003e/dev/null || true\n        continue\n      fi\n      tries=$((tries + 1))\n      if [ \"$tries\" -ge 60 ]; then\n        echo \"spinup-host-key: another run holds $dir\" \u003e\u00262\n        exit 1\n      fi\n      sleep 1\n    done\n    trap 'rmdir \"$dir\" 2\u003e/dev/null || true' EXIT\n  }\n\n  reload_sshd() {\n    if [ -n \"${SPINUP_HOSTKEY_RELOAD:-}\" ]; then\n      \"$SPINUP_HOSTKEY_RELOAD\"\n    else\n      systemctl reload ssh.service || systemctl restart ssh.service\n    fi\n  }\n\n  case \"${1:-}\" in\n    next)\n      lock\n      if [ ! -s \"$key.next\" ] || [ ! -s \"$key.next.pub\" ]; then\n        # Remove a partial pair, also a dangling link, so ssh-keygen never asks to overwrite.\n        rm -f \"$key.next\" \"$key.next.pub\"\n        ssh-keygen -q -t ed25519 -N '' -C '' -f \"$key.next\" \u003c/dev/null\n      fi\n      print_key \"$key.next.pub\"\n      ;;\n    activate)\n      lock\n      if [ -e \"$key.next\" ]; then\n        chmod 0600 \"$key.next\"\n        chmod 0644 \"$key.next.pub\"\n        mv -f \"$key.next\" \"$key\"\n        mv -f \"$key.next.pub\" \"$key.pub\"\n        reload_sshd\n        mkdir -p \"$state\"\n        touch \"$marker\"\n      fi\n      print_key \"$key.pub\"\n      ;;\n    status)\n      if [ -e \"$marker\" ]; then\n        echo rotated\n      else\n        echo pending\n      fi\n      ;;\n    *)\n      echo \"usage: spinup-host-key next|activate|status\" \u003e\u00262\n      exit 2\n      ;;\n  esac\n"
+    },
+    {
+      "block": false,
+      "op": "append",
+      "path": [
+        "write_files"
+      ],
+      "value": "path: /run/spinup-demo-hostkey-sudoers\nowner: root:root\npermissions: \"0440\"\ncontent: |\n  deploy ALL=(root) NOPASSWD: /usr/local/sbin/spinup-host-key next, /usr/local/sbin/spinup-host-key activate, /usr/local/sbin/spinup-host-key status\n"
+    },
+    {
+      "block": false,
+      "op": "append",
+      "path": [
+        "runcmd"
+      ],
+      "value": "[sh, -ec, \"visudo -cf /run/spinup-demo-hostkey-sudoers \u0026\u0026 mv -f /run/spinup-demo-hostkey-sudoers /etc/sudoers.d/spinup-demo-hostkey\"]\n"
+    }
+  ],
+  "comments": [
+    "#cloud-config"
+  ]
+}

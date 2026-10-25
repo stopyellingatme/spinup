@@ -1,0 +1,19 @@
+{
+  "id": "edge-literal",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "script"
+      ],
+      "value": "|\n  echo new\n  exit 0\n"
+    }
+  ],
+  "comments": [
+    "# Script"
+  ]
+}
