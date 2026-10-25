@@ -1285,6 +1285,7 @@ name = "spinup-project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "regex",
  "serde",
  "spinup-exec",
  "spinup-manifest",
