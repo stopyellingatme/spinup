@@ -20,6 +20,8 @@ Result: **pass.** Run A (the unit check) had zero failures in 3 switch runs and 
 
 ## Method
 
+The images and the health check are superseded by ADR 0019 §4 for Rust apps. The blue/green switch stays.
+
 - Images: `golang:1.27-alpine`, `gcr.io/distroless/static-debian12:nonroot`, and `caddy:2.11.7`, each by the digest in `internal/stackversions/stackversions.yaml`.
 - The app (`spikes/bluegreen/app/main.go`) answers `/` with its color and `/healthz` with `ok`. On SIGTERM it calls `http.Server.Shutdown`. The Compose health check runs the app binary with `-health`, because the distroless image has no `curl`.
 - Topology: one Docker network `bg-net`. One Caddy container publishes `127.0.0.1:<random port>`. Each color is a Compose project with 2 replicas of service `app` and the network alias `app-<color>`.
