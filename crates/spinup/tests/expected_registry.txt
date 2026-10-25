@@ -1,5 +1,8 @@
 # The registered IDs of the spinup binary, one `<kind> <id>` line each, sorted.
 # Main loop only (ADR 0020 §5). The registry test ignores lines that start with `#`.
+command cache
+command docs
+command version
 doctor-check compose-security
 doctor-check plaintext-secrets
 migration 0001_web_svmigrate

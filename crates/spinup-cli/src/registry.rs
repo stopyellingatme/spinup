@@ -8,6 +8,11 @@
 pub fn ids() -> Vec<String> {
     let mut ids: Vec<String> = Vec::new();
     ids.extend(
+        crate::root::COMMANDS
+            .iter()
+            .map(|command| format!("command {}", command.name)),
+    );
+    ids.extend(
         spinup_gen::contract::GENERATORS
             .iter()
             .map(|generator| format!("generator {}", generator.name)),
