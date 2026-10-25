@@ -6,3 +6,4 @@ command version
 doctor-check compose-security
 doctor-check plaintext-secrets
 migration 0001_web_svmigrate
+upgrade-extension ui
