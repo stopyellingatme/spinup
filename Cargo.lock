@@ -1354,6 +1354,7 @@ dependencies = [
  "dirs",
  "ed25519-dalek",
  "hex",
+ "regex",
  "serde",
  "serde_json",
  "sha2",

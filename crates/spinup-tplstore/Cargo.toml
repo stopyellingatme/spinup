@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+regex = { workspace = true }
 dirs = { workspace = true }
 ed25519-dalek = { workspace = true }
 hex = { workspace = true }
