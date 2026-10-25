@@ -1,0 +1,8 @@
+//! The resource handlers. spinup owns this file: `spinup g resource` writes
+//! one line per resource, sorted.
+[% if resources %]
+
+[% endif %]
+[% for r in resources %]
+pub mod [[ r.plural ]];
+[% endfor %]

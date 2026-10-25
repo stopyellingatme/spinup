@@ -1,0 +1,419 @@
+{
+  "files": {
+    "migrations/00005_create_todos.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:4815da9af849c87851dc2cef4820f277b9f37b7e6ad50a928a342c735a40cce5"
+    },
+    "migrations/00005_create_todos.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:7065d9603bb74f949388114e5fa51ffd475e2c1ad553bc5a7a6cca1f67b09c7b"
+    },
+    "migrations/00006_create_notes.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8a8427485a610b8e78f3ea2c68c2f9ce79d66eeaa06e8077f9931c04d5c14cfb"
+    },
+    "migrations/00006_create_notes.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:1ec55547ea42771cabf0d8cfbe648cd5123838c74dba32b43737118224d4e629"
+    },
+    "migrations/00007_create_projects.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:801a54a49cdde74e5d8995a91be1ca0d4aa0715374a088fe4d2fe041d19cd09d"
+    },
+    "migrations/00007_create_projects.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:85d7f9034e097697437d62c411c9dc79c0cbe40100b60a53f5e984c22ad3e93c"
+    },
+    "migrations/00008_create_tags.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:23da62b115286276eb4856f3d5e53257a3ea2648b58de86f9fd4f20fc4597c62"
+    },
+    "migrations/00008_create_tags.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:70ed79a731b34386dd3f3d89ad58e71f6e0d736ff5dc81d59cadf9152b93a0c1"
+    },
+    "migrations/00009_create_comments.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:1e7c573699737c5c15159373a7fb4b4869c2ca17bec83954bdb10ec05685ea07"
+    },
+    "migrations/00009_create_comments.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:923bf090369171e49003a94a768c5f0a44c7e708a1deac7b79b822466eadf3ff"
+    },
+    "migrations/00010_create_customers.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:4706a70e5bf798d166bbb497f7d97be78caaa742a01df6c048f7a83c6e70b2cc"
+    },
+    "migrations/00010_create_customers.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:7c10036b9a85cc970c03f1aeba6c836609e09e3507a303012f95b8b55f152c7c"
+    },
+    "migrations/00011_create_invoices.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:abc6cc5fc37ee364b3724804df71e4000d16e394a751590480610411979178b4"
+    },
+    "migrations/00011_create_invoices.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:7b275e34fb473c3008489955a5334f36113a88874dd737c20def58f1d4309965"
+    },
+    "migrations/00012_create_products.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:848224db59a15a6f093e272ccfb8cbd336204f32ebf3df15638016e34a6e4c5b"
+    },
+    "migrations/00012_create_products.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:88460011675712e18210d011da2db856e0cc43b9855c44bddc81d2b625eea142"
+    },
+    "migrations/00013_create_orders.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3ab5696a488196cee5825cf2dfb6ffc3690fc92982c6e4fed4d9bb8a293cdd1f"
+    },
+    "migrations/00013_create_orders.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8a186403ecbd622e2abedc04cd1daafe6182fa7b592dd88aff26b402b72cb56b"
+    },
+    "migrations/00014_create_suppliers.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:31e6b465b4d398e10c37a0dc853b6dbcdb8cff90c0de9b67401587ece392856a"
+    },
+    "migrations/00014_create_suppliers.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:25fa82906fd8966525ba972944ffb1b45858fd3085020c9444c794ea347c924b"
+    },
+    "migrations/00015_create_warehouses.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:87614f286912853894baaf867d6b4b21e1146933ff99a6a7fcc3f0b4ca2d530b"
+    },
+    "migrations/00015_create_warehouses.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:057295b1b1b694b2ce99cbdc568fb1221a173ed069b8128121e0e5a7f5eb16a7"
+    },
+    "migrations/00016_create_shipments.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:615bc4fd408911aa3bbeafab9e119b547dfd59db48f27498e7c39ccadb140edc"
+    },
+    "migrations/00016_create_shipments.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:a9a1ee7f315591c2428ab924e49e883e31de477c197ac6a502940e3bcbc4baf2"
+    },
+    "migrations/00017_create_events.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:afdc5c9ace949b1f0a6606cb1863a6e89555a17ea5d5fe4fce6fa5b6eacb1a70"
+    },
+    "migrations/00017_create_events.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:9b8d7179b8c5ce171cb56d8f895248492413a81a87e7fabdabe0da658a0ae167"
+    },
+    "migrations/00018_create_tickets.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:d9103803235aca41b09500861e1bec110bbdfc3ac99b519c7c4f2aeae2728202"
+    },
+    "migrations/00018_create_tickets.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:505c6d4af037e9924a8ab4307e0a9f32b349b6c7fe1b1240914f8d51d106990f"
+    },
+    "migrations/00019_create_articles.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:d3ee0b81adbe45cfd57beb3663f8b486d29db4a3bac0df56629da327b7b7ec88"
+    },
+    "migrations/00019_create_articles.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:b6334afccfc2e5444d0c2d966e0b6205daec73dfa85c0cac4200c1f56f4c4b84"
+    },
+    "migrations/00020_create_categories.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:72a95b7efe4a7ad0530d1e840e6edc50b49ee67ba5ff30e2000d2b68098f7a2e"
+    },
+    "migrations/00020_create_categories.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3ea8ff92c65bb7d4ddb563b33e65cbc80ec29a06d1cf85844b200129f8c21756"
+    },
+    "migrations/00021_create_reviews.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:4257ecd97e0314a9c7935dc5abd1c52bff7df74ae2f0457531e8229cfca5d7bb"
+    },
+    "migrations/00021_create_reviews.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:97f8724a7dc821e879fd90bbd09dfe4ecf092a751cd64d74a4f41c9cf3dfcb57"
+    },
+    "migrations/00022_create_coupons.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:87299f2a9555981f14a940c92c5d54c65d2d89115310dbce7332833e941812f4"
+    },
+    "migrations/00022_create_coupons.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:112065eee5ee405faf42c7b78a8bdcea026dda11c04b0a844f1809f278d37403"
+    },
+    "migrations/00023_create_employees.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:b551e7b9392ea5e058bdcd725c9a09378e224beb293eb4ac0a8d2d9ed7272688"
+    },
+    "migrations/00023_create_employees.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:fc8df1244352beeec2845219376a4c6601346b08034ba79f2439a1fcc0c97366"
+    },
+    "migrations/00024_create_meetings.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:c31a9009030761fa29a251d354a80982044cfcdb54c8362778282a6c8e9d6506"
+    },
+    "migrations/00024_create_meetings.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:76bde9cd6dc86d4739030cd55060a941393efe6fa384db37f1b6ba9b3ccb99a9"
+    },
+    "src/handlers/articles.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8ba1d9e823083acf9087b3a7f6fb4d77a7048900924805f88c05935be6045adf"
+    },
+    "src/handlers/categories.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:c0891e4b8bcf9f66513883d32b0ee07fd7edeffc5401865321e4d0feb5c13f9e"
+    },
+    "src/handlers/comments.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:a5a59f26e8c09bb3b22c0dce861626095d4220342b300823142d7a586ae34c0f"
+    },
+    "src/handlers/coupons.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:ce26a061c32d3d6d607e91a215e3c61a3447e1c9f50b11792a25239461831f0b"
+    },
+    "src/handlers/customers.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:aacbe1491b13bf1e8078a2b328681112318d09ab692a6225d64a21e0315e7589"
+    },
+    "src/handlers/employees.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:790a4021e033f45fdd2e6bf9cb69a2e67575a980ba17736d9bb6294a2a96ba0f"
+    },
+    "src/handlers/events.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3dc7cc3ba815d0a7b342db9cbdda72ffe73a089a5760df32a2219786b43e6be0"
+    },
+    "src/handlers/invoices.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:f1d4598348cb0666922f6bc327a03d75e93ab4e511fa9aa4ddbf5b1d6f8c36ac"
+    },
+    "src/handlers/meetings.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:ea233d8415f01d0c5b4f4d103d5272afe17b09dd09c1bb1b2227c0945bf5b929"
+    },
+    "src/handlers/mod.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:02cbd8f69c3607353ccf380f97307adeec5267fc9d0291239431ff386e799484"
+    },
+    "src/handlers/notes.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:2c161c981e57c5e13c5eefd7dc5c42da3e64194a87ee695654a42e5d776bc134"
+    },
+    "src/handlers/orders.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3920b4abc997cd8bd0f5b32512b18a0ef36dec43f2688784819ca62c3a75a245"
+    },
+    "src/handlers/products.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:2bb14666b410d8c3fcb77ffb7d8d6b1fd6f483694682e4cb568e0eb6e9469d1d"
+    },
+    "src/handlers/projects.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:f477909d0cdd90d2cee6d2b3f94f2916fb35fde08bcb4929663776194a610fa6"
+    },
+    "src/handlers/reviews.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:d5efb2d06836cddf2d2c1c9b616403fe2e58ef4af9c7ce69665cf01a11c0ca4c"
+    },
+    "src/handlers/shipments.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:02bb17ec6b19516c5d97202a04ec4de414a01a082afbc2c8ab873412688a3c32"
+    },
+    "src/handlers/suppliers.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:d83287e207f60725423c0dcc1b881e909ca30548f188d53232f7253a186f4532"
+    },
+    "src/handlers/tags.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:348ecc49e68dc53cf8d0ba1d8a72f42ad6b84a96617f42c1d34d6abd1d4a889b"
+    },
+    "src/handlers/tickets.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:ae69e1ebc00b6ce7e166113c0b5ca47ac2212487155dac12f5fcc423f15ef006"
+    },
+    "src/handlers/todos.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:5213576acf2d105ea807dda98bf12000a4466c738a524728cd8ac6eb8f6faa69"
+    },
+    "src/handlers/warehouses.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3f56e9d743fc742d1a91bf02d26259a9c756d7c93a380d54cd064ca9fb722178"
+    },
+    "src/models/article.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:cd373d044ea5276631669308b8f9292f052cabad26d8a82324100fafe5ced767"
+    },
+    "src/models/category.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8cfded0483f25cdf38baaef08ac2f6638bf3e186d9b14826d7161500aac3ab1e"
+    },
+    "src/models/comment.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:78ff62f66f7a100cffb8b5263ae581e893fe9a633b51a6f609127e66bce8665c"
+    },
+    "src/models/coupon.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:de21fda0ee08554f15de969d332ef9acc3a071be5e209c029441443d188ed1d8"
+    },
+    "src/models/customer.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:a04cedbd7a36afedc37ee992ee8c7f7e8aa590805faad42e33b6f3373abcbbac"
+    },
+    "src/models/employee.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:e992b4e545867d1956420409acf92baad43f36e033cfe2c3a6d3cd3aa69e3f21"
+    },
+    "src/models/event.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:26e8b0f41147ba619bcd5daaeeb9e4b9340affd939f2e2944afa72acd1545cdb"
+    },
+    "src/models/invoice.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:3b807848118ad335b939c19f01ddc8ec7678302e90675f0923a8951713349c4a"
+    },
+    "src/models/meeting.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:240a98e91b9c15364559c5e7f185b380901f34422dd7e06edfd77ae5c9693835"
+    },
+    "src/models/mod.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:3af4f014d0ae44d6034a58f9535a258fef71c883b8092f1a220252f553b38762"
+    },
+    "src/models/note.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:284c7cd8c21004b124a56c3d904dd823b9de413d2b7d43d51425c3cc68acc092"
+    },
+    "src/models/order.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:efc7bf33bfb032096e6764807c06fa39d1b2ca4a3b21dcf6043ea9c2f4ed9862"
+    },
+    "src/models/product.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:aa5fb55957d8a2dae8d64445fa7ff7bfd7ae330e85338feac4127ffee78accd1"
+    },
+    "src/models/project.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:03c07872776aee84e5b093b7ec33e81d93c688ac5a07149548d31e49a3999b8e"
+    },
+    "src/models/review.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:a29915c5f1b56ca7607bb370a08d6b5748a8fffcfa6cf705b74e5cde11689c8e"
+    },
+    "src/models/shipment.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:e43943e9cd5f59681a496f6a04dd95aa9021a3c802edc077027cfd6d6a9a7c05"
+    },
+    "src/models/supplier.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:2c0934cb979a9b4af44a9bdba4e4f196cf956c6c95ded4acbadfccfbfe200c8a"
+    },
+    "src/models/tag.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:9a80661f72d2ab4fb0264c5148ad5365f488dc69c5ea2fbdab7962c116dbe93f"
+    },
+    "src/models/ticket.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:57c3d26c00862f3b6f8d5b156676180ede9d65d6528051c72e0d372a1b00eeea"
+    },
+    "src/models/todo.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:37a1ead09b71966982ff6d934b21c62971c273b14fc6ba6d276147a220be9b2c"
+    },
+    "src/models/warehouse.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8ed55fefc37d1501ff61796bb17ea210a17a7aa3452255c6d49fca6bd5f75fc4"
+    },
+    "src/routes_gen.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:23647fe21278fee4a0375ae1430882dd60d3feee192e240020ebc0c68da46e38"
+    }
+  }
+}

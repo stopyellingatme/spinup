@@ -1,8 +1,70 @@
 [workspace]
 resolver = "3"
-members = ["kit", "todo-api", "supervisor"]
+# kit and todo-api are the R0.12 full-kit app (R0.6 plus the R0.7 auth stack
+# plus the R0.8 job queue and telemetry). gen is the R0.10 generator, which
+# wrote the 20 resources of todo-api. supervisor is the own dev loop
+# (notify, rebuild, restart, readiness), and measure.py drives the series.
+members = ["gen", "kit", "supervisor", "todo-api"]
 
 [workspace.package]
 edition = "2024"
 rust-version = "1.99"
 publish = false
+
+[workspace.dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+aws-lc-rs = { version = "1.18.2", default-features = false, features = ["aws-lc-sys", "alloc"] }
+axum = { version = "0.8.9", features = ["macros"] }
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc"] }
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+fastrand = "2.5.0"
+futures = "0.3.34"
+hex = "0.4.3"
+http-body-util = "0.1.5"
+listenfd = "1.0.2"
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto"] }
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1", "tokio1-rustls", "ring", "webpki-roots", "file-transport", "hostname"] }
+mimalloc = "0.1.52"
+oauth2 = { version = "5.0.0", default-features = false }
+notify = "8.2.0"
+opentelemetry = { version = "0.33.1", features = ["trace", "metrics", "logs"] }
+opentelemetry-appender-tracing = "0.33.1"
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.33.1", features = ["rt-tokio", "trace", "metrics", "logs", "experimental_trace_batch_span_processor_with_async_runtime", "experimental_metrics_periodicreader_with_async_runtime", "experimental_logs_batch_log_processor_with_async_runtime"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "form"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+serde_urlencoded = "0.7.1"
+sha2 = "0.11.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json", "derive"] }
+subtle = "2.6.1"
+time = { version = "0.3.55", features = ["serde", "serde-human-readable", "formatting", "parsing", "macros"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-sessions = { version = "0.15.0", default-features = false, features = ["axum-core"] }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.34.0"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+url = "2.5.8"
+utoipa = { version = "6.0.0", features = ["yaml", "uuid", "time", "axum_extras"] }
+utoipa-axum = "0.3.0"
+uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
+
+# The R0.12 release profile: fat LTO, one codegen unit, stripped symbols, and
+# abort on panic.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# argon2id with 64 MiB and 3 passes takes about 1 s per hash in an
+# unoptimized build (R0.7). Optimize the hash crates in the dev profile too.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
