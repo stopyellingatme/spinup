@@ -20,4 +20,5 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
 tempfile = { workspace = true }

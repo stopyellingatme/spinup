@@ -1186,6 +1186,7 @@ name = "spinup-manifest"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "hex",
  "serde",
  "serde_json",
@@ -1294,6 +1295,7 @@ name = "spinup-render"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "minijinja",
  "serde",
  "serde_json",
@@ -1320,6 +1322,7 @@ name = "spinup-testutil"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "serde",
  "serde_json",
  "similar",
@@ -1397,12 +1400,14 @@ name = "spinup-vfs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "cap-std",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
  "walkdir",
+ "zstd",
 ]
 
 [[package]]

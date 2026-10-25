@@ -22,3 +22,6 @@ spinup-stack = { workspace = true }
 spinup-ui = { workspace = true }
 spinup-vfs = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+base64 = { workspace = true }

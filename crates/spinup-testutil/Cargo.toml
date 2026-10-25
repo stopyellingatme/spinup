@@ -21,3 +21,6 @@ spinup-stack = { workspace = true }
 spinup-vfs = { workspace = true }
 toml = { workspace = true }
 walkdir = { workspace = true }
+
+[dev-dependencies]
+base64 = { workspace = true }
