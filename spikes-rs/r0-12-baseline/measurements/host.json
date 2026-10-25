@@ -1,0 +1,165 @@
+{
+  "machine": {
+    "cpu": "Apple M1 Max",
+    "ncpu": 10,
+    "mem_bytes": 68719476736,
+    "os": "26.4.1",
+    "uptime": "18:45  up 179 days,  8:09, 20 users, load averages: 2.14 2.64 3.30"
+  },
+  "binaries": {
+    "go-api": 38821170,
+    "go-api-base": 24300098,
+    "go-api-linux-arm64": 25952416,
+    "go-api-stripped": 26931778,
+    "go-spinup": 27998914,
+    "go-spinup-stripped": 19781906,
+    "rs-api": 9318912,
+    "rs-api-mimalloc": 9470496,
+    "rs-api-noauth": 7944640,
+    "rs-spinup": 5387072
+  },
+  "cli": {
+    "rs-spinup": {
+      "help": {
+        "n": 50,
+        "median_ms": 4.74,
+        "p90_ms": 5.28,
+        "min_ms": 3.94,
+        "max_ms": 5.58
+      },
+      "version": {
+        "n": 50,
+        "median_ms": 4.04,
+        "p90_ms": 4.57,
+        "min_ms": 3.74,
+        "max_ms": 7.35
+      },
+      "help_max_rss_bytes": 4325376,
+      "cache_list": {
+        "n": 20,
+        "median_ms": 7.88,
+        "p90_ms": 7.98,
+        "min_ms": 7.69,
+        "max_ms": 8.36
+      },
+      "cache_list_max_rss_bytes": 11042816,
+      "load1_before": 1.97,
+      "load1_after": 1.97
+    },
+    "go-spinup": {
+      "help": {
+        "n": 50,
+        "median_ms": 13.28,
+        "p90_ms": 15.06,
+        "min_ms": 12.07,
+        "max_ms": 16.37
+      },
+      "version": {
+        "n": 50,
+        "median_ms": 13.18,
+        "p90_ms": 14.35,
+        "min_ms": 12.3,
+        "max_ms": 16.55
+      },
+      "help_max_rss_bytes": 21807104,
+      "load1_before": 1.97,
+      "load1_after": 1.97
+    },
+    "go-spinup-stripped": {
+      "help": {
+        "n": 50,
+        "median_ms": 13.38,
+        "p90_ms": 14.55,
+        "min_ms": 12.38,
+        "max_ms": 15.58
+      },
+      "version": {
+        "n": 50,
+        "median_ms": 14.02,
+        "p90_ms": 15.02,
+        "min_ms": 12.17,
+        "max_ms": 19.25
+      },
+      "help_max_rss_bytes": 21807104,
+      "load1_before": 1.97,
+      "load1_after": 1.97
+    }
+  },
+  "api": {
+    "rs-api": {
+      "healthz": {
+        "n": 20,
+        "median_ms": 124.75,
+        "p90_ms": 126.91,
+        "min_ms": 118.12,
+        "max_ms": 134.33
+      },
+      "idle_rss_kib": 77088,
+      "idle_footprint_kib": 69427,
+      "rss_after_2000_requests_kib": 77360,
+      "footprint_after_2000_requests_kib": 69734,
+      "load1_before": 1.97,
+      "load1_after": 2.3
+    },
+    "rs-api-mimalloc": {
+      "healthz": {
+        "n": 20,
+        "median_ms": 124.39,
+        "p90_ms": 127.1,
+        "min_ms": 120.38,
+        "max_ms": 140.56
+      },
+      "idle_rss_kib": 77056,
+      "idle_footprint_kib": 69427,
+      "rss_after_2000_requests_kib": 77072,
+      "footprint_after_2000_requests_kib": 7649,
+      "load1_before": 1.87,
+      "load1_after": 2.19
+    },
+    "rs-api-noauth": {
+      "healthz": {
+        "n": 20,
+        "median_ms": 8.97,
+        "p90_ms": 10.16,
+        "min_ms": 7.41,
+        "max_ms": 300.15
+      },
+      "idle_rss_kib": 10048,
+      "idle_footprint_kib": 3360,
+      "rss_after_2000_requests_kib": 10336,
+      "footprint_after_2000_requests_kib": 3632,
+      "load1_before": 1.92,
+      "load1_after": 2.01
+    },
+    "go-api-stripped": {
+      "healthz": {
+        "n": 20,
+        "median_ms": 51.82,
+        "p90_ms": 53.05,
+        "min_ms": 50.67,
+        "max_ms": 54.89
+      },
+      "idle_rss_kib": 88992,
+      "idle_footprint_kib": 75162,
+      "rss_after_2000_requests_kib": 101840,
+      "footprint_after_2000_requests_kib": 87859,
+      "load1_before": 1.92,
+      "load1_after": 1.76
+    },
+    "go-api-base": {
+      "healthz": {
+        "n": 20,
+        "median_ms": 12.42,
+        "p90_ms": 13.67,
+        "min_ms": 11.26,
+        "max_ms": 383.16
+      },
+      "idle_rss_kib": 20416,
+      "idle_footprint_kib": 7841,
+      "rss_after_2000_requests_kib": 26320,
+      "footprint_after_2000_requests_kib": 13414,
+      "load1_before": 1.76,
+      "load1_after": 2.38
+    }
+  }
+}

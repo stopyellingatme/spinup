@@ -1,0 +1,44 @@
+# The glibc image of todo-api: a release build in the Rust image, then
+# distroless cc (glibc, libgcc). Build it offline with the vendored crates:
+#   cargo vendor --offline --locked <vendor dir>
+#   docker build --network=none -f docker/Dockerfile.glibc \
+#     --build-context vendor=<vendor dir> -t r0-12/api-glibc .
+FROM scratch AS vendor
+
+FROM rust:1.99.1-slim-trixie AS build
+ENV CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=4 SQLX_OFFLINE=true
+WORKDIR /src
+COPY docker/cargo-vendor.toml /usr/local/cargo/config.toml
+# The dependency layer: the manifests, the lock, and stub sources. A source
+# edit does not invalidate it (the cargo-chef idea, without cargo-chef).
+COPY Cargo.toml Cargo.lock ./
+COPY kit/Cargo.toml kit/
+COPY todo-api/Cargo.toml todo-api/
+COPY cli-skel/Cargo.toml cli-skel/
+RUN --mount=type=bind,from=vendor,target=/vendor \
+    mkdir -p kit/src todo-api/src cli-skel/src \
+    && echo 'fn main() {}' > cli-skel/build.rs \
+    && echo 'fn main() {}' > cli-skel/src/main.rs \
+    && touch kit/src/lib.rs todo-api/src/lib.rs \
+    && echo 'fn main() {}' > todo-api/src/main.rs \
+    && cargo build --release --locked -p todo-api \
+    && rm -rf kit/src todo-api/src cli-skel
+COPY .cargo .cargo
+COPY .sqlx .sqlx
+COPY kit kit
+COPY todo-api todo-api
+COPY cli-skel/Cargo.toml cli-skel/
+RUN --mount=type=bind,from=vendor,target=/vendor \
+    mkdir -p cli-skel/src && echo 'fn main() {}' > cli-skel/src/main.rs \
+    && echo 'fn main() {}' > cli-skel/build.rs \
+    && touch kit/src/lib.rs todo-api/src/lib.rs todo-api/src/main.rs \
+    && cargo build --release --locked -p todo-api \
+    && cp target/release/todo-api /api
+
+FROM gcr.io/distroless/cc-debian13:nonroot
+ENV SPINUP_ENV=production
+COPY --from=build /api /api
+USER nonroot
+EXPOSE 8080
+HEALTHCHECK --interval=2s --timeout=2s --retries=3 CMD ["/api", "healthcheck"]
+ENTRYPOINT ["/api"]

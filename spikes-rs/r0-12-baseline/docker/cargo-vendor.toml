@@ -1,0 +1,7 @@
+# Source replacement for the offline image build: the vendored crates are a
+# bind mount of the build context "vendor".
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "/vendor"

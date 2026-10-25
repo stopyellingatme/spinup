@@ -1,0 +1,16 @@
+# The static musl image of todo-api on distroless static. The binary comes
+# from the host (the R0.14 command, offline):
+#   cargo zigbuild --release --locked --offline -p todo-api \
+#     --target aarch64-unknown-linux-musl
+#   docker build -f docker/Dockerfile.musl \
+#     --build-context bin=<target dir>/aarch64-unknown-linux-musl/release \
+#     -t r0-12/api-musl .
+FROM scratch AS bin
+
+FROM gcr.io/distroless/static-debian13:nonroot
+ENV SPINUP_ENV=production
+COPY --from=bin todo-api /api
+USER nonroot
+EXPOSE 8080
+HEALTHCHECK --interval=2s --timeout=2s --retries=3 CMD ["/api", "healthcheck"]
+ENTRYPOINT ["/api"]
