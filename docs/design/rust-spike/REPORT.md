@@ -78,7 +78,7 @@ Other sessions shared the machine during every spike. R0.1 to R0.10 and R0.14 ra
 - R3 replaces the "Go runtime" dashboard of the monitoring pack with tokio or process metrics.
 
 **Release and policy**
-- The repository needs a LICENSE before the first release. This is a user decision.
+- License: `MIT OR Apache-2.0`, in `LICENSE-MIT` and `LICENSE-APACHE` at the repository root (chosen 2026-10-25, the user delegated the choice). The release archives take `LICENSE*`. Each crate sets `license = "MIT OR Apache-2.0"`.
 - The C dependency rule allows the required OS libraries and the C code of `ring`, `aws-lc-sys`, and `zstd-sys`. Other external C libraries stay prohibited.
 - The crate names `spinup-kit`, `spinup-plugin-sdk`, and `spinup-cli` are free (checked 2026-10-24). `spinup` is taken.
 - `verify.py` of R0.14 reads the wrong `dist/` sub-directory. Fix it when R4 ports the release check.

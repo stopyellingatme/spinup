@@ -22,6 +22,7 @@ This ADR records the user decisions, the R0 results, and the changes to earlier 
 - The work happens in the same repository, on the long-lived branch `rust`. Go stays as the parity oracle until R5. Then all Go code goes away.
 - Lanes are offline. The main loop pre-seeds the crates. A lane cannot add a crate.
 - `spinup-kit` and `spinup-plugin-sdk` go to crates.io as alpha versions. Each publish needs the approval of the user.
+- The license is `MIT OR Apache-2.0` (`LICENSE-MIT`, `LICENSE-APACHE`). Each crate sets `license = "MIT OR Apache-2.0"`.
 - The main loop tags `go-freeze-r0` at the R0 gate. After the tag, Go gets bug fixes only, and each fix adds a txtar or golden case.
 
 The full list is in `rust-plan.md`, "Fixed decisions" and section 11.
@@ -89,4 +90,4 @@ The swap limit counts the increase over the swap in use when the run starts. The
 - The Rust binaries are smaller and use less memory than Go: the CLI is 5.4 MB against 28.0 MB, and the API uses 7.3 MiB of memory at idle on Linux against 84 MiB.
 - The full-kit API starts in 125 ms against 52 ms for Go, because the startup argon2 dummy hash runs on one thread. R2 moves the hash after the start.
 - Lanes take longer at 2 build jobs. Plan more wall time per lane, not more lanes.
-- These items stay open and do not block R1: native Windows runs (they need a CI runner, so `rust` must be pushed), a LICENSE file before the first release, a Mailpit run, and Linux dev-loop numbers.
+- These items stay open and do not block R1: native Windows runs (they need a CI workflow on `rust`, which the R1 pre-seed adds), a Mailpit run, and Linux dev-loop numbers.
