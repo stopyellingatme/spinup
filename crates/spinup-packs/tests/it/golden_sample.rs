@@ -1,1 +1,7 @@
-//! Stub from the R1 pre-seed. Unit R1.14 owns this file and replaces this stub.
+//! The sample pack must match the Go golden tree.
+
+#[test]
+fn golden_sample() -> anyhow::Result<()> {
+    spinup_testutil::golden::run("_sample")?;
+    Ok(())
+}
