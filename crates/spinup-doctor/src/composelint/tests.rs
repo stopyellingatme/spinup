@@ -522,3 +522,132 @@ fn golden_dev_compose() {
     let findings = lint(file, &data).unwrap();
     assert!(findings.is_empty(), "{findings:#?}");
 }
+
+#[test]
+fn item_comment_suppresses_only_that_item() {
+    // (name, data, rule, want findings)
+    let tests: &[(&str, &str, &str, usize)] = &[
+        (
+            "trailing comment on one volume",
+            "services:\n  app:\n    volumes:\n      - /var/run/docker.sock:/a # spinup:allow docker-socket needed here\n      - /run/docker.sock:/b\n",
+            "docker-socket",
+            1,
+        ),
+        (
+            "head comment on one volume",
+            "services:\n  app:\n    volumes:\n      # spinup:allow docker-socket needed here\n      - /var/run/docker.sock:/a\n      - /run/docker.sock:/b\n",
+            "docker-socket",
+            1,
+        ),
+        (
+            "comment on the second volume",
+            "services:\n  app:\n    volumes:\n      - /var/run/docker.sock:/a\n      - /run/docker.sock:/b # spinup:allow docker-socket needed here\n",
+            "docker-socket",
+            1,
+        ),
+        (
+            "both volumes suppressed",
+            "services:\n  app:\n    volumes:\n      - /var/run/docker.sock:/a # spinup:allow docker-socket one\n      - /run/docker.sock:/b # spinup:allow docker-socket two\n",
+            "docker-socket",
+            0,
+        ),
+        (
+            "item comment does not suppress another rule",
+            "services:\n  app:\n    privileged: true\n    volumes:\n      - /data:/d # spinup:allow privileged wrong place\n",
+            "privileged",
+            1,
+        ),
+        (
+            "item comment on a long form port",
+            "services:\n  app:\n    ports:\n      # spinup:allow public-port intended\n      - target: 80\n        published: 80\n      - target: 81\n        published: 81\n",
+            "public-port",
+            1,
+        ),
+        (
+            "environment entry",
+            "services:\n  app:\n    environment:\n      PASSWORD: a # spinup:allow literal-secret test value\n      TOKEN: b\n",
+            "literal-secret",
+            1,
+        ),
+        (
+            "environment list entry",
+            "services:\n  app:\n    environment:\n      - PASSWORD=a # spinup:allow literal-secret test value\n      - TOKEN=b\n",
+            "literal-secret",
+            1,
+        ),
+        (
+            "capability list",
+            "services:\n  app:\n    cap_add:\n      - ALL # spinup:allow dangerous-cap reason\n      - SYS_ADMIN\n",
+            "dangerous-cap",
+            1,
+        ),
+        (
+            "indentless list",
+            "services:\n  app:\n    volumes:\n    - /var/run/docker.sock:/a # spinup:allow docker-socket reason\n    - /run/docker.sock:/b\n",
+            "docker-socket",
+            1,
+        ),
+        (
+            "key comment still covers the service",
+            "services:\n  app:\n    volumes: # spinup:allow docker-socket reason\n      - /var/run/docker.sock:/a\n      - /run/docker.sock:/b\n",
+            "docker-socket",
+            0,
+        ),
+        (
+            "a comment without a reason on an item suppresses nothing",
+            "services:\n  app:\n    volumes:\n      - /var/run/docker.sock:/a # spinup:allow docker-socket\n",
+            "docker-socket",
+            1,
+        ),
+    ];
+    for (name, data, rule, want) in tests {
+        let findings = lint("deploy/compose.yml", data).unwrap();
+        assert_eq!(count(&findings, rule), *want, "{name}: {findings:#?}");
+    }
+}
+
+#[test]
+fn anchor_comments_reach_the_service() {
+    let tests: &[(&str, &str, &str, usize)] = &[
+        (
+            "merge copies a commented key",
+            "x-d: &d\n  # spinup:allow privileged reason\n  privileged: true\nservices:\n  app:\n    <<: *d\n",
+            "privileged",
+            0,
+        ),
+        (
+            "alias service copies a commented key",
+            "x-d: &d\n  privileged: true # spinup:allow privileged reason\nservices:\n  app: *d\n",
+            "privileged",
+            0,
+        ),
+        (
+            "an overridden key does not bring its comment",
+            "x-d: &d\n  privileged: true # spinup:allow privileged reason\nservices:\n  app:\n    privileged: true\n    <<: *d\n",
+            "privileged",
+            1,
+        ),
+        (
+            "item comment in an anchor",
+            "x-d: &d\n  volumes:\n    - /var/run/docker.sock:/a # spinup:allow docker-socket reason\n    - /run/docker.sock:/b\nservices:\n  app:\n    <<: *d\n",
+            "docker-socket",
+            1,
+        ),
+        (
+            "an uncommented anchor still fails",
+            "x-d: &d\n  privileged: true\nservices:\n  app:\n    <<: *d\n",
+            "privileged",
+            1,
+        ),
+        (
+            "suppression in another service does not leak",
+            "services:\n  a:\n    privileged: true # spinup:allow privileged reason\n  b:\n    privileged: true\n",
+            "privileged",
+            1,
+        ),
+    ];
+    for (name, data, rule, want) in tests {
+        let findings = lint("deploy/compose.yml", data).unwrap();
+        assert_eq!(count(&findings, rule), *want, "{name}: {findings:#?}");
+    }
+}
