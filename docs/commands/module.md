@@ -4,10 +4,13 @@ A module is an optional built-in pack.
 The registry reads each pack's description and requirements.
 The `base`, `api`, and `web` packs are core packs.
 
+The Rust R1 CLI supports module listing, additions, and recovery with lock schema 3.
+
 Run `spinup module list` inside an app.
 The table shows each module's name, state, requirements, and description.
 Use `--json` for structured output.
 The `enabled` field reads the `modules` setting in `spinup.toml`.
+Use `--dir` to select a project from another directory.
 
 ```console
 $ spinup module add --continue --abort
@@ -35,7 +38,9 @@ The command renders the locked template version, even when a newer version exist
 
 The branch uses `spinup/module-<names>` with sorted names separated by hyphens.
 The worktree uses `.spinup/upgrade/<locked-version>`.
-The upgrade flow applies the plan, updates dependencies, commits changes, and verifies the app.
+The upgrade flow applies the plan and commits changes.
+The Go CLI also updates dependencies and verifies the app.
+The Rust CLI adds Cargo dependency changes and build verification in R2.
 The lock records the new packs and answers.
 The command edits `spinup.toml` through the TOML editor and preserves comments.
 The main checkout keeps its files and branch.

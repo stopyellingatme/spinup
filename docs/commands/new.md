@@ -3,6 +3,8 @@
 `spinup new <name>` composes template packs and creates an application directory.
 The default packs are `base`, `api`, `web`, `ci`, and `deploy`.
 Pass `--api-only` to create the Go API without the web frontend.
+The Rust R1 CLI still renders the Go API pack.
+It writes lock schema 3 with the `minijinja` engine marker.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
@@ -55,7 +57,9 @@ If git is absent or a commit fails, generation continues with a warning.
 Configure your git identity and commit the app manually.
 
 For local kit development, set `SPINUP_KIT_REPLACE` to the kit directory.
-The command adds an absolute `replace` directive to `api/go.mod` and prints a note.
+For a Go API, the command adds an absolute `replace` directive to `api/go.mod`.
+For a Rust API, it adds the kit path under `[patch.crates-io]` in `api/Cargo.toml`.
+The command prints the selected kit path.
 The lock hashes the modified file.
 
 An image build passes the local kit directory to Docker as the build context `kit`.
