@@ -24,7 +24,7 @@ impl Git<'_> {
     /// Requires the project root to be the Git root.
     pub fn check_repository(&self, root: &Path) -> Result<()> {
         let top = self.run(root, &["rev-parse", "--show-toplevel"])?;
-        if std::fs::canonicalize(top.trim()).ok().as_deref() != Some(root) {
+        if spinup_vfs::path::canonical(top.trim()).ok().as_deref() != Some(root) {
             bail!(
                 "upgrade repository {root:?}: Git root is {:?}\nTry: run spinup upgrade at the project Git root",
                 top.trim()
@@ -91,10 +91,10 @@ impl Git<'_> {
     /// Validates the recorded worktree before recovery or removal.
     pub fn check(&self, work: &Path, branch: &str) -> Result<()> {
         let top = self.run(work, &["rev-parse", "--show-toplevel"])?;
-        let resolved = std::fs::canonicalize(work).map_err(|e| {
+        let resolved = spinup_vfs::path::canonical(work).map_err(|e| {
             anyhow!("resume upgrade: cannot resolve the worktree: {e}\nTry: restore the upgrade worktree at {}", work.display())
         })?;
-        if std::fs::canonicalize(top.trim()).ok().as_deref() != Some(resolved.as_path())
+        if spinup_vfs::path::canonical(top.trim()).ok().as_deref() != Some(resolved.as_path())
             || resolved != work
         {
             bail!(

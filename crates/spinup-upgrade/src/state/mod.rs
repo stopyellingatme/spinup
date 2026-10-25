@@ -283,9 +283,9 @@ pub(crate) fn read_file(root: &Path, name: &str) -> Result<Option<Vec<u8>>> {
     if clean_path(name)? != name {
         bail!("read upgrade file {name:?}: unsafe path\nTry: use a clean relative path");
     }
-    let root = std::fs::canonicalize(root)
+    let root = spinup_vfs::path::canonical(root)
         .map_err(|e| anyhow!("open upgrade worktree: {e}\nTry: restore the upgrade worktree"))?;
-    let path = match std::fs::canonicalize(root.join(name)) {
+    let path = match spinup_vfs::path::canonical(root.join(name)) {
         Ok(path) => path,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => bail!("read upgrade file {name:?}: {e}\nTry: check the file permissions"),

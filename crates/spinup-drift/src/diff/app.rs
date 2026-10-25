@@ -125,7 +125,7 @@ pub(crate) enum ReadError {
 pub(crate) fn read(root: &Path, name: &str) -> Result<Vec<u8>, ReadError> {
     let path = root.join(name);
     let parent = path.parent().unwrap_or(root);
-    match std::fs::canonicalize(parent) {
+    match spinup_vfs::path::canonical(parent) {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Err(ReadError::NotFound),
         Err(e) => return Err(ReadError::Io(e)),
         Ok(resolved) if !resolved.starts_with(root) => {
@@ -148,7 +148,7 @@ pub(crate) fn read(root: &Path, name: &str) -> Result<Vec<u8>, ReadError> {
 
 /// Returns the canonical project root for [`read`].
 pub(crate) fn canonical(root: &Path) -> Result<PathBuf> {
-    std::fs::canonicalize(root).map_err(disk_error)
+    spinup_vfs::path::canonical(root).map_err(disk_error)
 }
 
 /// The error of a failed disk inspection (Go `diskError`).

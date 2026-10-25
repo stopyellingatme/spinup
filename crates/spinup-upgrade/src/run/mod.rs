@@ -88,7 +88,7 @@ impl<'a> Runner<'a> {
         if self.root.as_os_str().is_empty() {
             self.root = PathBuf::from(".");
         }
-        self.root = std::fs::canonicalize(&self.root).map_err(|e| {
+        self.root = spinup_vfs::path::canonical(&self.root).map_err(|e| {
             anyhow!("resolve upgrade root: {e}\nTry: select an existing project with --dir")
         })?;
         Ok(())

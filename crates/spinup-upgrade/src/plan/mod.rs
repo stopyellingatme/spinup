@@ -121,7 +121,7 @@ pub fn build_plan(input: &PlanInput<'_>) -> Result<Plan> {
     let renames = &newer.renames;
     let new_files = index(&newer.plan.files);
     let old_files = index(&older.files);
-    let root = std::fs::canonicalize(input.root).map_err(|e| {
+    let root = spinup_vfs::path::canonical(input.root).map_err(|e| {
         anyhow!(
             "open upgrade root {:?}: {e}\nTry: select a readable project directory",
             input.root
@@ -366,7 +366,7 @@ fn read_disk(root: &Path, name: &str) -> Result<Disk> {
         bail!("read upgrade path {name:?}: path is not clean\nTry: repair the lock path");
     }
     let full: PathBuf = root.join(name);
-    let resolved = match std::fs::canonicalize(&full) {
+    let resolved = match spinup_vfs::path::canonical(&full) {
         Ok(resolved) => resolved,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Disk::default()),
         Err(e) => bail!(

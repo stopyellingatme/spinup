@@ -178,8 +178,55 @@ pub(crate) fn rooted_path(dir: &Dir, root: &Path, name: &str, write: bool) -> Re
     Ok(current)
 }
 
+/// Canonicalizes a path. On Windows it returns the plain form (`C:\x` or `\\server\share\x`)
+/// in place of the verbatim form (`\\?\C:\x`) that `std::fs::canonicalize` returns,
+/// because Git and other tools reject verbatim paths. Use it on both sides of a comparison.
+pub fn canonical(path: impl AsRef<std::path::Path>) -> std::io::Result<PathBuf> {
+    let path = std::fs::canonicalize(path)?;
+    Ok(match path.to_str().and_then(plain_windows) {
+        Some(plain) if cfg!(windows) => PathBuf::from(plain),
+        _ => path,
+    })
+}
+
+/// Returns the plain form of a verbatim Windows path, or `None` when the path is not a
+/// verbatim drive or UNC path, or is too long for the plain form (260 characters).
+fn plain_windows(path: &str) -> Option<String> {
+    let plain = if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else {
+        let rest = path.strip_prefix(r"\\?\")?;
+        let bytes = rest.as_bytes();
+        if bytes.len() < 3
+            || !bytes[0].is_ascii_alphabetic()
+            || bytes[1] != b':'
+            || bytes[2] != b'\\'
+        {
+            return None;
+        }
+        rest.to_owned()
+    };
+    (plain.len() < 260).then_some(plain)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn plain_windows_strips_verbatim_prefixes() {
+        use super::plain_windows;
+        assert_eq!(
+            plain_windows(r"\\?\C:\Users\a").as_deref(),
+            Some(r"C:\Users\a")
+        );
+        assert_eq!(
+            plain_windows(r"\\?\UNC\srv\share\a").as_deref(),
+            Some(r"\\srv\share\a")
+        );
+        assert_eq!(plain_windows(r"C:\Users\a"), None);
+        assert_eq!(plain_windows(r"\\?\Volume{x}\a"), None);
+        assert_eq!(plain_windows(&format!(r"\\?\C:\{}", "a".repeat(300))), None);
+    }
+
     use super::*;
     use serde::Deserialize;
     #[derive(Deserialize)]
