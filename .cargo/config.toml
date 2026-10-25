@@ -1,0 +1,11 @@
+# Cargo settings for the workspace (main loop only).
+# Lanes set CARGO_NET_OFFLINE=true and pass --locked (ADR 0019 §5). This file does not
+# force offline mode, because the main loop fetches with `make rs-fetch`.
+
+[resolver]
+# Never pick a crate version that needs a newer Rust than rust-version (1.99).
+incompatible-rust-versions = "fallback"
+
+[term]
+# Keep lane and CI logs short.
+progress.when = "never"

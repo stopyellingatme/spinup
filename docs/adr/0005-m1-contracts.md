@@ -29,6 +29,8 @@ The M1 units run in parallel. These decisions fix the contracts between them.
 
 ## 3. Doc tests
 
+Superseded by ADR 0020 §8 (R1 contracts) for the Rust CLI: the Go runner runs the Rust binary with `SPINUP_BIN`.
+
 `make doctest` runs every `console` code block in `docs/**/*.md`, except under `docs/design/` and `docs/adr/`.
 
 - A line that starts with `$ ` is a command. The lines after it, up to the next command, are the expected output (stdout and stderr together).

@@ -1,0 +1,23 @@
+[package]
+name = "spinup-gen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+linkme = { workspace = true }
+serde = { workspace = true }
+spinup-exec = { workspace = true }
+spinup-manifest = { workspace = true }
+spinup-project = { workspace = true }
+spinup-ui = { workspace = true }
+spinup-vfs = { workspace = true }
+thiserror = { workspace = true }

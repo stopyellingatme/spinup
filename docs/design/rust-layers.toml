@@ -1,0 +1,50 @@
+# The allowed edges between workspace crates (docs/design/rust-plan.md §1, ADR 0020 §5).
+# Main loop only. The test crates/spinup-cli/tests/it/layers.rs reads `cargo metadata` and
+# fails on any edge that this file does not allow.
+#
+# [normal] lists the allowed normal and build dependencies of each crate. Every workspace
+# crate has a key. [dev] lists the extra edges that only dev-dependencies may use.
+# No crate depends on spinup-cli, except the binary crate spinup.
+#
+# Additions to the crate table of rust-plan.md §1 (ADR 0020 §5):
+# - spinup-tplstore -> spinup-vfs: Version.packs is a spinup_vfs::tree::Tree.
+# - spinup-testutil -> spinup-stack: the golden render loads the stack versions.
+# - spinup -> the crates of the wire list (src/wire_gen.rs).
+
+[normal]
+"spinup-ui" = []
+"spinup-compat" = []
+"spinup-vfs" = []
+"spinup-manifest" = []
+"spinup-stack" = []
+"spinup-editors" = []
+"spinup-exec" = []
+"spinup-project" = ["spinup-ui", "spinup-manifest", "spinup-exec"]
+"spinup-packs" = ["spinup-vfs", "spinup-manifest", "spinup-stack"]
+"spinup-tplstore" = ["spinup-packs", "spinup-manifest", "spinup-compat", "spinup-stack", "spinup-project", "spinup-vfs"]
+"spinup-render" = ["spinup-packs", "spinup-stack", "spinup-manifest", "spinup-vfs", "spinup-project", "spinup-ui"]
+"spinup-merge" = ["spinup-exec", "spinup-compat"]
+"spinup-doctor" = ["spinup-exec", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-editors"]
+"spinup-plugin-api" = ["spinup-manifest", "spinup-vfs"]
+"spinup-migrate" = ["spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
+"spinup-gen" = ["spinup-vfs", "spinup-manifest", "spinup-exec", "spinup-ui", "spinup-project"]
+"spinup-upgrade" = [
+  "spinup-merge", "spinup-migrate", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",
+  "spinup-project", "spinup-manifest", "spinup-vfs", "spinup-exec", "spinup-compat", "spinup-editors", "spinup-ui",
+]
+"spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs"]
+"spinup-newapp" = [
+  "spinup-render", "spinup-packs", "spinup-tplstore", "spinup-stack", "spinup-manifest", "spinup-vfs", "spinup-exec",
+  "spinup-ui", "spinup-plugin-api",
+]
+"spinup-cli" = [
+  "spinup-ui", "spinup-compat", "spinup-vfs", "spinup-manifest", "spinup-stack", "spinup-editors", "spinup-exec",
+  "spinup-project", "spinup-packs", "spinup-tplstore", "spinup-render", "spinup-merge", "spinup-doctor",
+  "spinup-plugin-api", "spinup-migrate", "spinup-gen", "spinup-upgrade", "spinup-drift", "spinup-newapp",
+]
+"spinup" = ["spinup-cli", "spinup-doctor", "spinup-gen", "spinup-migrate", "spinup-upgrade"]
+"spinup-testutil" = ["spinup-render", "spinup-packs", "spinup-vfs", "spinup-stack"]
+
+[dev]
+# The golden tests of the packs render through spinup-render and compare through spinup-testutil.
+"spinup-packs" = ["spinup-testutil", "spinup-render"]

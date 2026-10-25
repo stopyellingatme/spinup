@@ -1,0 +1,238 @@
+# The Rust workspace CI (docs/design/rust-plan.md §6, ADR 0020 §9). Main loop only.
+# It runs fmt, clippy, nextest, and the parity subset on ubuntu, macOS, and Windows, and the
+# open R0 checks on native runners (R0.3 registry, R0.4 runner, R0.5 interop; REPORT.md
+# "Open items"). At R5 this workflow becomes ci.yml.
+name: Rust
+
+on:
+  push:
+    branches: [rust]
+  pull_request:
+    branches: [rust]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  GOTOOLCHAIN: local
+  # Keep in step with scripts/rust/tools-check.sh and the cargo_tools of
+  # crates/spinup-stack/stackversions.yaml.
+  NEXTEST_VERSION: 0.9.146
+  LLVM_COV_VERSION: 0.9.1
+  DENY_VERSION: 0.20.2
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Check the format
+        run: cargo fmt --all --check
+      - name: Check that the Rust stack file is current
+        run: scripts/rust/gen-stack.sh --check
+
+  clippy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: clippy-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: clippy-${{ runner.os }}-
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  nextest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest*
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-
+      - name: Install cargo-nextest
+        run: |
+          if ! cargo nextest --version 2>/dev/null | grep -q "^cargo-nextest $NEXTEST_VERSION "; then
+            cargo install --locked cargo-nextest --version "$NEXTEST_VERSION"
+          fi
+      # make rs-test: every test except packs_digest (a gate check), then the doc tests.
+      - name: Nextest
+        run: cargo nextest run --workspace --locked --profile ci -E 'not test(packs_digest)'
+      - name: Doc tests
+        run: cargo test --workspace --locked --doc
+
+  # The scripts of testdata/script/parity.txt with the Rust binary (make rs-script). The Go
+  # script harness does not run on Windows (scripts/ci/windows-excluded.txt), so this job
+  # runs on Linux and macOS. The golden parity tests run in the nextest job on all three.
+  parity:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+      - name: Prepare the test machine
+        uses: ./.github/actions/prepare-tests
+        with:
+          tools: shellcheck
+          warm: go
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: parity-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: parity-${{ runner.os }}-
+      - name: The converted packs are current
+        run: make rs-convert-check
+      - name: The parity scripts with the Rust binary
+        run: make rs-script
+
+  # Line coverage (make rs-cover, 70 percent for merge, manifest, and migrate). The main loop
+  # removes continue-on-error at the R1 gate, when those crates hold their code.
+  cover:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-llvm-cov
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+          key: cover-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ env.LLVM_COV_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cover-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ env.LLVM_COV_VERSION }}-
+      - name: Install cargo-nextest and cargo-llvm-cov
+        run: |
+          if ! cargo nextest --version 2>/dev/null | grep -q "^cargo-nextest $NEXTEST_VERSION "; then
+            cargo install --locked cargo-nextest --version "$NEXTEST_VERSION"
+          fi
+          if ! cargo llvm-cov --version 2>/dev/null | grep -q "^cargo-llvm-cov $LLVM_COV_VERSION$"; then
+            cargo install --locked cargo-llvm-cov --version "$LLVM_COV_VERSION"
+          fi
+      - name: Coverage
+        run: make rs-cover
+
+  # Supply chain: bans, licenses, sources, and the advisory database (make rs-deny, rs-vuln).
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: deny-${{ runner.os }}-${{ env.DENY_VERSION }}
+      - name: Install cargo-deny
+        run: |
+          if ! cargo deny --version 2>/dev/null | grep -q "^cargo-deny $DENY_VERSION$"; then
+            cargo install --locked cargo-deny --version "$DENY_VERSION"
+          fi
+      - name: Fetch the locked crates
+        run: cargo fetch --locked
+      - name: Bans, licenses, and sources
+        run: make rs-deny
+      - name: Advisories
+        run: make rs-vuln
+
+  # The R0 checks that need native Linux and Windows runners (REPORT.md "Open items"):
+  # R0.3 registration (debug, release, and fat LTO, with the wire mutations of verify.py),
+  # R0.4 the sync runner, and R0.5 the format interop and path policy.
+  spikes:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      # spike-check.sh calls python3. Windows runners name the interpreter python.
+      - name: Provide python3
+        run: |
+          if ! command -v python3 > /dev/null; then
+            mkdir -p "$RUNNER_TEMP/py"
+            printf '#!/bin/sh\nexec python "$@"\n' > "$RUNNER_TEMP/py/python3"
+            chmod +x "$RUNNER_TEMP/py/python3"
+            echo "$RUNNER_TEMP/py" >> "$GITHUB_PATH"
+          fi
+      # spike-check.sh builds offline, so fetch each spike workspace first.
+      - name: Fetch the spike crates
+        run: |
+          for dir in spikes-rs/r0-03-linkme spikes-rs/r0-04-runtime spikes-rs/r0-05-interop; do
+            (cd "$dir" && cargo fetch --locked)
+          done
+      - name: R0.3 registration
+        run: scripts/rust/spike-check.sh r0-03
+      - name: R0.3 registration matrix (debug, release, fat LTO)
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/r0-03-target
+        run: |
+          cd spikes-rs/r0-03-linkme
+          python3 verify.py --output "$RUNNER_TEMP/r0-03-${{ runner.os }}.json"
+      - name: R0.4 runner
+        run: scripts/rust/spike-check.sh r0-04
+      - name: R0.5 interop
+        run: scripts/rust/spike-check.sh r0-05
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: r0-03-${{ runner.os }}
+          path: ${{ runner.temp }}/r0-03-${{ runner.os }}.json
+          if-no-files-found: ignore

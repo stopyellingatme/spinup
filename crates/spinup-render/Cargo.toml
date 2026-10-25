@@ -1,0 +1,24 @@
+[package]
+name = "spinup-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+minijinja = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+spinup-manifest = { workspace = true }
+spinup-packs = { workspace = true }
+spinup-project = { workspace = true }
+spinup-stack = { workspace = true }
+spinup-ui = { workspace = true }
+spinup-vfs = { workspace = true }
+thiserror = { workspace = true }
