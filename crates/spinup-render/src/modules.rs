@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use spinup_manifest::lock::Lock;
 use spinup_packs::{
     embed::embedded,
-    loader::{Pack, list, load},
+    loader::{self, Pack, load},
 };
 use spinup_project::config::Config;
 use spinup_ui::prompt::Prompter;
@@ -38,7 +38,7 @@ fn catalog() -> &'static Vec<Module> {
     static CATALOG: OnceLock<Vec<Module>> = OnceLock::new();
     CATALOG.get_or_init(|| {
         let tree = embedded().expect("embedded module tree is invalid");
-        let packs: BTreeMap<_, _> = list(&tree)
+        let packs: BTreeMap<_, _> = loader::list(&tree)
             .expect("embedded pack list is invalid")
             .into_iter()
             .filter(|name| !name.starts_with('_'))
@@ -96,6 +96,70 @@ pub fn get(name: &str) -> Option<Module> {
 pub fn enabled(config: Option<&Config>, name: &str) -> bool {
     assert!(get(name).is_some(), "unknown built-in module {name:?}");
     config.is_some_and(|c| c.modules.iter().any(|m| m == name))
+}
+
+/// One row of `spinup module list --json`: the module fields, then `enabled` (Go `modules.List`).
+#[derive(Serialize)]
+struct ListRow<'a> {
+    #[serde(flatten)]
+    module: &'a Module,
+    enabled: bool,
+}
+
+/// Returns the output of `spinup module list` for a project configuration (Go `modules.List`).
+///
+/// With `as_json`, the output is one compact JSON line, escaped as Go `json.Encoder` does.
+/// Otherwise it is the Go `tabwriter` table: the first three columns are padded to their widest
+/// cell plus two spaces, and the description column is not padded.
+pub fn list(config: Option<&Config>, as_json: bool) -> Result<String> {
+    let modules = all();
+    let rows: Vec<ListRow<'_>> = modules
+        .iter()
+        .map(|module| ListRow {
+            module,
+            enabled: enabled(config, &module.name),
+        })
+        .collect();
+    if as_json {
+        let mut out = spinup_ui::printer::go_escape(&serde_json::to_string(&rows)?);
+        out.push('\n');
+        return Ok(out);
+    }
+    let mut lines = vec![[
+        "NAME".to_owned(),
+        "STATE".to_owned(),
+        "REQUIRES".to_owned(),
+        "DESCRIPTION".to_owned(),
+    ]];
+    for row in &rows {
+        let requires = row.module.requires.join(",");
+        lines.push([
+            row.module.name.clone(),
+            if row.enabled { "on" } else { "off" }.to_owned(),
+            if requires.is_empty() {
+                "-".to_owned()
+            } else {
+                requires
+            },
+            row.module.description.clone(),
+        ]);
+    }
+    let mut widths = [0usize; 3];
+    for line in &lines {
+        for (width, cell) in widths.iter_mut().zip(line.iter()) {
+            *width = (*width).max(cell.chars().count());
+        }
+    }
+    let mut out = String::new();
+    for line in &lines {
+        for (width, cell) in widths.iter().zip(line.iter()) {
+            out.push_str(cell);
+            out.extend(std::iter::repeat_n(' ', width - cell.chars().count() + 2));
+        }
+        out.push_str(&line[3]);
+        out.push('\n');
+    }
+    Ok(out)
 }
 
 /// Reports whether the lock selects the web pack.
@@ -295,6 +359,24 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn list_equals_go() {
+        // The fixtures come from Go modules.List logic with deploy and ci enabled.
+        let config = Config {
+            modules: vec!["deploy".into(), "ci".into()],
+            ..Config::default()
+        };
+        assert_eq!(
+            list(Some(&config), false).unwrap(),
+            include_str!("testdata/module-list.txt")
+        );
+        assert_eq!(
+            list(Some(&config), true).unwrap(),
+            include_str!("testdata/module-list.json")
+        );
+        assert!(list(None, false).unwrap().contains("deploy      off"));
+    }
+
     fn lock(modules: &[&str], web: bool) -> Lock {
         let mut lock = Lock::new();
         lock.packs = ["base", "api"]
@@ -312,7 +394,7 @@ mod tests {
     #[test]
     fn catalog_matches_optional_packs() {
         let tree = embedded().unwrap();
-        let expected: Vec<_> = list(&tree)
+        let expected: Vec<_> = loader::list(&tree)
             .unwrap()
             .into_iter()
             .filter(|n| !core(n) && !n.starts_with('_'))

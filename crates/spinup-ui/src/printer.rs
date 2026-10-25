@@ -89,7 +89,7 @@ fn lock(sink: &Sink) -> std::sync::MutexGuard<'_, Box<dyn Write + Send>> {
 }
 
 /// Go `json.Marshal` escapes `<`, `>`, `&`, U+2028, and U+2029. Do the same for byte parity.
-fn go_escape(json: &str) -> String {
+pub fn go_escape(json: &str) -> String {
     let mut s = String::with_capacity(json.len());
     for c in json.chars() {
         match c {
