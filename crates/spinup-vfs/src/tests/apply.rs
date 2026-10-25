@@ -125,11 +125,13 @@ fn injected_failures_restore_content_modes_deletions_and_directories() {
                     .unwrap();
             }
         }
+        // Windows plans a mode-only change only for the read-only attribute (owner write).
+        let mode_only = if cfg!(windows) { 0o444 } else { 0o600 };
         let plan = plan(&[
             ("a-update", b"changed", 0, false),
             ("b-remove", b"", 0, true),
             ("c-dir/sub/create", b"created", 0, false),
-            ("d-mode", b"original", 0o600, false),
+            ("d-mode", b"original", mode_only, false),
             (
                 "z-fail",
                 if stage == "before-mode" {
@@ -137,7 +139,7 @@ fn injected_failures_restore_content_modes_deletions_and_directories() {
                 } else {
                     b"changed"
                 },
-                0o600,
+                mode_only,
                 false,
             ),
         ]);

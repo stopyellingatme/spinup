@@ -39,6 +39,8 @@ fn fixture(edit: bool) -> (tempfile::TempDir, Versions) {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     git(root, &["init"]);
+    // Windows runners set core.autocrlf=true globally: keep the test repository byte-exact.
+    git(root, &["config", "core.autocrlf", "false"]);
     git(root, &["config", "user.name", "Spinup Test"]);
     git(root, &["config", "user.email", "test@example.com"]);
     write(root, ".gitignore", ".spinup/\n", 0o644);
