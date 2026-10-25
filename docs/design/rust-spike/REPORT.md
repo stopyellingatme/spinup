@@ -1,6 +1,6 @@
 # R0 go/no-go report
 
-Status: draft. 12 of 14 spikes are merged. R0.11 and R0.13 are pending.
+Status: draft. 13 of 14 spikes are merged. R0.13 is pending.
 Unit: R0.15 (main loop). Plan: `docs/design/rust-plan.md` §4. Issue: #3.
 Sources: the 14 `*.verdict.toml` files in this directory, and the main-loop verification notes of run `20261024-144640`.
 
@@ -8,10 +8,10 @@ Sources: the 14 `*.verdict.toml` files in this directory, and the main-loop veri
 
 **Provisional: `GO with changes`.**
 
-No merged spike has a `no-go` verdict. Eight spikes are `go`, and four spikes are `soft`.
-The two hard no-go conditions do not have numbers yet. R0.11 measures condition (a), the dev loop. R0.13 measures condition (b), the lane cost.
-If R0.11 or R0.13 fails its hard limit, the decision changes to `NO-GO`. The plan then stops, and the Go project stays.
-The main loop writes the final decision when the last three verdict files are merged.
+No merged spike has a `no-go` verdict. Nine spikes are `go`, and four spikes are `soft`.
+Hard no-go condition (a), the dev loop, passes: the median is 3381 ms against the limit of 5000 ms (R0.11).
+Condition (b), the lane cost, has no number yet. R0.13 measures it. If R0.13 fails its hard limit, the decision changes to `NO-GO`. The plan then stops, and the Go project stays.
+The main loop writes the final decision when the R0.13 verdict file is merged.
 
 ## Spike results
 
@@ -27,7 +27,7 @@ The main loop writes the final decision when the last three verdict files are me
 | R0.8 jobs and OTel | go | 10 000 jobs, 50 kills: 0 lost, 0 completed twice (both runs). 7 of 9 RED panel queries have data | Own River-style queue, at-least-once. OpenTelemetry 0.33 crates pinned together. |
 | R0.9 web | go | Web pack changes: 0. Playwright 14 of 14 and smoke 2 of 2, in 3 of 3 runs. Main loop ran it again: pass | The web pack works with the Rust API as it is. |
 | R0.10 generator | go | `rustfmt` 44 ms per resource. Plan A breaks at a resource name of 10 characters | Plan C: one `rustfmt` run per generator run, hash after formatting. |
-| R0.11 dev loop | pending | Hard no-go (a): the median of handler-body edits is more than 5 s warm | |
+| R0.11 dev loop | go | Handler-body edit to the first correct response: median 3381 ms, p90 3645 ms (limit: 5000 ms). Default dev profile: 5458 ms. Go with air: 2043 ms. Load 2.1 to 7.0 | Passes only with the shipped dev profile: `debug = 0`, `strip = "symbols"`, dependencies at `opt-level = 1`. The main loop recomputed the median from the raw samples. |
 | R0.12 size baseline | go | CLI 5.4 MB against 28.0 MB. `--help` 4.7 ms against 13.3 ms. API 9.3 MB against 26.9 MB. Linux idle RSS 7.3 MiB against 84 MiB. musl image 12.1 MB against 28.3 MB. Start to `/healthz`: 125 ms against 52 ms (9 ms without auth) | Smaller and lighter than Go. The full-kit start is slower, because the startup argon2 dummy hash runs on one thread. R2 moves the hash after startup. |
 | R0.13 lane cost | pending | Hard no-go (b): above 40 GB disk, load average above 14, or swap above 2 GB | |
 | R0.14 release | soft | All six ADR 0012 archives build (main loop, after the gnullvm target). Archives 1.23 to 1.45 MB | GoReleaser Rust builder + `cargo-zigbuild`. `builder: prebuilt` is not available. |
@@ -77,13 +77,15 @@ R0.16 writes these changes into `rust-plan.md` and ADR 0019 before R1 starts.
 - R1.5 (YAML editor): add 600 to 800 adapter lines, 200 to 350 test lines, and 3 to 5 engineering days (R0.1 planning estimate).
 - R1: add the `apidocs` port and the session cookie fix.
 - R2: start the argon2 dummy hash after startup (R0.12).
+- R2: the app template ships the R0.11 dev profile. Without it, the dev loop fails the 5 s limit. Do not use rust-lld on macOS: it was 200 to 400 ms slower in every pair (R0.11).
+- R2: the dev loop is about 1.3 s slower than Go with air (3381 ms against 2043 ms). The app crate rebuild (about 2.7 s, 147 sqlx macros) and the macOS first-start check of each new binary are the two main costs.
 - R2.8: add `complete_tx`, job metrics, the trace link from insert to job, the cleaner, pause, cancel, and snooze.
 - R3: add the Rust runtime dashboard.
 - R0 itself: the 11 lane spikes finished in one day (2026-10-24), inside the time box of 3 weeks.
 
 ## Open before the R0 gate
 
-- R0.11 and R0.13 (idle machine, one at a time).
+- R0.13 (lane cost, hard no-go b).
 - Native Windows runs for R0.3, R0.4, R0.5, and R0.14, and native execution of the Linux release binaries. These need a CI runner, so `rust` must be pushed. This is a user decision.
 - A Mailpit run for mail (R0.7), and the RED panel check with 5xx traffic (R0.8). R1 can take both.
 - The soft verdict of R0.3 changes to `go` only after the native Windows runs. R0.5 is `go`, but its native Windows check is also open.
