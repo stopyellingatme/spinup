@@ -1,0 +1,10 @@
+NAME        STATE  REQUIRES  DESCRIPTION
+auth        off    web       Accounts with kit auth: register, log in, log out, and PostgreSQL sessions, with login pages.
+backups     off    deploy    Continuous PostgreSQL backups with pgBackRest: full, differential, and WAL to encrypted S3-compatible storage.
+ci          on     -         Build, test, deploy, verify backups, and propose upgrades with GitHub Actions.
+deploy      on     api       Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments.
+jobs        off    api       Background jobs on River: a worker process and River migrations in the migrate step.
+mail        off    api       Typed email templates, SMTP delivery, Mailpit, and optional River retries.
+monitoring  off    deploy    Production monitoring next to the app: Alloy, Prometheus, Loki, and Grafana (lite), plus Tempo and exporters (full).
+secrets     off    api       Encrypted secrets for each environment with sops and age.
+tofu        off    deploy    OpenTofu infrastructure for a Hetzner Cloud VM.

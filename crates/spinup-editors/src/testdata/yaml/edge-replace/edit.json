@@ -1,0 +1,21 @@
+{
+  "id": "edge-replace",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "app"
+      ],
+      "value": "new"
+    }
+  ],
+  "comments": [
+    "# Header",
+    "# Name",
+    "# Inline"
+  ]
+}

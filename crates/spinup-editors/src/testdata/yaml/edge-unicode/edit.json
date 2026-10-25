@@ -1,0 +1,20 @@
+{
+  "id": "edge-unicode",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "name"
+      ],
+      "value": "日本語"
+    }
+  ],
+  "comments": [
+    "# Unicode",
+    "# café"
+  ]
+}

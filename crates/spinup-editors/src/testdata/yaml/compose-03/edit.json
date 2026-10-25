@@ -1,0 +1,19 @@
+{
+  "id": "compose-03",
+  "family": "compose",
+  "mode": "map",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "services",
+        "postgres",
+        "image"
+      ],
+      "value": "demo-postgres:18-pgbackrest2.57"
+    }
+  ],
+  "comments": []
+}

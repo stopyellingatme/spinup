@@ -1,0 +1,70 @@
+// The generator of emit-oracle.json (go.yaml.in/yaml/v3 v3.0.5). It is a .txt file, so the
+// go tool and the linters skip it. To run it, copy it to main.go in an empty module with:
+//   module yamloracle; go 1.26.0; require go.yaml.in/yaml/v3 v3.0.5
+// and run: GOFLAGS=-mod=mod GOPROXY=off GOSUMDB=off go run . > emit-oracle.json
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"go.yaml.in/yaml/v3"
+)
+
+func enc(v any, indent int) string {
+	var b bytes.Buffer
+	e := yaml.NewEncoder(&b)
+	e.SetIndent(indent)
+	if err := e.Encode(v); err != nil {
+		return "ERR " + err.Error()
+	}
+	e.Close()
+	return b.String()
+}
+
+func main() {
+	out := map[string]any{}
+	// strings marshaled as Node with tag !!str
+	strs := []string{"a b\nc\n", " lead\nx", "x\n\n", "\n", "tab\tx\n", "trail \nx", "a\n b\nc", "😀", "\u0085x", "x\u2028y", "a\x01b", "-", "- a", "?", "? a", ":x", "a:", "a: b", "#a", "a #b", "a#b", "[a", "a]", "{", "a,b", "*a", "&a", "!a", "|", ">", "'", "\"", "%", "@", "`", "---", "...", "---a", "null", "Null", "~", "", "true", "yes", "on", "0x1F", "0o17", "0b1", "1_000", "1e3", ".5", "1.", "+1", "-0", "2026-10-13", "2026-1-2", "2026-10-13T10:00:00Z", "1:30", "80:80", "<<", "=", "a\\b", "é", "\u00a0x", "\ufeffx", " ", "x "}
+	var nodes []string
+	var folded []string
+	var single []string
+	var flow []string
+	var maps []string
+	for _, s := range strs {
+		nodes = append(nodes, enc(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s}, 2))
+		folded = append(folded, enc(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s, Style: yaml.FoldedStyle}, 2))
+		single = append(single, enc(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s, Style: yaml.SingleQuotedStyle}, 2))
+		flow = append(flow, enc(&yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Tag: "!!str", Value: s}}}, 2))
+		maps = append(maps, enc(map[string]any{"k": s, s: 1}, 4))
+	}
+	out["strs"] = strs
+	out["nodes"] = nodes
+	out["folded"] = folded
+	out["single"] = single
+	out["flow"] = flow
+	out["maps"] = maps
+	floats := []float64{1, 0.5, 1e6, 1234567.5, 1e-5, 0.0001, 1e21, 123456789, -2.5e-7, 3.14159}
+	var fs []string
+	for _, f := range floats {
+		fs = append(fs, enc(f, 4))
+	}
+	out["floats"] = floats
+	out["float_out"] = fs
+	keys := []string{"b", "a10", "a9", "a", "A", "_x", "1", "01", "x1y", "x01y", "x1", "é", "Z9", "a_b", "a-b", "a.b"}
+	m := map[string]any{}
+	for _, k := range keys {
+		m[k] = 1
+	}
+	out["keys_out"] = enc(m, 4)
+	// nested layouts
+	var doc yaml.Node
+	yaml.Unmarshal([]byte("a:\n- x\n- - y\n  - z\n- k: v\n  j:\n  - 1\n  m: {}\n- |\n  lit\nb: [1, {c: d}]\nc:\n  d:\n    e: [ ]\n"), &doc)
+	out["layout2"] = enc(&doc, 2)
+	out["layout4"] = enc(&doc, 4)
+	out["layout3"] = enc(&doc, 3)
+	b, _ := json.MarshalIndent(out, "", " ")
+	fmt.Fprintln(os.Stdout, string(b))
+}

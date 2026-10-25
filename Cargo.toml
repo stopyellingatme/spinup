@@ -57,6 +57,7 @@ disallowed_types = "warn"
 
 [workspace.dependencies]
 # Workspace crates. Each crate lists only the edges of docs/design/rust-layers.toml.
+base64 = "=0.23.1"                                                        # R1: decode Go []byte oracle fields (diffs, hashes, render)
 spinup-ui = { path = "crates/spinup-ui" }
 spinup-compat = { path = "crates/spinup-compat" }
 spinup-vfs = { path = "crates/spinup-vfs" }

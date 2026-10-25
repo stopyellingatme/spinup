@@ -1,0 +1,21 @@
+{
+  "id": "edge-null",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "a",
+        "b"
+      ],
+      "value": "v"
+    }
+  ],
+  "comments": [
+    "# about a",
+    "# remains"
+  ]
+}

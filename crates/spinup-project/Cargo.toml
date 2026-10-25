@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 spinup-exec = { workspace = true }
 spinup-manifest = { workspace = true }

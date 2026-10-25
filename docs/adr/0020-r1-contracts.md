@@ -172,3 +172,27 @@ The script harness does not run on Windows (`scripts/ci/windows-excluded.txt`), 
 - A merge that registers an item also changes `expected_registry.txt`. The main loop makes that change in the merge commit.
 - The Go sections stay in the Rust stack file until the R2 gate.
 - The native Windows runs of R0.3, R0.4, and R0.5 happen when the user pushes `rust`.
+
+## R1 results (added at the R1 gate, 2026-10-25)
+
+The R1 gate passed locally: the Rust build, lint, tests, and `cargo deny`; coverage 95.5 percent for `merge`, `manifest`, and `migrate`; the packs digest; every golden tree of `testdata/golden/rust-parity.txt` byte-equal with Go; the 9 parity scripts against the Rust binary, including the exit test `upgrade_flow` (conflict, `--continue`, `--abort`); the 12 R1 doc pages; `make rs-convert-check`; `make oracle` with no diff; and the full Go gate.
+
+### Crate edges added during R1
+- `spinup-migrate -> spinup-compat` (Go `migrate` compares versions with `compat`).
+- `spinup-upgrade -> spinup-packs` (the real `PackRenderer`; `spinup-drift` renders through it).
+- `spinup-drift -> spinup-manifest, spinup-project, spinup-ui, spinup-exec, spinup-compat`.
+- Dev edges: `spinup-packs` tests use `spinup-doctor` (composelint) and `spinup-exec` (the optional `docker compose config`, `caddy adapt`, and `promtool` checks).
+
+### Recorded deviations from Go
+- YAML editor (R1.5): 29 of 32 R0.1 fixtures are byte-equal with go-yaml. In `alert-01`, `codemod-delete`, and `codemod-insert`, the Rust editor keeps a comment that Go drops or moves. The value writer equals go-yaml v3.0.5 on about 340 oracle cases. The Compose writer removes comments like Go (user decision).
+- `composelint` (R1.9): `spinup:allow` comments have the Go scope. A comment that cannot be mapped to an item suppresses nothing. Parser error texts differ from Go.
+- Plan JSON (R1.17): a tombstone-only path has the class `seed` (Go: an empty class).
+- Drift (R1.19): the diff hunks come from the `spinup-vfs` patience diff (Go drift used go-internal/diff). The `diff` parity script passes. Safe reads use `std` with a canonical-parent check.
+- CLI (R1.21): the version JSON has a `rust` key in place of `go`. The update notice and `version --check` are inactive until R4. A second SIGINT or SIGTERM exits with code 130.
+- Migrate (R1.13): errors in place of Go panics. Kit-notes field names match exactly (Go matched without case).
+
+### Due later
+- `upgrade_apply` (the kit replace of the upgrade apply phase) and `upgrade_generated` (`spinup g resource`) are due at R2 (R2.10, R2.11).
+- Go `TestBunWorkflows` needs the `ci` pack golden helpers (R4).
+- The native Windows run of the R1 crates, mainly the path handling of `spinup-vfs` and `spinup-drift` (the R0.5 probe failed the `parent-absolute-inside` case on Windows), runs in `rust.yml` after the R1 merge is pushed.
+

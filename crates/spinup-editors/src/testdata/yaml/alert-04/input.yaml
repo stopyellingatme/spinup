@@ -1,0 +1,4 @@
+# Custom alerts
+groups:
+  - name: system
+    rules: []

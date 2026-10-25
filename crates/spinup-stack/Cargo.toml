@@ -11,6 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+regex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 yaml_serde = { workspace = true }

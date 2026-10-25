@@ -1109,6 +1109,8 @@ dependencies = [
 name = "spinup-compat"
 version = "0.0.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
@@ -1136,8 +1138,13 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
+ "spinup-compat",
  "spinup-doctor",
+ "spinup-exec",
+ "spinup-manifest",
+ "spinup-project",
  "spinup-tplstore",
+ "spinup-ui",
  "spinup-upgrade",
  "spinup-vfs",
  "tempfile",
@@ -1148,6 +1155,7 @@ dependencies = [
 name = "spinup-editors"
 version = "0.0.0"
 dependencies = [
+ "regex",
  "serde_json",
  "thiserror",
  "toml_edit",
@@ -1186,6 +1194,8 @@ name = "spinup-manifest"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
+ "cap-std",
  "hex",
  "serde",
  "serde_json",
@@ -1199,6 +1209,7 @@ name = "spinup-merge"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "regex",
  "spinup-compat",
  "spinup-exec",
  "tempfile",
@@ -1213,6 +1224,8 @@ dependencies = [
  "linkme",
  "serde",
  "serde_json",
+ "similar",
+ "spinup-compat",
  "spinup-editors",
  "spinup-exec",
  "spinup-manifest",
@@ -1228,6 +1241,7 @@ name = "spinup-newapp"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "regex",
  "serde",
  "serde_json",
  "spinup-exec",
@@ -1249,9 +1263,14 @@ name = "spinup-packs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "hex",
+ "regex",
  "serde",
  "serde_json",
+ "sha2",
  "similar",
+ "spinup-doctor",
+ "spinup-exec",
  "spinup-manifest",
  "spinup-render",
  "spinup-stack",
@@ -1261,6 +1280,7 @@ dependencies = [
  "thiserror",
  "toml",
  "walkdir",
+ "yaml_serde",
 ]
 
 [[package]]
@@ -1280,6 +1300,7 @@ name = "spinup-project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "regex",
  "serde",
  "spinup-exec",
  "spinup-manifest",
@@ -1294,7 +1315,9 @@ name = "spinup-render"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "minijinja",
+ "regex",
  "serde",
  "serde_json",
  "spinup-manifest",
@@ -1310,6 +1333,7 @@ dependencies = [
 name = "spinup-stack"
 version = "0.0.0"
 dependencies = [
+ "regex",
  "serde",
  "thiserror",
  "yaml_serde",
@@ -1320,6 +1344,7 @@ name = "spinup-testutil"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "serde",
  "serde_json",
  "similar",
@@ -1339,6 +1364,7 @@ dependencies = [
  "dirs",
  "ed25519-dalek",
  "hex",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
@@ -1373,6 +1399,7 @@ dependencies = [
  "anyhow",
  "clap",
  "linkme",
+ "regex",
  "serde",
  "serde_json",
  "spinup-compat",
@@ -1382,6 +1409,7 @@ dependencies = [
  "spinup-manifest",
  "spinup-merge",
  "spinup-migrate",
+ "spinup-packs",
  "spinup-plugin-api",
  "spinup-project",
  "spinup-render",
@@ -1397,12 +1425,14 @@ name = "spinup-vfs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "cap-std",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
  "walkdir",
+ "zstd",
 ]
 
 [[package]]

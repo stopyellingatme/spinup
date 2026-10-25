@@ -11,6 +11,11 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+spinup-compat = { workspace = true }
+spinup-exec = { workspace = true }
+spinup-manifest = { workspace = true }
+spinup-project = { workspace = true }
+spinup-ui = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

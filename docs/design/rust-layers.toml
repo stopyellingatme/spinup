@@ -26,13 +26,13 @@
 "spinup-merge" = ["spinup-exec", "spinup-compat"]
 "spinup-doctor" = ["spinup-exec", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-editors"]
 "spinup-plugin-api" = ["spinup-manifest", "spinup-vfs"]
-"spinup-migrate" = ["spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
+"spinup-migrate" = ["spinup-compat", "spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
 "spinup-gen" = ["spinup-vfs", "spinup-manifest", "spinup-exec", "spinup-ui", "spinup-project"]
 "spinup-upgrade" = [
-  "spinup-merge", "spinup-migrate", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",
+  "spinup-merge", "spinup-migrate", "spinup-packs", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",
   "spinup-project", "spinup-manifest", "spinup-vfs", "spinup-exec", "spinup-compat", "spinup-editors", "spinup-ui",
 ]
-"spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs"]
+"spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-exec", "spinup-compat"]
 "spinup-newapp" = [
   "spinup-render", "spinup-packs", "spinup-tplstore", "spinup-stack", "spinup-manifest", "spinup-vfs", "spinup-exec",
   "spinup-ui", "spinup-plugin-api",
@@ -47,4 +47,5 @@
 
 [dev]
 # The golden tests of the packs render through spinup-render and compare through spinup-testutil.
-"spinup-packs" = ["spinup-testutil", "spinup-render"]
+# They lint Compose files with spinup-doctor and run the optional tool checks through spinup-exec.
+"spinup-packs" = ["spinup-testutil", "spinup-render", "spinup-doctor", "spinup-exec"]

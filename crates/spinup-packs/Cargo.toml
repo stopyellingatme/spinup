@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 spinup-manifest = { workspace = true }
 spinup-stack = { workspace = true }
@@ -20,6 +21,11 @@ thiserror = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
+spinup-doctor = { workspace = true }
+spinup-exec = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
+yaml_serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
 spinup-render = { workspace = true }

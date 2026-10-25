@@ -1,0 +1,4 @@
+# Custom alerts
+groups:
+  - name: custom
+    rules: [] # operator rules

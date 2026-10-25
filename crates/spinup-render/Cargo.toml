@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+regex = { workspace = true }
 minijinja = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -22,3 +23,6 @@ spinup-stack = { workspace = true }
 spinup-ui = { workspace = true }
 spinup-vfs = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+base64 = { workspace = true }

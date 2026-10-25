@@ -1,0 +1,3 @@
+# SOPS recipients
+creation_rules:
+  - path_regex: ^secrets/prod\.enc\.yaml$

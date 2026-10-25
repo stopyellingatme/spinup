@@ -1,0 +1,29 @@
+{
+  "id": "alert-04",
+  "family": "alert",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "append",
+      "path": [
+        "groups"
+      ],
+      "value": "name: custom\nrules: []\n"
+    },
+    {
+      "block": true,
+      "op": "append",
+      "path": [
+        "groups",
+        "1",
+        "rules"
+      ],
+      "value": "alert: HighErrors\nexpr: rate(errors_total[5m]) \u003e 0\nfor: 5m\nlabels:\n  severity: warning\nannotations:\n  summary: Too many errors\n"
+    }
+  ],
+  "comments": [
+    "# Custom alerts"
+  ]
+}

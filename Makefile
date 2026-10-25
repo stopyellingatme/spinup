@@ -120,11 +120,23 @@ rs-pack-tree: ## Rust: write the merged pack tree (converted plus overlay) to $(
 rs-script: rs-pack-tree ## Rust: the Go script harness with the Rust binary (SPINUP_BIN, parity.txt). RUN=<glob> narrows
 	@$(CARGO) build --locked -p spinup
 	@SPINUP_BIN='$(RS_BIN)' SPINUP_PACKS_SRC='$(RS_PACK_TREE)' SPINUP_STACK_SRC='$(RS_STACK)' \
-		SPINUP_SCRIPT_RUN='$(or $(RUN),$(SPINUP_SCRIPT_RUN))' go test ./internal/testutil/scripttest -run 'TestScripts' -count=1 -timeout 30m
+		SPINUP_SCRIPT_RUN='$(or $(RUN),$(SPINUP_SCRIPT_RUN))' go test ./internal/testutil/scripttest -run 'TestScripts' -count=1 -timeout 30m -v \
+		> '$(RS_TARGET)/rs-script.log' 2>&1; rc=$$?; grep -E -- '--- (PASS|FAIL|SKIP): TestScripts/' '$(RS_TARGET)/rs-script.log'; \
+	if [ $$rc -ne 0 ]; then tail -60 '$(RS_TARGET)/rs-script.log'; exit $$rc; fi; \
+	if ! grep -q -- '--- PASS: TestScripts/' '$(RS_TARGET)/rs-script.log'; then \
+		echo "rs-script: no script ran"; echo "Try: list the script in testdata/script/parity.txt, or check RUN"; exit 1; fi
 
-rs-doctest: ## Rust: the Go doc tests with the Rust binary (SPINUP_BIN) until R5
+rs-doctest: ## Rust: the Go doc tests with the Rust binary for the pages in testdata/script/doc-parity.txt, until R5
 	@$(CARGO) build --locked -p spinup
-	@SPINUP_BIN='$(RS_BIN)' go test ./internal/doctest/... -run 'TestDocs' -count=1
+	@pages=$$(sed -e 's/#.*//' -e '/^[[:space:]]*$$/d' testdata/script/doc-parity.txt); \
+	for page in $$pages; do \
+		pat=$$(printf '%s' "$$page" | sed -e 's/[.]/[.]/g' -e 's#/#$$/^#g'); \
+		out=$$(SPINUP_BIN='$(RS_BIN)' go test ./internal/doctest/... -run "^TestDocs$$/^$$pat$$" -count=1 -v 2>&1); rc=$$?; \
+		if [ $$rc -ne 0 ]; then printf '%s\n' "$$out"; echo "rs-doctest: $$page failed"; exit 1; fi; \
+		if ! printf '%s\n' "$$out" | grep -q -- "--- PASS: TestDocs/$$page "; then \
+			echo "rs-doctest: $$page did not run"; echo "Try: check the path in testdata/script/doc-parity.txt"; exit 1; fi; \
+		echo "ok $$page"; \
+	done
 
 rs-fetch: ## Rust: fetch every locked crate into CARGO_HOME (network; main loop only)
 	@CARGO_NET_OFFLINE=false $(CARGO) fetch --locked
