@@ -253,7 +253,7 @@ def images(args):
     gobin = Path(args.bin) / "go-linux"
     gobin.mkdir(exist_ok=True)
     shutil.copy2(Path(args.bin) / "go-api-linux-arm64", gobin / "api")
-    dgo = ["docker", "build", "--no-cache", "-f", "docker/Dockerfile.go", "--build-context", f"bin={gobin}", "-t", "r0-12/api-go", "."]
+    dgo = ["docker", "build", "--no-cache", "-f", "docker/Dockerfile.goapi", "--build-context", f"bin={gobin}", "-t", "r0-12/api-go", "."]
     res["go"]["image"] = sh(dgo, cwd=ctx)
     res["go"]["image_bytes"] = image_size("r0-12/api-go")
     res["go"]["binary_bytes"] = (gobin / "api").stat().st_size

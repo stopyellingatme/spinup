@@ -31,7 +31,7 @@ Images (Docker Desktop 27.4, linux/arm64 VM with 10 CPUs):
 
 - musl: `cargo zigbuild --release --locked --offline -p todo-api --target aarch64-unknown-linux-musl` on the host (the R0.14 command). `docker/Dockerfile.musl` copies the binary into `gcr.io/distroless/static-debian13:nonroot`.
 - glibc: `docker/Dockerfile.glibc` builds in `rust:1.99.1-slim-trixie` with `--network=none`. The crates come from `cargo vendor --offline --locked` (519 MB) as the build context `vendor`. A dependency layer builds the manifests with stub sources (the cargo-chef method without cargo-chef). The final stage is `gcr.io/distroless/cc-debian13:nonroot`.
-- Go: `docker/Dockerfile.go` copies the linux/arm64 Go binary into distroless static.
+- Go: `docker/Dockerfile.goapi` copies the linux/arm64 Go binary into distroless static.
 - Cold: no Rust target directory for the musl target, and `docker build --no-cache`. Warm: one comment line added to `todo-api/src/todos.rs`, then a rebuild with the cache. Three warm runs each.
 - `docker/compose.yml` runs each Rust image with `read_only: true` and `healthcheck: ["CMD", "/api", "healthcheck"]`.
 - Linux RSS: each Linux binary runs `serve` in the Rust image for 3 s. The script reads `VmRSS` and `VmHWM` from `/proc`.
