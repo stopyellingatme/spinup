@@ -1307,6 +1307,7 @@ dependencies = [
  "anyhow",
  "base64",
  "minijinja",
+ "regex",
  "serde",
  "serde_json",
  "spinup-manifest",
