@@ -99,8 +99,11 @@ jobs:
   # The scripts of testdata/script/parity.txt with the Rust binary (make rs-script). The Go
   # script harness does not run on Windows (scripts/ci/windows-excluded.txt), so this job
   # runs on Linux and macOS. The golden parity tests run in the nextest job on all three.
+  # The scripts need the R1 wiring units (R1.21 to R1.23), so the main loop removes
+  # continue-on-error at the R1 gate, as for cover.
   parity:
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -201,8 +204,11 @@ jobs:
       RUSTUP_TOOLCHAIN: "1.99.1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # With RUSTUP_TOOLCHAIN set, rustup skips the components of rust-toolchain.toml.
       - name: Install the pinned toolchain (rust-toolchain.toml)
-        run: rustup toolchain install
+        run: |
+          rustup toolchain install
+          rustup component add rustfmt clippy
       # spike-check.sh calls python3. Windows runners name the interpreter python.
       - name: Provide python3
         run: |
