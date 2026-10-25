@@ -1,3 +1,5 @@
-//! The codemods, one module each (0001: `sv migrate`).
+//! The codemods, one module each (Go `internal/migrate/0001_*.go`).
 //!
-//! Stub from the R1 pre-seed. Unit R1.13 owns this module and replaces this stub.
+//! Each module registers its codemod in [`crate::contract::MIGRATIONS`].
+
+pub mod web_svmigrate;
