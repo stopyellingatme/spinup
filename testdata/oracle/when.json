@@ -1,0 +1,1060 @@
+[
+  {
+    "expression": "",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": " \t\n",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "on",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "!on",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "! off",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "on \u0026\u0026 off || on",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "on || off \u0026\u0026 off",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "off \u0026\u0026 on || off",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "kind == 'api'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "kind != 'web'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "empty == ''",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "modules contains 'auth'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "modules contains 'missing'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "on || missing",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"on || missing\": unknown answer key \"missing\"\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "off \u0026\u0026 missing",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"off \u0026\u0026 missing\": unknown answer key \"missing\"\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "missing",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"missing\": unknown answer key \"missing\"\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "kind",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"kind\": answer \"kind\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!kind",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"!kind\": answer \"kind\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "on == 'true'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"on == 'true'\": answer \"on\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "kind contains 'api'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"kind contains 'api'\": answer \"kind\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "modules == 'auth'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"modules == 'auth'\": answer \"modules\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "(on)",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"(on)\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "on \u0026 off",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"on \u0026 off\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "on | off",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"on | off\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "on \u0026\u0026",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"on \u0026\u0026\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "on ||",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"on ||\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "!!on",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"!!on\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "!kind == 'api'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"!kind == 'api'\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "kind == \"api\"",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"kind == \\\"api\\\"\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "kind == 'unterminated",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"kind == 'unterminated\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "modules contains'auth'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"modules contains'auth'\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "kind == 'a'junk",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"kind == 'a'junk\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "true",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "evaluate when \"true\": unknown answer key \"true\"\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "1key",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": "invalid when expression \"1key\"\nTry: use keys, single-quoted values, \u0026\u0026, and ||"
+  },
+  {
+    "expression": "_key1",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "kind == 'a\\b'",
+    "answers": {
+      "_key1": true,
+      "empty": "",
+      "kind": "api",
+      "modules": [
+        "auth",
+        "jobs"
+      ],
+      "off": false,
+      "on": true
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": null
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": null
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": null
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": null
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": null
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": true
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": true
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": true
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": true
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": true
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": false
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": false
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": false
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": false
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": false
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": ""
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": ""
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": ""
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": ""
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": ""
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": "api"
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": "api"
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": "api"
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": "api"
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": "api"
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": 0
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": 0
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": 0
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": 0
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": 0
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": [
+        "auth"
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": [
+        "auth"
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": [
+        "auth"
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": [
+        "auth"
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": [
+        "auth"
+      ]
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": []
+    },
+    "expected": false,
+    "error": ""
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": [
+        "auth",
+        false,
+        null
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": [
+        "auth",
+        false,
+        null
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": [
+        "auth",
+        false,
+        null
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": [
+        "auth",
+        false,
+        null
+      ]
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": [
+        "auth",
+        false,
+        null
+      ]
+    },
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "value",
+    "answers": {
+      "value": {}
+    },
+    "expected": false,
+    "error": "evaluate when \"value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "!value",
+    "answers": {
+      "value": {}
+    },
+    "expected": false,
+    "error": "evaluate when \"!value\": answer \"value\" must be a bool\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value == 'api'",
+    "answers": {
+      "value": {}
+    },
+    "expected": false,
+    "error": "evaluate when \"value == 'api'\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value != ''",
+    "answers": {
+      "value": {}
+    },
+    "expected": false,
+    "error": "evaluate when \"value != ''\": answer \"value\" must be a string\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "value contains 'auth'",
+    "answers": {
+      "value": {}
+    },
+    "expected": false,
+    "error": "evaluate when \"value contains 'auth'\": answer \"value\" must be a string slice\nTry: supply answers with the declared types"
+  },
+  {
+    "expression": "",
+    "answers": null,
+    "expected": true,
+    "error": ""
+  },
+  {
+    "expression": "missing",
+    "answers": null,
+    "expected": false,
+    "error": "evaluate when \"missing\": unknown answer key \"missing\"\nTry: supply answers with the declared types"
+  }
+]
