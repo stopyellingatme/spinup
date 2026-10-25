@@ -13,6 +13,8 @@ Hard no-go condition (a), the dev loop, passes: the median is 3381 ms against th
 Condition (b), the lane cost, has no number yet. R0.13 measures it. If R0.13 fails its hard limit, the decision changes to `NO-GO`. The plan then stops, and the Go project stays.
 The main loop writes the final decision when the R0.13 verdict file is merged.
 
+The swap part of condition (b) counts the increase over the baseline. The user decided this on 2026-10-24. Other sessions already used 9.18 GB of swap before R0.13 started, so an absolute reading fails before any lane runs. The limit protects the machine from the lane workload. So `swap_gb` is the largest swap increase during the run, over the swap in use when the run starts. The limit is 2 GB. The disk limit (40 GB) and the load limit (1-minute load average 14) stay absolute.
+
 ## Spike results
 
 | Spike | Verdict | Key numbers | Result |
