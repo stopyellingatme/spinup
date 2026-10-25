@@ -145,22 +145,14 @@ fn apply_change(
     if matches!(change.kind, ChangeKind::Update | ChangeKind::Remove) {
         hook(&change.path, "before-backup")?;
         let backup_name = applied.len().to_string();
+        // Move the original into the backups, as Go does. The write below then renames into a
+        // free name: Windows denies a rename that replaces an existing file.
+        entry.parent.rename(&entry.name, backups, &backup_name)?;
+        entry.backup = Some(backup_name);
         if change.kind == ChangeKind::Remove {
-            entry.parent.rename(&entry.name, backups, &backup_name)?;
-            entry.backup = Some(backup_name);
             applied.push(entry);
             return Ok(());
         }
-        let mut source = entry.parent.open(&entry.name)?;
-        let permissions = source.metadata()?.permissions();
-        let mut destination = backups.open_with(
-            &backup_name,
-            OpenOptions::new().write(true).create_new(true),
-        )?;
-        io::copy(&mut source, &mut destination)?;
-        destination.set_permissions(permissions)?;
-        destination.sync_all()?;
-        entry.backup = Some(backup_name);
     }
     let (temp_name, mut temp) = create_temporary(&entry.parent)?;
     let result: Result<()> = (|| {
@@ -176,9 +168,11 @@ fn apply_change(
         Ok(())
     })();
     let _ = entry.parent.remove_file(&temp_name);
-    result?;
-    applied.push(entry);
-    Ok(())
+    // Record the entry also on failure when it holds a backup, so the rollback restores it.
+    if result.is_ok() || entry.backup.is_some() {
+        applied.push(entry);
+    }
+    result
 }
 
 fn create_temporary(parent: &Dir) -> io::Result<(String, cap_std::fs::File)> {
@@ -226,8 +220,12 @@ fn rollback(
             ChangeKind::Create => entry.parent.remove_file(&entry.name),
             ChangeKind::Remove | ChangeKind::Update => {
                 // Remove the replacement before restoring the saved file, as Go does.
+                // An update that failed before its rename left no replacement to remove.
                 let remove = if entry.kind == ChangeKind::Update {
-                    entry.parent.remove_file(&entry.name)
+                    match entry.parent.remove_file(&entry.name) {
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+                        other => other,
+                    }
                 } else {
                     Ok(())
                 };

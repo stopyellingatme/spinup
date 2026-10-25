@@ -470,10 +470,16 @@ mod tests {
             let text = String::from_utf8(output.stdout).unwrap();
             assert!(text.contains("SPINUP_EXEC_VALUE=explicit\n"));
             assert!(!text.contains("SPINUP_EXEC_VALUE=old"));
-            assert!(text.contains(&format!(
-                "dir={}",
-                std::fs::canonicalize(dir.path()).unwrap().display()
-            )));
+            // Compare canonical forms: on Windows the child may print a short (8.3) or a
+            // verbatim path for the same directory.
+            let printed = text
+                .lines()
+                .find_map(|line| line.strip_prefix("dir="))
+                .expect("dir line");
+            assert_eq!(
+                std::fs::canonicalize(printed).unwrap(),
+                std::fs::canonicalize(dir.path()).unwrap()
+            );
         }
     }
 

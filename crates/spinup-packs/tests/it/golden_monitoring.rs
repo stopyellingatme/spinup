@@ -584,6 +584,10 @@ fn write_executable(path: &Path, data: &str) -> Result<()> {
 /// The Grafana entrypoint rotates the admin password through stdin, or prints the manual
 /// reset guidance (Go `TestMonitoringGrafanaPassword`).
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "runs a POSIX sh entrypoint; Go excludes templates on Windows (scripts/ci/windows-excluded.txt)"
+)]
 fn golden_monitoring_grafana_password() -> Result<()> {
     if !spinup_testutil::golden::selected("monitoring") {
         return Ok(());
