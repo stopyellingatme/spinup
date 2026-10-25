@@ -1255,8 +1255,11 @@ name = "spinup-packs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "hex",
+ "regex",
  "serde",
  "serde_json",
+ "sha2",
  "similar",
  "spinup-manifest",
  "spinup-render",
@@ -1267,6 +1270,7 @@ dependencies = [
  "thiserror",
  "toml",
  "walkdir",
+ "yaml_serde",
 ]
 
 [[package]]
