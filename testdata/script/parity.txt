@@ -19,3 +19,8 @@ eject
 #     web_variants, app_gate_*
 # R3: secrets, deploy_digitalocean
 # R4: ci_verify, plugin, plugin_new, plugin_render
+# The R1 exit test (rust-plan.md §5 "R1 gate"): conflict, --continue, --abort. Rust twin in rust/.
+upgrade_flow
+upgrade_ui
+# Due at R2: upgrade_apply (the kit replace of the upgrade apply phase, R2.10) and
+# upgrade_generated (spinup g resource).

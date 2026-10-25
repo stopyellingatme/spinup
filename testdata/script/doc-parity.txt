@@ -1,0 +1,17 @@
+# The documentation pages that the Rust binary must pass (make rs-doctest). Main loop only.
+# One page path per line. Text after "#" is a comment. Pages of commands that arrive
+# later (R2 to R4) join this list in the milestone that ports them.
+#
+# R1 (ADR 0020 §8): the engine page and the pages of the R1 commands.
+docs/rust/engine.md
+docs/commands/version.md
+docs/commands/cache.md
+docs/commands/docs.md
+docs/commands/new.md
+docs/commands/upgrade.md
+docs/commands/module.md
+docs/commands/generate.md
+docs/commands/check.md
+docs/commands/diff.md
+docs/commands/eject.md
+docs/commands/restore.md
