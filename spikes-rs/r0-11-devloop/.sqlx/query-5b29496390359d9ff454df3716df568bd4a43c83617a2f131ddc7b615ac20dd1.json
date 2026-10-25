@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE employees\n         SET name = $2, hired = $3, salary = $4, updated_at = now()\n         WHERE id = $1\n         RETURNING id, name, hired, salary, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "hired",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "hired"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "salary",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "salary"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "employees",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Date",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "5b29496390359d9ff454df3716df568bd4a43c83617a2f131ddc7b615ac20dd1"
+}

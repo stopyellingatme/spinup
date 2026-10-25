@@ -1,0 +1,853 @@
+{
+ "label": "clone-53k-throttled-r2",
+ "profile": "clone",
+ "lines_arg": 47000,
+ "jobs": {
+  "lane": 2,
+  "gate": 4,
+  "test_threads": 4
+ },
+ "pace_s": 30,
+ "basedirs": false,
+ "slots": false,
+ "cargo_build_jobs_env": "4",
+ "clone_s": {
+  "lane-a": 9.7,
+  "lane-b": 9.7,
+  "gate": 7.3
+ },
+ "dirs": [
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/lane-a",
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/lane-b",
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate",
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home",
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/seed",
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/gate-seed"
+ ],
+ "registry_home_kb": {
+  "/Users/king/.cargo/registry": 1600312
+ },
+ "wait": {
+  "waited_s": 15,
+  "load1": 3.49,
+  "uptime": "23:11  up 179 days, 12:35, 20 users, load averages: 3.49 5.31 6.63"
+ },
+ "uptime_start": "23:11  up 179 days, 12:35, 20 users, load averages: 3.49 5.31 6.63",
+ "swap_baseline_mb": 9170.81,
+ "free_gb_start": 228.6,
+ "wall_s": 219.8,
+ "uptime_end": "23:15  up 179 days, 12:39, 20 users, load averages: 6.56 6.32 6.80",
+ "lanes": {
+  "lane-a": {
+   "cold_s": 61.9,
+   "warm": [
+    {
+     "cycle": 1,
+     "edit": "spinup-gen-app/src/m00.rs",
+     "secs": 5.3
+    },
+    {
+     "cycle": 2,
+     "edit": "spinup-kit/src/lib.rs",
+     "secs": 6.2
+    },
+    {
+     "cycle": 3,
+     "edit": "spinup-gen-app/src/m00.rs",
+     "secs": 5.3
+    },
+    {
+     "cycle": 4,
+     "edit": "spinup-kit/src/lib.rs",
+     "secs": 6.1
+    },
+    {
+     "cycle": 5,
+     "edit": "spinup-gen-app/src/m00.rs",
+     "secs": 5.4
+    },
+    {
+     "cycle": 6,
+     "edit": "spinup-kit/src/lib.rs",
+     "secs": 5.9
+    }
+   ],
+   "test_binaries": 3,
+   "steps": [
+    {
+     "step": "lane-a-cold-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 3.49,
+     "start": 1792901476.591295,
+     "secs": 0.2,
+     "rc": 0,
+     "load1_end": 3.49
+    },
+    {
+     "step": "lane-a-cold-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 3.49,
+     "start": 1792901476.760363,
+     "secs": 19.9,
+     "rc": 0,
+     "load1_end": 5.65
+    },
+    {
+     "step": "lane-a-cold-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 5.65,
+     "start": 1792901496.6336682,
+     "secs": 40.7,
+     "rc": 0,
+     "load1_end": 8.25
+    },
+    {
+     "step": "lane-a-cold-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.25,
+     "start": 1792901537.3530471,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 8.23
+    },
+    {
+     "step": "lane-a-warm1-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.23,
+     "start": 1792901538.5141451,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 8.23
+    },
+    {
+     "step": "lane-a-warm1-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 8.23,
+     "start": 1792901538.654814,
+     "secs": 0.9,
+     "rc": 0,
+     "load1_end": 8.23
+    },
+    {
+     "step": "lane-a-warm1-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.23,
+     "start": 1792901539.588342,
+     "secs": 3.2,
+     "rc": 0,
+     "load1_end": 8.23
+    },
+    {
+     "step": "lane-a-warm1-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.23,
+     "start": 1792901542.752137,
+     "secs": 1.1,
+     "rc": 0,
+     "load1_end": 8.05
+    },
+    {
+     "step": "lane-a-warm2-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.02,
+     "start": 1792901569.002882,
+     "secs": 0.2,
+     "rc": 0,
+     "load1_end": 8.02
+    },
+    {
+     "step": "lane-a-warm2-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 8.02,
+     "start": 1792901569.153513,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 8.02
+    },
+    {
+     "step": "lane-a-warm2-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 8.02,
+     "start": 1792901570.390263,
+     "secs": 3.7,
+     "rc": 0,
+     "load1_end": 7.85
+    },
+    {
+     "step": "lane-a-warm2-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 7.85,
+     "start": 1792901574.049101,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 7.85
+    },
+    {
+     "step": "lane-a-warm3-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.22,
+     "start": 1792901599.427756,
+     "secs": 0.2,
+     "rc": 0,
+     "load1_end": 6.22
+    },
+    {
+     "step": "lane-a-warm3-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 6.22,
+     "start": 1792901599.578584,
+     "secs": 0.8,
+     "rc": 0,
+     "load1_end": 6.22
+    },
+    {
+     "step": "lane-a-warm3-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.22,
+     "start": 1792901600.379366,
+     "secs": 3.2,
+     "rc": 0,
+     "load1_end": 6.28
+    },
+    {
+     "step": "lane-a-warm3-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.28,
+     "start": 1792901603.574096,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 6.28
+    },
+    {
+     "step": "lane-a-warm4-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 7.28,
+     "start": 1792901629.437106,
+     "secs": 0.2,
+     "rc": 0,
+     "load1_end": 7.28
+    },
+    {
+     "step": "lane-a-warm4-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 7.28,
+     "start": 1792901629.593932,
+     "secs": 1.3,
+     "rc": 0,
+     "load1_end": 7.28
+    },
+    {
+     "step": "lane-a-warm4-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 7.28,
+     "start": 1792901630.9378939,
+     "secs": 3.4,
+     "rc": 0,
+     "load1_end": 7.02
+    },
+    {
+     "step": "lane-a-warm4-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 7.02,
+     "start": 1792901634.37065,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 7.02
+    },
+    {
+     "step": "lane-a-warm5-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.07,
+     "start": 1792901659.7363021,
+     "secs": 0.2,
+     "rc": 0,
+     "load1_end": 6.07
+    },
+    {
+     "step": "lane-a-warm5-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 6.07,
+     "start": 1792901659.891047,
+     "secs": 0.8,
+     "rc": 0,
+     "load1_end": 6.07
+    },
+    {
+     "step": "lane-a-warm5-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.07,
+     "start": 1792901660.7247849,
+     "secs": 3.2,
+     "rc": 0,
+     "load1_end": 6.46
+    },
+    {
+     "step": "lane-a-warm5-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.46,
+     "start": 1792901663.969564,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 6.46
+    },
+    {
+     "step": "lane-a-warm6-fmt",
+     "cmd": "cargo fmt --check -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.09,
+     "start": 1792901689.803645,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 6.09
+    },
+    {
+     "step": "lane-a-warm6-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-kit -p spinup-gen-app --all-targets -- -D warnings",
+     "load1_start": 6.09,
+     "start": 1792901689.950896,
+     "secs": 1.2,
+     "rc": 0,
+     "load1_end": 6.09
+    },
+    {
+     "step": "lane-a-warm6-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 6.09,
+     "start": 1792901691.139406,
+     "secs": 3.4,
+     "rc": 0,
+     "load1_end": 7.04
+    },
+    {
+     "step": "lane-a-warm6-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-kit -p spinup-gen-app",
+     "load1_start": 7.04,
+     "start": 1792901694.552511,
+     "secs": 1.1,
+     "rc": 0,
+     "load1_end": 7.04
+    }
+   ]
+  },
+  "lane-b": {
+   "cold_s": 52.5,
+   "warm": [
+    {
+     "cycle": 1,
+     "edit": "spinup-cli/src/m00.rs",
+     "secs": 4.4
+    },
+    {
+     "cycle": 2,
+     "edit": "spinup-deploy/src/m00.rs",
+     "secs": 6.1
+    },
+    {
+     "cycle": 3,
+     "edit": "spinup-cli/src/m00.rs",
+     "secs": 3.6
+    },
+    {
+     "cycle": 4,
+     "edit": "spinup-deploy/src/m00.rs",
+     "secs": 6.8
+    },
+    {
+     "cycle": 5,
+     "edit": "spinup-cli/src/m00.rs",
+     "secs": 3.5
+    },
+    {
+     "cycle": 6,
+     "edit": "spinup-deploy/src/m00.rs",
+     "secs": 6.0
+    }
+   ],
+   "test_binaries": 4,
+   "steps": [
+    {
+     "step": "lane-b-cold-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 3.49,
+     "start": 1792901476.591548,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 3.49
+    },
+    {
+     "step": "lane-b-cold-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 3.49,
+     "start": 1792901476.722815,
+     "secs": 15.9,
+     "rc": 0,
+     "load1_end": 5.35
+    },
+    {
+     "step": "lane-b-cold-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 5.35,
+     "start": 1792901492.646137,
+     "secs": 35.9,
+     "rc": 0,
+     "load1_end": 8.1
+    },
+    {
+     "step": "lane-b-cold-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 8.1,
+     "start": 1792901528.564277,
+     "secs": 0.6,
+     "rc": 0,
+     "load1_end": 8.1
+    },
+    {
+     "step": "lane-b-warm1-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 8.1,
+     "start": 1792901529.117724,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 8.1
+    },
+    {
+     "step": "lane-b-warm1-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 8.1,
+     "start": 1792901529.239257,
+     "secs": 0.7,
+     "rc": 0,
+     "load1_end": 8.1
+    },
+    {
+     "step": "lane-b-warm1-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 8.1,
+     "start": 1792901529.9382951,
+     "secs": 2.9,
+     "rc": 0,
+     "load1_end": 8.1
+    },
+    {
+     "step": "lane-b-warm1-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 8.1,
+     "start": 1792901532.8566551,
+     "secs": 0.6,
+     "rc": 0,
+     "load1_end": 8.25
+    },
+    {
+     "step": "lane-b-warm2-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.92,
+     "start": 1792901559.1541939,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 6.92
+    },
+    {
+     "step": "lane-b-warm2-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 6.92,
+     "start": 1792901559.2696478,
+     "secs": 1.3,
+     "rc": 0,
+     "load1_end": 6.92
+    },
+    {
+     "step": "lane-b-warm2-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.92,
+     "start": 1792901560.522783,
+     "secs": 4.3,
+     "rc": 0,
+     "load1_end": 8.37
+    },
+    {
+     "step": "lane-b-warm2-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 8.37,
+     "start": 1792901564.828672,
+     "secs": 0.5,
+     "rc": 0,
+     "load1_end": 8.37
+    },
+    {
+     "step": "lane-b-warm3-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.62,
+     "start": 1792901589.4664829,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 6.62
+    },
+    {
+     "step": "lane-b-warm3-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 6.62,
+     "start": 1792901589.5805178,
+     "secs": 0.7,
+     "rc": 0,
+     "load1_end": 6.62
+    },
+    {
+     "step": "lane-b-warm3-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.62,
+     "start": 1792901590.251303,
+     "secs": 2.4,
+     "rc": 0,
+     "load1_end": 6.62
+    },
+    {
+     "step": "lane-b-warm3-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.62,
+     "start": 1792901592.651616,
+     "secs": 0.4,
+     "rc": 0,
+     "load1_end": 6.33
+    },
+    {
+     "step": "lane-b-warm4-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 7.71,
+     "start": 1792901619.7442958,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 7.71
+    },
+    {
+     "step": "lane-b-warm4-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 7.71,
+     "start": 1792901619.868871,
+     "secs": 1.4,
+     "rc": 0,
+     "load1_end": 7.71
+    },
+    {
+     "step": "lane-b-warm4-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 7.71,
+     "start": 1792901621.224948,
+     "secs": 4.8,
+     "rc": 0,
+     "load1_end": 7.65
+    },
+    {
+     "step": "lane-b-warm4-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 7.65,
+     "start": 1792901626.021215,
+     "secs": 0.5,
+     "rc": 0,
+     "load1_end": 7.65
+    },
+    {
+     "step": "lane-b-warm5-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.11,
+     "start": 1792901650.208956,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 6.11
+    },
+    {
+     "step": "lane-b-warm5-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 6.11,
+     "start": 1792901650.321651,
+     "secs": 0.6,
+     "rc": 0,
+     "load1_end": 6.11
+    },
+    {
+     "step": "lane-b-warm5-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.11,
+     "start": 1792901650.9344351,
+     "secs": 2.4,
+     "rc": 0,
+     "load1_end": 6.42
+    },
+    {
+     "step": "lane-b-warm5-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.42,
+     "start": 1792901653.3519151,
+     "secs": 0.4,
+     "rc": 0,
+     "load1_end": 6.42
+    },
+    {
+     "step": "lane-b-warm6-fmt",
+     "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+     "load1_start": 5.79,
+     "start": 1792901680.444244,
+     "secs": 0.1,
+     "rc": 0,
+     "load1_end": 5.79
+    },
+    {
+     "step": "lane-b-warm6-clippy",
+     "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+     "load1_start": 5.79,
+     "start": 1792901680.55581,
+     "secs": 1.3,
+     "rc": 0,
+     "load1_end": 5.79
+    },
+    {
+     "step": "lane-b-warm6-nextest",
+     "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 5.79,
+     "start": 1792901681.8178618,
+     "secs": 4.2,
+     "rc": 0,
+     "load1_end": 6.44
+    },
+    {
+     "step": "lane-b-warm6-doctest",
+     "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+     "load1_start": 6.44,
+     "start": 1792901685.978601,
+     "secs": 0.5,
+     "rc": 0,
+     "load1_end": 6.44
+    }
+   ]
+  }
+ },
+ "gate": {
+  "passes": [
+   {
+    "pass": "cold",
+    "secs": 134.6,
+    "test_binaries_built": 32
+   },
+   {
+    "pass": "warm1",
+    "secs": 81.8,
+    "test_binaries_built": 32
+   }
+  ],
+  "steps": [
+   {
+    "step": "gate-cold-build-api",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 3.49,
+    "start": 1792901476.595267,
+    "secs": 20.1,
+    "rc": 0,
+    "load1_end": 5.65
+   },
+   {
+    "step": "gate-cold-build-auth",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 5.65,
+    "start": 1792901496.675104,
+    "secs": 3.4,
+    "rc": 0,
+    "load1_end": 5.67
+   },
+   {
+    "step": "gate-cold-build-jobs",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 5.67,
+    "start": 1792901500.028471,
+    "secs": 12.8,
+    "rc": 0,
+    "load1_end": 6.73
+   },
+   {
+    "step": "gate-cold-build-mail",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 6.73,
+    "start": 1792901512.842695,
+    "secs": 3.8,
+    "rc": 0,
+    "load1_end": 6.75
+   },
+   {
+    "step": "gate-cold-build-res2",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 6.75,
+    "start": 1792901516.6945338,
+    "secs": 4.3,
+    "rc": 0,
+    "load1_end": 7.73
+   },
+   {
+    "step": "gate-cold-build-res5",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.73,
+    "start": 1792901521.0026739,
+    "secs": 5.2,
+    "rc": 0,
+    "load1_end": 7.67
+   },
+   {
+    "step": "gate-cold-build-res10",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.67,
+    "start": 1792901526.232992,
+    "secs": 6.7,
+    "rc": 0,
+    "load1_end": 8.1
+   },
+   {
+    "step": "gate-cold-build-corpus",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 8.1,
+    "start": 1792901532.914303,
+    "secs": 9.0,
+    "rc": 0,
+    "load1_end": 8.23
+   },
+   {
+    "step": "gate-cold-musl",
+    "cmd": "cargo zigbuild --release --locked --offline --target aarch64-unknown-linux-musl",
+    "load1_start": 8.23,
+    "start": 1792901541.9290922,
+    "secs": 66.0,
+    "rc": 0,
+    "load1_end": 6.28
+   },
+   {
+    "step": "gate-cold-docker",
+    "cmd": "docker build -f /private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/docker/Dockerfile --build-context bin=/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/target/aarch64-unknown-linux-musl/release -t r0-13/api-musl:clone-53k-throttled-r2 /private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/docker",
+    "load1_start": 6.28,
+    "start": 1792901607.906867,
+    "secs": 0.4,
+    "rc": 0,
+    "load1_end": 6.02
+   },
+   {
+    "step": "gate-cold-refcheck",
+    "cmd": "cargo check --locked --offline",
+    "load1_start": 6.02,
+    "start": 1792901608.319318,
+    "secs": 2.8,
+    "rc": 0,
+    "load1_end": 6.02
+   },
+   {
+    "step": "gate-warm1-build-api",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 6.02,
+    "start": 1792901611.155809,
+    "secs": 2.7,
+    "rc": 0,
+    "load1_end": 6.9
+   },
+   {
+    "step": "gate-warm1-build-auth",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 6.9,
+    "start": 1792901613.854197,
+    "secs": 1.7,
+    "rc": 0,
+    "load1_end": 6.9
+   },
+   {
+    "step": "gate-warm1-build-jobs",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 6.9,
+    "start": 1792901615.598204,
+    "secs": 2.7,
+    "rc": 0,
+    "load1_end": 7.71
+   },
+   {
+    "step": "gate-warm1-build-mail",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.71,
+    "start": 1792901618.3506591,
+    "secs": 1.9,
+    "rc": 0,
+    "load1_end": 7.71
+   },
+   {
+    "step": "gate-warm1-build-res2",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.71,
+    "start": 1792901620.2228968,
+    "secs": 2.2,
+    "rc": 0,
+    "load1_end": 7.71
+   },
+   {
+    "step": "gate-warm1-build-res5",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.71,
+    "start": 1792901622.381841,
+    "secs": 2.6,
+    "rc": 0,
+    "load1_end": 7.65
+   },
+   {
+    "step": "gate-warm1-build-res10",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.65,
+    "start": 1792901624.965075,
+    "secs": 2.5,
+    "rc": 0,
+    "load1_end": 7.65
+   },
+   {
+    "step": "gate-warm1-build-corpus",
+    "cmd": "cargo build --locked --offline --all-targets --message-format=json-render-diagnostics",
+    "load1_start": 7.65,
+    "start": 1792901627.513945,
+    "secs": 3.0,
+    "rc": 0,
+    "load1_end": 7.28
+   },
+   {
+    "step": "gate-warm1-musl",
+    "cmd": "cargo zigbuild --release --locked --offline --target aarch64-unknown-linux-musl",
+    "load1_start": 7.28,
+    "start": 1792901630.513037,
+    "secs": 61.0,
+    "rc": 0,
+    "load1_end": 6.09
+   },
+   {
+    "step": "gate-warm1-docker",
+    "cmd": "docker build -f /private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/docker/Dockerfile --build-context bin=/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/target/aarch64-unknown-linux-musl/release -t r0-13/api-musl:clone-53k-throttled-r2 /private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/docker",
+    "load1_start": 6.09,
+    "start": 1792901691.4764879,
+    "secs": 0.3,
+    "rc": 0,
+    "load1_end": 6.09
+   },
+   {
+    "step": "gate-warm1-refcheck",
+    "cmd": "cargo check --locked --offline",
+    "load1_start": 6.09,
+    "start": 1792901691.758775,
+    "secs": 1.2,
+    "rc": 0,
+    "load1_end": 6.09
+   }
+  ],
+  "image_bytes": 10516882
+ },
+ "peaks": {
+  "peak_total_gb": 31.229,
+  "load1_max": 8.37,
+  "swap_abs_peak_mb": 9170.81,
+  "swap_baseline_mb": 9170.81,
+  "swap_increase_mb": 0.0,
+  "free_drop_gb": 5.07,
+  "samples": 45,
+  "du_s_max": 4.31
+ },
+ "final_du_kb": {
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/lane-a/target": 6839436,
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/lane-b/target": 6642976,
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2/gate/target": 7253704,
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/run-clone-53k-throttled-r2": 20753828
+ }
+}

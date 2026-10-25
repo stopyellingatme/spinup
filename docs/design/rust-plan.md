@@ -1,6 +1,6 @@
 # spinup in Rust: the rewrite plan (`docs/design/rust-plan.md`)
 
-Status: accepted (2026-10-24). R0 decides go or no-go. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it. Where this document and `plan.md` disagree about Rust work, this document wins.
+Status: accepted (2026-10-24). R0 result: `GO with changes` (`docs/design/rust-spike/REPORT.md`, ADR 0019). This document includes the R0 changes. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it. Where this document and `plan.md` disagree about Rust work, this document wins.
 
 ## Context
 
@@ -31,7 +31,7 @@ The main loop accepted each item on 2026-10-24. Section 11 records the answers.
 5. **R0 lanes are offline too.** The R0 pre-seed writes one `spikes-rs/r0-NN-<name>/Cargo.toml` for each spike, with every candidate crate from the research, plus its `Cargo.lock`. The main loop runs `cargo fetch --locked` in each spike directory. A spike lane builds with `CARGO_NET_OFFLINE=true` and `--locked`. If a spike needs one more crate, it reports `blocked: <crate>`. The user chose this on 2026-10-24 in place of a network exception.
 6. **One binary for Rust apps.** The worker is a subcommand (`api worker`). The queue tables ship in the kit migration set.
 7. **R3 has three runs** (R3a, R3b, R3c).
-8. **Formatter plan.** R0.10 decides. The default is: templates are written rustfmt-stable, and a golden test runs `rustfmt --check`. Render does no formatting. If dynamic code cannot stay stable, a `rustfmt` post-step runs and the lock hash covers the formatted bytes.
+8. **Formatter plan.** R0.10 chose plan C. The generator formats all planned Rust files with one `rustfmt --edition 2024` process in the plan step, before apply. The lock hash covers the formatted bytes. The templates stay rustfmt-stable anyway, and a golden test asserts that formatting changes nothing for the reference resources. `prettyplease` and `syn` printing are not used.
 9. **R1 keeps all Go-facing text in the neutral packs.** R1 also renders the converted Go `api` pack, because most packs require it (see R1 scope). The `module` question and the README wording do not change in R1. R2 changes them. The flag name `--module` stays in R2, because about 20 shared scripts pass it. It feeds the crate slug.
 10. **Go freeze timing.** The main loop tags `go-freeze-r0` at the R0 gate. Only four Go-side units may refactor Go after the tag: R1.0a, R1.0b, R3.0a, R3.0b. Everything else is a bug fix with a txtar or golden case. The main loop moves the final tag `go-parity-target` after R3.0b.
 11. **Stack versions stay in sync.** `crates/spinup-stack/stackversions.yaml` (schema 2) shares sections with the Go file (schema 1). A script generates the shared sections from the Go file. A test fails on a mismatch. R1.5 ports `ci_pins_test` (digest pins, SHA pins, 14-day rule). In R1, schema 2 is additive: it keeps the Go sections (`go`, `go_modules`, `go_tools`) and adds `rust`, `crates`, `cargo_tools`. The main loop removes the Go sections in the R2 gate commit, after all overlays merge. A strict-undefined render proves that no pack still reads them.
@@ -47,7 +47,7 @@ The main loop accepted each item on 2026-10-24. Section 11 records the answers.
 | Migration | None for Go apps. The dogfood todo app is created again. |
 | Repository | Same repository. Go is the oracle until R5. Then delete all Go. |
 | HTTP | axum on tokio. |
-| OpenAPI | Code-first (utoipa or aide). The app emits the spec. spinup commits it as `api/openapi/bundle.gen.yaml`. The web client generation does not change. |
+| OpenAPI | Code-first with utoipa 6 and `utoipa-axum` 0.3 (R0.6: aide is not needed). The app emits the spec. spinup commits it as `api/openapi/bundle.gen.yaml`. The web client generation does not change. |
 | Database | sqlx `query_as!` with committed `.sqlx/`. `spinup db prepare` refreshes it. sqlx migrations are embedded in the app binary. goose goes away. |
 | R0 | Time-boxed spike with a go/no-go report. |
 | Hard no-go | (a) Handler edit to served response over about 5 s warm. (b) Two Rust lanes plus the gate overload the Mac, or use more than about 40 GB. |
@@ -56,12 +56,12 @@ The main loop accepted each item on 2026-10-24. Section 11 records the answers.
 | Milestones | R0 spike, R1 CLI core, R2 kit and Rust API pack and generators, R3 operate commands, R4 plugins and release and docs, R5 cutover. |
 | Parity | `SPINUP_BIN` in the Go testscript harness. The Rust golden test reads the same `testdata/golden` trees. R5 ports the harness to Rust. |
 | Lanes | Offline. Crates are pre-seeded. Lanes cannot add crates. |
-| Kit defaults | tower-sessions with a sqlx store, argon2, openidconnect, lettre, tracing and opentelemetry-otlp, own rate limiter (ADR 0016), own job queue on sqlx. |
+| Kit defaults | tower-sessions with a sqlx store, argon2, `oauth2` and `jsonwebtoken` for OIDC (R0.7 replaced openidconnect), lettre, tracing and opentelemetry-otlp, own rate limiter (ADR 0016), own job queue on sqlx. |
 | Registration | linkme distributed slices. |
 | Plugin SDK | Rust crate only. Protocol stays JSON-RPC over stdio. |
 | Publishing | `spinup-kit` and `spinup-plugin-sdk` go to crates.io as alpha. Each publish needs user approval. |
 | Go freeze | Tag the parity target. Go gets bug fixes only. Each fix adds a txtar or golden case. |
-| Defaults | GoReleaser with the Rust builder (cargo-zigbuild) and the ADR 0012 asset names. Keep the template archive format and the six platform targets. Per-lane `CARGO_TARGET_DIR`, shared sccache, delete after merge. |
+| Defaults | GoReleaser with the Rust builder (cargo-zigbuild) and the ADR 0012 asset names. Keep the template archive format and the six platform targets. Per-lane `CARGO_TARGET_DIR` from an APFS clone seed, no shared sccache (R0.13), delete after merge. |
 
 The hard no-go limits for load average (14) and swap (2 GB) came from this plan. The user confirmed them on 2026-10-24.
 
@@ -247,9 +247,9 @@ Go shared files (`go.mod`, `go.sum`, `go.work`, `deps_m*.go`, the Go contract fi
 | Rust | 1.99.1 (edition 2024) | Pinned in `rust-toolchain.toml` with `rustfmt`, `clippy`, and the target list. The Mac default is 1.91.1. sqlx 0.9 needs 1.94 or newer. |
 | cargo-nextest | 0.9.149 | Installed copy is 0.9.146. |
 | sqlx-cli | 0.9.0 | Installed. It cannot install with `--locked`, so `tools-check` pins by version. |
-| cargo-deny | 0.20.2 | Not installed. Replaces `govulncheck` and checks licenses. |
-| sccache | verify in R0.13 | Not installed. |
-| cargo-zigbuild, zig | 0.24.0, 0.16.0 | zig is installed. Release only. |
+| cargo-deny | 0.20.2 | Installed. Replaces `govulncheck` and checks licenses. The main loop fetches the advisory database. |
+| sccache | 0.19.0 | Installed. Lanes do not use it: its Rust cache key holds the absolute target path (R0.13). |
+| cargo-zigbuild, zig | 0.24.0, 0.17.0 | Installed. Release builds and the musl image. |
 | cargo-chef | 0.1.78 | Generated app Dockerfile. |
 | GoReleaser | 2.19.0 | The installed copy may be older. `tools-check` decides. |
 
@@ -293,11 +293,13 @@ Add these to `CLAUDE.md`. The Go forms `T`, `S`, `G` stay until R5.
 ### Lane environment (from R1)
 
 ```
-RUSTUP_TOOLCHAIN=1.99.1  RUSTUP_AUTO_INSTALL=0 (verify in R0.13)
+RUSTUP_TOOLCHAIN=1.99.1  RUSTUP_AUTO_INSTALL=0
 CARGO_NET_OFFLINE=true   (and --locked on every command)
 CARGO_HOME=<shared>      CARGO_TARGET_DIR=<lane dir>/target
-CARGO_BUILD_JOBS=4       SQLX_OFFLINE=true
-CARGO_INCREMENTAL and RUSTC_WRAPPER: set by the R0.13 result
+CARGO_BUILD_JOBS=2       (the gate: 4)      NEXTEST_TEST_THREADS=4
+SQLX_OFFLINE=true
+CARGO_INCREMENTAL: cargo default           RUSTC_WRAPPER: unset (no sccache)
+CARGO_TARGET_DIR seed: cp -c -R of the milestone seed target (R0.13)
 LANE_NICE=10             max 2 lanes; the gate runs alone
 ```
 
@@ -406,7 +408,7 @@ A "wave" is an ordering group. It is not a batch. Each milestone has an explicit
 | R1.2 | `spinup-exec`: OsRunner, process groups, cancel, streaming redaction, `ExitError`, `Fake`. | `RT spinup-exec` | `crates/spinup-exec/src/` (not `runner.rs`) | none |
 | R1.3 | `spinup-vfs`: plan, `CleanPath`, apply with backups and rollback, patience diff, binary detection. | `RT spinup-vfs` (oracle diff cases, failure injection) | `crates/spinup-vfs/src/` | R1.0b |
 | R1.4 | `spinup-manifest`: schema 3, canonical JSON, normalized hash, status, tombstones, orphans, atomic save. | `RT spinup-manifest` (oracle lock cases) | `crates/spinup-manifest/src/` | R1.0b |
-| R1.5 | `spinup-stack` (schema 2 additive loader, strict decode, helpers, the sync test with the Go file, the `ci_pins_test` port) and `spinup-editors` (TOML, JSON, and the R0.1 YAML choice). | `RT spinup-stack spinup-editors` (codemod fixtures, ADR 0018 §6 blank-line rule) | `crates/spinup-stack/src/`, `crates/spinup-editors/src/` | R0 result |
+| R1.5 | `spinup-stack` (schema 2 additive loader, strict decode, helpers, the sync test with the Go file, the `ci_pins_test` port) and `spinup-editors` (TOML, JSON, and an own YAML editor on tree-sitter source spans: R0.1 estimates 600 to 800 adapter lines and 200 to 350 test lines). | `RT spinup-stack spinup-editors` (codemod fixtures, ADR 0018 §6 blank-line rule) | `crates/spinup-stack/src/`, `crates/spinup-editors/src/` | R0 result |
 
 **Wave 2**
 
@@ -487,7 +489,7 @@ The R1 exit test: a Rust-only upgrade of a `base`+`api`+`web` app, from a synthe
 
 **R2 pre-seed commit**
 - All R2 crates in the workspace: `spinup-kit`, `spinup-kit-testkit`, `spinup-db`, `spinup-build`, `spinup-appcmd`, `spinup-gen-web`, `spinup-gen-app`.
-- Crates: axum 0.8.9, tokio 1.54.1 or newer, tower-http 0.7.1, sqlx 0.9.0, utoipa 6.0.0, utoipa-axum 0.3.0, tower-sessions 0.15.0, argon2 0.6.0, the OIDC crates (per R0.7), lettre 0.11.23, opentelemetry 0.33.x with tracing-opentelemetry 0.34.0, garde 0.23.0, testcontainers (exact pair), and the others from the reference app.
+- Crates: axum 0.8.9, tokio 1.54.1 or newer, tower-http 0.7.1, sqlx 0.9.0, utoipa 6.0.0, utoipa-axum 0.3.0, tower-sessions 0.15.0, argon2 0.6.0, `oauth2` 5 and `jsonwebtoken` 11 (R0.7), lettre 0.11.23, opentelemetry 0.33.x with tracing-opentelemetry 0.34.0, garde 0.23.0, testcontainers (exact pair), and the others from the reference app.
 - The `api` pack `Cargo.toml.tmpl`, `Cargo.lock` (produced as R0.6 and R0.15 decided), and `pack.d/deps.toml`. The vendored Scalar bundle.
 - `stackversions.yaml`: the rust builder image, distroless static, new Action pins (toolchain action, rust-cache), and the kit crate pin.
 - Move the code of R0.6 to R0.9 to `testdata/reference/todo-rs/` (frozen).
@@ -515,7 +517,7 @@ The R1 exit test: a Rust-only upgrade of a `base`+`api`+`web` app, from a synthe
 |---|---|---|---|---|
 | R2.9 | `spinup-db`: `db migrate` (runs the app binary), `NextMigrationName` (sqlx `up/down` pairs), `db lint` (up files only), `db new/status/redo/to/reset/seed/psql/dump/restore/doctor`, `db prepare`. | `RT spinup-db` | `crates/spinup-db/src/` | R1 gate |
 | R2.10 | Upgrade cargo phases: `Cargo.toml` edits with `toml_edit`, `Cargo.lock` never merged as text, kit path and `[patch]` keep rule (ADR 0018 §3), `rust-version` raise, verify (`cargo check` or `clippy` and `test`, per R0.13), placeholder kit rule. | `RT spinup-upgrade :: test(deps) \| test(apply) \| test(verify)` | `crates/spinup-upgrade/src/cargo/` | R1.18 |
-| R2.11 | `spinup-gen`: Rust field types, naming rules, post-steps (`sqlx-prepare`, `openapi-emit`, `client`, `rustfmt` or none per R0.10), retry hints. | `RT spinup-gen :: test(fields) \| test(poststeps)` | `crates/spinup-gen/src/{fields,poststeps}/` | R1.10 |
+| R2.11 | `spinup-gen`: Rust field types, naming rules, post-steps in the order `migrate`, `sqlx-prepare`, build, `openapi-emit`, `client` (rustfmt runs in the plan step, R0.10), retry hints, `Try: spinup db prepare`. | `RT spinup-gen :: test(fields) \| test(poststeps)` | `crates/spinup-gen/src/{fields,poststeps}/` | R1.10 |
 | R2.12 | `spinup-gen-web`: the resource `pages` part, `nav.gen.ts`, `page`, `component`, `client`, `dashboard`, `alert`. Checked against the existing neutral goldens. | `RT spinup-gen-web`, `RG gen-resource :: test(web) \| test(paths)` | `crates/spinup-gen-web/src/` | R2.11 |
 | R2.13 | `gen-app` resource core: spec parsing, ownership, reserved names, migration SQL, `Part` registry, `Next:` lines. | `RT spinup-gen-app :: test(resource)` | `crates/spinup-gen-app/src/resource_core/` | R2.9, R2.11 |
 | R2.14 | `gen-app` Rust templates: handlers (axum and `#[utoipa::path]`), `ToSchema` types, store module, `routes_gen.rs`, generated test. The output equals the todo module of the reference app. | `RT spinup-gen-app :: test(handlers)`, `RG gen-resource-rs`, `make rs-ref-check` | `crates/spinup-gen-app/src/resource_rs/`, `crates/spinup-gen-app/templates/`, `testdata/golden-rs/gen-resource-rs/` | R2.13 |
@@ -593,7 +595,7 @@ R3a gate: all `rs-*` targets, then `make dind` † (deploy, broken-readyz rollba
 
 **R3b: cloud, provision, infra, tools**
 
-Pre-seed: `reqwest` or `ureq` (per R0.4), `md-5`, a DNS lookup choice (`hickory` or `std`). Re-seed `Cargo.lock` and re-run `make rs-fetch`.
+Pre-seed: `ureq` 3.5.0 with rustls and `ring` (R0.4), `md-5`, a DNS lookup choice (`hickory` or `std`). Re-seed `Cargo.lock` and re-run `make rs-fetch`.
 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
@@ -711,7 +713,7 @@ New ADRs supersede the named sections. The old ADR text stays. Each old section 
 |---|---|---|
 | **0019 Rust rewrite** | R0.16 | 0001 Decision bullets 1 to 3 and Consequences. 0003 Images and health check. States the user decisions and the R0 results. |
 | **0020 R1 contracts** | start of R1 | 0006 §1 (contract files in Rust), §2 (lock schema 3, fields `formatter`, `kit.crate`, `engine`), §3 (engine marker, minijinja packs, stack schema 2 additive, archives restart at the first Rust release), §5 (linkme registration, no Go editor). 0005 §3 (doctest uses `SPINUP_BIN`). 0013 §4 (minijinja plugin packs). 0012 §2 (`TrustedKeys` in Rust). Also: sync or async, error text mapper, the parity rules and `parity.txt`, regex-level console parity, oracle fixtures and the `.modes` format, converted-pack and overlay rules, the `--module` flag name, the workflow table, `docs/site-rs/`. |
-| **0021 R2 contracts** | start of R2 | 0005 §1 (`db migrate` runs the Rust binary), §2 (Cargo files, kit pin, path or patch), 0007 §1 to §6, 0008 §3 to §6, 0010 §1 and §2, 0013 §2 and §3, 0014 §2, 0015 §1 and §2, 0016 §3 and §4, 0018 §1 to §3. Also: the wire contract (schema names, operationIds, Problem, pagination), the formatter decision, the OpenAPI 3.1 choice, the kit package dispositions, the registry owner field, no behavior-version gates. |
+| **0021 R2 contracts** | start of R2 | 0005 §1 (the spinup CLI runs `db migrate` with the sqlx migrator, and `spinup db prepare`, ADR 0019 §4), §2 (Cargo files, kit pin, path or patch), 0007 §1 to §6, 0008 §3 to §6, 0010 §1 and §2, 0013 §2 and §3, 0014 §2, 0015 §1 and §2, 0016 §3 and §4, 0018 §1 to §3. Also: the wire contract (schema names, operationIds, Problem, pagination), the formatter decision, the OpenAPI 3.1 choice, the kit package dispositions, the registry owner field, no behavior-version gates. |
 | **0022 R3 contracts** | start of R3a | 0009 §1 to §4, 0011 §2, §3, §6 (table `_sqlx_migrations`), 0014 §6 and §7, 0017 §2, §3, §6, §10, 0018 §4 to §7. Also: shared shell scripts and the transcript oracle. |
 | **0023 R4 contracts** | start of R4 | 0014 §1, §5, §8 (docs site baseline, field `rust`), 0012 §1 to §4 (Rust builder, `cargo-auditable`), 0013 §4 (final plugin syntax). Also: kit API guard, crates.io alpha publish rule. |
 | **0024 Cutover** | start of R5 | The Go freeze, the deletion list, the new `Makefile` and `CLAUDE.md` contract, the first Rust release rules. |
@@ -740,20 +742,20 @@ The main loop makes each change. Keep the style of the current file.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| 1 | **Dev loop too slow** with axum, sqlx macros, and utoipa (hard no-go a). | R0.11 measures it on a 20-resource app with the full kit. Options: `split-debuginfo`, `line-tables-only`, dependency `opt-level`, `bacon` or `watchexec`, `listenfd`. Re-measure at the R2 gate. If it fails, stop. |
-| 2 | **Lane builds too heavy** (hard no-go b). About 45 crates, many test binaries, C code in zstd and ring, up to 8 generated apps in the gate. | R0.13 simulates the gate with the exact lane commands. `CARGO_BUILD_JOBS=4`, nice, max 2 lanes, serial gate. Lanes run clippy and nextest only. Per-lane target dirs deleted after merge. One test binary per crate. Merge small crates if the numbers say so. |
+| 1 | **Dev loop too slow** with axum, sqlx macros, and utoipa (hard no-go a). | R0.11 measures it on a 20-resource app with the full kit. Options: `split-debuginfo`, `line-tables-only`, dependency `opt-level`, `bacon` or `watchexec`, `listenfd`. Re-measure at the R2 gate. If it fails, stop. R0.11: 3381 ms median, only with the shipped dev profile (ADR 0019 §4). |
+| 2 | **Lane builds too heavy** (hard no-go b). About 45 crates, many test binaries, C code in zstd and ring, up to 8 generated apps in the gate. | R0.13 simulates the gate with the exact lane commands. R0.13: lanes at `CARGO_BUILD_JOBS=2` and 4 test threads, the gate at 4 jobs, clone seeds, nice, max 2 lanes, serial gate (peak load 10.52). With 4 jobs per lane, the load reached 33.8 to 54.9. Lanes run clippy and nextest only. Per-lane target dirs deleted after merge. One test binary per crate. Merge small crates if the numbers say so. |
 | 3 | **Toolchain drift.** The Mac default is 1.91.1. sqlx 0.9 needs 1.94. Clippy lints change. | Pin 1.99.1 in `rust-toolchain.toml`. Bump only in a dedicated commit. Lanes cannot install toolchains. |
 | 4 | **minijinja byte-equality and 3.0 churn.** Whitespace rules and `[[ ]]` clashes. | Go converter on the real syntax tree. Custom filters. Pin 3.0.3. Soft risk: if under 99 percent, the plan accepts a documented list of differences and new golden files for those packs. |
-| 5 | **YAML editing has no mature crate.** | R0.1 tests three options. Fallback: hand-written splice editor. The write surface is small (six call sites). Do not promise byte-equality with go-yaml for inputs outside its style. |
+| 5 | **YAML editing has no mature crate.** | R0.1: no crate reaches Go parity. R1.5 writes an own splice editor on tree-sitter spans. The write surface is small (six call sites). Do not promise byte-equality with go-yaml for inputs outside its style. |
 | 6 | **Own job queue.** At-least-once, crash recovery, periodic jobs, lost `NOTIFY`. | River schema as the reference. Rescuer and poll fallback. Chaos test in R0.8 and again in R2.8. Fallback: `graphile_worker`. |
-| 7 | **Dependency health.** `openidconnect` is old and pulls `rsa` (RUSTSEC-2023-0071). The official tower-sessions sqlx store is stale. OpenTelemetry crates break every few months. | Own `SessionStore`. R0.7 chooses the OIDC crate and records the advisory ignore in `deny.toml`. Pin all OpenTelemetry crates together. Check release dates at each pre-seed (the 14-day rule). |
-| 8 | **Code-first OpenAPI drift.** utoipa 6 emits OpenAPI 3.1. Client output changes. The spec needs a compiled app. | R0.6 diffs both clients. A golden for the emitted `bundle.gen.yaml` comes before any fragment golden. Keep aide as a fallback. ADR 0021 holds the wire contract. |
-| 9 | **Formatting breaks the lock hash.** There is no in-process rustfmt. | R0.10 decides. Default: rustfmt-stable templates plus a `rustfmt --check` golden. Otherwise a `rustfmt` post-step with the hash taken after formatting. |
+| 7 | **Dependency health.** `openidconnect` is old and pulls `rsa` (RUSTSEC-2023-0071). The official tower-sessions sqlx store is stale. OpenTelemetry crates break every few months. | Own `SessionStore`. R0.7 chose `oauth2` + `jsonwebtoken`. Until the `aws_lc_rs` backend is in the lock, `deny.toml` ignores RUSTSEC-2023-0071 with its reason (verify only, no RSA private key). Pin all OpenTelemetry crates together. Check release dates at each pre-seed (the 14-day rule). |
+| 8 | **Code-first OpenAPI drift.** utoipa 6 emits OpenAPI 3.1. Client output changes. The spec needs a compiled app. | R0.6 diffs both clients. A golden for the emitted `bundle.gen.yaml` comes before any fragment golden. aide is dropped: R0.6 gives byte-equal clients. ADR 0021 holds the wire contract. |
+| 9 | **Formatting breaks the lock hash.** There is no in-process rustfmt. | R0.10 chose plan C: one `rustfmt` run in the plan step, with the hash taken after formatting (decision 8). |
 | 10 | **Parity is weaker than it sounds.** Scripts compare console text by regex. Cobra and clap text differ. zstd bytes differ. Go-only scripts cannot be shared. | Files and goldens are byte-equal. Console text is regex-equal. The docs site gets a new baseline. Archives compare by decoded tar. Forked scripts use `[impl:rust]`. Oracle fixtures cover the algorithms. ADR 0020 states this. |
-| 11 | **Release builds for six targets.** The GoReleaser Rust builder is young. Windows arm64 is not in its default list. | R0.14 tests all six targets. Fallback: `builder: prebuilt` with a cargo matrix. Native Windows runner if needed. `cargo-auditable` for SBOMs. |
+| 11 | **Release builds for six targets.** The GoReleaser Rust builder is young. Windows arm64 is not in its default list. | R0.14: all six targets build, with `aarch64-pc-windows-gnullvm` for Windows arm64. `builder: prebuilt` is not available in GoReleaser OSS. Native Windows runner if needed. `cargo-auditable` for SBOMs. |
 | 12 | **R3 size** (about 19k Go lines plus tests). | Three runs. Shared shell scripts. The transcript oracle makes the orchestration logic byte-checkable without a VM. |
 | 13 | **Go freeze costs.** Every Go fix needs a port. | Each Go fix adds a txtar or golden case. Neutral packs are converted by script, so pack fixes flow to Rust through `make rs-convert-packs`. Only four Go-side units may refactor Go. |
-| 14 | **linkme drops crates that nothing references.** | `wire_gen.rs` plus the registry ID test. R0.3 proves it on three operating systems. Fallback: `inventory`. |
+| 14 | **linkme drops crates that nothing references.** | `wire_gen.rs` plus the registry ID test. R0.3 proved it on macOS and Linux. Windows waits for a CI runner. Fallback: `inventory`. |
 | 15 | **Unexpected approvals.** Publishing to crates.io and the merge of each branch need the user. | The epic lists them. Lanes never publish, tag, or merge. |
 | 16 | **Converter and pack defects found late.** | Golden units own their converter rules. A converter-core defect gives `blocked: converter`. The main loop dispatches a fix before the next slot. |
 | 17 | **Lockfile fails under `[patch]`.** A registry-made `Cargo.lock` may fail `--locked` with a path kit. | R0.6 tests it. The pack lock uses a path kit until the kit is published. The pre-seed after publish regenerates it. |
@@ -769,6 +771,7 @@ The main loop makes each change. Keep the style of the current file.
 6. No `SPINUP_BEHAVIOR_VERSION` in the Rust kit: accepted (decision 12).
 7. The Go freeze tag at the R0 gate with four allowed refactor units: accepted (decision 10).
 8. The hard no-go limits (40 GB disk, load average 14, swap 2 GB): confirmed by the user.
+9. The swap limit counts the increase over the swap in use when the run starts (user, 2026-10-24). Disk and load stay absolute.
 
 ---
 

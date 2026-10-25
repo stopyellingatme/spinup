@@ -1,0 +1,5 @@
+services:
+    postgres:
+        image: demo-postgres:17 # pinned
+        volumes:
+            - postgres_data:/var/lib/postgresql/data

@@ -1,0 +1,55 @@
+name = "ci"
+description = "Build, test, deploy, verify backups, and propose upgrades with GitHub Actions."
+requires = []
+
+[[questions]]
+key = "app_name"
+prompt = "App name"
+type = "string"
+pattern = "^[a-z][a-z0-9-]{0,62}$"
+
+[[questions]]
+key = "modules"
+prompt = "Modules, separated by commas"
+type = "string"
+default = "ci,deploy"
+
+[[questions]]
+key = "db_version"
+prompt = "PostgreSQL major version"
+type = "enum"
+choices = ["18", "17", "16"]
+default = "18"
+
+[[questions]]
+key = "ci_deploy_on_push"
+prompt = "Deploy the default environment on pushes to main"
+type = "bool"
+default = false
+
+[[files]]
+path = ".github/actions/setup-spinup/action.yml"
+source = "files/.github/actions/setup-spinup/action.yml"
+class = "managed"
+
+[[files]]
+path = ".github/workflows/ci.yml"
+source = "files/.github/workflows/ci.yml.tmpl"
+class = "managed"
+
+[[files]]
+path = ".github/workflows/deploy.yml"
+source = "files/.github/workflows/deploy.yml.tmpl"
+class = "managed"
+when = "modules contains 'deploy'"
+
+[[files]]
+path = ".github/workflows/backup-verify.yml"
+source = "files/.github/workflows/backup-verify.yml.tmpl"
+class = "managed"
+when = "modules contains 'backups'"
+
+[[files]]
+path = ".github/workflows/upgrade-check.yml"
+source = "files/.github/workflows/upgrade-check.yml.tmpl"
+class = "managed"

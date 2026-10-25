@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = ["linkme"]
+linkme = ["dep:linkme"]
+inventory = ["dep:inventory"]
+
 [dependencies]
-inventory = "0.3.25"
-linkme = "0.3.37"
+inventory = { version = "0.3.25", optional = true }
+linkme = { version = "0.3.37", optional = true }

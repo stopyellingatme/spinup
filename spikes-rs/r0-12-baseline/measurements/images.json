@@ -1,0 +1,143 @@
+{
+  "machine": {
+    "cpu": "Apple M1 Max",
+    "ncpu": 10,
+    "mem_bytes": 68719476736,
+    "os": "26.4.1",
+    "uptime": "18:49  up 179 days,  8:13, 20 users, load averages: 1.93 2.39 3.04"
+  },
+  "musl": {
+    "load1_wait": 1.93,
+    "cold_binary": {
+      "s": 136.7,
+      "load1_before": 1.93,
+      "load1_after": 3.19
+    },
+    "cold_image": {
+      "s": 1.0,
+      "load1_before": 3.19,
+      "load1_after": 3.01
+    },
+    "binary_bytes": 9764576,
+    "warm": [
+      {
+        "binary": {
+          "s": 63.9,
+          "load1_before": 1.86,
+          "load1_after": 2.24
+        },
+        "image": {
+          "s": 0.2,
+          "load1_before": 2.24,
+          "load1_after": 2.24
+        }
+      },
+      {
+        "binary": {
+          "s": 63.5,
+          "load1_before": 1.96,
+          "load1_after": 1.72
+        },
+        "image": {
+          "s": 0.2,
+          "load1_before": 1.72,
+          "load1_after": 1.72
+        }
+      },
+      {
+        "binary": {
+          "s": 64.2,
+          "load1_before": 1.72,
+          "load1_after": 1.46
+        },
+        "image": {
+          "s": 0.3,
+          "load1_before": 1.46,
+          "load1_after": 1.46
+        }
+      }
+    ],
+    "image_bytes": 12137266
+  },
+  "glibc": {
+    "load1_wait": 1.46,
+    "cold_image": {
+      "s": 111.6,
+      "load1_before": 1.46,
+      "load1_after": 4.02
+    },
+    "warm": [
+      {
+        "image": {
+          "s": 57.5,
+          "load1_before": 1.94,
+          "load1_after": 2.22
+        }
+      },
+      {
+        "image": {
+          "s": 57.3,
+          "load1_before": 1.98,
+          "load1_after": 2.27
+        }
+      },
+      {
+        "image": {
+          "s": 58.0,
+          "load1_before": 1.96,
+          "load1_after": 7.0
+        }
+      }
+    ],
+    "image_bytes": 48073339,
+    "runs": true,
+    "binary_bytes": 9843256
+  },
+  "go": {
+    "image": {
+      "s": 0.5,
+      "load1_before": 7.0,
+      "load1_after": 7.0
+    },
+    "image_bytes": 28325106,
+    "binary_bytes": 25952416
+  },
+  "compose": {
+    "api-musl": {
+      "up": {
+        "s": 1.8,
+        "load1_before": 1.82,
+        "load1_after": 1.82
+      },
+      "health": "healthy",
+      "read_only": true,
+      "healthz_from_host": true,
+      "mem_usage": "2.457MiB / 12.16GiB"
+    },
+    "api-glibc": {
+      "up": {
+        "s": 1.8,
+        "load1_before": 1.89,
+        "load1_after": 1.81
+      },
+      "health": "healthy",
+      "read_only": true,
+      "healthz_from_host": true,
+      "mem_usage": "2.168MiB / 12.16GiB"
+    }
+  },
+  "linux_rss": {
+    "rs-musl": {
+      "vmrss_kib": 7496,
+      "vmhwm_kib": 69692
+    },
+    "rs-glibc": {
+      "vmrss_kib": 8312,
+      "vmhwm_kib": 71232
+    },
+    "go-static": {
+      "vmrss_kib": 85688,
+      "vmhwm_kib": 85688
+    }
+  }
+}

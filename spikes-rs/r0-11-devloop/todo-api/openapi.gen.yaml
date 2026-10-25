@@ -1,0 +1,5372 @@
+openapi: 3.1.0
+info:
+  title: todo
+  version: 0.1.0
+servers:
+- url: /
+paths:
+  /api/articles:
+    get:
+      tags:
+      - articles
+      summary: List articles
+      operationId: listArticles
+      parameters:
+      - name: limit
+        in: query
+        description: The number of articles to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of articles to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of articles in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - articles
+      summary: Create an article
+      operationId: createArticle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleInput'
+        required: true
+      responses:
+        '201':
+          description: The new article.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/articles/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - articles
+      summary: Get an article
+      operationId: getArticle
+      responses:
+        '200':
+          description: The article.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The article does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - articles
+      summary: Replace an article
+      operationId: updateArticle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleInput'
+        required: true
+      responses:
+        '200':
+          description: The updated article.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The article does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - articles
+      summary: Delete an article
+      operationId: deleteArticle
+      responses:
+        '204':
+          description: The article is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The article does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/categories:
+    get:
+      tags:
+      - categories
+      summary: List categories
+      operationId: listCategories
+      parameters:
+      - name: limit
+        in: query
+        description: The number of categories to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of categories to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of categories in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - categories
+      summary: Create a category
+      operationId: createCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+        required: true
+      responses:
+        '201':
+          description: The new category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/categories/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - categories
+      summary: Get a category
+      operationId: getCategory
+      responses:
+        '200':
+          description: The category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The category does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - categories
+      summary: Replace a category
+      operationId: updateCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+        required: true
+      responses:
+        '200':
+          description: The updated category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The category does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - categories
+      summary: Delete a category
+      operationId: deleteCategory
+      responses:
+        '204':
+          description: The category is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The category does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/comments:
+    get:
+      tags:
+      - comments
+      summary: List comments
+      operationId: listComments
+      parameters:
+      - name: limit
+        in: query
+        description: The number of comments to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of comments to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of comments in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - comments
+      summary: Create a comment
+      operationId: createComment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+        required: true
+      responses:
+        '201':
+          description: The new comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/comments/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - comments
+      summary: Get a comment
+      operationId: getComment
+      responses:
+        '200':
+          description: The comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The comment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - comments
+      summary: Replace a comment
+      operationId: updateComment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+        required: true
+      responses:
+        '200':
+          description: The updated comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The comment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - comments
+      summary: Delete a comment
+      operationId: deleteComment
+      responses:
+        '204':
+          description: The comment is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The comment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/coupons:
+    get:
+      tags:
+      - coupons
+      summary: List coupons
+      operationId: listCoupons
+      parameters:
+      - name: limit
+        in: query
+        description: The number of coupons to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of coupons to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of coupons in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - coupons
+      summary: Create a coupon
+      operationId: createCoupon
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponInput'
+        required: true
+      responses:
+        '201':
+          description: The new coupon.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Coupon'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/coupons/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - coupons
+      summary: Get a coupon
+      operationId: getCoupon
+      responses:
+        '200':
+          description: The coupon.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Coupon'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The coupon does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - coupons
+      summary: Replace a coupon
+      operationId: updateCoupon
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponInput'
+        required: true
+      responses:
+        '200':
+          description: The updated coupon.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Coupon'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The coupon does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - coupons
+      summary: Delete a coupon
+      operationId: deleteCoupon
+      responses:
+        '204':
+          description: The coupon is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The coupon does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/customers:
+    get:
+      tags:
+      - customers
+      summary: List customers
+      operationId: listCustomers
+      parameters:
+      - name: limit
+        in: query
+        description: The number of customers to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of customers to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of customers in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - customers
+      summary: Create a customer
+      operationId: createCustomer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+        required: true
+      responses:
+        '201':
+          description: The new customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/customers/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - customers
+      summary: Get a customer
+      operationId: getCustomer
+      responses:
+        '200':
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The customer does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - customers
+      summary: Replace a customer
+      operationId: updateCustomer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+        required: true
+      responses:
+        '200':
+          description: The updated customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The customer does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - customers
+      summary: Delete a customer
+      operationId: deleteCustomer
+      responses:
+        '204':
+          description: The customer is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The customer does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/employees:
+    get:
+      tags:
+      - employees
+      summary: List employees
+      operationId: listEmployees
+      parameters:
+      - name: limit
+        in: query
+        description: The number of employees to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of employees to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of employees in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - employees
+      summary: Create an employee
+      operationId: createEmployee
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeInput'
+        required: true
+      responses:
+        '201':
+          description: The new employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/employees/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - employees
+      summary: Get an employee
+      operationId: getEmployee
+      responses:
+        '200':
+          description: The employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The employee does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - employees
+      summary: Replace an employee
+      operationId: updateEmployee
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeInput'
+        required: true
+      responses:
+        '200':
+          description: The updated employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The employee does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - employees
+      summary: Delete an employee
+      operationId: deleteEmployee
+      responses:
+        '204':
+          description: The employee is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The employee does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/events:
+    get:
+      tags:
+      - events
+      summary: List events
+      operationId: listEvents
+      parameters:
+      - name: limit
+        in: query
+        description: The number of events to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of events to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of events in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - events
+      summary: Create an event
+      operationId: createEvent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+        required: true
+      responses:
+        '201':
+          description: The new event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/events/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - events
+      summary: Get an event
+      operationId: getEvent
+      responses:
+        '200':
+          description: The event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The event does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - events
+      summary: Replace an event
+      operationId: updateEvent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+        required: true
+      responses:
+        '200':
+          description: The updated event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The event does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - events
+      summary: Delete an event
+      operationId: deleteEvent
+      responses:
+        '204':
+          description: The event is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The event does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/invoices:
+    get:
+      tags:
+      - invoices
+      summary: List invoices
+      operationId: listInvoices
+      parameters:
+      - name: limit
+        in: query
+        description: The number of invoices to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of invoices to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of invoices in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - invoices
+      summary: Create an invoice
+      operationId: createInvoice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceInput'
+        required: true
+      responses:
+        '201':
+          description: The new invoice.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/invoices/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - invoices
+      summary: Get an invoice
+      operationId: getInvoice
+      responses:
+        '200':
+          description: The invoice.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The invoice does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - invoices
+      summary: Replace an invoice
+      operationId: updateInvoice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceInput'
+        required: true
+      responses:
+        '200':
+          description: The updated invoice.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The invoice does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - invoices
+      summary: Delete an invoice
+      operationId: deleteInvoice
+      responses:
+        '204':
+          description: The invoice is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The invoice does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/meetings:
+    get:
+      tags:
+      - meetings
+      summary: List meetings
+      operationId: listMeetings
+      parameters:
+      - name: limit
+        in: query
+        description: The number of meetings to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of meetings to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of meetings in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - meetings
+      summary: Create a meeting
+      operationId: createMeeting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingInput'
+        required: true
+      responses:
+        '201':
+          description: The new meeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meeting'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/meetings/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - meetings
+      summary: Get a meeting
+      operationId: getMeeting
+      responses:
+        '200':
+          description: The meeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meeting'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The meeting does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - meetings
+      summary: Replace a meeting
+      operationId: updateMeeting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingInput'
+        required: true
+      responses:
+        '200':
+          description: The updated meeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meeting'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The meeting does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - meetings
+      summary: Delete a meeting
+      operationId: deleteMeeting
+      responses:
+        '204':
+          description: The meeting is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The meeting does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/notes:
+    get:
+      tags:
+      - notes
+      summary: List notes
+      operationId: listNotes
+      parameters:
+      - name: limit
+        in: query
+        description: The number of notes to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of notes to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of notes in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - notes
+      summary: Create a note
+      operationId: createNote
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+        required: true
+      responses:
+        '201':
+          description: The new note.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/notes/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - notes
+      summary: Get a note
+      operationId: getNote
+      responses:
+        '200':
+          description: The note.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The note does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - notes
+      summary: Replace a note
+      operationId: updateNote
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+        required: true
+      responses:
+        '200':
+          description: The updated note.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The note does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - notes
+      summary: Delete a note
+      operationId: deleteNote
+      responses:
+        '204':
+          description: The note is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The note does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/orders:
+    get:
+      tags:
+      - orders
+      summary: List orders
+      operationId: listOrders
+      parameters:
+      - name: limit
+        in: query
+        description: The number of orders to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of orders to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of orders in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - orders
+      summary: Create an order
+      operationId: createOrder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+        required: true
+      responses:
+        '201':
+          description: The new order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/orders/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - orders
+      summary: Get an order
+      operationId: getOrder
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The order does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - orders
+      summary: Replace an order
+      operationId: updateOrder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+        required: true
+      responses:
+        '200':
+          description: The updated order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The order does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - orders
+      summary: Delete an order
+      operationId: deleteOrder
+      responses:
+        '204':
+          description: The order is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The order does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/products:
+    get:
+      tags:
+      - products
+      summary: List products
+      operationId: listProducts
+      parameters:
+      - name: limit
+        in: query
+        description: The number of products to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of products to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of products in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - products
+      summary: Create a product
+      operationId: createProduct
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+        required: true
+      responses:
+        '201':
+          description: The new product.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/products/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - products
+      summary: Get a product
+      operationId: getProduct
+      responses:
+        '200':
+          description: The product.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The product does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - products
+      summary: Replace a product
+      operationId: updateProduct
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+        required: true
+      responses:
+        '200':
+          description: The updated product.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The product does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - products
+      summary: Delete a product
+      operationId: deleteProduct
+      responses:
+        '204':
+          description: The product is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The product does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/projects:
+    get:
+      tags:
+      - projects
+      summary: List projects
+      operationId: listProjects
+      parameters:
+      - name: limit
+        in: query
+        description: The number of projects to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of projects to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of projects in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - projects
+      summary: Create a project
+      operationId: createProject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+        required: true
+      responses:
+        '201':
+          description: The new project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/projects/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - projects
+      summary: Get a project
+      operationId: getProject
+      responses:
+        '200':
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The project does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - projects
+      summary: Replace a project
+      operationId: updateProject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+        required: true
+      responses:
+        '200':
+          description: The updated project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The project does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - projects
+      summary: Delete a project
+      operationId: deleteProject
+      responses:
+        '204':
+          description: The project is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The project does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/reviews:
+    get:
+      tags:
+      - reviews
+      summary: List reviews
+      operationId: listReviews
+      parameters:
+      - name: limit
+        in: query
+        description: The number of reviews to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of reviews to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of reviews in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - reviews
+      summary: Create a review
+      operationId: createReview
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+        required: true
+      responses:
+        '201':
+          description: The new review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/reviews/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - reviews
+      summary: Get a review
+      operationId: getReview
+      responses:
+        '200':
+          description: The review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The review does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - reviews
+      summary: Replace a review
+      operationId: updateReview
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+        required: true
+      responses:
+        '200':
+          description: The updated review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The review does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - reviews
+      summary: Delete a review
+      operationId: deleteReview
+      responses:
+        '204':
+          description: The review is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The review does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/shipments:
+    get:
+      tags:
+      - shipments
+      summary: List shipments
+      operationId: listShipments
+      parameters:
+      - name: limit
+        in: query
+        description: The number of shipments to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of shipments to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of shipments in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - shipments
+      summary: Create a shipment
+      operationId: createShipment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShipmentInput'
+        required: true
+      responses:
+        '201':
+          description: The new shipment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/shipments/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - shipments
+      summary: Get a shipment
+      operationId: getShipment
+      responses:
+        '200':
+          description: The shipment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The shipment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - shipments
+      summary: Replace a shipment
+      operationId: updateShipment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShipmentInput'
+        required: true
+      responses:
+        '200':
+          description: The updated shipment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The shipment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - shipments
+      summary: Delete a shipment
+      operationId: deleteShipment
+      responses:
+        '204':
+          description: The shipment is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The shipment does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/suppliers:
+    get:
+      tags:
+      - suppliers
+      summary: List suppliers
+      operationId: listSuppliers
+      parameters:
+      - name: limit
+        in: query
+        description: The number of suppliers to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of suppliers to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of suppliers in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - suppliers
+      summary: Create a supplier
+      operationId: createSupplier
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierInput'
+        required: true
+      responses:
+        '201':
+          description: The new supplier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/suppliers/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - suppliers
+      summary: Get a supplier
+      operationId: getSupplier
+      responses:
+        '200':
+          description: The supplier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The supplier does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - suppliers
+      summary: Replace a supplier
+      operationId: updateSupplier
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierInput'
+        required: true
+      responses:
+        '200':
+          description: The updated supplier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The supplier does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - suppliers
+      summary: Delete a supplier
+      operationId: deleteSupplier
+      responses:
+        '204':
+          description: The supplier is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The supplier does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/tags:
+    get:
+      tags:
+      - tags
+      summary: List tags
+      operationId: listTags
+      parameters:
+      - name: limit
+        in: query
+        description: The number of tags to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of tags to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of tags in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - tags
+      summary: Create a tag
+      operationId: createTag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+        required: true
+      responses:
+        '201':
+          description: The new tag.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/tags/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - tags
+      summary: Get a tag
+      operationId: getTag
+      responses:
+        '200':
+          description: The tag.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The tag does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - tags
+      summary: Replace a tag
+      operationId: updateTag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+        required: true
+      responses:
+        '200':
+          description: The updated tag.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The tag does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - tags
+      summary: Delete a tag
+      operationId: deleteTag
+      responses:
+        '204':
+          description: The tag is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The tag does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/tickets:
+    get:
+      tags:
+      - tickets
+      summary: List tickets
+      operationId: listTickets
+      parameters:
+      - name: limit
+        in: query
+        description: The number of tickets to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of tickets to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of tickets in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - tickets
+      summary: Create a ticket
+      operationId: createTicket
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketInput'
+        required: true
+      responses:
+        '201':
+          description: The new ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/tickets/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - tickets
+      summary: Get a ticket
+      operationId: getTicket
+      responses:
+        '200':
+          description: The ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The ticket does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - tickets
+      summary: Replace a ticket
+      operationId: updateTicket
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketInput'
+        required: true
+      responses:
+        '200':
+          description: The updated ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The ticket does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - tickets
+      summary: Delete a ticket
+      operationId: deleteTicket
+      responses:
+        '204':
+          description: The ticket is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The ticket does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/todos:
+    get:
+      tags:
+      - todos
+      summary: List todos
+      operationId: listTodos
+      parameters:
+      - name: limit
+        in: query
+        description: The number of todos to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of todos to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of todos in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - todos
+      summary: Create a todo
+      operationId: createTodo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoInput'
+        required: true
+      responses:
+        '201':
+          description: The new todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/todos/greeting:
+    get:
+      tags:
+      - todos
+      summary: Greet the todo list
+      operationId: todoGreeting
+      responses:
+        '200':
+          description: The greeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greeting'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/todos/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - todos
+      summary: Get a todo
+      operationId: getTodo
+      responses:
+        '200':
+          description: The todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The todo does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - todos
+      summary: Replace a todo
+      operationId: updateTodo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoInput'
+        required: true
+      responses:
+        '200':
+          description: The updated todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The todo does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - todos
+      summary: Delete a todo
+      operationId: deleteTodo
+      responses:
+        '204':
+          description: The todo is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The todo does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/warehouses:
+    get:
+      tags:
+      - warehouses
+      summary: List warehouses
+      operationId: listWarehouses
+      parameters:
+      - name: limit
+        in: query
+        description: The number of warehouses to return.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      - name: offset
+        in: query
+        description: The number of warehouses to skip.
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      responses:
+        '200':
+          description: A page of warehouses in id order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseList'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      tags:
+      - warehouses
+      summary: Create a warehouse
+      operationId: createWarehouse
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseInput'
+        required: true
+      responses:
+        '201':
+          description: The new warehouse.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/warehouses/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      tags:
+      - warehouses
+      summary: Get a warehouse
+      operationId: getWarehouse
+      responses:
+        '200':
+          description: The warehouse.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The warehouse does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - warehouses
+      summary: Replace a warehouse
+      operationId: updateWarehouse
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseInput'
+        required: true
+      responses:
+        '200':
+          description: The updated warehouse.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The warehouse does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The request has invalid values.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+      - warehouses
+      summary: Delete a warehouse
+      operationId: deleteWarehouse
+      responses:
+        '204':
+          description: The warehouse is deleted.
+        '400':
+          description: The request is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: The warehouse does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The request conflicts with other data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          description: An unexpected error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  schemas:
+    Article:
+      type: object
+      required:
+      - id
+      - title
+      - body
+      - published
+      - created_at
+      - updated_at
+      properties:
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        published:
+          type: boolean
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ArticleInput:
+      type: object
+      required:
+      - title
+      - body
+      - published
+      properties:
+        body:
+          type: string
+        published:
+          type: boolean
+        title:
+          type: string
+    ArticleList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Article'
+        total:
+          type: integer
+          format: int64
+    Category:
+      type: object
+      required:
+      - id
+      - name
+      - position
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        position:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    CategoryInput:
+      type: object
+      required:
+      - name
+      - position
+      properties:
+        name:
+          type: string
+        position:
+          type: integer
+          format: int32
+    CategoryList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        total:
+          type: integer
+          format: int64
+    Comment:
+      type: object
+      required:
+      - id
+      - body
+      - author
+      - created_at
+      - updated_at
+      properties:
+        author:
+          type: string
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+          format: date-time
+    CommentInput:
+      type: object
+      required:
+      - body
+      - author
+      properties:
+        author:
+          type: string
+        body:
+          type: string
+    CommentList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        total:
+          type: integer
+          format: int64
+    Coupon:
+      type: object
+      required:
+      - id
+      - code
+      - discount
+      - expires
+      - created_at
+      - updated_at
+      properties:
+        code:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        discount:
+          type: number
+          format: double
+        expires:
+          type:
+          - string
+          - 'null'
+          format: date
+        id:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+          format: date-time
+    CouponInput:
+      type: object
+      required:
+      - code
+      - discount
+      properties:
+        code:
+          type: string
+        discount:
+          type: number
+          format: double
+        expires:
+          type:
+          - string
+          - 'null'
+          format: date
+    CouponList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coupon'
+        total:
+          type: integer
+          format: int64
+    Customer:
+      type: object
+      required:
+      - id
+      - name
+      - email
+      - phone
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        email:
+          type: string
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        phone:
+          type:
+          - string
+          - 'null'
+        updated_at:
+          type: string
+          format: date-time
+    CustomerInput:
+      type: object
+      required:
+      - name
+      - email
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type:
+          - string
+          - 'null'
+    CustomerList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        total:
+          type: integer
+          format: int64
+    Employee:
+      type: object
+      required:
+      - id
+      - name
+      - hired
+      - salary
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        hired:
+          type: string
+          format: date
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        salary:
+          type:
+          - number
+          - 'null'
+          format: double
+        updated_at:
+          type: string
+          format: date-time
+    EmployeeInput:
+      type: object
+      required:
+      - name
+      - hired
+      properties:
+        hired:
+          type: string
+          format: date
+        name:
+          type: string
+        salary:
+          type:
+          - number
+          - 'null'
+          format: double
+    EmployeeList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        total:
+          type: integer
+          format: int64
+    Event:
+      type: object
+      required:
+      - id
+      - title
+      - starts_at
+      - ends_at
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        ends_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        starts_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    EventInput:
+      type: object
+      required:
+      - title
+      - starts_at
+      properties:
+        ends_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        starts_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+    EventList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        total:
+          type: integer
+          format: int64
+    Greeting:
+      type: object
+      description: |-
+        The greeting of the todo list. This handler is a hand edit of the
+        scaffold file: R0.11 edits its body, its signature, and its
+        `#[utoipa::path]` in the dev loop measurements.
+      required:
+      - message
+      - open
+      properties:
+        message:
+          type: string
+          description: The message.
+        open:
+          type: integer
+          format: int64
+          description: The number of open todos.
+    Invoice:
+      type: object
+      required:
+      - id
+      - number
+      - amount
+      - paid
+      - due
+      - created_at
+      - updated_at
+      properties:
+        amount:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        due:
+          type:
+          - string
+          - 'null'
+          format: date
+        id:
+          type: integer
+          format: int64
+        number:
+          type: string
+        paid:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+    InvoiceInput:
+      type: object
+      required:
+      - number
+      - amount
+      - paid
+      properties:
+        amount:
+          type: number
+          format: double
+        due:
+          type:
+          - string
+          - 'null'
+          format: date
+        number:
+          type: string
+        paid:
+          type: boolean
+    InvoiceList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        total:
+          type: integer
+          format: int64
+    Meeting:
+      type: object
+      required:
+      - id
+      - topic
+      - at
+      - notes
+      - created_at
+      - updated_at
+      properties:
+        at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        notes:
+          type:
+          - string
+          - 'null'
+        topic:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    MeetingInput:
+      type: object
+      required:
+      - topic
+      - at
+      properties:
+        at:
+          type: string
+          format: date-time
+        notes:
+          type:
+          - string
+          - 'null'
+        topic:
+          type: string
+    MeetingList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Meeting'
+        total:
+          type: integer
+          format: int64
+    Note:
+      type: object
+      required:
+      - id
+      - title
+      - body
+      - created_at
+      - updated_at
+      properties:
+        body:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    NoteInput:
+      type: object
+      required:
+      - title
+      properties:
+        body:
+          type:
+          - string
+          - 'null'
+        title:
+          type: string
+    NoteList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+        total:
+          type: integer
+          format: int64
+    Order:
+      type: object
+      required:
+      - id
+      - reference
+      - total
+      - status
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        reference:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+        total:
+          type: number
+          format: double
+        updated_at:
+          type: string
+          format: date-time
+    OrderInput:
+      type: object
+      required:
+      - reference
+      - total
+      - status
+      properties:
+        reference:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+        total:
+          type: number
+          format: double
+    OrderList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+          format: int64
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      properties:
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required:
+            - field
+            - message
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        instance:
+          type: string
+        request_id:
+          type: string
+        status:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+    Product:
+      type: object
+      required:
+      - id
+      - name
+      - price
+      - stock
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+        stock:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    ProductInput:
+      type: object
+      required:
+      - name
+      - price
+      - stock
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+        stock:
+          type: integer
+          format: int32
+    ProductList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+          format: int64
+    Project:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - archived
+      - created_at
+      - updated_at
+      properties:
+        archived:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - 'null'
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ProjectInput:
+      type: object
+      required:
+      - name
+      - archived
+      properties:
+        archived:
+          type: boolean
+        description:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+    ProjectList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        total:
+          type: integer
+          format: int64
+    Review:
+      type: object
+      required:
+      - id
+      - rating
+      - body
+      - created_at
+      - updated_at
+      properties:
+        body:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        rating:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    ReviewInput:
+      type: object
+      required:
+      - rating
+      properties:
+        body:
+          type:
+          - string
+          - 'null'
+        rating:
+          type: integer
+          format: int32
+    ReviewList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        total:
+          type: integer
+          format: int64
+    Shipment:
+      type: object
+      required:
+      - id
+      - tracking
+      - shipped_at
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        shipped_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        tracking:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ShipmentInput:
+      type: object
+      required:
+      - tracking
+      properties:
+        shipped_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        tracking:
+          type: string
+    ShipmentList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Shipment'
+        total:
+          type: integer
+          format: int64
+    Supplier:
+      type: object
+      required:
+      - id
+      - name
+      - country
+      - created_at
+      - updated_at
+      properties:
+        country:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    SupplierInput:
+      type: object
+      required:
+      - name
+      - country
+      properties:
+        country:
+          type: string
+        name:
+          type: string
+    SupplierList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Supplier'
+        total:
+          type: integer
+          format: int64
+    Tag:
+      type: object
+      required:
+      - id
+      - name
+      - color
+      - created_at
+      - updated_at
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    TagInput:
+      type: object
+      required:
+      - name
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+    TagList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        total:
+          type: integer
+          format: int64
+    Ticket:
+      type: object
+      required:
+      - id
+      - subject
+      - severity
+      - open
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        open:
+          type: boolean
+        severity:
+          type: string
+          enum:
+          - low
+          - high
+        subject:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    TicketInput:
+      type: object
+      required:
+      - subject
+      - severity
+      - open
+      properties:
+        open:
+          type: boolean
+        severity:
+          type: string
+          enum:
+          - low
+          - high
+        subject:
+          type: string
+    TicketList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ticket'
+        total:
+          type: integer
+          format: int64
+    Todo:
+      type: object
+      required:
+      - id
+      - title
+      - done
+      - due
+      - priority
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        done:
+          type: boolean
+        due:
+          type:
+          - string
+          - 'null'
+          format: date
+        id:
+          type: integer
+          format: int64
+        priority:
+          type: string
+          enum:
+          - low
+          - normal
+          - high
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    TodoInput:
+      type: object
+      required:
+      - title
+      - done
+      - priority
+      properties:
+        done:
+          type: boolean
+        due:
+          type:
+          - string
+          - 'null'
+          format: date
+        priority:
+          type: string
+          enum:
+          - low
+          - normal
+          - high
+        title:
+          type: string
+    TodoList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Todo'
+        total:
+          type: integer
+          format: int64
+    Warehouse:
+      type: object
+      required:
+      - id
+      - name
+      - capacity
+      - created_at
+      - updated_at
+      properties:
+        capacity:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    WarehouseInput:
+      type: object
+      required:
+      - name
+      - capacity
+      properties:
+        capacity:
+          type: integer
+          format: int64
+        name:
+          type: string
+    WarehouseList:
+      type: object
+      required:
+      - items
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Warehouse'
+        total:
+          type: integer
+          format: int64

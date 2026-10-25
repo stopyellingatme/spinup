@@ -6,3 +6,9 @@ members = ["cli-skel"]
 edition = "2024"
 rust-version = "1.99"
 publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

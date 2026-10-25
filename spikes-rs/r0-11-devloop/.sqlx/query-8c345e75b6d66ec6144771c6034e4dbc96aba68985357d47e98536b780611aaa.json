@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shipments\n         SET tracking = $2, shipped_at = $3, updated_at = now()\n         WHERE id = $1\n         RETURNING id, tracking, shipped_at, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "tracking",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "tracking"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "shipped_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "shipped_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "8c345e75b6d66ec6144771c6034e4dbc96aba68985357d47e98536b780611aaa"
+}

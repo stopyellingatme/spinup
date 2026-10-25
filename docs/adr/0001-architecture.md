@@ -9,6 +9,8 @@ maintenance cost: it owned too many tools and gave generated apps no safe upgrad
 
 ## Decision
 
+Bullets 1 to 3 are superseded by ADR 0019 (Rust rewrite).
+
 - The CLI is Go (cobra, embedded templates), module `github.com/stopyellingatme/spinup`.
 - Generated apps use a Go API (stdlib ServeMux, oapi-codegen, pgx, sqlc, goose, River), a SvelteKit web app,
   PostgreSQL, Docker Compose on a VM with Caddy, and OpenTelemetry with self-hosted Grafana LGTM.
@@ -20,6 +22,8 @@ maintenance cost: it owned too many tools and gave generated apps no safe upgrad
 The full design is in `docs/design/architecture.md`. The critic resolutions in `docs/design/plan.md` override it.
 
 ## Consequences
+
+Superseded by ADR 0019 (Rust rewrite).
 
 - Upgrade safety is tested from M2 on with a frozen corpus of real generated apps.
 - The kit and the CLI share minor versions (lockstep). Patch versions ship independently.

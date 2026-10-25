@@ -1,36 +1,54 @@
 [package]
-name = "kit"
-version = "0.0.0"
+# The crates.io name of the kit. The generated app depends on it by this name,
+# so a [patch.crates-io] entry can point it at a path before it is published.
+name = "spinup-kit"
+version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[lib]
+name = "kit"
+
+[features]
+default = ["jobs", "telemetry"]
+# The own job queue on sqlx (River schema).
+jobs = ["dep:fastrand", "dep:futures"]
+# Traces, metrics, and logs over OTLP HTTP, and the HTTP metric layer.
+telemetry = [
+    "dep:opentelemetry",
+    "dep:opentelemetry-appender-tracing",
+    "dep:opentelemetry-otlp",
+    "dep:opentelemetry_sdk",
+    "dep:tracing-opentelemetry",
+]
+
 [dependencies]
-anyhow = "1.0.104"
-axum = { version = "0.8.9", features = ["macros"] }
-bytes = "1.12.1"
-clap = { version = "4.6.7", features = ["derive", "env"] }
-dotenvy = "0.15.7"
-fastrand = "2.5.0"
-futures = "0.3.34"
-garde = { version = "0.23.0", features = ["derive", "email", "regex", "unicode"] }
-http-body-util = "0.1.5"
-opentelemetry = { version = "0.33.1", features = ["trace", "metrics", "logs"] }
-opentelemetry-appender-tracing = "0.33.1"
-opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
-opentelemetry-semantic-conventions = "0.33.1"
-opentelemetry_sdk = { version = "0.33.1", features = ["rt-tokio", "trace", "metrics", "logs"] }
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
-sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json", "derive"] }
-thiserror = "2.0.21"
-time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
-tokio = { version = "1.54.1", features = ["full"] }
-tower = { version = "0.5.3", features = ["util"] }
-tower-http = { version = "0.7.1", features = ["trace", "request-id", "cors", "timeout", "limit", "util", "fs", "set-header"] }
-tracing = "0.1.44"
-tracing-opentelemetry = "0.34.0"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
-utoipa = { version = "6.0.0", features = ["yaml", "uuid", "time", "axum_extras", "preserve_order"] }
-utoipa-axum = "0.3.0"
-uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
+anyhow.workspace = true
+axum.workspace = true
+fastrand = { workspace = true, optional = true }
+form_urlencoded = "1.2.2"
+futures = { workspace = true, optional = true }
+opentelemetry = { workspace = true, optional = true }
+opentelemetry-appender-tracing = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+serde_urlencoded.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-opentelemetry = { workspace = true, optional = true }
+tracing-subscriber.workspace = true
+utoipa.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+opentelemetry-proto.workspace = true
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+prost.workspace = true
+regex = "1"
+tower.workspace = true

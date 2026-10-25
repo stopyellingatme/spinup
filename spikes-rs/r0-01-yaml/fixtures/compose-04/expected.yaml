@@ -1,0 +1,13 @@
+services:
+    postgres:
+        environment:
+            PGDATA: /var/lib/postgresql/18/docker
+        image: demo-postgres:18-pgbackrest2.57
+        volumes:
+            - source: postgres_data
+              target: /var/lib/postgresql
+              type: volume
+volumes:
+    postgres_data:
+        external: true
+        name: demo_pgdata_18

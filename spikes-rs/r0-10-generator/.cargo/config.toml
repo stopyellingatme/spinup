@@ -1,0 +1,4 @@
+# The query macros read .sqlx/, so a build needs no database.
+# cargo sqlx prepare sets SQLX_OFFLINE=false itself.
+[env]
+SQLX_OFFLINE = "true"

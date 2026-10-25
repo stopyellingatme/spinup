@@ -1,0 +1,4 @@
+# Script
+script: |
+  echo old
+  exit 0

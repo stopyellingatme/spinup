@@ -1,0 +1,53 @@
+# The app shell (ADR 0015 §3): the navigation file, the shell components, the error page, and the
+# home redirect. The layout and the home page are in pack.toml (node) and pack.d/embed.toml (embed).
+
+# Generator-owned: `spinup g resource` and `spinup destroy resource` rebuild it from the page folders.
+[[files]]
+path = "web/src/lib/nav.gen.ts"
+source = "files/web/src/lib/nav.gen.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/components/app/app-sidebar.svelte"
+source = "files/web/src/lib/components/app/app-sidebar.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/components/app/top-bar.svelte"
+source = "files/web/src/lib/components/app/top-bar.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/components/app/user-menu.svelte"
+source = "files/web/src/lib/components/app/user-menu.svelte"
+class = "scaffold"
+when = "modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/components/app/page-header.svelte"
+source = "files/web/src/lib/components/app/page-header.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/components/app/field.svelte"
+source = "files/web/src/lib/components/app/field.svelte"
+class = "scaffold"
+
+# One menu for the rows of a list (the resource list page uses it).
+[[files]]
+path = "web/src/lib/components/app/row-menu.svelte"
+source = "files/web/src/lib/components/app/row-menu.svelte"
+class = "scaffold"
+
+# The error page has no server code, so the embed app (an SPA) uses it too.
+[[files]]
+path = "web/src/routes/+error.svelte"
+source = "files/web/src/routes/+error.svelte"
+class = "scaffold"
+
+# Signed-in users go from / to home. Only node mode has server code, and only auth has users.
+[[files]]
+path = "web/src/routes/+page.server.ts"
+source = "files/web/src/routes/+page.server.ts"
+class = "scaffold"
+when = "modules contains 'auth' && frontend_mode != 'embed'"

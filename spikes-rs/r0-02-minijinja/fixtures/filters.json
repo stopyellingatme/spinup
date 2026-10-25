@@ -1,0 +1,672 @@
+[
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": "\"\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": ""
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "\"HTTPServer2ID\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "httpserver2id\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "HTTPSERVER2ID\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "http_server2_id\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "http-server2-id\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "httpServer2Id\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "HTTPServer2ID"
+    },
+    "expected": "HttpServer2Id\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "\"myURL42Value\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "myurl42value\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "MYURL42VALUE\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "my_url42_value\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "my-url42-value\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "myUrl42Value\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "myURL42Value"
+    },
+    "expected": "MyUrl42Value\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "\"already_snake-case.dot space\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "already_snake-case.dot space\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "ALREADY_SNAKE-CASE.DOT SPACE\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "already_snake_case_dot_space\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "already-snake-case-dot-space\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "alreadySnakeCaseDotSpace\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "already_snake-case.dot space"
+    },
+    "expected": "AlreadySnakeCaseDotSpace\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "\"éÉÉcole_Σςİıßﬃǅ\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "ééécole_σςiıßﬃǆ\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "ÉÉÉCOLE_ΣΣİIßﬃǄ\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "é_é_école_σς_iıßﬃǆ\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "é-é-école-σς-iıßﬃǆ\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "éÉÉcoleΣςIıßﬃǆ\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "éÉÉcole_Σςİıßﬃǅ"
+    },
+    "expected": "ÉÉÉcoleΣςIıßﬃǆ\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "\"中文名東京7ÅÖ\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7åö\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7ÅÖ\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7_åö\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7-åö\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7Åö\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "中文名東京7ÅÖ"
+    },
+    "expected": "中文名東京7Åö\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "\"x́Y_ⅠⅫ²a_ͅ\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "x́y_ⅰⅻ²a_ͅ\n"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "X́Y_ⅠⅫ²A_Ι\n"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "x_y_a\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "x-y-a\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "xYA\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "x́Y_ⅠⅫ²a_ͅ"
+    },
+    "expected": "XYA\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "\"hello\\n\\t\\r\\x00\\x01\\a\\b\\f\\v\\\\\\\"\u003c\u003e \u0026\\x7f\\u0085\\u00a0\\u200b\\u2028\\u2029😀\"\n"
+  },
+  {
+    "source": "[[ lower(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+  },
+  {
+    "source": "[[ upper(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "HELLO\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+  },
+  {
+    "source": "[[ snake(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "hello\n"
+  },
+  {
+    "source": "[[ kebab(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "hello\n"
+  },
+  {
+    "source": "[[ camel(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "hello\n"
+  },
+  {
+    "source": "[[ pascal(data.value) ]]",
+    "data": {
+      "value": "hello\n\t\r\u0000\u0001\u0007\b\f\u000b\\\"\u003c\u003e \u0026 ​\u2028\u2029😀"
+    },
+    "expected": "Hello\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": null
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": false
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": true
+    },
+    "expected": "true\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": 0
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": 1
+    },
+    "expected": "1\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": 0
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": -1.5
+    },
+    "expected": "-1.5\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": ""
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": "x"
+    },
+    "expected": "x\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": []
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": [
+        "x"
+      ]
+    },
+    "expected": "[x]\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": {}
+    },
+    "expected": "fallback\n"
+  },
+  {
+    "source": "[[ go_printf(\"%v\", go_default(\"fallback\", data.value)) ]]",
+    "data": {
+      "value": {
+        "a": 1
+      }
+    },
+    "expected": "map[a:1]\n"
+  },
+  {
+    "source": "[[ go_default(\"missing\", (get(data, \"missing\"))) ]]",
+    "data": {},
+    "expected": "missing\n"
+  },
+  {
+    "source": "[[ get(data.map, \"key\") ]]",
+    "data": {
+      "map": {
+        "key": "found"
+      }
+    },
+    "expected": "found\n"
+  },
+  {
+    "source": "[[ get(data.list, 1) ]]",
+    "data": {
+      "list": [
+        "zero",
+        "one"
+      ]
+    },
+    "expected": "one\n"
+  },
+  {
+    "source": "[[ go_printf(\"%.2s\", data.value) ]]",
+    "data": {
+      "value": "é😀three"
+    },
+    "expected": "é😀\n"
+  },
+  {
+    "source": "[[ go_printf(\"%q\", data.value) ]]",
+    "data": {
+      "value": "quote\n"
+    },
+    "expected": "\"quote\\n\"\n"
+  },
+  {
+    "source": "[[ go_join(\",\", data.list) ]]",
+    "data": {
+      "list": [
+        "zero",
+        "one"
+      ]
+    },
+    "expected": "zero,one\n"
+  },
+  {
+    "source": "[[ indent(2, data.value) ]]",
+    "data": {
+      "value": "one\ntwo\n"
+    },
+    "expected": "  one\n  two\n  \n"
+  },
+  {
+    "source": "[[ has(\"x\", data.list) ]]",
+    "data": {
+      "list": [
+        "x",
+        "y"
+      ]
+    },
+    "expected": "true\n"
+  },
+  {
+    "source": "[[ image(\"postgres\") ]]",
+    "data": {
+      "list": [
+        "x",
+        "y"
+      ]
+    },
+    "expected": "postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336\n"
+  },
+  {
+    "source": "[[ npm(\"svelte\") ]]",
+    "data": {
+      "list": [
+        "x",
+        "y"
+      ]
+    },
+    "expected": "5.57.2\n"
+  },
+  {
+    "source": "[[ gomod(\"github.com/stopyellingatme/spinup/kit\") ]]",
+    "data": {
+      "list": [
+        "x",
+        "y"
+      ]
+    },
+    "expected": "v0.1.0-alpha.418\n"
+  },
+  {
+    "source": "[[ uses(\"actions/checkout\") ]]",
+    "data": {
+      "list": [
+        "x",
+        "y"
+      ]
+    },
+    "expected": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
+  },
+  {
+    "source": "[% for _item1 in go_items(data.list) %][% set v_i = _item1[0] %][% set v_v = _item1[1] %][% if v_i %],[% endif %][[ v_v ]]/[[ data.root ]][% else %]empty[% endfor %]",
+    "data": {
+      "list": [
+        "a",
+        "b"
+      ],
+      "root": "R"
+    },
+    "expected": "a/R,b/R\n"
+  },
+  {
+    "source": "[% set _with1 = get(data, \"missing\") %][% if _with1 %]wrong[% else %]absent[% endif %]",
+    "data": {},
+    "expected": "absent\n"
+  },
+  {
+    "source": "[% set v_pg = \"default\" %][% if data.yes %][% set v_pg = \"changed\" %][% endif %][[ v_pg ]]",
+    "data": {
+      "yes": true
+    },
+    "expected": "changed\n"
+  },
+  {
+    "source": "[[ get(data, \"missing\") ]]",
+    "data": {},
+    "expected": "\u003cno value\u003e\n"
+  },
+  {
+    "source": "[% for _item1 in go_items(data.map) %][[ _item1[1] ]][% else %]empty[% endfor %]",
+    "data": {
+      "map": {
+        "a": "first",
+        "z": "last"
+      }
+    },
+    "expected": "firstlast\n"
+  },
+  {
+    "source": "[% for _item1 in go_items(data.list) %]wrong[% else %]empty[% endfor %]",
+    "data": {
+      "list": []
+    },
+    "expected": "empty\n"
+  },
+  {
+    "source": "[[ has(\"x\", data.list) ]]",
+    "data": {
+      "list": null
+    },
+    "expected": "false\n"
+  },
+  {
+    "source": "[[ has(\"x\", data.list) ]]",
+    "data": {
+      "list": [
+        "y"
+      ]
+    },
+    "expected": "false\n"
+  },
+  {
+    "source": "[% set _with1 = data.user %][% if _with1 %][[ _with1.Name ]]/[[ data.root ]][% endif %]",
+    "data": {
+      "root": "R",
+      "user": {
+        "Name": "nested"
+      }
+    },
+    "expected": "nested/R\n"
+  },
+  {
+    "source": "[[ quote(data.value) ]]",
+    "data": {
+      "value": "󠀁􏿿"
+    },
+    "expected": "\"\\U000e0001\\U0010ffff\"\n"
+  }
+]

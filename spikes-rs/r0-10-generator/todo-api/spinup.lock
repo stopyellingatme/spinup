@@ -1,0 +1,59 @@
+{
+  "files": {
+    "migrations/00002_create_todos.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:4815da9af849c87851dc2cef4820f277b9f37b7e6ad50a928a342c735a40cce5"
+    },
+    "migrations/00002_create_todos.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:7065d9603bb74f949388114e5fa51ffd475e2c1ad553bc5a7a6cca1f67b09c7b"
+    },
+    "migrations/00003_create_notes.down.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:8a8427485a610b8e78f3ea2c68c2f9ce79d66eeaa06e8077f9931c04d5c14cfb"
+    },
+    "migrations/00003_create_notes.up.sql": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:1ec55547ea42771cabf0d8cfbe648cd5123838c74dba32b43737118224d4e629"
+    },
+    "src/handlers/mod.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:ae0ea23de6872949ad552111f7f095c9526883b6296ca3dad44f770cd491f095"
+    },
+    "src/handlers/notes.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:2c161c981e57c5e13c5eefd7dc5c42da3e64194a87ee695654a42e5d776bc134"
+    },
+    "src/handlers/todos.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:5213576acf2d105ea807dda98bf12000a4466c738a524728cd8ac6eb8f6faa69"
+    },
+    "src/models/mod.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:1e44d521abfba9c889e34443847a72ac53703f7a5ed31c2b8e38c09cb53806b4"
+    },
+    "src/models/note.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:284c7cd8c21004b124a56c3d904dd823b9de413d2b7d43d51425c3cc68acc092"
+    },
+    "src/models/todo.rs": {
+      "class": "scaffold",
+      "template": "gen/resource",
+      "hash": "sha256:37a1ead09b71966982ff6d934b21c62971c273b14fc6ba6d276147a220be9b2c"
+    },
+    "src/routes_gen.rs": {
+      "class": "managed",
+      "template": "gen/resource",
+      "hash": "sha256:713794f70943cac3d14734f691b4139a6c60e160548a65508eda40c3856eaab4"
+    }
+  }
+}

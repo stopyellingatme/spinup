@@ -1,0 +1,69 @@
+name = "sample"
+description = "Internal fixture for deterministic rendering and golden trees."
+requires = []
+
+[[questions]]
+key = "app_name"
+prompt = "App name"
+type = "string"
+default = "demo"
+pattern = "^[a-z][a-z0-9-]*$"
+
+[[questions]]
+key = "db"
+prompt = "Database"
+type = "enum"
+choices = ["postgres", "none"]
+default = "postgres"
+
+[[questions]]
+key = "modules"
+prompt = "Modules, separated by commas"
+type = "string"
+default = ""
+
+[[questions]]
+key = "auth"
+prompt = "Enable authentication"
+type = "bool"
+default = false
+
+[[files]]
+path = "api/cmd/[[ data.app_name ]]/main.go"
+source = "files/api/cmd/main.go.tmpl"
+class = "scaffold"
+since = "0.1.0"
+
+[[files]]
+path = "versions.txt"
+source = "files/versions.txt.tmpl"
+class = "managed"
+
+[[files]]
+path = "README.md"
+source = "files/README.md"
+class = "seed"
+
+[[files]]
+path = "database.txt"
+source = "files/database.txt.tmpl"
+class = "managed"
+when = "db == 'postgres'"
+
+[[files]]
+path = "auth.txt"
+source = "files/auth.txt.tmpl"
+class = "scaffold"
+when = "auth"
+
+[[files]]
+path = "jobs.txt"
+source = "files/jobs.txt.tmpl"
+class = "managed"
+when = "modules contains 'jobs'"
+
+[[files]]
+path = "scripts/start.sh"
+source = "files/start.sh.tmpl"
+class = "scaffold"
+mode = "0755"

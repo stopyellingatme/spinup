@@ -1,0 +1,597 @@
+[
+  {
+    "input": "",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": ".",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "..",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "../escape",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a/../b",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "/absolute",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "C:/absolute",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "//server/share",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a:b",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "x:y",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a\\b",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a\u0000b",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a\nb",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "a\tb",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "ab",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "ab",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "file.",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "file ",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir./file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir /file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/./file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM0",
+    "clean": "COM0",
+    "valid": true
+  },
+  {
+    "input": "COM10",
+    "clean": "COM10",
+    "valid": true
+  },
+  {
+    "input": "LPT0.txt",
+    "clean": "LPT0.txt",
+    "valid": true
+  },
+  {
+    "input": "LPT10",
+    "clean": "LPT10",
+    "valid": true
+  },
+  {
+    "input": "console.txt",
+    "clean": "console.txt",
+    "valid": true
+  },
+  {
+    "input": "auxiliary",
+    "clean": "auxiliary",
+    "valid": true
+  },
+  {
+    "input": "dir//file",
+    "clean": "dir/file",
+    "valid": true
+  },
+  {
+    "input": "dir/",
+    "clean": "dir",
+    "valid": true
+  },
+  {
+    "input": "README.md",
+    "clean": "README.md",
+    "valid": true
+  },
+  {
+    "input": "dir/K.txt",
+    "clean": "dir/K.txt",
+    "valid": true
+  },
+  {
+    "input": "CON",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "con.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/CON.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "CON/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "PRN",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "prn.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/PRN.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "PRN/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "AUX",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "aux.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/AUX.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "AUX/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "NUL",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "nul.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/NUL.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "NUL/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM1",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com1.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM1.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM1/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT1",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt1.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT1.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT1/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM2",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com2.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM2.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM2/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT2",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt2.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT2.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT2/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM3",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com3.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM3.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM3/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT3",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt3.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT3.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT3/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM4",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com4.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM4.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM4/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT4",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt4.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT4.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT4/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM5",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com5.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM5.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM5/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT5",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt5.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT5.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT5/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM6",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com6.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM6.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM6/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT6",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt6.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT6.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT6/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM7",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com7.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM7.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM7/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT7",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt7.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT7.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT7/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM8",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com8.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM8.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM8/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT8",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt8.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT8.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT8/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM9",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "com9.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/COM9.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "COM9/file",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT9",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "lpt9.txt",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "dir/LPT9.tar.gz",
+    "clean": "",
+    "valid": false
+  },
+  {
+    "input": "LPT9/file",
+    "clean": "",
+    "valid": false
+  }
+]

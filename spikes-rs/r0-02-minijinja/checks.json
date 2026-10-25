@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-24T20:10:26.565667+00:00",
+  "machine": "Darwin 25.4.0 arm64, shared",
+  "checks": [
+    {
+      "command": [
+        "scripts/rust/spike-check.sh",
+        "r0-02"
+      ],
+      "cwd": ".",
+      "seconds": 21.279908251017332,
+      "load1": 18.73,
+      "uptime": "15:09  21 users, load averages: 18.73 18.12 15.04",
+      "exit_code": 0,
+      "output": "   Compiling r0-02-minijinja v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.2/spikes-rs/r0-02-minijinja)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s\n     Running unittests src/lib.rs (/private/tmp/r0-02-target/debug/deps/r0_02_minijinja-25333990c1922b6e)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running tests/it/main.rs (/private/tmp/r0-02-target/debug/deps/it-fb2c690794f21771)\n\nrunning 4 tests\ntest strict_keys_and_lookup_errors ... ok\ntest helpers_match_go_oracle ... ok\ntest every_template_and_metadata_path_compiles ... ok\ntest neutral_golden_trees ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s\n\n   Doc-tests r0_02_minijinja\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\nspike-check r0-02: ok\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "spikes-rs/r0-02-minijinja",
+      "seconds": 0.751430332660675,
+      "load1": 14.54,
+      "uptime": "15:10  21 users, load averages: 14.54 17.20 14.78",
+      "exit_code": 0,
+      "output": "    Checking r0-02-minijinja v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.2/spikes-rs/r0-02-minijinja)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.68s\n"
+    },
+    {
+      "command": [
+        "make",
+        "build",
+        "lint"
+      ],
+      "cwd": ".",
+      "seconds": 9.380193624645472,
+      "load1": 15.22,
+      "uptime": "15:10  21 users, load averages: 15.22 17.30 14.83",
+      "exit_code": 0,
+      "output": "go: writing stat cache: open /Users/king/go/pkg/mod/cache/download/github.com/stopyellingatme/spinup/@v/v0.0.0-20261024195533-4b7eb7378195.info91312404.tmp: operation not permitted\n0 issues.\n0 issues.\n0 issues.\n"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "./scripts/rust/convert-templates/..."
+      ],
+      "cwd": ".",
+      "seconds": 5.189201125875115,
+      "load1": 14.96,
+      "uptime": "15:10  21 users, load averages: 14.96 17.21 14.81",
+      "exit_code": 0,
+      "output": "ok  \tgithub.com/stopyellingatme/spinup/scripts/rust/convert-templates\t4.164s\n"
+    }
+  ]
+}

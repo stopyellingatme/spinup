@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE password_resets SET used_at = $2 WHERE user_id = $1 AND used_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce6be38c252bb0163c387150db0b7ccbdefaaf1d585ed3d426be5797a2b9491c"
+}

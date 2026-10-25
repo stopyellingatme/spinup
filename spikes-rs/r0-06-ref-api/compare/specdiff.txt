@@ -1,0 +1,7 @@
+/components/schemas/Todo/properties/due/nullable: go=true rust="(absent)"
+/components/schemas/Todo/properties/due/type: go="string" rust=["string", "null"]
+/components/schemas/TodoInput/properties/due/nullable: go=true rust="(absent)"
+/components/schemas/TodoInput/properties/due/type: go="string" rust=["string", "null"]
+/openapi: go="3.0.3" rust="3.1.0"
+/paths/~1api~1todos/get/parameters/0/required: go="(absent)" rust=false
+/paths/~1api~1todos/get/parameters/1/required: go="(absent)" rust=false

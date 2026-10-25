@@ -1,0 +1,587 @@
+[
+  {
+    "id": "sops-01",
+    "family": "sops",
+    "mode": "node",
+    "input": "# SOPS recipients\ncreation_rules:\n  - path_regex: ^secrets/prod\\.enc\\.yaml$\n    age: age1old # recipient\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "creation_rules",
+          "0",
+          "age"
+        ],
+        "value": "age1new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "sops-02",
+    "family": "sops",
+    "mode": "node",
+    "input": "# SOPS recipients\ncreation_rules:\n  - path_regex: ^secrets/prod\\.enc\\.yaml$\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "creation_rules",
+          "0",
+          "age"
+        ],
+        "value": "age1new,age1other",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "sops-03",
+    "family": "sops",
+    "mode": "node",
+    "input": "# SOPS recipients\ncreation_rules: []\n",
+    "actions": [
+      {
+        "op": "append",
+        "path": [
+          "creation_rules"
+        ],
+        "value": "path_regex: ^secrets/prod\\.enc\\.yaml$\nage: age1new\n",
+        "block": true
+      }
+    ]
+  },
+  {
+    "id": "sops-04",
+    "family": "sops",
+    "mode": "node",
+    "input": "# SOPS recipients\ncreation_rules:\n  - path_regex: ^secrets/prod\\.enc\\.yaml$\n    age: \"age1old\" # keep quote\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "creation_rules",
+          "0",
+          "age"
+        ],
+        "value": "age1new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "sops-05",
+    "family": "sops",
+    "mode": "node",
+    "input": "# SOPS recipients\ncreation_rules:\n  - path_regex: ^secrets/prod\\.enc\\.yaml$\n    age: age1old\n  - path_regex: other/.*\n    age: age1other\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "creation_rules",
+          "0",
+          "age"
+        ],
+        "value": "age1new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "alert-01",
+    "family": "alert",
+    "mode": "node",
+    "input": "# Custom alerts\ngroups:\n  - name: custom\n    rules: [] # operator rules\n",
+    "actions": [
+      {
+        "op": "append",
+        "path": [
+          "groups",
+          "0",
+          "rules"
+        ],
+        "value": "alert: HighErrors\nexpr: rate(errors_total[5m]) > 0\nfor: 5m\nlabels:\n  severity: warning\nannotations:\n  summary: Too many errors\n",
+        "block": true
+      }
+    ]
+  },
+  {
+    "id": "alert-02",
+    "family": "alert",
+    "mode": "node",
+    "input": "# Custom alerts\ngroups:\n  - name: custom\n    rules:\n      - alert: Existing # keep alert\n        expr: up == 0\n",
+    "actions": [
+      {
+        "op": "append",
+        "path": [
+          "groups",
+          "0",
+          "rules"
+        ],
+        "value": "alert: HighErrors\nexpr: rate(errors_total[5m]) > 0\nfor: 5m\nlabels:\n  severity: warning\nannotations:\n  summary: Too many errors\n",
+        "block": true
+      }
+    ]
+  },
+  {
+    "id": "alert-03",
+    "family": "alert",
+    "mode": "node",
+    "input": "# Custom alerts\ngroups: []\n",
+    "actions": [
+      {
+        "op": "append",
+        "path": [
+          "groups"
+        ],
+        "value": "name: custom\nrules: []\n",
+        "block": false
+      },
+      {
+        "op": "append",
+        "path": [
+          "groups",
+          "0",
+          "rules"
+        ],
+        "value": "alert: HighErrors\nexpr: rate(errors_total[5m]) > 0\nfor: 5m\nlabels:\n  severity: warning\nannotations:\n  summary: Too many errors\n",
+        "block": true
+      }
+    ]
+  },
+  {
+    "id": "alert-04",
+    "family": "alert",
+    "mode": "node",
+    "input": "# Custom alerts\ngroups:\n  - name: system\n    rules: []\n",
+    "actions": [
+      {
+        "op": "append",
+        "path": [
+          "groups"
+        ],
+        "value": "name: custom\nrules: []\n",
+        "block": false
+      },
+      {
+        "op": "append",
+        "path": [
+          "groups",
+          "1",
+          "rules"
+        ],
+        "value": "alert: HighErrors\nexpr: rate(errors_total[5m]) > 0\nfor: 5m\nlabels:\n  severity: warning\nannotations:\n  summary: Too many errors\n",
+        "block": true
+      }
+    ]
+  },
+  {
+    "id": "compose-01",
+    "family": "compose",
+    "mode": "map",
+    "input": "# Compose image\nservices:\n  postgres:\n    image: demo-postgres:17\n    environment:\n      PGDATA: /var/lib/postgresql/data/pgdata\n    volumes:\n      - postgres_data:/var/lib/postgresql/data\nvolumes:\n  postgres_data: {}\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "image"
+        ],
+        "value": "demo-postgres:18-pgbackrest2.57",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "environment",
+          "PGDATA"
+        ],
+        "value": "/var/lib/postgresql/18/docker",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "volumes",
+          "postgres_data"
+        ],
+        "value": "external: true\nname: demo_pgdata_18\n",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "volumes"
+        ],
+        "value": "- postgres_data:/var/lib/postgresql\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "compose-02",
+    "family": "compose",
+    "mode": "map",
+    "input": "services:\n  postgres:\n    image: demo-postgres:17 # pinned\n    volumes:\n      - postgres_data:/var/lib/postgresql/data\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "image"
+        ],
+        "value": "demo-postgres:18-pgbackrest2.57",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "compose-03",
+    "family": "compose",
+    "mode": "map",
+    "input": "services:\n  postgres:\n    image: demo-postgres:17\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "image"
+        ],
+        "value": "demo-postgres:18-pgbackrest2.57",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "compose-04",
+    "family": "compose",
+    "mode": "map",
+    "input": "# Compose volume\nservices:\n  postgres:\n    image: demo-postgres:17\n    environment:\n      PGDATA: /var/lib/postgresql/data/pgdata\n    volumes:\n      - source: postgres_data\n        target: /var/lib/postgresql/data\n        type: volume\nvolumes:\n  postgres_data: {}\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "image"
+        ],
+        "value": "demo-postgres:18-pgbackrest2.57",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "environment",
+          "PGDATA"
+        ],
+        "value": "/var/lib/postgresql/18/docker",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "volumes",
+          "postgres_data"
+        ],
+        "value": "external: true\nname: demo_pgdata_18\n",
+        "block": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "services",
+          "postgres",
+          "volumes",
+          "0",
+          "target"
+        ],
+        "value": "/var/lib/postgresql",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "userdata-01",
+    "family": "userdata",
+    "mode": "node",
+    "input": "#cloud-config\n# Operator configuration\nusers:\n  - name: deploy\nwrite_files: []\nruncmd: []\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "ssh_keys"
+        ],
+        "value": "ed25519_private: |\n  TEST PRIVATE KEY\n  SECOND LINE\ned25519_public: ssh-ed25519 AAAATEST demo\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "userdata-02",
+    "family": "userdata",
+    "mode": "node",
+    "input": "#cloud-config\nwrite_files:\n  - path: /etc/motd # keep file\n    content: |\n      Welcome\nruncmd:\n  - [echo, ready]\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "ssh_keys"
+        ],
+        "value": "ed25519_private: |\n  TEST PRIVATE KEY\n  SECOND LINE\ned25519_public: ssh-ed25519 AAAATEST demo\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "userdata-03",
+    "family": "userdata",
+    "mode": "node",
+    "input": "#cloud-config\nusers:\n  - name: deploy\nwrite_files:\nruncmd:\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "ssh_keys"
+        ],
+        "value": "ed25519_private: |\n  TEST PRIVATE KEY\n  SECOND LINE\ned25519_public: ssh-ed25519 AAAATEST demo\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "userdata-04",
+    "family": "userdata",
+    "mode": "node",
+    "input": "#cloud-config\nwrite_files:\n  - path: /etc/motd\n    permissions: \"0644\"\n    content: |\n      Hello\n      World\nruncmd: [] # commands\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "ssh_keys"
+        ],
+        "value": "ed25519_private: |\n  TEST PRIVATE KEY\n  SECOND LINE\ned25519_public: ssh-ed25519 AAAATEST demo\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "rotation-01",
+    "family": "rotation",
+    "mode": "node",
+    "input": "#cloud-config\n# Operator configuration\nusers:\n  - name: deploy\nwrite_files: []\nruncmd: []\n",
+    "actions": []
+  },
+  {
+    "id": "rotation-02",
+    "family": "rotation",
+    "mode": "node",
+    "input": "#cloud-config\nwrite_files:\n  - path: /etc/motd # keep file\n    content: |\n      Welcome\nruncmd:\n  - [echo, ready]\n",
+    "actions": []
+  },
+  {
+    "id": "rotation-03",
+    "family": "rotation",
+    "mode": "node",
+    "input": "#cloud-config\nusers:\n  - name: deploy\nwrite_files:\nruncmd:\n",
+    "actions": []
+  },
+  {
+    "id": "rotation-04",
+    "family": "rotation",
+    "mode": "node",
+    "input": "#cloud-config\nwrite_files:\n  - path: /etc/motd\n    permissions: \"0644\"\n    content: |\n      Hello\n      World\nruncmd: [] # commands\n",
+    "actions": []
+  },
+  {
+    "id": "codemod-set",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# File comment.\napp: # Mapping comment.\n  name: 'old' # Name comment.\n  # List comment.\n  items:\n    - one # Item comment.\nother: true # Other comment.\n# End comment.\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "app",
+          "name"
+        ],
+        "value": "new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "codemod-insert",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# File comment.\napp: # Mapping comment.\n  name: 'old' # Name comment.\n  # List comment.\n  items:\n    - one # Item comment.\nother: true # Other comment.\n# End comment.\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "new",
+          "child"
+        ],
+        "value": "value",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "codemod-delete",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# File comment.\napp: # Mapping comment.\n  name: 'old' # Name comment.\n  # List comment.\n  items:\n    - one # Item comment.\nother: true # Other comment.\n# End comment.\n",
+    "actions": [
+      {
+        "op": "delete",
+        "path": [
+          "app",
+          "items"
+        ],
+        "value": "",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "codemod-noop",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# File comment.\napp: # Mapping comment.\n  name: 'old' # Name comment.\n  # List comment.\n  items:\n    - one # Item comment.\nother: true # Other comment.\n# End comment.\n",
+    "actions": [
+      {
+        "op": "noop",
+        "path": [],
+        "value": "",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-literal",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# Script\nscript: |\n  echo old\n  exit 0\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "script"
+        ],
+        "value": "|\n  echo new\n  exit 0\n",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-alias",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# Anchor\ndefaults: &defaults {name: old}\napp: *defaults\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "defaults",
+          "name"
+        ],
+        "value": "new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-flow",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# Flow\napp: {name: old, enabled: true}\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "app",
+          "name"
+        ],
+        "value": "new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-null",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# about a\na: # remains\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "a",
+          "b"
+        ],
+        "value": "v",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-replace",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# Header\napp:\n  # Name\n  name: old # Inline\nother: true\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "app"
+        ],
+        "value": "new",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-unicode",
+    "family": "codemod",
+    "mode": "node",
+    "input": "# Unicode\nname: café # café\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "name"
+        ],
+        "value": "日本語",
+        "block": false
+      }
+    ]
+  },
+  {
+    "id": "edge-ssh",
+    "family": "server",
+    "mode": "server",
+    "input": "#cloud-config\nusers:\n  - ssh_authorized_keys:\n      - SPINUP_DEPLOY_SSH_KEY\n",
+    "actions": [
+      {
+        "op": "set",
+        "path": [
+          "users",
+          "0",
+          "ssh_authorized_keys",
+          "0"
+        ],
+        "value": "'ssh-ed25519 AAAATEST operator # comment'\n",
+        "block": false
+      }
+    ]
+  }
+]

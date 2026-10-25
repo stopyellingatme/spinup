@@ -16,6 +16,7 @@ Read these before you change anything:
 
 The CLI, the kit, the plugin SDK, and the generated API move to Rust. The plan is `docs/design/rust-plan.md`. It overrides `plan.md` for Rust work. The epic is the GitHub issue labeled `epic` and `rust-rewrite`.
 - R0 is a spike with a go/no-go report. Spike code stays in `spikes-rs/r0-NN-<name>/`, each with its own workspace.
+- The R0 decision is `GO with changes` (`docs/design/rust-spike/REPORT.md`). ADR 0019 (`docs/adr/0019-rust-rewrite.md`) records the decisions, the contract changes for Rust apps, and the Rust lane settings (`CARGO_BUILD_JOBS=2` per lane, no shared sccache).
 - R0 spike lanes are offline too. The main loop pre-seeds each spike workspace with its candidate crates and runs `cargo fetch --locked`. A lane builds with `CARGO_NET_OFFLINE=true` and `--locked`. If it needs one more crate, it reports `blocked: <crate>`.
 - Rust 1.99.1 (edition 2024) is pinned in `rust-toolchain.toml`. Lanes set `RUSTUP_TOOLCHAIN=1.99.1` and never install a toolchain.
 - After the R0 gate (tag `go-freeze-r0`), Go gets bug fixes only. Each fix adds a txtar or golden case. Only the units R1.0a, R1.0b, R3.0a, and R3.0b may refactor Go.

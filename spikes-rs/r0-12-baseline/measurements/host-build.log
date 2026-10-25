@@ -1,0 +1,6 @@
+cli-skel build_s=62.8 load_before=[8.48 4.83 4.56] load_after=[5.39 4.65 4.51] size=5387072
+api build_s=129.9 load_before=[5.39 4.65 4.51] load_after=[3.65 4.40 4.44] size=9318896
+api-mimalloc build_s=64.2 load_before=[3.65 4.40 4.44] load_after=[3.08 4.08 4.32] size=9470496
+api rebuild_after_main_rs_edit_s=62.3 load_before=[3.33 2.90 3.56] load_after=[2.81 2.85 3.50] size=9318912
+api-mimalloc rebuild_after_main_rs_edit_s=62.3 load_before=[2.81 2.85 3.50] load_after=[3.09 2.89 3.46] size=9470496
+api-noauth rebuild_after_main_rs_edit_s=51.6 load_before=[3.09 2.89 3.46] load_after=[2.75 2.85 3.42] size=7944640

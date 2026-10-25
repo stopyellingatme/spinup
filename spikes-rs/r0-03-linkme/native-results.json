@@ -1,0 +1,1114 @@
+{
+  "machine": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: aarch64-apple-darwin\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "rustflags": "",
+  "sizes": [
+    {
+      "profile": "dev",
+      "backend": "linkme",
+      "baseline_bytes": 543336,
+      "wired_bytes": 564040,
+      "unwired_bytes": 562296,
+      "total_cost_bytes": 20704,
+      "registration_cost_bytes": 1744
+    },
+    {
+      "profile": "dev",
+      "backend": "inventory",
+      "baseline_bytes": 543336,
+      "wired_bytes": 563016,
+      "unwired_bytes": 556968,
+      "total_cost_bytes": 19680,
+      "registration_cost_bytes": 6048
+    },
+    {
+      "profile": "release",
+      "backend": "linkme",
+      "baseline_bytes": 435168,
+      "wired_bytes": 453392,
+      "unwired_bytes": 453232,
+      "total_cost_bytes": 18224,
+      "registration_cost_bytes": 160
+    },
+    {
+      "profile": "release",
+      "backend": "inventory",
+      "baseline_bytes": 435168,
+      "wired_bytes": 454096,
+      "unwired_bytes": 453216,
+      "total_cost_bytes": 18928,
+      "registration_cost_bytes": 880
+    },
+    {
+      "profile": "fat",
+      "backend": "linkme",
+      "baseline_bytes": 374144,
+      "wired_bytes": 377824,
+      "unwired_bytes": 377648,
+      "total_cost_bytes": 3680,
+      "registration_cost_bytes": 176
+    },
+    {
+      "profile": "fat",
+      "backend": "inventory",
+      "baseline_bytes": 374144,
+      "wired_bytes": 378208,
+      "unwired_bytes": 374144,
+      "total_cost_bytes": 4064,
+      "registration_cost_bytes": 4064
+    }
+  ],
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "app",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features"
+      ],
+      "elapsed_s": 0.625,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 0,
+      "stdout": "",
+      "stderr": "   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.59s\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "--workspace"
+      ],
+      "elapsed_s": 1.597,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/app-23fd3b863eb19f88)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-d16b3b26fbc90f40)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/reg_a-0601f191e86f99dc)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/reg_b-2a75ec16d1512c65)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry-be8b4294478d4f96)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.34,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964253886) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-d16b3b26fbc90f40)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.345,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964254140) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-d16b3b26fbc90f40)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.59033203125,
+      "load1_after": 8.59033203125,
+      "uptime": "16:51  20 users, load averages: 8.59 10.91 12.81",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.347,
+      "load1_before": 8.59033203125,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964254401) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-d16b3b26fbc90f40)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.374,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-d16b3b26fbc90f40)\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "--workspace"
+      ],
+      "elapsed_s": 1.66,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling inventory v0.3.25\n   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.51s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/app-8ec0d0f8f7ce880a)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-f383b1fb29861063)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/reg_a-8905b15d9b154fb0)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/reg_b-dbeab7b8bd8c0970)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry-db664accb86f88ec)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.344,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964255944) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-f383b1fb29861063)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.345,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964256155) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-f383b1fb29861063)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.342,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964256363) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-f383b1fb29861063)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/debug/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "dev",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.36,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/debug/deps/registry_ids-f383b1fb29861063)\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "app",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features"
+      ],
+      "elapsed_s": 0.482,
+      "load1_before": 9.263671875,
+      "load1_after": 9.263671875,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "",
+      "stderr": "   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.45s\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "--workspace"
+      ],
+      "elapsed_s": 7.672,
+      "load1_before": 9.263671875,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.26 11.01 12.84",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling proc-macro2 v1.0.107\n   Compiling unicode-ident v1.0.27\n   Compiling quote v1.0.47\n   Compiling linkme-impl v0.3.37\n   Compiling linkme v0.3.37\n   Compiling syn v3.0.9\n   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 4.47s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/app-357ba3f1cb49366b)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-fa10727ad80264cd)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/reg_a-67404f20494dfdde)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/reg_b-2f56db6cdfac7ccb)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry-a38de0bb2c5972f0)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.965,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964259171) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.14s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-fa10727ad80264cd)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.451,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964259502) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.24s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-fa10727ad80264cd)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.527,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964259669) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.32s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-fa10727ad80264cd)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.46,
+      "load1_before": 9.01416015625,
+      "load1_after": 9.01416015625,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.14s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-fa10727ad80264cd)\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "--workspace"
+      ],
+      "elapsed_s": 1.725,
+      "load1_before": 9.01416015625,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 9.01 10.89 12.77",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling inventory v0.3.25\n   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.49s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/app-4801c5436e675cae)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-39e36f9df5d2afa7)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/reg_a-9375ebd3de3dd86f)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/reg_b-cae5c988d5144c11)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry-8ee1d91035980ccb)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.408,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964261013) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.17s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-39e36f9df5d2afa7)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.352,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964261183) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.14s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-39e36f9df5d2afa7)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.399,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964261461) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.16s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-39e36f9df5d2afa7)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/release/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "release",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 0.365,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.7724609375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `release` profile [optimized] target(s) in 0.15s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/release/deps/registry_ids-39e36f9df5d2afa7)\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "app",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features"
+      ],
+      "elapsed_s": 2.237,
+      "load1_before": 8.7724609375,
+      "load1_after": 8.31005859375,
+      "uptime": "16:51  20 users, load averages: 8.77 10.81 12.73",
+      "status": 0,
+      "stdout": "",
+      "stderr": "   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.20s\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "--workspace"
+      ],
+      "elapsed_s": 13.778,
+      "load1_before": 8.31005859375,
+      "load1_after": 11.58349609375,
+      "uptime": "16:51  20 users, load averages: 8.31 10.68 12.68",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling proc-macro2 v1.0.107\n   Compiling quote v1.0.47\n   Compiling unicode-ident v1.0.27\n   Compiling linkme-impl v0.3.37\n   Compiling linkme v0.3.37\n   Compiling syn v3.0.9\n   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 12.63s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/app-521a8c9679a3b805)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-17675d2df8047520)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/reg_a-c68abe5cc6ba16ed)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/reg_b-7dc66aa5d49a30ed)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry-a899bdb19cfe142a)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 11.58349609375,
+      "load1_after": 11.58349609375,
+      "uptime": "16:51  20 users, load averages: 11.58 11.30 12.87",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.407,
+      "load1_before": 11.58349609375,
+      "load1_after": 11.05615234375,
+      "uptime": "16:51  20 users, load averages: 11.58 11.30 12.87",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964266463) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.18s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-17675d2df8047520)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 11.05615234375,
+      "load1_after": 11.05615234375,
+      "uptime": "16:52  20 users, load averages: 11.06 11.20 12.83",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.427,
+      "load1_before": 11.05615234375,
+      "load1_after": 11.05615234375,
+      "uptime": "16:52  20 users, load averages: 11.06 11.20 12.83",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964267073) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.21s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-17675d2df8047520)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 11.05615234375,
+      "load1_after": 11.05615234375,
+      "uptime": "16:52  20 users, load averages: 11.06 11.20 12.83",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.35,
+      "load1_before": 11.05615234375,
+      "load1_after": 10.89111328125,
+      "uptime": "16:52  20 users, load averages: 11.06 11.20 12.83",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964267784) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.13s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-17675d2df8047520)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 10.89111328125,
+      "load1_after": 10.89111328125,
+      "uptime": "16:52  20 users, load averages: 10.89 11.16 12.80",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "linkme",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.352,
+      "load1_before": 10.89111328125,
+      "load1_after": 10.89111328125,
+      "uptime": "16:52  20 users, load averages: 10.89 11.16 12.80",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.15s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-17675d2df8047520)\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "--workspace"
+      ],
+      "elapsed_s": 11.147,
+      "load1_before": 10.89111328125,
+      "load1_after": 12.2236328125,
+      "uptime": "16:52  20 users, load averages: 10.89 11.16 12.80",
+      "status": 0,
+      "stdout": "\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr": "   Compiling inventory v0.3.25\n   Compiling registry v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/registry)\n   Compiling reg-b v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-b)\n   Compiling reg-a v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/reg-a)\n   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 9.98s\n     Running unittests src/main.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/app-bf0311436c05a1f9)\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-1eeefae0f886292b)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/reg_a-ac8bbbd6cea5fca4)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/reg_b-a199044c09ec5380)\n     Running unittests src/lib.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry-cb0a48db0b60b9ed)\n   Doc-tests reg_a\n   Doc-tests reg_b\n   Doc-tests registry\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 12.2236328125,
+      "load1_after": 12.2236328125,
+      "uptime": "16:52  20 users, load averages: 12.22 11.43 12.88",
+      "status": 0,
+      "stdout": "reg-a\nreg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.398,
+      "load1_before": 12.2236328125,
+      "load1_after": 11.72509765625,
+      "uptime": "16:52  20 users, load averages: 12.22 11.43 12.88",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964272099) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-b\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.18s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-1eeefae0f886292b)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.004,
+      "load1_before": 11.72509765625,
+      "load1_after": 11.72509765625,
+      "uptime": "16:52  20 users, load averages: 11.73 11.34 12.84",
+      "status": 0,
+      "stdout": "reg-b\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.365,
+      "load1_before": 11.72509765625,
+      "load1_after": 11.72509765625,
+      "uptime": "16:52  20 users, load averages: 11.73 11.34 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964273004) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"reg-a\\n\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.15s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-1eeefae0f886292b)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 11.72509765625,
+      "load1_after": 11.72509765625,
+      "uptime": "16:52  20 users, load averages: 11.73 11.34 12.84",
+      "status": 0,
+      "stdout": "reg-a\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.308,
+      "load1_before": 11.72509765625,
+      "load1_after": 11.1865234375,
+      "uptime": "16:52  20 users, load averages: 11.73 11.34 12.84",
+      "status": 101,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... FAILED\n\nfailures:\n\n---- registered_ids_match_expected stdout ----\n\nthread 'registered_ids_match_expected' (964273772) panicked at app/tests/registry_ids.rs:7:5:\nassertion `left == right` failed: registry IDs differ from expected_registry.txt\n  left: \"\"\n right: \"reg-a\\nreg-b\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    registered_ids_match_expected\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.10s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-1eeefae0f886292b)\nerror: test failed, to rerun pass `-p app --test registry_ids`\n"
+    },
+    {
+      "command": [
+        "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.3/fat/app"
+      ],
+      "elapsed_s": 0.005,
+      "load1_before": 11.1865234375,
+      "load1_after": 11.1865234375,
+      "uptime": "16:52  20 users, load averages: 11.19 11.24 12.80",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--profile",
+        "fat",
+        "--no-default-features",
+        "--features",
+        "inventory",
+        "-p",
+        "app",
+        "--test",
+        "registry_ids"
+      ],
+      "elapsed_s": 2.381,
+      "load1_before": 11.1865234375,
+      "load1_after": 11.1865234375,
+      "uptime": "16:52  20 users, load averages: 11.19 11.24 12.80",
+      "status": 0,
+      "stdout": "\nrunning 1 test\ntest registered_ids_match_expected ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s\n\n",
+      "stderr": "   Compiling app v0.0.0 (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/worktrees/R0.3/spikes-rs/r0-03-linkme/app)\n    Finished `fat` profile [optimized] target(s) in 2.16s\n     Running tests/registry_ids.rs (/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/cargo-home/../target-R0.3/fat/deps/registry_ids-1eeefae0f886292b)\n"
+    }
+  ],
+  "target_linkers": {}
+}

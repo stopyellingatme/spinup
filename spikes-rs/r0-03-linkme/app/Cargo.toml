@@ -5,6 +5,12 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = ["linkme"]
+linkme = ["registry/linkme", "reg-a/linkme", "reg-b/linkme"]
+inventory = ["registry/inventory", "reg-a/inventory", "reg-b/inventory"]
+
 [dependencies]
-inventory = "0.3.25"
-linkme = "0.3.37"
+registry = { path = "../registry", default-features = false }
+reg-a = { path = "../reg-a", default-features = false }
+reg-b = { path = "../reg-b", default-features = false }

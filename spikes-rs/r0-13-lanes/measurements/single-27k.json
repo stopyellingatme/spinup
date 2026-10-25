@@ -1,0 +1,172 @@
+{
+ "label": "27k",
+ "lines_arg": 22000,
+ "cli_lines": 27652,
+ "wait": {
+  "waited_s": 15,
+  "load1": 3.71,
+  "uptime": "22:05  up 179 days, 11:29, 20 users, load averages: 3.71 6.02 9.14"
+ },
+ "uptime_start": "22:05  up 179 days, 11:29, 20 users, load averages: 3.71 6.02 9.14",
+ "swap_baseline_mb": 9178.81,
+ "lane": {
+  "cold_s": 28.5,
+  "warm": [
+   {
+    "cycle": 1,
+    "edit": "spinup-cli/src/m00.rs",
+    "secs": 2.7
+   },
+   {
+    "cycle": 2,
+    "edit": "spinup-deploy/src/m00.rs",
+    "secs": 3.7
+   }
+  ],
+  "test_binaries": 4,
+  "steps": [
+   {
+    "step": "lane-b-cold-fmt",
+    "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+    "load1_start": 3.71,
+    "start": 1792897524.721192,
+    "secs": 0.1,
+    "rc": 0,
+    "load1_end": 3.71
+   },
+   {
+    "step": "lane-b-cold-clippy",
+    "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+    "load1_start": 3.71,
+    "start": 1792897524.8161762,
+    "secs": 11.1,
+    "rc": 0,
+    "load1_end": 4.18
+   },
+   {
+    "step": "lane-b-cold-nextest",
+    "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 4.18,
+    "start": 1792897535.899526,
+    "secs": 17.0,
+    "rc": 0,
+    "load1_end": 5.24
+   },
+   {
+    "step": "lane-b-cold-doctest",
+    "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 5.24,
+    "start": 1792897552.9083571,
+    "secs": 0.3,
+    "rc": 0,
+    "load1_end": 5.24
+   },
+   {
+    "step": "lane-b-warm1-fmt",
+    "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+    "load1_start": 5.24,
+    "start": 1792897553.250489,
+    "secs": 0.1,
+    "rc": 0,
+    "load1_end": 5.24
+   },
+   {
+    "step": "lane-b-warm1-clippy",
+    "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+    "load1_start": 5.24,
+    "start": 1792897553.3432178,
+    "secs": 0.5,
+    "rc": 0,
+    "load1_end": 5.24
+   },
+   {
+    "step": "lane-b-warm1-nextest",
+    "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 5.24,
+    "start": 1792897553.825619,
+    "secs": 1.8,
+    "rc": 0,
+    "load1_end": 5.54
+   },
+   {
+    "step": "lane-b-warm1-doctest",
+    "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 5.54,
+    "start": 1792897555.582634,
+    "secs": 0.4,
+    "rc": 0,
+    "load1_end": 5.54
+   },
+   {
+    "step": "lane-b-warm2-fmt",
+    "cmd": "cargo fmt --check -p spinup-deploy -p spinup-cli",
+    "load1_start": 4.29,
+    "start": 1792897583.3116858,
+    "secs": 0.1,
+    "rc": 0,
+    "load1_end": 4.29
+   },
+   {
+    "step": "lane-b-warm2-clippy",
+    "cmd": "cargo clippy --locked --offline -p spinup-deploy -p spinup-cli --all-targets -- -D warnings",
+    "load1_start": 4.29,
+    "start": 1792897583.418696,
+    "secs": 0.8,
+    "rc": 0,
+    "load1_end": 4.29
+   },
+   {
+    "step": "lane-b-warm2-nextest",
+    "cmd": "cargo nextest run --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 4.29,
+    "start": 1792897584.2081878,
+    "secs": 2.5,
+    "rc": 0,
+    "load1_end": 5.31
+   },
+   {
+    "step": "lane-b-warm2-doctest",
+    "cmd": "cargo test --doc --locked --offline -p spinup-deploy -p spinup-cli",
+    "load1_start": 5.31,
+    "start": 1792897586.722718,
+    "secs": 0.3,
+    "rc": 0,
+    "load1_end": 5.31
+   }
+  ]
+ },
+ "workspace_steps": [
+  {
+   "step": "workspace-clippy",
+   "cmd": "cargo clippy --locked --offline --workspace --all-targets -- -D warnings",
+   "load1_start": 5.31,
+   "start": 1792897587.593885,
+   "secs": 47.4,
+   "rc": 0,
+   "load1_end": 5.74
+  },
+  {
+   "step": "workspace-nextest",
+   "cmd": "cargo nextest run --locked --offline --workspace --no-run",
+   "load1_start": 5.74,
+   "start": 1792897634.991798,
+   "secs": 89.2,
+   "rc": 0,
+   "load1_end": 6.06
+  }
+ ],
+ "uptime_end": "22:08  up 179 days, 11:33, 20 users, load averages: 6.06 6.07 8.50",
+ "peaks": {
+  "peak_total_gb": 4.998,
+  "load1_max": 7.28,
+  "swap_abs_peak_mb": 9178.81,
+  "swap_baseline_mb": 9178.81,
+  "swap_increase_mb": 0.0,
+  "free_drop_gb": 5.06,
+  "samples": 40,
+  "du_s_max": 0.39
+ },
+ "target_kb": {
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/single-27k/target": 4995396
+ }
+}

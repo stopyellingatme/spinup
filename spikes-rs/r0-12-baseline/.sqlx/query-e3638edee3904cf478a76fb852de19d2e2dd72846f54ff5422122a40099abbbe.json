@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT expires_at, used_at FROM password_resets WHERE token_hash = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "password_resets",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "used_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "password_resets",
+            "name": "used_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "e3638edee3904cf478a76fb852de19d2e2dd72846f54ff5422122a40099abbbe"
+}

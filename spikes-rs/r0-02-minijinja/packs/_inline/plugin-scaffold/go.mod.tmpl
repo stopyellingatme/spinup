@@ -1,0 +1,8 @@
+module example.com/[[ data.Name ]]
+
+go 1.26.0
+
+require github.com/stopyellingatme/spinup/plugin-sdk v0.0.0
+[% if data.SDKPath %]
+replace github.com/stopyellingatme/spinup/plugin-sdk => [[ quote(data.SDKPath) ]]
+[% endif %]

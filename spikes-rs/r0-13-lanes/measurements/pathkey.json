@@ -1,0 +1,195 @@
+{
+ "uptime_start": "21:57  up 179 days, 11:21, 20 users, load averages: 2.63 8.01 11.49",
+ "wait": {
+  "waited_s": 0,
+  "load1": 2.63,
+  "uptime": "21:57  up 179 days, 11:21, 20 users, load averages: 2.63 8.01 11.49"
+ },
+ "runs": [
+  {
+   "name": "x-t1-first",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/x/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t1/target",
+   "incremental": "0",
+   "basedirs": null,
+   "secs": 14.9,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 95,
+   "c_hits": 0,
+   "c_misses": 49,
+   "not_cached": {
+    "crate-type (proc-macro)": 2,
+    "crate-type (bin)": 15,
+    "missing input": 3,
+    "-o": 2,
+    "-": 1
+   }
+  },
+  {
+   "name": "x-t1-same-paths",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/x/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t1/target",
+   "incremental": "0",
+   "basedirs": null,
+   "secs": 4.5,
+   "rc": 0,
+   "rust_hits": 95,
+   "rust_misses": 0,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "-o": 2,
+    "crate-type (proc-macro)": 2,
+    "crate-type (bin)": 15,
+    "-": 1,
+    "missing input": 3
+   }
+  },
+  {
+   "name": "x-t2-other-target",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/x/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t2/target",
+   "incremental": "0",
+   "basedirs": null,
+   "secs": 12.2,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 95,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (bin)": 15,
+    "missing input": 3,
+    "crate-type (proc-macro)": 2,
+    "-o": 2,
+    "-": 1
+   }
+  },
+  {
+   "name": "y-t1-other-worktree",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/elsewhere/deeper/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t1/target",
+   "incremental": "0",
+   "basedirs": null,
+   "secs": 5.7,
+   "rc": 0,
+   "rust_hits": 79,
+   "rust_misses": 16,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (bin)": 15,
+    "crate-type (proc-macro)": 2,
+    "missing input": 3,
+    "-o": 2,
+    "-": 1
+   }
+  },
+  {
+   "name": "y-t3-both-other",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/elsewhere/deeper/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/other/t3/target",
+   "incremental": "0",
+   "basedirs": null,
+   "secs": 12.1,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 95,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (proc-macro)": 2,
+    "crate-type (bin)": 15,
+    "missing input": 3,
+    "-": 1,
+    "-o": 2
+   }
+  },
+  {
+   "name": "z-t4-basedirs-first",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/z/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t4/target",
+   "incremental": "0",
+   "basedirs": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey",
+   "secs": 12.2,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 95,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (proc-macro)": 2,
+    "-": 1,
+    "missing input": 3,
+    "-o": 2,
+    "crate-type (bin)": 15
+   }
+  },
+  {
+   "name": "w-t5-basedirs-other-paths",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/w/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t5/target",
+   "incremental": "0",
+   "basedirs": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey",
+   "secs": 12.3,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 95,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (proc-macro)": 2,
+    "-o": 2,
+    "missing input": 3,
+    "-": 1,
+    "crate-type (bin)": 15
+   }
+  },
+  {
+   "name": "z-t4-basedirs-same-paths",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/z/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t4/target",
+   "incremental": "0",
+   "basedirs": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey",
+   "secs": 4.5,
+   "rc": 0,
+   "rust_hits": 95,
+   "rust_misses": 0,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (bin)": 15,
+    "-o": 2,
+    "crate-type (proc-macro)": 2,
+    "-": 1,
+    "missing input": 3
+   }
+  },
+  {
+   "name": "x-t1-default-incremental",
+   "ws": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/x/ws",
+   "target": "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/pathkey/t1/target",
+   "incremental": null,
+   "basedirs": null,
+   "secs": 12.2,
+   "rc": 0,
+   "rust_hits": 0,
+   "rust_misses": 79,
+   "c_hits": 49,
+   "c_misses": 0,
+   "not_cached": {
+    "crate-type (bin)": 15,
+    "incremental": 16,
+    "-": 1,
+    "missing input": 3,
+    "crate-type (proc-macro)": 2,
+    "-o": 2
+   }
+  }
+ ],
+ "uptime_end": "21:59  up 179 days, 11:23, 20 users, load averages: 7.65 8.29 11.23",
+ "sccache_dir_kb": {
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/sccache-pathkey": 465396
+ }
+}

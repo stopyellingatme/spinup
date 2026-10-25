@@ -1,0 +1,24 @@
+[[files]]
+path = "api/openapi/openapi.yaml"
+source = "files/api/openapi/openapi.yaml.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/openapi/embed.go"
+source = "files/api/openapi/embed.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/openapi/schemas/.gitkeep"
+source = "files/api/openapi/schemas/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "api/oapi-codegen.yaml"
+source = "files/api/oapi-codegen.yaml.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/internal/gen/generate.go"
+source = "files/api/internal/gen/generate.go.tmpl"
+class = "managed"

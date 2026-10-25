@@ -1,8 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["registry", "reg-a", "app"]
+members = ["registry", "reg-a", "reg-b", "app"]
 
 [workspace.package]
 edition = "2024"
 rust-version = "1.99"
 publish = false
+
+[profile.fat]
+inherits = "release"
+lto = "fat"
+codegen-units = 1

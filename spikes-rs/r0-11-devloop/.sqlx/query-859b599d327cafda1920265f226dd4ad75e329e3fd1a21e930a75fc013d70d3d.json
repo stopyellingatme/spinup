@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE products\n         SET name = $2, price = $3, stock = $4, updated_at = now()\n         WHERE id = $1\n         RETURNING id, name, price, stock, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "price",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "price"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "stock",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "stock"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Float8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "859b599d327cafda1920265f226dd4ad75e329e3fd1a21e930a75fc013d70d3d"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "sops-05",
+  "family": "sops",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "creation_rules",
+        "0",
+        "age"
+      ],
+      "value": "age1new"
+    }
+  ],
+  "comments": [
+    "# SOPS recipients"
+  ]
+}

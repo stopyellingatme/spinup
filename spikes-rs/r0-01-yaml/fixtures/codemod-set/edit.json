@@ -1,0 +1,26 @@
+{
+  "id": "codemod-set",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "app",
+        "name"
+      ],
+      "value": "new"
+    }
+  ],
+  "comments": [
+    "# File comment.",
+    "# Mapping comment.",
+    "# Name comment.",
+    "# List comment.",
+    "# Item comment.",
+    "# End comment.",
+    "# Other comment."
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, title, done, due, priority, created_at, updated_at\n         FROM todos ORDER BY id LIMIT $1 OFFSET $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "done",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "done"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "due",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "due"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "priority"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "todos",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8c574dcbf192b5f453551388a9212e7a1a8f387e152c5a3589aeec1bf4ae78b2"
+}

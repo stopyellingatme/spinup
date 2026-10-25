@@ -1,0 +1,20 @@
+{
+  "id": "edge-flow",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "app",
+        "name"
+      ],
+      "value": "new"
+    }
+  ],
+  "comments": [
+    "# Flow"
+  ]
+}

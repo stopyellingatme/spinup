@@ -1,13 +1,19 @@
-// Command convert-templates converts the Go text/template packs to minijinja
-// (docs/design/rust-plan.md §4, R0.2). The R0.2 unit replaces this stub.
+// Command convert-templates converts the Go oracle templates for the R0.2 spike.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "convert-templates: not written yet (R0.2)")
-	os.Exit(1)
+	root := flag.String("root", ".", "repository root")
+	out := flag.String("out", "spikes-rs/r0-02-minijinja/packs", "output tree, relative to root")
+	flag.Parse()
+	if err := convertRepository(*root, filepath.Join(*root, *out)); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

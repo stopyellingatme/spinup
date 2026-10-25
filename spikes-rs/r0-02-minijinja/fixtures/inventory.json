@@ -1,0 +1,84 @@
+{
+  "pack_templates": 74,
+  "inline_templates": [
+    "_inline/job/registerTemplate.tmpl",
+    "_inline/job/jobTemplate.tmpl",
+    "_inline/job/testTemplate.tmpl",
+    "_inline/resource/listServerTS.tmpl",
+    "_inline/resource/listSvelte.tmpl",
+    "_inline/resource/itemServerTS.tmpl",
+    "_inline/resource/itemSvelte.tmpl",
+    "_inline/resource/editServerTS.tmpl",
+    "_inline/resource/editSvelte.tmpl",
+    "_inline/resource/fieldsSvelte.tmpl",
+    "_inline/resource/newServerTS.tmpl",
+    "_inline/resource/newSvelte.tmpl",
+    "_inline/resource/schemaTS.tmpl",
+    "_inline/plugin-scaffold/.gitignore.tmpl",
+    "_inline/plugin-scaffold/Makefile.tmpl",
+    "_inline/plugin-scaffold/README.md.tmpl",
+    "_inline/plugin-scaffold/files_note.txt.tmpl.tmpl",
+    "_inline/plugin-scaffold/go.mod.tmpl",
+    "_inline/plugin-scaffold/main.go.tmpl",
+    "_inline/plugin-scaffold/main_test.go.tmpl",
+    "_inline/plugin-scaffold/pack.toml.tmpl",
+    "_inline/plugin-scaffold/plugin.toml.tmpl"
+  ],
+  "clashes": [
+    {
+      "path": "backups/files/deploy/backups/run.sh.tmpl",
+      "token": "]]",
+      "line": 41
+    },
+    {
+      "path": "web/files/web/playwright.config.ts.tmpl",
+      "token": "[[",
+      "line": 6
+    },
+    {
+      "path": "web/files/web/playwright.config.ts.tmpl",
+      "token": "]]",
+      "line": 6
+    },
+    {
+      "path": "_inline/job/jobTemplate.tmpl",
+      "token": "[ before action",
+      "line": 23
+    },
+    {
+      "path": "_inline/job/jobTemplate.tmpl",
+      "token": "[ before action",
+      "line": 24
+    },
+    {
+      "path": "_inline/job/testTemplate.tmpl",
+      "token": "[ before action",
+      "line": 18
+    },
+    {
+      "path": "_inline/plugin-scaffold/plugin.toml.tmpl",
+      "token": "[[",
+      "line": 12
+    },
+    {
+      "path": "_inline/plugin-scaffold/plugin.toml.tmpl",
+      "token": "]]",
+      "line": 12
+    },
+    {
+      "path": "_inline/plugin-scaffold/plugin.toml.tmpl",
+      "token": "[[",
+      "line": 18
+    },
+    {
+      "path": "_inline/plugin-scaffold/plugin.toml.tmpl",
+      "token": "]]",
+      "line": 18
+    }
+  ],
+  "dynamic_sites": [
+    "internal/plugin/render/generator.go: execute(source, data), including generatorPath",
+    "internal/plugin/pack/meta.go: checkTemplatePath(value, args)",
+    "internal/render/render.go: execute(name, source, data, funcs), pack contents and FileSpec.Path"
+  ]
+}

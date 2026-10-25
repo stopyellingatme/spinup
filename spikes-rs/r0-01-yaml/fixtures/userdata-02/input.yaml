@@ -1,0 +1,7 @@
+#cloud-config
+write_files:
+  - path: /etc/motd # keep file
+    content: |
+      Welcome
+runcmd:
+  - [echo, ready]

@@ -1,0 +1,28 @@
+package jobs
+
+import (
+	"context"
+	"log/slog"
+
+	"github.com/stopyellingatme/spinup/kit/jobs"
+)
+
+// [[ data.Pascal ]]Args are the arguments of a [[ data.Snake ]] job. River stores them as
+// JSON, so add exported fields with json tags.
+type [[ data.Pascal ]]Args struct{}
+
+// Kind names the job kind in River. Do not change it after jobs exist.
+func ([[ data.Pascal ]]Args) Kind() string { return "[[ data.Snake ]]" }
+
+// [[ data.Pascal ]] returns the function that works [[ data.Snake ]] jobs. Return an
+// error to retry the job later.
+//
+// Insert a job from the API with a jobs.Client:
+//
+//	client.Insert(ctx, jobsapp.[[ data.Pascal ]]Args{})
+func [[ data.Pascal ]](d Deps) func(ctx context.Context, job jobs.Job[[ "[" ]][[ data.Pascal ]]Args]) error {
+	return func(ctx context.Context, job jobs.Job[[ "[" ]][[ data.Pascal ]]Args]) error {
+		slog.InfoContext(ctx, "job [[ data.Snake ]]", "job_id", job.ID, "attempt", job.Attempt)
+		return nil
+	}
+}
