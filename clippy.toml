@@ -1,0 +1,13 @@
+# Workspace clippy settings (main loop only, rust-plan.md §1 "Layering rules").
+# Clippy reads the clippy.toml of the crate directory first. A crate with its own
+# clippy.toml (spinup-exec, spinup-gen) repeats the settings it keeps.
+
+# Only spinup-exec runs subprocesses (CLAUDE.md, Layering).
+disallowed-types = [
+  { path = "std::process::Command", reason = "run subprocesses through spinup_exec::runner::Runner" },
+  { path = "tokio::process::Command", reason = "run subprocesses through spinup_exec::runner::Runner", allow-invalid = true },
+]
+disallowed-methods = [
+  { path = "std::process::Command::new", reason = "run subprocesses through spinup_exec::runner::Runner" },
+  { path = "tokio::process::Command::new", reason = "run subprocesses through spinup_exec::runner::Runner", allow-invalid = true },
+]

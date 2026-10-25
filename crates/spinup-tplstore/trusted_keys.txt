@@ -1,0 +1,4 @@
+# The Ed25519 public keys that the CLI accepts for template archives (ADR 0020 §3).
+# Main loop only. It holds the same keys as the Go store.TrustedKeys (none today).
+# Format: one key per line, 64 lowercase hex characters (32 bytes). A line that starts
+# with "#" is a comment. A release build with SPINUP_RELEASE=1 fails when no key is listed.

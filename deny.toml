@@ -1,0 +1,54 @@
+# cargo-deny for the Rust workspace (main loop only). It replaces govulncheck and checks
+# licenses (rust-plan.md §3). Run it offline:
+#   make rs-deny   (cargo deny --offline check bans licenses sources; gate only)
+#   make rs-vuln   (cargo deny check advisories; needs the advisory database)
+# The advisory database is $CARGO_HOME/advisory-dbs (the main loop fetches it).
+
+[graph]
+all-features = false
+
+[advisories]
+# No ignores in R1. Each later ignore names the advisory and the reason.
+ignore = []
+
+[licenses]
+confidence-threshold = 0.9
+# The workspace crates are MIT OR Apache-2.0 (ADR 0019 §1). The other entries are the
+# licenses of the locked crates, checked at the R1 pre-seed.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+# MPL-2.0 (file-level copyleft) is allowed only for this crate, which dirs-sys uses.
+exceptions = [
+  { crate = "option-ext", allow = ["MPL-2.0"] },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# The path dependencies of the workspace have no version requirement.
+allow-wildcard-paths = true
+deny = [
+  # The CLI uses rustls with ring (R0.4, ADR 0019 §3). The kit decides aws-lc in R2.
+  { crate = "aws-lc-rs", reason = "the CLI TLS provider is ring (ADR 0019 §3)" },
+  { crate = "aws-lc-sys", reason = "the CLI TLS provider is ring (ADR 0019 §3)" },
+  { crate = "openssl", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
+  { crate = "openssl-sys", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
+  { crate = "native-tls", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
+  # One async runtime: the CLI is synchronous (R0.4).
+  { crate = "tokio", reason = "the CLI is synchronous (R0.4); the kit is a separate graph in R2" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

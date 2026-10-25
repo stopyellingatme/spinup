@@ -1,0 +1,152 @@
+# The file selections of the Go golden tests (internal/templates/golden_*_test.go and
+# internal/testutil/golden_sample_test.go), for the Rust golden tests (spinup-testutil
+# `filter`, units R1.14 to R1.16). Main loop only (ADR 0020 §8).
+#
+# Each [golden."<name>"] table describes one tree of testdata/golden/<name>/:
+#   packs     the packs to render, in render order
+#   answers   the render answers
+#   sub       optional: take only the files below this directory, without the prefix
+#   prefixes  optional: take the files whose path starts with one of these prefixes
+#   paths     optional: also take these exact paths
+#   exclude   optional: drop these exact paths
+#   mode      "keep" keeps the rendered modes. "0644" sets every mode to 0644, as the Go test does.
+# Without sub, prefixes, and paths, the test takes every rendered file.
+# The Rust tests also skip every path that ends with one of skip_suffixes (R1 does not run
+# go/format, rust-plan.md "R1 scope").
+
+skip_suffixes = [".go"]
+
+# TestGolden_sample
+[golden."_sample"]
+packs = ["_sample"]
+answers = { app_name = "demo", db = "postgres", auth = true, modules = ["jobs", "mail"], greeting = "Hello" }
+mode = "keep"
+
+# TestGoldenBase
+[golden."base"]
+packs = ["base"]
+answers = { app_name = "todo", module = "example.com/todo" }
+mode = "keep"
+
+# TestGoldenSecrets
+[golden."secrets"]
+packs = ["base", "api", "secrets"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,secrets" }
+paths = [".sops.yaml", "secrets/.gitkeep"]
+mode = "0644"
+
+# TestGoldenTofu
+[golden."tofu"]
+packs = ["base", "api", "deploy", "tofu"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "deploy,tofu" }
+sub = "deploy/infra/tofu"
+mode = "keep"
+
+# TestGoldenDeploy (deployGoldenPath: the api and web packs own the other deploy/ files)
+[golden."deploy"]
+packs = ["base", "api", "web", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy" }
+prefixes = ["deploy/"]
+exclude = ["deploy/compose.dev.yml", "deploy/Dockerfile.api", "deploy/Dockerfile.web"]
+mode = "keep"
+
+# TestGoldenBackups (backupsFiles)
+[golden."backups"]
+packs = ["base", "api", "web", "deploy", "backups"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,backups" }
+paths = ["deploy/compose.backups.yml", "deploy/pgbackrest/pgbackrest.conf", "deploy/backups/run.sh", "deploy/systemd/spinup-todo-backup-full.service", "deploy/systemd/spinup-todo-backup-full.timer", "deploy/systemd/spinup-todo-backup-diff.service", "deploy/systemd/spinup-todo-backup-diff.timer", "deploy/systemd/spinup-todo-backup-verify.service", "deploy/systemd/spinup-todo-backup-verify.timer"]
+mode = "keep"
+
+# TestGoldenMonitoring/lite
+[golden."monitoring/lite"]
+packs = ["base", "api", "web", "deploy", "monitoring"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,monitoring", monitoring_profile = "lite" }
+prefixes = ["monitoring/"]
+mode = "keep"
+
+# TestGoldenMonitoring/full
+[golden."monitoring/full"]
+packs = ["base", "api", "web", "deploy", "monitoring"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,monitoring", monitoring_profile = "full" }
+prefixes = ["monitoring/"]
+mode = "keep"
+
+# TestGoldenWeb (webOutput)
+[golden."web"]
+packs = ["base", "api", "web"]
+answers = { app_name = "todo", module = "example.com/todo" }
+prefixes = ["web/"]
+paths = ["deploy/Dockerfile.web"]
+mode = "keep"
+
+# TestGoldenWebEmbed (skip_suffixes drops the .go files: the web half only)
+[golden."web-embed"]
+packs = ["base", "api", "web", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed" }
+prefixes = ["web/", "deploy/", "api/internal/webdist/"]
+paths = ["api/cmd/api/main.go"]
+mode = "keep"
+
+# TestGoldenWebVariants/node/pnpm/openapi-fetch
+[golden."web-variants/node-pnpm-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "pnpm", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/pnpm/heyapi
+[golden."web-variants/node-pnpm-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "pnpm", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/bun/openapi-fetch
+[golden."web-variants/node-bun-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "bun", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/bun/heyapi
+[golden."web-variants/node-bun-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "bun", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/pnpm/openapi-fetch
+[golden."web-variants/embed-pnpm-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "pnpm", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/pnpm/heyapi
+[golden."web-variants/embed-pnpm-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "pnpm", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/bun/openapi-fetch
+[golden."web-variants/embed-bun-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "bun", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/bun/heyapi
+[golden."web-variants/embed-bun-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "bun", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
