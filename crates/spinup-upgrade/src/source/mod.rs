@@ -1,10 +1,10 @@
 //! Pack and plugin selection for the OLD and NEW renders (Go `internal/upgrade/source.go`
 //! and the overlay part of `internal/plugin/render`).
 //!
-//! The crate has no edge to `spinup-packs` (rust-plan.md §1), so it cannot load a pack. The
-//! caller binds a [`PackRenderer`] that loads and renders the core packs of a template
-//! version. A [`PluginSource`] renders the plugin packs. [`Templates`] holds the two seams.
-//! [`PackSet`] selects the packs and the plugins of one side of a render.
+//! A [`PackRenderer`] loads and renders the core packs of a template version. [`Packs`] is
+//! the real renderer (`spinup-packs` and `spinup-render`). Tests bind a fake. A
+//! [`PluginSource`] renders the plugin packs. [`Templates`] holds the two seams. [`PackSet`]
+//! selects the packs and the plugins of one side of a render.
 
 use std::collections::BTreeMap;
 
@@ -14,9 +14,13 @@ use spinup_manifest::lock::{Lock, Plugin};
 use spinup_plugin_api::{Loaded, PluginSource};
 use spinup_tplstore::source::Version;
 use spinup_vfs::plan::Plan;
+use spinup_vfs::tree::Tree;
 
+mod packs;
 #[cfg(test)]
 mod tests;
+
+pub use packs::Packs;
 
 /// Renders the core packs of a template version (Go `upgrade.Render` and
 /// `upgrade.RenamedFrom`).
@@ -139,8 +143,7 @@ pub fn render(
 ///
 /// A plugin name that equals a pack of `version`, or the name of another plugin, is an
 /// error. The result keeps the order of `names` and appends the plugin names that `names`
-/// does not hold. R1 does not check the `requires` list of a plugin pack: the plugin source
-/// of R4 renders the plugin and checks it.
+/// does not hold. Each pack that a plugin pack requires must be in the result.
 pub fn overlay(version: &Version, names: &[String], plugins: &[Loaded]) -> Result<PackSet> {
     let mut selected = names.to_vec();
     let mut seen: Vec<&str> = Vec::new();
@@ -154,6 +157,22 @@ pub fn overlay(version: &Version, names: &[String], plugins: &[Loaded]) -> Resul
         seen.push(name);
         if !selected.iter().any(|n| n == name) {
             selected.push(name.to_string());
+        }
+    }
+    for plugin in plugins {
+        let name = plugin.meta.name.as_str();
+        let mut tree = Tree::new();
+        for (path, file) in plugin.tree.iter() {
+            tree.insert(format!("{name}/{path}"), file.data.clone(), file.mode)?;
+        }
+        let pack = spinup_packs::loader::load(&tree, name)
+            .map_err(|e| anyhow!("load plugin {name:?}: {e:#}\nTry: repair the plugin pack"))?;
+        for required in &pack.requires {
+            if !selected.contains(required) {
+                bail!(
+                    "load plugin {name:?}: required pack {required:?} is not selected\nTry: enable the required module before adding the plugin"
+                );
+            }
         }
     }
     Ok(PackSet {
