@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE coupons\n         SET code = $2, discount = $3, expires = $4, updated_at = now()\n         WHERE id = $1\n         RETURNING id, code, discount, expires, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "discount",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "discount"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "expires",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "expires"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Float8",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "86513fdf0259339e791dd67d7f1de6ebf62b856063e8a8db97a45313072ef326"
+}

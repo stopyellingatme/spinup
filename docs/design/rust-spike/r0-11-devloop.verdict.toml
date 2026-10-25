@@ -1,0 +1,23 @@
+# R0.11 verdict. spike-check.sh reads this file. R0.15 reads it, not the prose.
+spike = "r0-11"
+verdict = "go"
+# The best configuration (debug = 0, strip = "symbols", dependencies at
+# opt-level 1, the own supervisor with listenfd, the deferred dummy hash):
+# handler-body edit to the first correct response, 10 warm edits.
+# median_ms: the median of both series (20 samples). p90_ms: the higher p90
+# of the two series.
+median_ms = 3381
+p90_ms = 3645
+# The default dev profile with the own supervisor (no-go on its own).
+default_median_ms = 5458
+default_p90_ms = 5584
+# The Go baseline on the same day: air 1.67.4, 20 resources.
+go_air_median_ms = 2043
+go_air_p90_ms = 2050
+# Other edit kinds with the best configuration (not part of the limit).
+signature_median_ms = 4247
+utoipa_spec_median_ms = 3422
+client_regen_median_ms = 430
+migration_warm_median_ms = 6386  # the 2 warm samples; the first took 54004 (cold prepare)
+cold_start_s = 126.5
+load1_range = "2.1 to 7.0"

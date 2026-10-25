@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE invoices\n         SET number = $2, amount = $3, paid = $4, due = $5, updated_at = now()\n         WHERE id = $1\n         RETURNING id, number, amount, paid, due, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "amount",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "amount"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "paid",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "paid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "due",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "due"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "invoices",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Float8",
+        "Bool",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "da75f6aa3d6c5330de50b6f5bb7854615dc3e1849ac3d10352c4b164e77a5d8e"
+}

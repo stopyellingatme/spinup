@@ -1,0 +1,20 @@
+todo title:string done:bool due:date? priority:enum:low|normal|high
+note title:string body:text?
+project name:string description:text? archived:bool
+tag name:string color:string?
+comment body:text author:string
+customer name:string email:string phone:string?
+invoice number:string amount:float paid:bool due:date?
+product name:string price:float stock:int
+order reference:string total:float status:enum:new|paid|shipped
+supplier name:string country:string
+warehouse name:string capacity:bigint
+shipment tracking:string shipped_at:time?
+event title:string starts_at:time ends_at:time?
+ticket subject:string severity:enum:low|high open:bool
+article title:string body:text published:bool
+category name:string position:int
+review rating:int body:text?
+coupon code:string discount:float expires:date?
+employee name:string hired:date salary:float?
+meeting topic:string at:time notes:text?
