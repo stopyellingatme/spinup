@@ -1,0 +1,43 @@
+{
+ "uptime_start": "22:55  up 179 days, 12:19, 20 users, load averages: 3.63 5.53 7.47",
+ "wait": {
+  "waited_s": 0,
+  "load1": 3.63,
+  "uptime": "22:55  up 179 days, 12:19, 20 users, load averages: 3.63 5.53 7.47"
+ },
+ "test_binaries_workspace": 95,
+ "steps": [
+  {
+   "step": "seed-clippy",
+   "cmd": "cargo clippy --locked --offline --workspace --all-targets -- -D warnings",
+   "load1_start": 3.63,
+   "start": 1792900528.702094,
+   "secs": 52.2,
+   "rc": 0,
+   "load1_end": 4.75
+  },
+  {
+   "step": "seed-nextest",
+   "cmd": "cargo nextest run --locked --offline --workspace",
+   "load1_start": 4.75,
+   "start": 1792900580.895604,
+   "secs": 93.8,
+   "rc": 0,
+   "load1_end": 9.2
+  },
+  {
+   "step": "seed-doctest",
+   "cmd": "cargo test --doc --locked --offline --workspace",
+   "load1_start": 9.2,
+   "start": 1792900674.670366,
+   "secs": 3.7,
+   "rc": 0,
+   "load1_end": 8.94
+  }
+ ],
+ "uptime_end": "22:57  up 179 days, 12:22, 20 users, load averages: 8.94 7.41 7.94",
+ "target_kb": {
+  "/private/tmp/claude-501/-Users-king-Documents-code-spinup/e37155fd-f53e-449e-b19b-3584ed674877/scratchpad/orchestrate/20261024-144640/cache/shared/target-R0.13/lanes/seed/target": 4178268
+ },
+ "lines_arg": 22000
+}
