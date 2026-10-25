@@ -157,6 +157,18 @@ impl Emitter {
         self.indention = true;
     }
 
+    /// libyaml `write_break`: a line feed starts a new line. Another break character is
+    /// written as it is and also starts a new line.
+    fn write_break(&mut self, c: char) {
+        if c == '\n' {
+            self.put_break();
+        } else {
+            self.out.push(c);
+            self.column = 0;
+            self.indention = true;
+        }
+    }
+
     fn write(&mut self, text: &str) {
         for c in text.chars() {
             self.put(c);
@@ -384,7 +396,7 @@ impl Emitter {
                 if !breaks && c == '\n' {
                     self.put_break();
                 }
-                self.put_break();
+                self.write_break(c);
                 breaks = true;
             } else {
                 if breaks {
@@ -405,8 +417,10 @@ impl Emitter {
 
     fn double(&mut self, value: &str) {
         self.indicator("\"", true, false, false);
+        // libyaml `is_bom` looks at the start of the value, not at the current character.
+        let bom = value.starts_with('\u{feff}');
         for c in value.chars() {
-            if !is_printable(c) || c == '\u{feff}' || is_break(c) || c == '"' || c == '\\' {
+            if bom || !is_printable(c) || is_break(c) || c == '"' || c == '\\' {
                 self.put('\\');
                 match c {
                     '\0' => self.put('0'),
@@ -471,7 +485,7 @@ impl Emitter {
         let mut breaks = true;
         for c in value.chars() {
             if is_break(c) {
-                self.put_break();
+                self.write_break(c);
                 breaks = true;
             } else {
                 if breaks {
@@ -499,7 +513,7 @@ impl Emitter {
                 if !breaks && !leading_spaces && c == '\n' && !starts_blank {
                     self.put_break();
                 }
-                self.put_break();
+                self.write_break(c);
                 breaks = true;
             } else {
                 if breaks {
@@ -796,7 +810,7 @@ fn go_scalar(node: &Node, value: &str) -> Node {
             parsed.map_or_else(|| go_string(value), |n| Node::plain(n.to_string()))
         }
         Resolved::Float => Node::plain(go_float(value)),
-        Resolved::Timestamp | Resolved::Merge | Resolved::Str => go_string(value),
+        Resolved::Timestamp | Resolved::Str => go_string(value),
     }
 }
 

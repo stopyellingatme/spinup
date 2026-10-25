@@ -245,8 +245,6 @@ pub enum Resolved {
     Float,
     /// A date or a date-time.
     Timestamp,
-    /// The merge key `<<`.
-    Merge,
     /// A string.
     Str,
 }
@@ -258,7 +256,6 @@ pub fn resolve(value: &str) -> Resolved {
         "true" | "True" | "TRUE" | "false" | "False" | "FALSE" => return Resolved::Bool,
         ".nan" | ".NaN" | ".NAN" | ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF"
         | "-.inf" | "-.Inf" | "-.INF" => return Resolved::Float,
-        "<<" => return Resolved::Merge,
         _ => {}
     }
     match value.as_bytes()[0] {
@@ -915,7 +912,8 @@ mod tests {
             ("2026-10-13", Resolved::Timestamp),
             ("2026-10-13T10:00:00Z", Resolved::Timestamp),
             ("2026-10-13 10:00:00", Resolved::Timestamp),
-            ("<<", Resolved::Merge),
+            // go-yaml reads `<<` as a merge key only in the key position.
+            ("<<", Resolved::Str),
             ("5m", Resolved::Str),
             ("1.2.3", Resolved::Str),
             ("-", Resolved::Str),

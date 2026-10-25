@@ -381,3 +381,88 @@ fn compose_writer_removes_comments_like_go() {
     let out = marshal_value(&Node::parse(src).unwrap(), 4).unwrap();
     assert_eq!(out, "services:\n    postgres:\n        image: x\n");
 }
+
+/// The writer output equals go-yaml v3.0.5 output for scalars, keys, floats, and layouts
+/// (`src/testdata/emit-oracle.go.txt` writes the oracle file).
+#[test]
+fn writer_matches_go_yaml_oracle() {
+    let o: Value = serde_json::from_str(include_str!("../testdata/emit-oracle.json")).unwrap();
+    let strs: Vec<String> = o["strs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_str().unwrap().to_string())
+        .collect();
+    let mut bad = 0;
+    for (i, s) in strs.iter().enumerate() {
+        let checks = [
+            ("node", marshal(&Node::str(s.clone()), 2), &o["nodes"][i]),
+            (
+                "folded",
+                marshal(&Node::str(s.clone()).with_style(Style::Folded), 2),
+                &o["folded"][i],
+            ),
+            (
+                "single",
+                marshal(&Node::str(s.clone()).with_style(Style::Single), 2),
+                &o["single"][i],
+            ),
+            (
+                "flow",
+                marshal(
+                    &Node::seq(vec![Node::str(s.clone())]).with_style(Style::Flow),
+                    2,
+                ),
+                &o["flow"][i],
+            ),
+            (
+                "map",
+                marshal_value(
+                    &Node::new(Kind::Map(vec![
+                        (Node::str("k"), Node::str(s.clone())),
+                        (Node::str(s.clone()), Node::plain("1")),
+                    ])),
+                    4,
+                )
+                .unwrap(),
+                &o["maps"][i],
+            ),
+        ];
+        for (kind, got, want) in checks {
+            if got != want.as_str().unwrap() {
+                bad += 1;
+                eprintln!(
+                    "{kind} {s:?}: got {got:?} want {:?}",
+                    want.as_str().unwrap()
+                );
+            }
+        }
+    }
+    for (i, f) in o["floats"].as_array().unwrap().iter().enumerate() {
+        let f = f.as_f64().unwrap();
+        let got = marshal_value(&Node::plain(format!("{f:?}")), 4).unwrap();
+        let want = o["float_out"][i].as_str().unwrap();
+        if got != want {
+            bad += 1;
+            eprintln!("float {f}: got {got:?} want {want:?}");
+        }
+    }
+    let keys = [
+        "b", "a10", "a9", "a", "A", "_x", "1", "01", "x1y", "x01y", "x1", "é", "Z9", "a_b", "a-b",
+        "a.b",
+    ];
+    let got = marshal_value(&Node::map(keys.iter().map(|k| (*k, Node::plain("1")))), 4).unwrap();
+    if got != o["keys_out"].as_str().unwrap() {
+        bad += 1;
+        eprintln!("keys: got {got:?} want {:?}", o["keys_out"]);
+    }
+    let doc = Node::parse("a:\n- x\n- - y\n  - z\n- k: v\n  j:\n  - 1\n  m: {}\n- |\n  lit\nb: [1, {c: d}]\nc:\n  d:\n    e: [ ]\n").unwrap();
+    for (n, key) in [(2, "layout2"), (4, "layout4"), (3, "layout3")] {
+        let got = marshal(&doc, n);
+        if got != o[key].as_str().unwrap() {
+            bad += 1;
+            eprintln!("{key}: got {got:?}\nwant {:?}", o[key]);
+        }
+    }
+    assert_eq!(bad, 0);
+}
