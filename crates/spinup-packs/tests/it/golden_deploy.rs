@@ -1,12 +1,15 @@
 //! The deploy pack must match the Go golden tree and keep the contracts of ADR 0003 and
 //! ADR 0009 §6 (Go `internal/templates/golden_deploy_test.go`).
 //!
-//! The Go test also runs `docker compose config` and `caddy adapt` when the tools are on
-//! `PATH`. R1 does not port these tool runs. The Compose security lint (`composelint`) lives
-//! in `spinup-doctor`, which is not a dev-dependency of `spinup-packs` (see the R1.15 notes).
+//! As in Go, the test runs `docker compose config` and `caddy adapt` only when the tool is
+//! on `PATH`. It prints the reason when it skips a tool.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use spinup_exec::os_runner::OsRunner;
+use spinup_exec::runner::{Cancellation, Cmd, ExecError, Output, Runner};
 use spinup_vfs::tree::Tree;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// The Compose files that the deploy pack renders.
 const DEPLOY_COMPOSE_FILES: [&str; 3] = [
@@ -57,6 +60,132 @@ pub(crate) fn read(tree: &Tree, name: &str) -> Result<String> {
         .get(name)
         .with_context(|| format!("the render has no {name}"))?;
     Ok(String::from_utf8(file.data.to_vec())?)
+}
+
+/// Fails with the text of each `composelint` finding, as the Go tests do.
+pub(crate) fn lint_compose(name: &str, data: &str) -> Result<()> {
+    let findings = spinup_doctor::composelint::lint(name, data)
+        .map_err(|error| anyhow::anyhow!("lint {name}: {error}"))?;
+    let reports = findings
+        .iter()
+        .map(|f| format!("{}: {}: {}: {}", f.file, f.service, f.rule, f.message))
+        .collect::<Vec<_>>();
+    if !reports.is_empty() {
+        bail!("{}", reports.join("\n"));
+    }
+    Ok(())
+}
+
+/// Reports whether `program` is on `PATH`. It prints the skip reason when it is not.
+pub(crate) fn on_path(program: &str, what: &str) -> bool {
+    let found = spinup_exec::lookup::look_path(program).is_ok();
+    if !found {
+        eprintln!("skip {what}: {program} is not on PATH");
+    }
+    found
+}
+
+/// Runs a command through the `spinup-exec` runner with the Go time limit of one minute.
+pub(crate) fn run_tool(cmd: Cmd) -> Result<Output, ExecError> {
+    let cmd = Cmd {
+        timeout: cmd.timeout.or(Some(Duration::from_secs(60))),
+        ..cmd
+    };
+    OsRunner.output(&cmd, &Cancellation::new())
+}
+
+/// Formats a failed tool run with its captured output.
+pub(crate) fn tool_failure(error: &ExecError) -> String {
+    let output = error.output().map_or_else(String::new, |o| {
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&o.stdout),
+            String::from_utf8_lossy(&o.stderr)
+        )
+    });
+    format!("{error}\n{output}")
+}
+
+/// Writes every file of the tree below `root` with mode 0600 (Go `writeDeployTree` and
+/// `writeMonitoringTree`).
+pub(crate) fn write_tree(tree: &Tree, root: &Path) -> Result<()> {
+    for (name, file) in tree.iter() {
+        let target = root.join(name);
+        std::fs::create_dir_all(target.parent().context("a file path has no parent")?)?;
+        std::fs::write(&target, &file.data)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    Ok(())
+}
+
+/// Validates a rendered Compose file with `docker compose config -q` (Go `composeConfig`).
+/// The command needs the docker CLI with the Compose plugin, but no daemon.
+pub(crate) fn compose_config(dir: &Path, file: &str, env: &[(&str, &str)]) -> Result<()> {
+    if !on_path("docker", &format!("docker compose config {file}")) {
+        return Ok(());
+    }
+    let mut cmd = Cmd::new("docker")
+        .args(["compose", "-f", file, "config", "-q"])
+        .dir(dir)
+        .env("DOCKER_CLI_HINTS", "false");
+    for (name, value) in env {
+        cmd = cmd.env(*name, *value);
+    }
+    if let Err(error) = run_tool(cmd) {
+        bail!(
+            "docker compose -f {file} config -q: {}",
+            tool_failure(&error)
+        );
+    }
+    Ok(())
+}
+
+/// Parses the rendered Caddyfile with a sample `upstream.caddy` (Go `caddyAdapt`).
+fn caddy_adapt(dir: &Path, web: bool) -> Result<()> {
+    if !on_path("caddy", "caddy adapt") {
+        return Ok(());
+    }
+    let upstream = "reverse_proxy {\n\tdynamic a {\n\t\tname {args[0]}-green\n\t\tport {args[1]}\n\t\trefresh 1s\n\t}\n\
+        \tlb_policy round_robin\n\tlb_try_duration 5s\n\tlb_try_interval 50ms\n\
+        \ttransport http {\n\t\tdial_timeout 250ms\n\t}\n}\n";
+    std::fs::write(dir.join("upstream.caddy"), upstream)?;
+    let output = run_tool(
+        Cmd::new("caddy")
+            .args(["adapt", "--config", "Caddyfile", "--adapter", "caddyfile"])
+            .dir(dir)
+            .env("PUBLIC_HOST", "todo.example.com"),
+    )
+    .map_err(|error| anyhow::anyhow!("caddy adapt: {}", tool_failure(&error)))?;
+    let config = String::from_utf8(output.stdout)?;
+    for want in [
+        r#""name":"api-green""#,
+        r#""port":"8080""#,
+        r#""dial_timeout":250000000"#,
+        r#""grace_period":10000000000"#,
+    ] {
+        assert!(
+            config.contains(want),
+            "caddy adapt output does not contain {want}"
+        );
+    }
+    assert_eq!(
+        config.contains(r#""name":"web-green""#),
+        web,
+        "caddy adapt routes to web-green"
+    );
+    Ok(())
+}
+
+/// Writes the tree to a new temporary directory and returns it with its `deploy/` path.
+pub(crate) fn write_deploy_tree(tree: &Tree) -> Result<(tempfile::TempDir, PathBuf)> {
+    let root = tempfile::tempdir()?;
+    write_tree(tree, root.path())?;
+    let deploy = root.path().join("deploy");
+    Ok((root, deploy))
 }
 
 fn render_deploy(packs: &[&str], value: serde_json::Value) -> Result<Tree> {
@@ -182,13 +311,12 @@ fn golden_deploy_ignores_unselected_monitoring() -> Result<()> {
     Ok(())
 }
 
-/// Checks the contracts that a golden diff does not explain: the blue/green aliases, the
-/// routes, and the pins (Go `checkDeployTree`, without the tool runs).
+/// Checks the contracts of ADR 0003 and ADR 0009 §6 that a golden diff does not explain:
+/// the Compose security lint, the blue/green aliases, the routes, and the pins (Go
+/// `checkDeployTree`).
 fn check_deploy_tree(tree: &Tree, web: bool) -> Result<()> {
     for name in DEPLOY_COMPOSE_FILES {
-        let data = read(tree, name)?;
-        parse_yaml::<yaml_serde::Value>(&data)
-            .with_context(|| format!("{name} is not valid YAML"))?;
+        lint_compose(name, &read(tree, name)?)?;
     }
     let compose = read(tree, "deploy/compose.yml")?;
     let edge = read(tree, "deploy/compose.edge.yml")?;
@@ -305,7 +433,24 @@ fn check_deploy_tree(tree: &Tree, web: bool) -> Result<()> {
     ] {
         assert!(!data.contains(":latest"), "{name} uses a latest tag");
     }
-    Ok(())
+
+    let (_root, dir) = write_deploy_tree(tree)?;
+    compose_config(
+        &dir,
+        "compose.yml",
+        &[
+            ("SPINUP_COLOR", "blue"),
+            ("API_IMAGE", "todo-api:20261015T000000Z-0123456789ab"),
+            ("WEB_IMAGE", "todo-web:20261015T000000Z-0123456789ab"),
+            ("PUBLIC_ORIGIN", "https://todo.example.com"),
+        ],
+    )?;
+    compose_config(
+        &dir,
+        "compose.edge.yml",
+        &[("PUBLIC_HOST", "todo.example.com")],
+    )?;
+    caddy_adapt(&dir, web)
 }
 
 /// The monitoring Compose file mounts only the restricted secrets and labels the config hash

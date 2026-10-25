@@ -1,15 +1,31 @@
 //! The monitoring pack must match the Go golden trees and keep the contracts of ADR 0010 §2
 //! (Go `internal/templates/golden_monitoring_test.go`).
 //!
-//! The Go tests also run `promtool`, `docker compose config`, and the Grafana entrypoint
-//! script with `sh`. R1 does not port these subprocess runs. The Compose security lint
-//! (`composelint`) lives in `spinup-doctor`, which is not a dev-dependency of
-//! `spinup-packs` (see the R1.15 notes). The pack keeps `go-runtime.json` unchanged.
+//! As in Go, the tests run `promtool` and `docker compose config` only when the tool is on
+//! `PATH`, and print the reason when they skip a tool. The Grafana entrypoint test always
+//! runs the script with `sh`. The pack keeps `go-runtime.json` unchanged.
 
-use crate::golden_deploy::{parse_yaml, read, render, select};
+use crate::golden_deploy::{
+    compose_config, lint_compose, on_path, parse_yaml, read, render, run_tool, select,
+    tool_failure, write_tree,
+};
 use anyhow::{Context, Result, bail};
+use spinup_exec::runner::Cmd;
 use spinup_vfs::tree::Tree;
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::time::Duration;
+
+/// Runs `promtool` in `dir` when it is on `PATH` (Go `promtool`).
+pub(crate) fn promtool(dir: &Path, args: &[&str]) -> Result<()> {
+    if !on_path("promtool", &format!("promtool {}", args[..2].join(" "))) {
+        return Ok(());
+    }
+    if let Err(error) = run_tool(Cmd::new("promtool").args(args.iter().copied()).dir(dir)) {
+        bail!("promtool {}: {}", args.join(" "), tool_failure(&error));
+    }
+    Ok(())
+}
 
 /// Renders the monitoring pack with a profile and keeps the files under `monitoring/`.
 pub(crate) fn render_monitoring(profile: &str) -> Result<Tree> {
@@ -111,11 +127,12 @@ fn on_network(networks: Option<&yaml_serde::Value>, name: &str) -> bool {
     }
 }
 
-/// Checks the contracts that a golden diff does not explain: the pins, the profile services,
-/// the datasource UIDs, the rule files, and the dashboard JSON (Go `checkMonitoringTree`,
-/// without the lint and the tool runs).
+/// Checks the contracts of ADR 0010 §2 that a golden diff does not explain: the Compose
+/// security lint, the pins, the profile services, the datasource UIDs, the rule files, and
+/// the dashboard JSON (Go `checkMonitoringTree`).
 fn check_monitoring_tree(tree: &Tree, full: bool) -> Result<()> {
     const COMPOSE_FILE: &str = "monitoring/compose.monitoring.yml";
+    lint_compose(COMPOSE_FILE, &read(tree, COMPOSE_FILE)?)?;
     let parsed: Compose =
         parse_yaml(&read(tree, COMPOSE_FILE)?).with_context(|| format!("parse {COMPOSE_FILE}"))?;
     assert_eq!(parsed.name, "todo-monitoring", "project name");
@@ -285,11 +302,21 @@ fn check_monitoring_tree(tree: &Tree, full: bool) -> Result<()> {
     want_rules.sort_unstable();
     rule_files.sort_unstable();
     assert_eq!(rule_files, want_rules, "rule files");
-    for name in &rule_files {
-        yaml_serde::from_str::<yaml_serde::Value>(&read(tree, name)?)
-            .with_context(|| format!("{name} is not valid YAML"))?;
-    }
-    Ok(())
+
+    let root = tempfile::tempdir()?;
+    write_tree(tree, root.path())?;
+    let mut args = vec!["check", "rules"];
+    args.extend(rule_files.iter().copied());
+    promtool(root.path(), &args)?;
+    promtool(
+        root.path(),
+        &["check", "config", "monitoring/prometheus/prometheus.yml"],
+    )?;
+    compose_config(
+        &root.path().join("monitoring"),
+        "compose.monitoring.yml",
+        &[("PUBLIC_URL", "https://todo.example.com")],
+    )
 }
 
 /// Decodes a Go interpreted string literal with the escapes that the alloy config uses.
@@ -434,5 +461,227 @@ fn golden_monitoring_alloy_job() -> Result<()> {
         alloy.contains(r#"replacement = "alloy""#) && alloy.contains(r#"target_label = "job""#),
         "the self scrape must replace the exporter job label with alloy"
     );
+    Ok(())
+}
+
+/// A healthy stack stays quiet. Missing and stale data fire the absence alerts (Go
+/// `TestMonitoringAbsenceAlerts`).
+#[test]
+fn golden_monitoring_absence_alerts() -> Result<()> {
+    if !spinup_testutil::golden::selected("monitoring") {
+        return Ok(());
+    }
+    for profile in ["lite", "full"] {
+        let root = tempfile::tempdir()?;
+        write_tree(&render_monitoring(profile)?, root.path())?;
+        std::fs::write(root.path().join("absence.yml"), ABSENCE_TESTS)?;
+        promtool(root.path(), &["test", "rules", "absence.yml"])
+            .with_context(|| format!("profile {profile}"))?;
+    }
+    Ok(())
+}
+
+const ABSENCE_TESTS: &str = r#"rule_files:
+  - monitoring/prometheus/rules/stack.yml
+  - monitoring/prometheus/rules/app.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="alloy",instance="self"}'
+        values: '1+0x20'
+      - series: 'http_server_request_duration_seconds_count{job="todo-api"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AlloyMissing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: APIRequestMetricsMissing
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{job="alloy",instance="self"}'
+        values: '1 1 stale _x15'
+      - series: 'http_server_request_duration_seconds_count{job="todo-api"}'
+        values: '1 2 stale _x15'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="AlloyMissing",alertstate="firing"}'
+        eval_time: 4m
+        exp_samples: []
+      - expr: 'ALERTS{alertname="AlloyMissing",alertstate="firing"}'
+        eval_time: 8m
+        exp_samples:
+          - labels: 'ALERTS{alertname="AlloyMissing",alertstate="firing",job="alloy",severity="critical"}'
+            value: 1
+      - expr: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing"}'
+        eval_time: 13m
+        exp_samples:
+          - labels: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing",severity="warning"}'
+            value: 1
+  - interval: 1m
+    promql_expr_test:
+      - expr: 'ALERTS{alertname=~"AlloyMissing|APIRequestMetricsMissing",alertstate="firing"}'
+        eval_time: 15m
+        exp_samples:
+          - labels: 'ALERTS{alertname="AlloyMissing",alertstate="firing",job="alloy",severity="critical"}'
+            value: 1
+          - labels: 'ALERTS{alertname="APIRequestMetricsMissing",alertstate="firing",severity="warning"}'
+            value: 1
+"#;
+
+const FAKE_WGET: &str = r#"#!/bin/sh
+if [ -f "$TEST_ROOT/started" ]; then
+ touch "$TEST_ROOT/healthy"
+ exit 0
+fi
+exit 1
+"#;
+
+const FAKE_GRAFANA: &str = r#"#!/bin/sh
+for arg do
+ if [ "$arg" = --help ]; then
+  if [ "$SUPPORTED" = true ]; then echo --password-from-stdin; fi
+  exit 0
+ fi
+done
+if [ ! -f "$TEST_ROOT/healthy" ]; then exit 2; fi
+printf '%s\n' "$@" > "$TEST_ROOT/args"
+IFS= read -r password
+printf '%s' "$password" > "$TEST_ROOT/password"
+if [ "$RESET_FAILS" = true ]; then exit 1; fi
+touch "$TEST_ROOT/reset"
+"#;
+
+const FAKE_SERVER: &str = r#"#!/bin/sh
+trap 'exit 0' TERM INT
+touch "$TEST_ROOT/started"
+# A reset failure must stop the server. The outer test timeout catches a missing stop.
+if [ "$RESET_FAILS" = true ]; then
+ while :; do sleep 0.1; done
+fi
+if [ "$SUPPORTED" = true ]; then
+ while [ ! -f "$TEST_ROOT/reset" ]; do sleep 0.1; done
+fi
+exit 0
+"#;
+
+/// Writes a file with mode 0700 and closes it before a later run (Go `WriteExecutable`).
+fn write_executable(path: &Path, data: &str) -> Result<()> {
+    std::fs::create_dir_all(path.parent().context("a file path has no parent")?)?;
+    let file = std::fs::File::create(path)?;
+    std::io::Write::write_all(&mut &file, data.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
+/// The Grafana entrypoint rotates the admin password through stdin, or prints the manual
+/// reset guidance (Go `TestMonitoringGrafanaPassword`).
+#[test]
+fn golden_monitoring_grafana_password() -> Result<()> {
+    if !spinup_testutil::golden::selected("monitoring") {
+        return Ok(());
+    }
+    const PASSWORD: &str = "new ' \" $(touch injected) `touch injected` ; $HOME \\\\ password";
+    let entrypoint = read(
+        &render_monitoring("lite")?,
+        "monitoring/grafana/entrypoint.sh",
+    )?;
+    for (name, supported, reset_fails) in [
+        ("rotate", true, false),
+        ("reset failure", true, true),
+        ("manual fallback", false, false),
+    ] {
+        let dir = tempfile::tempdir()?;
+        let root = dir.path();
+        let path_of = |name: &str| root.join(name).to_string_lossy().into_owned();
+        for (file, data) in [
+            ("secrets/GRAFANA_ADMIN_PASSWORD", PASSWORD),
+            ("source/.keep", ""),
+            ("bin/wget", FAKE_WGET),
+            ("bin/grafana", FAKE_GRAFANA),
+            ("server.sh", FAKE_SERVER),
+        ] {
+            write_executable(&root.join(file), data)?;
+        }
+        let script = entrypoint
+            .replace("/run/secrets", &path_of("secrets"))
+            .replace("/etc/spinup/provisioning", &path_of("source"))
+            .replace("/run.sh", &path_of("server.sh"));
+        let script_path = root.join("entrypoint.sh");
+        write_executable(&script_path, &script)?;
+        let path = format!(
+            "{}:{}",
+            path_of("bin"),
+            std::env::var("PATH").unwrap_or_default()
+        );
+        let result = run_tool(Cmd {
+            timeout: Some(Duration::from_secs(5)),
+            ..Cmd::new("sh")
+                .args([script_path.to_string_lossy().into_owned()])
+                .dir(root)
+                .env("TEST_ROOT", root.to_string_lossy().into_owned())
+                .env("PATH", path)
+                .env("GF_PATHS_PROVISIONING", path_of("provisioning"))
+                .env("SUPPORTED", supported.to_string())
+                .env("RESET_FAILS", reset_fails.to_string())
+        });
+        let (stdout, stderr) = match &result {
+            Ok(output) => (output.stdout.clone(), output.stderr.clone()),
+            Err(error) => error
+                .output()
+                .map(|o| (o.stdout.clone(), o.stderr.clone()))
+                .unwrap_or_default(),
+        };
+        let stdout = String::from_utf8_lossy(&stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&stderr).into_owned();
+        if reset_fails {
+            assert!(
+                result.is_err(),
+                "{name}: Grafana started despite a failed password reset"
+            );
+            assert!(
+                stderr.contains("Try:"),
+                "{name}: the reset failure has no guidance: {stderr}"
+            );
+        } else if let Err(error) = &result {
+            bail!("{name}: start Grafana: {}", tool_failure(error));
+        }
+        if supported {
+            let got = std::fs::read_to_string(root.join("password"))?;
+            assert_eq!(
+                got, PASSWORD,
+                "{name}: the password changed in the stdin transfer"
+            );
+            let args = std::fs::read_to_string(root.join("args"))?;
+            assert!(
+                args.contains("--password-from-stdin") && !args.contains(PASSWORD),
+                "{name}: the password must enter the CLI through stdin: {args}"
+            );
+            assert!(
+                args.contains("cfg:default.paths.data="),
+                "{name}: the CLI must use the server database: {args}"
+            );
+        } else {
+            assert!(
+                stderr.contains("manual reset"),
+                "{name}: an unsupported CLI needs manual reset guidance: {stderr}"
+            );
+        }
+        assert!(
+            !root.join("injected").exists(),
+            "{name}: the password ran as shell code"
+        );
+        assert!(
+            !format!("{stdout}{stderr}").contains(PASSWORD),
+            "{name}: the password leaked in the startup output"
+        );
+    }
     Ok(())
 }
