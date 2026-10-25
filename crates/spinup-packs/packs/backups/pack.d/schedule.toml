@@ -1,0 +1,35 @@
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-full.service"
+source = "files/deploy/systemd/backup-full.service.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-full.timer"
+source = "files/deploy/systemd/backup-full.timer.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-diff.service"
+source = "files/deploy/systemd/backup-diff.service.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-diff.timer"
+source = "files/deploy/systemd/backup-diff.timer.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-verify.service"
+source = "files/deploy/systemd/backup-verify.service.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/systemd/spinup-[[ data.app_name ]]-backup-verify.timer"
+source = "files/deploy/systemd/backup-verify.timer.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/backups/run.sh"
+source = "files/deploy/backups/run.sh.tmpl"
+class = "managed"
+mode = "0755"

@@ -1,0 +1,8 @@
+# Copy this file to terraform.tfvars. Keep HCLOUD_TOKEN in the environment.
+server_type         = "cx23"
+location            = "fsn1"
+image               = "ubuntu-24.04"
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+volume_size         = 20
+# Use a unique name_prefix and SSH key for each environment.
+# name_prefix = "myapp-staging"

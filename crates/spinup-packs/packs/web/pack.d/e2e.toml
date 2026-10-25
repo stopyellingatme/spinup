@@ -1,0 +1,12 @@
+# Playwright runs against services started by CI or by `spinup dev`.
+# The test configuration is managed. The smoke test is a seed for app-specific changes.
+
+[[files]]
+path = "web/playwright.config.ts"
+source = "files/web/playwright.config.ts.tmpl"
+class = "managed"
+
+[[files]]
+path = "web/e2e/smoke.spec.ts"
+source = "files/web/e2e/smoke.spec.ts.tmpl"
+class = "seed"

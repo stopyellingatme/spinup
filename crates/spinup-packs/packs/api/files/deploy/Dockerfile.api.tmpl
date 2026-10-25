@@ -1,0 +1,44 @@
+[% if ((get(data, "frontend_mode")) == "embed") %]# Build with the API context and the web context:
+# docker build -f deploy/Dockerfile.api --build-context web=web api
+FROM [[ image("node") ]] AS web-build[% if ((get(data, "package_manager")) == "bun") %]
+RUN npm install --global bun@[[ npm("bun") ]][% else %]
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable[% endif %]
+WORKDIR /web[% if ((get(data, "package_manager")) == "bun") %]
+COPY --from=web package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts[% else %]
+COPY --from=web package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts[% endif %]
+COPY --from=web . .
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.[% if ((get(data, "package_manager")) == "bun") %]
+RUN bunx --no-install svelte-kit sync && bun run build[% else %]
+RUN pnpm exec svelte-kit sync && pnpm build[% endif %]
+
+[% endif %]# The kit stage is empty. A local kit replace in api/go.mod makes spinup pass the kit
+# directory as the build context kit, which takes the place of this stage:
+# docker build -f deploy/Dockerfile.api --build-context kit=<kit dir> api
+FROM scratch AS kit
+
+FROM [[ image("golang") ]] AS build
+WORKDIR /src
+# A bind mount works when the kit stage is empty. COPY --from an empty stage fails with
+# "no source files". The RUN copies the kit to /opt/kit and points the replace at it.
+# COPY . . brings back api/go.mod, so the same RUN runs again after it.
+COPY go.mod go.sum ./
+RUN --mount=type=bind,from=kit,target=/kit \
+    if [ -f /kit/go.mod ]; then mkdir -p /opt/kit && cp -a /kit/. /opt/kit/ && go mod edit -replace=github.com/stopyellingatme/spinup/kit=/opt/kit; fi
+RUN go mod download
+COPY . .
+RUN if [ -f /opt/kit/go.mod ]; then go mod edit -replace=github.com/stopyellingatme/spinup/kit=/opt/kit; fi[% if ((get(data, "frontend_mode")) == "embed") %]
+# A local web build can leave old assets in the context. The image embeds only the new build.
+RUN rm -rf internal/webdist/dist
+COPY --from=web-build /web/build ./internal/webdist/dist[% endif %]
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build[% if ((get(data, "frontend_mode")) == "embed") %] -tags embedweb[% endif %] -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+
+FROM [[ image("distroless-static") ]]
+ENV SPINUP_ENV=production
+COPY --from=build /out/api /api
+USER nonroot
+EXPOSE 8080
+ENTRYPOINT ["/api"]

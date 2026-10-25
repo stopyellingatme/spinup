@@ -1,0 +1,19 @@
+# Vendored community dashboards (managed). Main loop only: see files/monitoring/grafana/dashboards/stack/vendor/README.md.
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/vendor/node-exporter-full.json"
+source = "files/monitoring/grafana/dashboards/stack/vendor/node-exporter-full.json"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/vendor/postgresql.json"
+source = "files/monitoring/grafana/dashboards/stack/vendor/postgresql.json"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
+[[files]]
+path = "monitoring/grafana/dashboards/stack/vendor/cadvisor.json"
+source = "files/monitoring/grafana/dashboards/stack/vendor/cadvisor.json"
+class = "managed"
+when = "monitoring_profile == 'full'"
