@@ -2,6 +2,10 @@
 # Main loop only (ADR 0020 §5). The registry test ignores lines that start with `#`.
 command cache
 command docs
+command generate
+command module
+command new
+command upgrade
 command version
 doctor-check compose-security
 doctor-check plaintext-secrets
