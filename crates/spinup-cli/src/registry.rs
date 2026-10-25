@@ -13,6 +13,16 @@ pub fn ids() -> Vec<String> {
             .map(|generator| format!("generator {}", generator.name)),
     );
     ids.extend(
+        spinup_doctor::registry::CHECKS
+            .iter()
+            .map(|check| format!("doctor-check {}", check.id)),
+    );
+    ids.extend(
+        spinup_gen::run::POST_STEPS
+            .iter()
+            .map(|runner| format!("post-step {}", spinup_gen::run::step_name(runner.step))),
+    );
+    ids.extend(
         spinup_migrate::contract::MIGRATIONS
             .iter()
             .map(|migration| format!("migration {}", migration.id)),
