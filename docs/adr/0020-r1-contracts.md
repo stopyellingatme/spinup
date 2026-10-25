@@ -194,5 +194,11 @@ The R1 gate passed locally: the Rust build, lint, tests, and `cargo deny`; cover
 ### Due later
 - `upgrade_apply` (the kit replace of the upgrade apply phase) and `upgrade_generated` (`spinup g resource`) are due at R2 (R2.10, R2.11).
 - Go `TestBunWorkflows` needs the `ci` pack golden helpers (R4).
-- The native Windows run of the R1 crates, mainly the path handling of `spinup-vfs` and `spinup-drift` (the R0.5 probe failed the `parent-absolute-inside` case on Windows), runs in `rust.yml` after the R1 merge is pushed.
+
+### Windows (rust.yml run 40232030925, 2026-10-25: all jobs green on Linux, macOS, and Windows)
+- `spinup-vfs` compares only the owner-write bit on Windows (it stores only the read-only attribute), so it plans no other mode change there, and a mode-only change sets the attribute by path. Before, every unchanged file became a mode-only change, and setting attributes through a read-only handle failed with "Access is denied".
+- `spinup-vfs` updates move the original into the backups first and rename into a free name, as Go does. Renames and removals retry for up to 2 s on Windows on "access denied" or a sharing violation, and an apply error names the failing step.
+- `spinup_vfs::path::canonical` returns plain paths on Windows (not `\\?\C:\...`), because `git worktree add` rejects verbatim paths. `spinup-upgrade` and `spinup-drift` use it.
+- Ignored on Windows, with the reason in the test: the Grafana entrypoint golden test (POSIX `sh`; Go excludes `templates` on Windows) and the R0.5 probe case `parent-absolute-inside` (the production `spinup-vfs` passes the same cases).
+- R2 topic: with `core.autocrlf=true` (the Windows default of many Git installs), an upgrade can show LF files as modified. The upgrade tests set `core.autocrlf=false`. Go behaves the same. Decide in R2 whether generated apps add a `.gitattributes` rule.
 

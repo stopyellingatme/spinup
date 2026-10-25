@@ -98,6 +98,7 @@ Other sessions shared the machine during every spike. R0.1 to R0.10 and R0.14 ra
 These items do not block the R0 gate. The gate needs the 14 result files, the two hard no-go numbers, and a decision.
 - Native Windows runs for R0.3, R0.4, R0.5, and R0.14, and native execution of the Linux release binaries. These need a CI runner, so `rust` must be pushed. This is a user decision.
 - The soft verdict of R0.3 changes to `go` only after the native Windows runs. R0.5 is `go`, but its native Windows check is also open.
+  Result (rust.yml, 2026-10-25): R0.3 (registration in debug, release, and fat LTO) and R0.4 pass natively on Linux x86_64 and Windows, so R0.3 is now `go`. R0.5 passes natively on Linux; on Windows one probe case (`parent-absolute-inside`) fails, and the production `spinup-vfs` passes the same fixtures there (ADR 0020, R1 results).
 - A Mailpit run for mail (R0.7), and the RED panel check with 5xx traffic (R0.8).
 - Linux numbers for the dev loop (R0.11), and a Docker build that compiles inside the image (R0.12, R0.13: offline lanes cannot fetch the musl target).
 - R0.13 ran each setting once or twice, on generated CLI code. Repeat the lane-cost check at the R1 gate with the real crates.
