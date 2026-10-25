@@ -1,0 +1,2 @@
+# spinup-exec is the only crate that may use std::process::Command (rust-plan.md §1).
+# This file replaces the root clippy.toml for this crate, without the subprocess bans.

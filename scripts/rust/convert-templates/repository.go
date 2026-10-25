@@ -44,34 +44,13 @@ func convertRepository(root, out string) error {
 			return err
 		}
 		if strings.HasSuffix(rel, ".tmpl") {
-			converted, clashes, err := convert(filepath.ToSlash(rel), string(data), "[[", "]]")
-			if err != nil {
-				return err
-			}
 			inv.PackTemplates++
-			inv.Clashes = append(inv.Clashes, clashes...)
-			data = []byte(converted)
-		} else if strings.HasSuffix(rel, ".toml") {
-			// Metadata has literal TOML arrays. Only output paths are templates.
-			lines := strings.Split(string(data), "\n")
-			for i, line := range lines {
-				if !strings.HasPrefix(line, "path = ") {
-					continue
-				}
-				var metadata struct{ Path string }
-				if err := toml.Unmarshal([]byte(line), &metadata); err != nil {
-					return fmt.Errorf("%s: %w", rel, err)
-				}
-				path := metadata.Path
-				converted, clashes, err := convert(filepath.ToSlash(rel)+" path", path, "[[", "]]")
-				if err != nil {
-					return err
-				}
-				inv.Clashes = append(inv.Clashes, clashes...)
-				lines[i] = "path = " + strconv.Quote(converted)
-			}
-			data = []byte(strings.Join(lines, "\n"))
 		}
+		data, clashes, err := convertFile(filepath.ToSlash(rel), data)
+		if err != nil {
+			return err
+		}
+		inv.Clashes = append(inv.Clashes, clashes...)
 		return writeFile(filepath.Join(out, rel), data)
 	})
 	if err != nil {
@@ -90,6 +69,41 @@ func convertRepository(root, out string) error {
 	}
 	fmt.Printf("converted %d pack templates and %d inline templates\n", inv.PackTemplates, len(inv.InlineTemplates))
 	return nil
+}
+
+// convertFile converts one pack file. rel is the slash-separated path below the packs
+// directory. A .tmpl file is a template. In a .toml file, only the `path = ` lines are
+// templates. Other files stay as they are.
+func convertFile(rel string, data []byte) ([]byte, []clash, error) {
+	if strings.HasSuffix(rel, ".tmpl") {
+		converted, clashes, err := convert(rel, string(data), "[[", "]]")
+		if err != nil {
+			return nil, nil, err
+		}
+		return []byte(converted), clashes, nil
+	}
+	if !strings.HasSuffix(rel, ".toml") {
+		return data, nil, nil
+	}
+	// Metadata has literal TOML arrays. Only output paths are templates.
+	var all []clash
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if !strings.HasPrefix(line, "path = ") {
+			continue
+		}
+		var metadata struct{ Path string }
+		if err := toml.Unmarshal([]byte(line), &metadata); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", rel, err)
+		}
+		converted, clashes, err := convert(rel+" path", metadata.Path, "[[", "]]")
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, clashes...)
+		lines[i] = "path = " + strconv.Quote(converted)
+	}
+	return []byte(strings.Join(lines, "\n")), all, nil
 }
 
 // stringEvaluator reads composed inline strings without executing generator code.

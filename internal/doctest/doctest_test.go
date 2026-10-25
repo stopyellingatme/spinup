@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -124,9 +125,25 @@ func TestDocs(t *testing.T) {
 		t.Skip("no doc pages")
 	}
 	bin := filepath.Join(t.TempDir(), "spinup")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	implementation := "go"
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
-	if _, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "go", Args: []string{"build", "-o", bin, "./cmd/spinup"}, Dir: root}); err != nil {
+	if source := os.Getenv("SPINUP_BIN"); source != "" {
+		implementation = "rust"
+		if !filepath.IsAbs(source) {
+			source = filepath.Join(root, source)
+		}
+		data, err := os.ReadFile(source)
+		if err != nil {
+			t.Fatalf("read SPINUP_BIN %q: %v\nTry: build the binary and set SPINUP_BIN to its path", source, err)
+		}
+		if err := os.WriteFile(bin, data, 0o755); err != nil {
+			t.Fatalf("copy SPINUP_BIN: %v\nTry: use a writable temporary directory", err)
+		}
+	} else if _, err := (exec.OSRunner{}).Run(ctx, exec.Cmd{Name: "go", Args: []string{"build", "-o", bin, "./cmd/spinup"}, Dir: root}); err != nil {
 		t.Fatal(err)
 	}
 	// Pages run with their own HOME, so pin the Go caches to the real ones, and point
@@ -139,14 +156,32 @@ func TestDocs(t *testing.T) {
 	if len(caches) != 2 {
 		t.Fatalf("go env printed %q, want two lines", goEnv.Stdout)
 	}
+	kit := filepath.Join(root, "kit")
+	if implementation == "rust" && os.Getenv("SPINUP_KIT_DIR") != "" {
+		kit = os.Getenv("SPINUP_KIT_DIR")
+		if !filepath.IsAbs(kit) {
+			kit = filepath.Join(root, kit)
+		}
+	}
 	vars := []string{
 		"GOCACHE=" + caches[0],
 		"GOMODCACHE=" + caches[1],
-		"SPINUP_KIT_REPLACE=" + filepath.Join(root, "kit"),
+		"SPINUP_KIT_REPLACE=" + kit,
 	}
 	// Pages run with their own HOME: pnpm (scripts/bin/pnpm) and corepack use the real one.
 	if home, err := os.UserHomeDir(); err == nil {
 		vars = append(vars, "SPINUP_PNPM_HOME="+home)
+		for key, fallback := range map[string]string{"CARGO_HOME": ".cargo", "RUSTUP_HOME": ".rustup"} {
+			value := os.Getenv(key)
+			if value == "" {
+				value = filepath.Join(home, fallback)
+			}
+			absolute, err := filepath.Abs(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			vars = append(vars, key+"="+absolute)
+		}
 		if os.Getenv("DOCKER_CONFIG") == "" {
 			vars = append(vars, "DOCKER_CONFIG="+filepath.Join(home, ".docker"))
 		}
@@ -168,7 +203,7 @@ func TestDocs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, failure := range RunPage(ctx, exec.OSRunner{}, page, Env{Bin: filepath.Dir(bin), Vars: vars}) {
+			for _, failure := range RunPage(ctx, exec.OSRunner{}, page, Env{Bin: filepath.Dir(bin), Vars: vars, Implementation: implementation}) {
 				t.Errorf("%s:%d: %s: %s", failure.Path, failure.Line, failure.Command, failure.Message)
 			}
 		})
@@ -191,5 +226,45 @@ func repositoryRoot(t *testing.T) string {
 			t.Fatal("repository root not found")
 		}
 		directory = parent
+	}
+}
+
+func TestImplementationDirectives(t *testing.T) {
+	t.Parallel()
+	input := "<!-- doctest: only go -->\n```console\n$ echo go\ngo\n```\n<!-- doctest: only rust -->\n```console\n$ echo rust\nrust\n```\n"
+	page, err := Parse("impl.md", []byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, impl := range []string{"", "go", "rust"} {
+		t.Run(impl, func(t *testing.T) {
+			selected := impl
+			if selected == "" {
+				selected = "go"
+			}
+			runner := &exec.Fake{}
+			runner.Expect("bash", "-c", "exec 2>&1\necho "+selected).Return(selected+"\n", "", 0)
+			if failures := RunPage(t.Context(), runner, page, Env{Implementation: impl}); len(failures) != 0 {
+				t.Fatalf("RunPage = %#v", failures)
+			}
+			runner.AssertDone(t)
+		})
+	}
+	if _, err := Parse("bad.md", []byte("<!-- doctest: only other -->\n```console\n$ true\n```")); err == nil {
+		t.Fatal("accepted unknown implementation")
+	}
+}
+
+func TestParseCombinedDirectives(t *testing.T) {
+	t.Parallel()
+	page, err := Parse("combined.md", []byte("<!-- doctest: only rust -->\n<!-- doctest: requires-env DATABASE_URL -->\n```console\n$ true\n```"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Blocks) != 1 || page.Blocks[0].Only != "rust" || len(page.Blocks[0].RequiresEnv) != 1 || page.Blocks[0].RequiresEnv[0] != "DATABASE_URL" {
+		t.Fatalf("combined directives = %#v", page)
+	}
+	if _, err := Parse("conflict.md", []byte("<!-- doctest: only rust -->\n<!-- doctest: only go -->\n```console\n$ true\n```")); err == nil {
+		t.Fatal("accepted conflicting implementations")
 	}
 }

@@ -1,0 +1,121 @@
+# The spinup Cargo workspace (docs/design/rust-plan.md §1, ADR 0020).
+# Only the main loop edits this file (CLAUDE.md, "Shared files"). Lanes never add a crate,
+# a feature, or a version. A lane that needs one reports `blocked: <crate>`.
+#
+# Versions are exact (`=x.y.z`). They come from the R0 spike locks in spikes-rs/*/Cargo.lock.
+
+[workspace]
+resolver = "3"
+members = [
+  "crates/spinup-ui",
+  "crates/spinup-compat",
+  "crates/spinup-vfs",
+  "crates/spinup-manifest",
+  "crates/spinup-stack",
+  "crates/spinup-editors",
+  "crates/spinup-exec",
+  "crates/spinup-project",
+  "crates/spinup-packs",
+  "crates/spinup-tplstore",
+  "crates/spinup-render",
+  "crates/spinup-merge",
+  "crates/spinup-doctor",
+  "crates/spinup-plugin-api",
+  "crates/spinup-migrate",
+  "crates/spinup-gen",
+  "crates/spinup-upgrade",
+  "crates/spinup-drift",
+  "crates/spinup-newapp",
+  "crates/spinup-cli",
+  "crates/spinup",
+  "crates/spinup-testutil",
+]
+# Each spike in spikes-rs/ is its own workspace (ADR 0019).
+exclude = ["spikes-rs"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/stopyellingatme/spinup"
+publish = false
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# The root clippy.toml bans std::process::Command (only spinup-exec runs subprocesses).
+disallowed_methods = "warn"
+disallowed_types = "warn"
+
+[workspace.dependencies]
+# Workspace crates. Each crate lists only the edges of docs/design/rust-layers.toml.
+spinup-ui = { path = "crates/spinup-ui" }
+spinup-compat = { path = "crates/spinup-compat" }
+spinup-vfs = { path = "crates/spinup-vfs" }
+spinup-manifest = { path = "crates/spinup-manifest" }
+spinup-stack = { path = "crates/spinup-stack" }
+spinup-editors = { path = "crates/spinup-editors" }
+spinup-exec = { path = "crates/spinup-exec" }
+spinup-project = { path = "crates/spinup-project" }
+spinup-packs = { path = "crates/spinup-packs" }
+spinup-tplstore = { path = "crates/spinup-tplstore" }
+spinup-render = { path = "crates/spinup-render" }
+spinup-merge = { path = "crates/spinup-merge" }
+spinup-doctor = { path = "crates/spinup-doctor" }
+spinup-plugin-api = { path = "crates/spinup-plugin-api" }
+spinup-migrate = { path = "crates/spinup-migrate" }
+spinup-gen = { path = "crates/spinup-gen" }
+spinup-upgrade = { path = "crates/spinup-upgrade" }
+spinup-drift = { path = "crates/spinup-drift" }
+spinup-newapp = { path = "crates/spinup-newapp" }
+spinup-cli = { path = "crates/spinup-cli" }
+spinup-testutil = { path = "crates/spinup-testutil" }
+
+# External crates (R1). The R0 spike that chose each version is in the comment.
+anyhow = "=1.0.104"                                                       # all spikes
+cap-std = "=4.0.3"                                                        # R0.5 path policy
+clap = { version = "=4.6.7", features = ["derive", "env", "string", "wrap_help"] } # R0.12
+clap_complete = "=4.6.11"                                                 # R0.12
+dirs = "=7.0.0"                                                           # R0.12 (user cache dir)
+ed25519-dalek = "=3.0.0"                                                  # R0.5 archive signature
+hex = "=0.4.3"                                                            # R0.5
+inquire = { version = "=0.9.4", default-features = false, features = ["crossterm"] } # R0.12
+libc = "=0.2.191"                                                         # R0.4 process groups
+linkme = "=0.3.37"                                                        # R0.3 registration
+# R0.2 features. preserve_order keeps the insertion order of maps that the converter builds.
+minijinja = { version = "=3.0.3", features = ["builtins", "json", "loop_controls", "macros", "serde", "preserve_order", "urlencode"] }
+regex = "=1.13.1"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.154", features = ["raw_value"] }           # R0.5 lock JSON (no preserve_order)
+sha2 = "=0.11.1"                                                          # R0.5
+signal-hook = "=0.4.5"                                                    # R0.4 (Unix signal handler)
+tar = "=0.4.46"                                                           # R0.5 archives
+tempfile = "=3.27.0"
+thiserror = "=2.0.21"
+toml = "=1.1.8"                                                           # R0.2
+toml_edit = "=0.25.17"                                                    # R0.12
+tree-sitter = "=0.27.1"                                                   # R0.1 splice editor
+tree-sitter-yaml = "=0.7.2"                                               # R0.1
+# R0.4: rustls with the ring provider and the WebPKI roots. No aws-lc (deny.toml bans it).
+ureq = { version = "=3.5.0", default-features = false, features = ["rustls"] }
+walkdir = "=2.5.0"
+yaml_serde = "=0.10.7"                                                    # R0.2 (YAML decode only, no editing)
+zstd = "=0.14.3"                                                          # R0.5 archives
+
+# Test-only crates.
+similar = "=3.2.1"                                                        # R0.2 golden diffs
+
+# R0.12: the release profile of the CLI.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

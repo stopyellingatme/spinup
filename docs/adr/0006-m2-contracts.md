@@ -6,6 +6,8 @@ The M2 units run in parallel. These decisions fix the contracts between them. Th
 
 ## 1. Contract files
 
+Superseded by ADR 0020 §1 (R1 contracts) for the Rust CLI.
+
 | File | Holds | Implemented by |
 |---|---|---|
 | `internal/templates/source.go` | `templates.Version`, `templates.Source`, `ErrVersionUnavailable` | M2.6 (`internal/templates/store`) |
@@ -15,9 +17,13 @@ The M2 units run in parallel. These decisions fix the contracts between them. Th
 
 ## 2. Lock schema 2
 
+Superseded by ADR 0020 §2 (R1 contracts) for the Rust CLI: lock schema 3.
+
 The lock gains `packs`: the template packs of the app in render order. `spinup new` writes it. A schema 1 lock (from M1) migrates to `base`, `api`, plus the packs named by the `modules` answer. An upgrade re-renders exactly these packs, with the lock answers.
 
 ## 3. Template versions
+
+Superseded by ADR 0020 §3 (R1 contracts) for the Rust CLI.
 
 - A version string is semantic, with no `v` prefix. A development build of the CLI renders `0.0.0-dev`.
 - The current build's own packs (`templates.Embedded()` with `stackversions.MustLoad()`) are always a loadable version: the CLI's template version.
@@ -38,6 +44,8 @@ The lock gains `packs`: the template packs of the app in render order. `spinup n
 - `SPINUP_KIT_REPLACE`: when it is set, the Apply phase adds the kit `replace` directive to `api/go.mod` again, as `spinup new` does.
 
 ## 5. Codemods and kit notes
+
+Superseded by ADR 0020 §5 (R1 contracts) for the Rust CLI: linkme registration, no Go AST editor. The kit notes format stays.
 
 - Codemods live in `internal/migrate`, one per file named `NNNN_slug.go`, registered in `init()`. They edit code only through `internal/codemod` (Go AST, comment-keeping YAML, TOML, and JSON editors), never through regular expressions.
 - `MIGRATION.json` (kit notes, shown by `upgrade --plan`): `{"schema":1,"version":"0.2.0","steps":[{"id":"...","desc":"...","kind":"codemod|fix-inline|manual","migration":"<codemod id, for kind codemod>"}]}`.

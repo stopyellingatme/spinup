@@ -1,0 +1,50 @@
+// Package mail holds the typed mailers of the application.
+package mail
+
+import (
+ "context"
+
+ "github.com/jackc/pgx/v5/pgxpool"
+ "github.com/stopyellingatme/spinup/kit/config"
+ kitmail "github.com/stopyellingatme/spinup/kit/mail"[% if has("jobs", data.modules) %]
+ "github.com/stopyellingatme/spinup/kit/jobs"[% endif %]
+)
+
+// Mailers renders templates and sends emails. Construct it with New.
+type Mailers struct {
+ // Mailer delivers messages. Tests can use kit mail.Capture.
+ Mailer kitmail.Mailer
+ // From is the sender address.
+ From string[% if has("jobs", data.modules) %]
+ transport kitmail.Mailer[% endif %]
+}
+
+// New loads SMTP_URL, SMTP_PASSWORD or SMTP_PASSWORD_FILE, SMTP_TIMEOUT, and MAIL_FROM.
+// With SMTP_URL absent, development uses Mailpit. Other environments log delivery metadata.
+func New([% if has("jobs", data.modules) %]pool[% else %]_[% endif %] *pgxpool.Pool) (*Mailers,error) {
+ var cfg struct {
+  kitmail.Config
+  config.Base
+  From string `env:"MAIL_FROM" default:"noreply@example.com"`
+ }
+ if err := config.Load(&cfg); err != nil { return nil,err }
+ if cfg.Env == "dev" && cfg.URL == "" { cfg.URL = "smtp://localhost:1025" }
+ transport,err := kitmail.New(cfg.Config)
+ if err != nil { return nil,err }[% if has("jobs", data.modules) %]
+ client,err := jobs.New(pool)
+ if err != nil { return nil,err }
+ return &Mailers{Mailer:queued{client:client},From:cfg.From,transport:transport},nil[% else %]
+ return &Mailers{Mailer:transport,From:cfg.From},nil[% endif %]
+}
+
+// Send delivers m through the configured transport or River queue.
+func (m *Mailers) Send(ctx context.Context,msg kitmail.Message) error {
+ return m.Mailer.Send(ctx,msg)
+}
+
+// SendTemplate renders a subject, text, and HTML template set before sending.
+func (m *Mailers) SendTemplate(ctx context.Context,to,name string,data any) error {
+ msg,err := kitmail.Render(Templates,name,m.From,to,data)
+ if err != nil { return err }
+ return m.Send(ctx,msg)
+}

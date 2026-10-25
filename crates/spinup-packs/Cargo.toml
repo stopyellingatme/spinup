@@ -1,0 +1,30 @@
+[package]
+name = "spinup-packs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+spinup-manifest = { workspace = true }
+spinup-stack = { workspace = true }
+spinup-vfs = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+similar = { workspace = true }
+spinup-render = { workspace = true }
+spinup-testutil = { workspace = true }
+tempfile = { workspace = true }
+
+[build-dependencies]
+walkdir = { workspace = true }

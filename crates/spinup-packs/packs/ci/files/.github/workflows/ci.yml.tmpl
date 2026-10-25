@@ -1,0 +1,112 @@
+# Managed by spinup. Regenerated on upgrade.
+# Add extensions in a separate workflow file.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: [% if (data.db_version == "18") %][[ image("postgres") ]][% else %][% if (data.db_version == "17") %][[ image("postgres-17") ]][% else %][[ image("postgres-16") ]][% endif %][% endif %]
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: api
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/app?sslmode=disable
+      GOTOOLCHAIN: local
+      CI: "true"
+    steps:
+      - uses: [[ uses("actions/checkout") ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses("actions/setup-go") ]]
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - run: |
+          set -euo pipefail
+          go mod verify
+          go build ./...
+          go vet ./...
+          go test -race ./...[% if get(data, "shadcn_registry") %]
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: web
+    steps:
+      - uses: [[ uses("actions/checkout") ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses("actions/setup-node") ]]
+        with:
+          node-version: '[[ go_printf("%.2s", ((get(data.Stack.Images, "node"))).Tag) ]]'[% if ((get(data, "package_manager")) == "bun") %]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm("bun") ]][% else %]
+      - uses: [[ uses("pnpm/action-setup") ]]
+        with:
+          package_json_file: web/package.json[% endif %]
+      - run: |
+          set -euo pipefail[% if ((get(data, "package_manager")) == "bun") %]
+          bun install --frozen-lockfile
+          bun run check
+          # A new app has no unit tests. Playwright runs in its own workflow.
+          bun run test --passWithNoTests[% else %]
+          pnpm install --frozen-lockfile
+          pnpm check
+          # A new app has no unit tests. Playwright runs in its own workflow.
+          pnpm test --passWithNoTests[% endif %][% endif %]
+
+  spinup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: [[ uses("actions/checkout") ]]
+        with:
+          persist-credentials: false
+      - uses: [[ uses("actions/setup-go") ]]
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum[% if get(data, "shadcn_registry") %]
+      - uses: [[ uses("actions/setup-node") ]]
+        with:
+          node-version: '[[ go_printf("%.2s", ((get(data.Stack.Images, "node"))).Tag) ]]'[% if ((get(data, "package_manager")) == "bun") %]
+      - run: |
+          set -euo pipefail
+          npm install --global bun@[[ npm("bun") ]][% else %]
+      - uses: [[ uses("pnpm/action-setup") ]]
+        with:
+          package_json_file: web/package.json[% endif %][% endif %]
+      - uses: ./.github/actions/setup-spinup
+      - run: |
+          set -euo pipefail
+          cp .env.example .env
+          chmod 0600 .env
+          spinup check --allow-behind
+          spinup doctor

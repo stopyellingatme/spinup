@@ -3161,8 +3161,8 @@
     "files": [
       {
         "pack": "_sample",
-        "source": "files/api/cmd/main.go.tmpl",
-        "path": "api/cmd/[[ data.app_name ]]/main.go",
+        "source": "files/api/cmd/main.txt.tmpl",
+        "path": "api/cmd/[[ data.app_name ]]/main.txt",
         "mode": "0644"
       },
       {

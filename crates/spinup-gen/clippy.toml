@@ -1,0 +1,20 @@
+# Generators return a plan and never write to disk (rust-plan.md §1, ADR 0007).
+# This file replaces the root clippy.toml for this crate: it keeps the subprocess bans and
+# adds the file-write bans. Only spinup-vfs and spinup-manifest write files.
+disallowed-types = [
+  { path = "std::process::Command", reason = "run subprocesses through spinup_exec::runner::Runner" },
+  { path = "tokio::process::Command", reason = "run subprocesses through spinup_exec::runner::Runner", allow-invalid = true },
+]
+disallowed-methods = [
+  { path = "std::process::Command::new", reason = "run subprocesses through spinup_exec::runner::Runner" },
+  { path = "tokio::process::Command::new", reason = "run subprocesses through spinup_exec::runner::Runner", allow-invalid = true },
+  { path = "std::fs::write", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::File::create", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::File::create_new", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::create_dir", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::create_dir_all", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::remove_file", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::remove_dir_all", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::rename", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::OpenOptions::open", reason = "generators return a plan; spinup-vfs applies it" },
+]

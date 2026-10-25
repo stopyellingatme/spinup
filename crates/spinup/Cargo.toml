@@ -1,0 +1,24 @@
+[package]
+name = "spinup"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "spinup"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+# spinup-cli is the only logic dependency. The other crates are here only for the wire
+# list in src/wire_gen.rs (ADR 0020 §5).
+[dependencies]
+spinup-cli = { workspace = true }
+spinup-doctor = { workspace = true }
+spinup-gen = { workspace = true }
+spinup-migrate = { workspace = true }
+spinup-upgrade = { workspace = true }

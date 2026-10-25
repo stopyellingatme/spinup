@@ -1,0 +1,113 @@
+name = "web"
+description = "SvelteKit 3 web app with Tailwind, shadcn-svelte, and a same-origin API client."
+requires = ["api"]
+
+# The lock records the shadcn-svelte registry version of the seed components (critic resolution 6).
+# `spinup upgrade --ui` compares it with the registry version of a newer spinup.
+[[questions]]
+key = "shadcn_registry"
+prompt = "shadcn-svelte registry version"
+type = "string"
+default = "1.7.0"
+pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+# The npm inputs, the lockfile, and the shadcn-svelte components are in pack.d/deps.toml and
+# pack.d/shadcn.toml (main loop only).
+
+[[files]]
+path = "web/vite.config.js"
+when = "frontend_mode != 'embed'"
+source = "files/web/vite.config.js"
+class = "managed"
+
+[[files]]
+path = "web/tsconfig.json"
+source = "files/web/tsconfig.json"
+class = "managed"
+
+[[files]]
+path = "web/.gitignore"
+source = "files/web/gitignore"
+class = "managed"
+
+[[files]]
+path = "web/.dockerignore"
+source = "files/web/dockerignore"
+class = "managed"
+
+[[files]]
+path = "web/components.json"
+source = "files/web/components.json"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.html"
+source = "files/web/src/app.html.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.css"
+source = "files/web/src/app.css"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.d.ts"
+source = "files/web/src/app.d.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/env.ts"
+source = "files/web/src/env.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/hooks.server.ts"
+when = "frontend_mode != 'embed'"
+source = "files/web/src/hooks.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/utils.ts"
+source = "files/web/src/lib/utils.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/api/client.ts"
+when = "api_client != 'heyapi'"
+source = "files/web/src/lib/api/client.ts"
+class = "scaffold"
+
+# Tool output: the client post-step overwrites it with openapi-typescript output.
+[[files]]
+path = "web/src/lib/api/schema.d.ts"
+source = "files/web/src/lib/api/schema.d.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/routes/+layout.svelte"
+when = "frontend_mode != 'embed'"
+source = "files/web/src/routes/+layout.svelte.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/+layout.server.ts"
+when = "frontend_mode != 'embed'"
+source = "files/web/src/routes/+layout.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/+page.svelte"
+source = "files/web/src/routes/+page.svelte.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/healthz/+server.ts"
+when = "frontend_mode != 'embed'"
+source = "files/web/src/routes/healthz/+server.ts"
+class = "managed"
+
+[[files]]
+path = "deploy/Dockerfile.web"
+when = "frontend_mode != 'embed'"
+source = "files/deploy/Dockerfile.web.tmpl"
+class = "managed"

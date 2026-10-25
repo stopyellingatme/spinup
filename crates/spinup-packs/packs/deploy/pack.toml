@@ -1,0 +1,70 @@
+name = "deploy"
+description = "Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments."
+requires = ["api"]
+
+[[questions]]
+key = "db_version"
+prompt = "PostgreSQL major version"
+type = "enum"
+choices = ["18", "17", "16"]
+default = "18"
+
+# The color project: api, web, and the one-shot migrate (ADR 0003). spinup deploy runs it as
+# <app>-blue or <app>-green.
+[[files]]
+path = "deploy/compose.yml"
+source = "files/deploy/compose.yml.tmpl"
+class = "managed"
+
+# The extension point of compose.yml. spinup never changes it after `spinup new`.
+[[files]]
+path = "deploy/compose.override.yml"
+source = "files/deploy/compose.override.yml"
+class = "seed"
+
+# The base project <app>: Caddy and Postgres. A color switch never restarts it.
+[[files]]
+path = "deploy/compose.edge.yml"
+source = "files/deploy/compose.edge.yml.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/Caddyfile"
+source = "files/deploy/Caddyfile.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/Caddyfile.d/.gitkeep"
+source = "files/deploy/Caddyfile.d/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "deploy/Dockerfile.postgres"
+source = "files/deploy/Dockerfile.postgres.tmpl"
+class = "managed"
+
+[[files]]
+path = "deploy/postgres/postgresql.conf"
+source = "files/deploy/postgres/postgresql.conf"
+class = "managed"
+
+# The extension point of postgresql.conf. The backups pack adds its archive settings here.
+[[files]]
+path = "deploy/postgres/conf.d/.gitkeep"
+source = "files/deploy/postgres/conf.d/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "deploy/environments/staging.toml"
+source = "files/deploy/environments/staging.toml.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "deploy/environments/production.toml"
+source = "files/deploy/environments/production.toml.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "deploy/cloud-init/user-data.yaml"
+source = "files/deploy/cloud-init/user-data.yaml.tmpl"
+class = "managed"

@@ -1,0 +1,10 @@
+[[questions]]
+key = "greeting"
+prompt = "Greeting"
+type = "string"
+default = "Hello"
+
+[[files]]
+path = "greeting.txt"
+source = "files/greeting.txt.tmpl"
+class = "seed"

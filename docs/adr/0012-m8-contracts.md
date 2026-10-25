@@ -23,6 +23,8 @@ A release `v<version>` of the CLI repository publishes these assets. Other units
 
 ## 2. Versions and signing
 
+Superseded by ADR 0020 §3 (R1 contracts) for the trusted keys of the Rust CLI (`trusted_keys.txt`).
+
 - The CLI and the kit share the minor version (ADR 0001). A release tags `v<version>` and `kit/v<version>` on the same commit. `scripts/release/check.sh` fails when the kit has changes since the last kit tag and the tags would differ in minor, or when `CHANGELOG.md` has no section for the version.
 - Binaries and `checksums.txt` are signed with cosign keyless signing in GitHub Actions (OIDC). `actions/attest-build-provenance` adds a provenance attestation.
 - The template archive is signed with ed25519, because the CLI verifies it offline with the standard library (`internal/templates/store`). The private key is the GitHub secret `SPINUP_TEMPLATES_SIGNING_KEY` (base64). The maintainer creates the key pair once with `go run ./scripts/release/keygen` and adds the public key to `store.TrustedKeys`. That is a manual step, not done by a unit: a release fails when `TrustedKeys` is empty.

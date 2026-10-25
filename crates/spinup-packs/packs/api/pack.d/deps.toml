@@ -1,0 +1,23 @@
+# Go module and dev-tool lockfiles for the generated API.
+# Main loop only: scripts/bump-stack.sh regenerates the four sources below from stackversions.yaml.
+# Units never edit this fragment or its sources.
+
+[[files]]
+path = "api/go.mod"
+source = "files/api/go.mod.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/go.sum"
+source = "files/api/go.sum"
+class = "scaffold"
+
+[[files]]
+path = "api/tools.mod"
+source = "files/api/tools.mod.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/tools.sum"
+source = "files/api/tools.sum"
+class = "managed"

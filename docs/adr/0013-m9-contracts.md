@@ -26,6 +26,8 @@ The M9 units run in parallel. These decisions fix the contracts between them. Ar
 
 ## 4. Pack plugins (`internal/plugin`, units M9.4 and M9.5)
 
+Superseded by ADR 0020 §4 (R1 contracts) for the Rust CLI: minijinja plugin packs and the `PluginSource` seam.
+
 - A plugin is a pack directory (`pack.toml`, `pack.d/`, `files/`) plus `plugin.toml`: `name`, `version`, `api = 1`, `spinup` (a version range of the CLI), `description`, and optional `[[generators]]` (declarative generators: `name`, `short`, `usage`, `args` names, and `[[generators.files]]` with `path`, `source`, `class`; paths and sources are templates over the arguments).
 - `spinup.toml` declares `[[plugins]] name, source, version`. Sources: a local directory (`path:./plugins/foo`) or a git repository and tag (`git:https://host/owner/repo` with `version` as the tag, fetched with the `git` binary through `internal/exec`). spinup never runs code from a plugin: tier-1 plugins are data (templates and metadata).
 - The plugin's hash is the SHA-256 of its normalized tree (sorted paths, LF-normalized text, modes), so a re-fetch gives the same hash. `spinup.lock` records `name`, `version`, `api`, and `sha256`.

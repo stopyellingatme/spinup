@@ -1,0 +1,30 @@
+[% set v_pg = "postgres" %][% if (data.db_version == "17") %][% set v_pg = "postgres-17" %][% else %][% if (data.db_version == "16") %][% set v_pg = "postgres-16" %][% endif %][% endif %]# Managed by spinup: `spinup upgrade` keeps this file current.
+# Build context is deploy/ (compose.edge.yml builds it):
+#   docker build -f deploy/Dockerfile.postgres deploy
+#
+# The official Postgres image already has the apt.postgresql.org repository. pgBackRest comes
+# from it at the version that spinup pins. The backups pack sets archive_mode and
+# archive_command in deploy/compose.backups.yml, an override of compose.edge.yml.
+FROM [[ image(v_pg) ]]
+ARG PGBACKREST_VERSION=[[ get(data.Stack.Apt, "pgbackrest") ]]
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}-*" \
+ && rm -rf /var/lib/apt/lists/*
+
+# WAL-G supports the optional walg backend. Verify the asset before extraction.
+# TARGETARCH follows the target image, including a cross-platform build.
+ARG TARGETARCH
+RUN set -eu; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in \
+      amd64) asset='[[ ((get(((get(data.Stack.Binaries, "wal-g"))).Assets, "linux-amd64"))).Name ]]'; checksum='[[ ((get(((get(data.Stack.Binaries, "wal-g"))).Assets, "linux-amd64"))).SHA256 ]]' ;; \
+      arm64) asset='[[ ((get(((get(data.Stack.Binaries, "wal-g"))).Assets, "linux-arm64"))).Name ]]'; checksum='[[ ((get(((get(data.Stack.Binaries, "wal-g"))).Assets, "linux-arm64"))).SHA256 ]]' ;; \
+      *) echo 'Unsupported WAL-G architecture' >&2; exit 1 ;; \
+    esac; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl libsodium23 liblzo2-2; \
+    curl --fail --location --retry 3 "https://github.com/[[ ((get(data.Stack.Binaries, "wal-g"))).Repo ]]/releases/download/v[[ ((get(data.Stack.Binaries, "wal-g"))).Version ]]/$asset" -o /tmp/wal-g.tar.gz; \
+    printf '%s  /tmp/wal-g.tar.gz\n' "$checksum" | sha256sum -c -; \
+    mkdir /tmp/wal-g; \
+    tar -xzf /tmp/wal-g.tar.gz -C /tmp/wal-g; \
+    install -m 0755 "/tmp/wal-g/${asset%.tar.gz}" /usr/local/bin/wal-g; \
+    rm -rf /tmp/wal-g /tmp/wal-g.tar.gz /var/lib/apt/lists/*

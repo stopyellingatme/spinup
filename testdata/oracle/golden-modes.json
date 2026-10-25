@@ -1,0 +1,358 @@
+[
+  {
+    "name": "empty tree",
+    "files": [],
+    "manifest": "",
+    "error": ""
+  },
+  {
+    "name": "default mode",
+    "files": [
+      {
+        "path": "readme.txt",
+        "mode": "0644",
+        "data": "hello\n"
+      }
+    ],
+    "manifest": "",
+    "error": ""
+  },
+  {
+    "name": "sorted nondefault modes",
+    "files": [
+      {
+        "path": "a/config",
+        "mode": "0600",
+        "data": "private\n"
+      },
+      {
+        "path": "a/default.txt",
+        "mode": "0644",
+        "data": ""
+      },
+      {
+        "path": "a/space name",
+        "mode": "0640",
+        "data": "space\n"
+      },
+      {
+        "path": "z.sh",
+        "mode": "0755",
+        "data": "#!/bin/sh\n"
+      },
+      {
+        "path": "é.txt",
+        "mode": "0664",
+        "data": "unicode\n"
+      }
+    ],
+    "manifest": "0600 a/config\n0640 a/space name\n0755 z.sh\n0664 é.txt\n",
+    "error": ""
+  },
+  {
+    "name": "read-00",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "",
+    "error": ""
+  },
+  {
+    "name": "read-01",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "\n\n",
+    "error": ""
+  },
+  {
+    "name": "read-02",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 file\n",
+    "error": ""
+  },
+  {
+    "name": "read-03",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "644 file",
+    "error": ""
+  },
+  {
+    "name": "read-04",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 space name\n",
+    "error": ""
+  },
+  {
+    "name": "read-05",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 file\n\n0644 space name\n",
+    "error": ""
+  },
+  {
+    "name": "read-06",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0755 file\n",
+    "error": "golden oracle: mode: file: want 0755, got 0644\nTry: inspect the render or run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-07",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0000 file\n",
+    "error": "golden oracle: mode: file: want 0000, got 0644\nTry: inspect the render or run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-08",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 missing\n",
+    "error": "read golden oracle: invalid .modes entry \"0644 missing\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-09",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 file\n0600 file\n",
+    "error": "read golden oracle: invalid .modes entry \"0600 file\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-10",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0999 file\n",
+    "error": "read golden oracle: invalid .modes entry \"0999 file\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-11",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "1000 file\n",
+    "error": "read golden oracle: invalid .modes entry \"1000 file\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-12",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644\n",
+    "error": "read golden oracle: invalid .modes entry \"0644\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-13",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644  file\n",
+    "error": "read golden oracle: invalid .modes entry \"0644  file\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-14",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 file\r\n",
+    "error": "read golden oracle: invalid .modes entry \"0644 file\\r\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-15",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 .modes\n",
+    "error": "read golden oracle: invalid .modes entry \"0644 .modes\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "read-16",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": "0644 ../file\n",
+    "error": "read golden oracle: invalid .modes entry \"0644 ../file\"\nTry: run make golden PACK=oracle UPDATE=1"
+  },
+  {
+    "name": "missing manifest",
+    "files": [
+      {
+        "path": "file",
+        "mode": "0644",
+        "data": "data\n"
+      },
+      {
+        "path": "space name",
+        "mode": "0644",
+        "data": "space\n"
+      }
+    ],
+    "manifest": null,
+    "error": ""
+  }
+]

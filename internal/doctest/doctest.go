@@ -1,4 +1,8 @@
 // Package doctest runs console blocks in documentation pages.
+//
+// A console block can use <!-- doctest: only go --> or <!-- doctest: only rust -->.
+// Adjacent directives can also require environment variables or skip a block.
+// The test runner uses SPINUP_BIN for Rust pages and otherwise builds the Go CLI.
 package doctest
 
 import (
@@ -25,6 +29,7 @@ type Page struct {
 type Block struct {
 	Line        int
 	Skip        bool
+	Only        string
 	RequiresEnv []string
 	Steps       []Step
 }
@@ -47,8 +52,9 @@ type Failure struct {
 
 // Env gives RunPage the binary directory and extra environment values.
 type Env struct {
-	Bin  string
-	Vars []string
+	Bin            string
+	Vars           []string
+	Implementation string
 }
 
 // Parse reads console blocks from a Markdown page.
@@ -66,9 +72,9 @@ func Parse(path string, data []byte) (Page, error) {
 			continue
 		}
 		block := Block{Line: index + 1}
-		if index > 0 {
+		for preceding := index - 1; preceding >= 0 && strings.HasPrefix(strings.TrimSpace(lines[preceding]), "<!-- doctest:"); preceding-- {
 			var err error
-			block, err = directive(path, index, lines[index-1], block)
+			block, err = directive(path, preceding+1, lines[preceding], block)
 			if err != nil {
 				return Page{}, err
 			}
@@ -119,6 +125,15 @@ func directive(path string, line int, text string, block Block) (Block, error) {
 		block.Skip = true
 		return block, nil
 	}
+	for _, implementation := range []string{"go", "rust"} {
+		if text == "<!-- doctest: only "+implementation+" -->" {
+			if block.Only != "" && block.Only != implementation {
+				return Block{}, fmt.Errorf("%s:%d: conflicting doctest implementations\nTry: use one doctest: only directive per block", path, line)
+			}
+			block.Only = implementation
+			return block, nil
+		}
+	}
 	const prefix = "<!-- doctest: requires-env "
 	if strings.HasPrefix(text, prefix) && strings.HasSuffix(text, " -->") {
 		name := strings.TrimSuffix(strings.TrimPrefix(text, prefix), " -->")
@@ -127,7 +142,7 @@ func directive(path string, line int, text string, block Block) (Block, error) {
 			return block, nil
 		}
 	}
-	return Block{}, fmt.Errorf("%s:%d: unknown doctest directive", path, line)
+	return Block{}, fmt.Errorf("%s:%d: unknown doctest directive\nTry: use skip, requires-env NAME, only go, or only rust", path, line)
 }
 
 func validEnvName(name string) bool {
@@ -260,10 +275,14 @@ func RunPage(ctx context.Context, runner exec.Runner, page Page, env Env) []Fail
 		return []Failure{{Path: page.Path, Message: fmt.Sprintf("make temporary directory: %v", err)}}
 	}
 	defer os.RemoveAll(directory)
+	implementation := env.Implementation
+	if implementation == "" {
+		implementation = "go"
+	}
 	current := directory
 	var failures []Failure
 	for _, block := range page.Blocks {
-		if block.Skip || missingEnv(block.RequiresEnv, env.Vars) {
+		if block.Skip || block.Only != "" && block.Only != implementation || missingEnv(block.RequiresEnv, env.Vars) {
 			continue
 		}
 		for _, step := range block.Steps {

@@ -245,7 +245,8 @@ Go shared files (`go.mod`, `go.sum`, `go.work`, `deps_m*.go`, the Go contract fi
 | Tool | Version | Note |
 |---|---|---|
 | Rust | 1.99.1 (edition 2024) | Pinned in `rust-toolchain.toml` with `rustfmt`, `clippy`, and the target list. The Mac default is 1.91.1. sqlx 0.9 needs 1.94 or newer. |
-| cargo-nextest | 0.9.149 | Installed copy is 0.9.146. |
+| cargo-nextest | 0.9.146 | Installed. Pinned exactly in `scripts/rust/tools-check.sh` and `rust.yml` (user, 2026-10-25). |
+| cargo-llvm-cov | 0.9.1 | Installed. `make rs-cover`. Pinned exactly in `scripts/rust/tools-check.sh` and `rust.yml`. |
 | sqlx-cli | 0.9.0 | Installed. It cannot install with `--locked`, so `tools-check` pins by version. |
 | cargo-deny | 0.20.2 | Installed. Replaces `govulncheck` and checks licenses. The main loop fetches the advisory database. |
 | sccache | 0.19.0 | Installed. Lanes do not use it: its Rust cache key holds the absolute target path (R0.13). |

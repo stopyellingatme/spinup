@@ -1,0 +1,11 @@
+# Managed by spinup.
+[Unit]
+Description=Backup diff timer for [[ data.app_name ]]
+
+[Timer]
+OnCalendar=[[ go_default("Mon..Sat *-*-* 03:00:00", (get(data, "schedule_diff"))) ]]
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

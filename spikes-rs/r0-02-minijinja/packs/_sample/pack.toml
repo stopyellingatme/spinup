@@ -29,8 +29,8 @@ type = "bool"
 default = false
 
 [[files]]
-path = "api/cmd/[[ data.app_name ]]/main.go"
-source = "files/api/cmd/main.go.tmpl"
+path = "api/cmd/[[ data.app_name ]]/main.txt"
+source = "files/api/cmd/main.txt.tmpl"
 class = "scaffold"
 since = "0.1.0"
 

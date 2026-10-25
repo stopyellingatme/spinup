@@ -1,0 +1,23 @@
+# The web variants of ADR 0014 §2 and §3. Main loop only: package.json.tmpl and the lockfiles
+# (pack.d/deps.toml) read these answers, so units never edit this fragment.
+
+[[questions]]
+key = "frontend_mode"
+prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the Go binary)"
+type = "enum"
+choices = ["node", "embed"]
+default = "node"
+
+[[questions]]
+key = "package_manager"
+prompt = "JavaScript package manager"
+type = "enum"
+choices = ["pnpm", "bun"]
+default = "pnpm"
+
+[[questions]]
+key = "api_client"
+prompt = "Generated API client (openapi-fetch or heyapi)"
+type = "enum"
+choices = ["openapi-fetch", "heyapi"]
+default = "openapi-fetch"

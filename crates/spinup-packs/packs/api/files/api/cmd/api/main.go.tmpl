@@ -1,0 +1,86 @@
+package main
+
+import (
+ "context"
+ "errors"
+ "fmt"
+ "net/http"
+ "os"
+ "os/signal"
+ "syscall"
+
+ "[[ data.module ]]/api/db/migrations"
+ "[[ data.module ]]/api/internal/routes"
+ "[[ data.module ]]/api/openapi"[% if ((get(data, "frontend_mode")) == "embed") %]
+ "[[ data.module ]]/api/internal/webdist"[% endif %][% if has("mail", data.modules) %]
+ mailapp "[[ data.module ]]/api/internal/mail"[% endif %]
+ "github.com/stopyellingatme/spinup/kit/app"[% if has("auth", data.modules) %]
+ "github.com/stopyellingatme/spinup/kit/auth"[% endif %]
+ "github.com/stopyellingatme/spinup/kit/config"
+ "github.com/stopyellingatme/spinup/kit/db"
+ "github.com/stopyellingatme/spinup/kit/telemetry"[% if has("jobs", data.modules) %]
+ "github.com/stopyellingatme/spinup/kit/jobs"[% endif %]
+)
+
+var version = "dev"
+
+func main() {
+ if err := run(); err != nil {
+  fmt.Fprintln(os.Stderr, err)
+  os.Exit(1)
+ }
+}
+
+func run() (err error) {
+ var cfg config.Base
+ if err := config.Load(&cfg); err != nil {
+  return err
+ }
+ ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+ defer stop()
+ shutdown, err := telemetry.Setup(ctx, telemetry.Options{ServiceName: [[ quote((go_printf("%s-api", data.app_name))) ]], ServiceVersion: version, Environment: cfg.Env})
+ if err != nil { return err }
+ defer func() {
+  shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+  defer cancel()
+  err = errors.Join(err, shutdown(shutdownCtx))
+ }()
+ pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithMaxConns(cfg.DatabaseMaxConns))
+ if err != nil {
+  return err
+ }[% if has("mail", data.modules) %]
+ mailers, err := mailapp.New(pool)
+ if err != nil { return err }
+ _ = mailers // Pass this dependency to application handlers that send mail.[% endif %][% if has("auth", data.modules) %]
+ // The web app posts its form actions from PUBLIC_ORIGIN, so the CSRF check trusts it.
+ var web struct {
+  PublicOrigin string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
+ }
+ if err := config.Load(&web); err != nil {
+  return err
+ }
+ authn, err := auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))
+ if err != nil {
+  return err
+ }[% if has("mail", data.modules) %]
+ resetRoutes, err := passwordResetRoutes(authn, mailers, web.PublicOrigin)
+ if err != nil { return err }[% endif %][% endif %]
+ a := app.New(
+  app.WithName([[ quote(data.app_name) ]]),
+  app.WithVersion(version),
+  app.WithConfig(cfg),
+  app.WithAPIDocs(openapi.FS),[% if ((get(data, "frontend_mode")) == "embed") %]
+  app.WithSPA(webdist.FS),[% endif %]
+  app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),[% if has("auth", data.modules) %]
+  app.WithMiddleware(authn.Middleware()),
+  app.WithRoutes(authn.Routes),[% if has("mail", data.modules) %]
+  app.WithRoutes(resetRoutes),[% endif %][% endif %][% if has("mail", data.modules) %][% if has("jobs", data.modules) %]
+  app.WithCommand("mail-worker", mailers.WorkerCommand(pool)),[% endif %][% endif %]
+  app.WithReadiness("db", pool.Ping),
+  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[% if has("jobs", data.modules) %], db.WithHook(jobs.MigrationHook())[% endif %])),[% if has("jobs", data.modules) %]
+  app.WithCommand("jobs-migrate", jobs.MigrateCommand(jobs.WithMigrateDatabaseURL(cfg.DatabaseURL))),[% endif %]
+  app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),[% if has("auth", data.modules) %]
+  app.WithShutdown(authn.Close),[% endif %]
+ )
+ return a.Run(ctx, os.Args[1:])
+}
