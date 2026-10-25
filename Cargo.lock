@@ -1204,6 +1204,7 @@ name = "spinup-merge"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "regex",
  "spinup-compat",
  "spinup-exec",
  "tempfile",
