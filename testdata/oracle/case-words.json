@@ -1,0 +1,236 @@
+[
+  {
+    "input": "",
+    "lower": "",
+    "upper": "",
+    "snake": "",
+    "kebab": "",
+    "camel": "",
+    "pascal": ""
+  },
+  {
+    "input": "word",
+    "lower": "word",
+    "upper": "WORD",
+    "snake": "word",
+    "kebab": "word",
+    "camel": "word",
+    "pascal": "Word"
+  },
+  {
+    "input": "helloWorld",
+    "lower": "helloworld",
+    "upper": "HELLOWORLD",
+    "snake": "hello_world",
+    "kebab": "hello-world",
+    "camel": "helloWorld",
+    "pascal": "HelloWorld"
+  },
+  {
+    "input": "HTTPServer",
+    "lower": "httpserver",
+    "upper": "HTTPSERVER",
+    "snake": "http_server",
+    "kebab": "http-server",
+    "camel": "httpServer",
+    "pascal": "HttpServer"
+  },
+  {
+    "input": "XMLHTTPAPI",
+    "lower": "xmlhttpapi",
+    "upper": "XMLHTTPAPI",
+    "snake": "xmlhttpapi",
+    "kebab": "xmlhttpapi",
+    "camel": "xmlhttpapi",
+    "pascal": "Xmlhttpapi"
+  },
+  {
+    "input": "getHTTPResponse",
+    "lower": "gethttpresponse",
+    "upper": "GETHTTPRESPONSE",
+    "snake": "get_http_response",
+    "kebab": "get-http-response",
+    "camel": "getHttpResponse",
+    "pascal": "GetHttpResponse"
+  },
+  {
+    "input": "userID",
+    "lower": "userid",
+    "upper": "USERID",
+    "snake": "user_id",
+    "kebab": "user-id",
+    "camel": "userId",
+    "pascal": "UserId"
+  },
+  {
+    "input": "userID2FA",
+    "lower": "userid2fa",
+    "upper": "USERID2FA",
+    "snake": "user_id2_fa",
+    "kebab": "user-id2-fa",
+    "camel": "userId2Fa",
+    "pascal": "UserId2Fa"
+  },
+  {
+    "input": "version2HTTPServer",
+    "lower": "version2httpserver",
+    "upper": "VERSION2HTTPSERVER",
+    "snake": "version2_http_server",
+    "kebab": "version2-http-server",
+    "camel": "version2HttpServer",
+    "pascal": "Version2HttpServer"
+  },
+  {
+    "input": "123abc",
+    "lower": "123abc",
+    "upper": "123ABC",
+    "snake": "123abc",
+    "kebab": "123abc",
+    "camel": "123abc",
+    "pascal": "123abc"
+  },
+  {
+    "input": "123ABC",
+    "lower": "123abc",
+    "upper": "123ABC",
+    "snake": "123_abc",
+    "kebab": "123-abc",
+    "camel": "123Abc",
+    "pascal": "123Abc"
+  },
+  {
+    "input": "snake_case",
+    "lower": "snake_case",
+    "upper": "SNAKE_CASE",
+    "snake": "snake_case",
+    "kebab": "snake-case",
+    "camel": "snakeCase",
+    "pascal": "SnakeCase"
+  },
+  {
+    "input": "kebab-case",
+    "lower": "kebab-case",
+    "upper": "KEBAB-CASE",
+    "snake": "kebab_case",
+    "kebab": "kebab-case",
+    "camel": "kebabCase",
+    "pascal": "KebabCase"
+  },
+  {
+    "input": " dots.and/slashes\\tabs\there ",
+    "lower": " dots.and/slashes\\tabs\there ",
+    "upper": " DOTS.AND/SLASHES\\TABS\tHERE ",
+    "snake": "dots_and_slashes_tabs_here",
+    "kebab": "dots-and-slashes-tabs-here",
+    "camel": "dotsAndSlashesTabsHere",
+    "pascal": "DotsAndSlashesTabsHere"
+  },
+  {
+    "input": "__--..",
+    "lower": "__--..",
+    "upper": "__--..",
+    "snake": "",
+    "kebab": "",
+    "camel": "",
+    "pascal": ""
+  },
+  {
+    "input": "two  words",
+    "lower": "two  words",
+    "upper": "TWO  WORDS",
+    "snake": "two_words",
+    "kebab": "two-words",
+    "camel": "twoWords",
+    "pascal": "TwoWords"
+  },
+  {
+    "input": "écoleÉté",
+    "lower": "écoleété",
+    "upper": "ÉCOLEÉTÉ",
+    "snake": "école_été",
+    "kebab": "école-été",
+    "camel": "écoleÉté",
+    "pascal": "ÉcoleÉté"
+  },
+  {
+    "input": "ÉCOLEÉté",
+    "lower": "écoleété",
+    "upper": "ÉCOLEÉTÉ",
+    "snake": "école_été",
+    "kebab": "école-été",
+    "camel": "écoleÉté",
+    "pascal": "ÉcoleÉté"
+  },
+  {
+    "input": "Straße",
+    "lower": "straße",
+    "upper": "STRAßE",
+    "snake": "straße",
+    "kebab": "straße",
+    "camel": "straße",
+    "pascal": "Straße"
+  },
+  {
+    "input": "İstanbul",
+    "lower": "istanbul",
+    "upper": "İSTANBUL",
+    "snake": "istanbul",
+    "kebab": "istanbul",
+    "camel": "istanbul",
+    "pascal": "Istanbul"
+  },
+  {
+    "input": "Σίσυφος",
+    "lower": "σίσυφος",
+    "upper": "ΣΊΣΥΦΟΣ",
+    "snake": "σίσυφος",
+    "kebab": "σίσυφος",
+    "camel": "σίσυφος",
+    "pascal": "Σίσυφος"
+  },
+  {
+    "input": "Kelvin",
+    "lower": "kelvin",
+    "upper": "KELVIN",
+    "snake": "kelvin",
+    "kebab": "kelvin",
+    "camel": "kelvin",
+    "pascal": "Kelvin"
+  },
+  {
+    "input": "中文API名字",
+    "lower": "中文api名字",
+    "upper": "中文API名字",
+    "snake": "中文api名字",
+    "kebab": "中文api名字",
+    "camel": "中文api名字",
+    "pascal": "中文api名字"
+  },
+  {
+    "input": "áB",
+    "lower": "áb",
+    "upper": "ÁB",
+    "snake": "a_b",
+    "kebab": "a-b",
+    "camel": "aB",
+    "pascal": "AB"
+  },
+  {
+    "input": "a😀B",
+    "lower": "a😀b",
+    "upper": "A😀B",
+    "snake": "a_b",
+    "kebab": "a-b",
+    "camel": "aB",
+    "pascal": "AB"
+  },
+  {
+    "input": "a\u0000B",
+    "lower": "a\u0000b",
+    "upper": "A\u0000B",
+    "snake": "a_b",
+    "kebab": "a-b",
+    "camel": "aB",
+    "pascal": "AB"
+  }
+]

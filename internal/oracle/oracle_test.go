@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-var update = flag.Bool("update", false, "regenerate the R0.5 oracle fixtures")
+var update = flag.Bool("update", false, "regenerate the frozen Go oracle fixtures")
 var rustArchive = flag.String("rust-archive", "", "also validate a Rust archive with the Go reader")
 
 func TestFixtures(t *testing.T) {

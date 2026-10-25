@@ -1,0 +1,1066 @@
+[
+  {
+    "input": "",
+    "expected": "\"\""
+  },
+  {
+    "input": "YQ0KYgoK",
+    "expected": "\"a\\r\\nb\\n\\n\""
+  },
+  {
+    "input": "8JCAgPSPv7/vv77vv78=",
+    "expected": "\"𐀀\\U0010ffff\\ufffe\\uffff\""
+  },
+  {
+    "input": "4oCq4oCu4oGm4oGpwq0=",
+    "expected": "\"\\u202a\\u202e\\u2066\\u2069\\u00ad\""
+  },
+  {
+    "input": "wK8=",
+    "expected": "\"\\xc0\\xaf\""
+  },
+  {
+    "input": "7aCA",
+    "expected": "\"\\xed\\xa0\\x80\""
+  },
+  {
+    "input": "9JCAgA==",
+    "expected": "\"\\xf4\\x90\\x80\\x80\""
+  },
+  {
+    "input": "4oI=",
+    "expected": "\"\\xe2\\x82\""
+  },
+  {
+    "input": "gP/+",
+    "expected": "\"\\x80\\xff\\xfe\""
+  },
+  {
+    "input": "dmFsaWQg77+9",
+    "expected": "\"valid �\""
+  },
+  {
+    "input": "AA==",
+    "expected": "\"\\x00\""
+  },
+  {
+    "input": "AQ==",
+    "expected": "\"\\x01\""
+  },
+  {
+    "input": "Ag==",
+    "expected": "\"\\x02\""
+  },
+  {
+    "input": "Aw==",
+    "expected": "\"\\x03\""
+  },
+  {
+    "input": "BA==",
+    "expected": "\"\\x04\""
+  },
+  {
+    "input": "BQ==",
+    "expected": "\"\\x05\""
+  },
+  {
+    "input": "Bg==",
+    "expected": "\"\\x06\""
+  },
+  {
+    "input": "Bw==",
+    "expected": "\"\\a\""
+  },
+  {
+    "input": "CA==",
+    "expected": "\"\\b\""
+  },
+  {
+    "input": "CQ==",
+    "expected": "\"\\t\""
+  },
+  {
+    "input": "Cg==",
+    "expected": "\"\\n\""
+  },
+  {
+    "input": "Cw==",
+    "expected": "\"\\v\""
+  },
+  {
+    "input": "DA==",
+    "expected": "\"\\f\""
+  },
+  {
+    "input": "DQ==",
+    "expected": "\"\\r\""
+  },
+  {
+    "input": "Dg==",
+    "expected": "\"\\x0e\""
+  },
+  {
+    "input": "Dw==",
+    "expected": "\"\\x0f\""
+  },
+  {
+    "input": "EA==",
+    "expected": "\"\\x10\""
+  },
+  {
+    "input": "EQ==",
+    "expected": "\"\\x11\""
+  },
+  {
+    "input": "Eg==",
+    "expected": "\"\\x12\""
+  },
+  {
+    "input": "Ew==",
+    "expected": "\"\\x13\""
+  },
+  {
+    "input": "FA==",
+    "expected": "\"\\x14\""
+  },
+  {
+    "input": "FQ==",
+    "expected": "\"\\x15\""
+  },
+  {
+    "input": "Fg==",
+    "expected": "\"\\x16\""
+  },
+  {
+    "input": "Fw==",
+    "expected": "\"\\x17\""
+  },
+  {
+    "input": "GA==",
+    "expected": "\"\\x18\""
+  },
+  {
+    "input": "GQ==",
+    "expected": "\"\\x19\""
+  },
+  {
+    "input": "Gg==",
+    "expected": "\"\\x1a\""
+  },
+  {
+    "input": "Gw==",
+    "expected": "\"\\x1b\""
+  },
+  {
+    "input": "HA==",
+    "expected": "\"\\x1c\""
+  },
+  {
+    "input": "HQ==",
+    "expected": "\"\\x1d\""
+  },
+  {
+    "input": "Hg==",
+    "expected": "\"\\x1e\""
+  },
+  {
+    "input": "Hw==",
+    "expected": "\"\\x1f\""
+  },
+  {
+    "input": "IA==",
+    "expected": "\" \""
+  },
+  {
+    "input": "IQ==",
+    "expected": "\"!\""
+  },
+  {
+    "input": "Ig==",
+    "expected": "\"\\\"\""
+  },
+  {
+    "input": "Iw==",
+    "expected": "\"#\""
+  },
+  {
+    "input": "JA==",
+    "expected": "\"$\""
+  },
+  {
+    "input": "JQ==",
+    "expected": "\"%\""
+  },
+  {
+    "input": "Jg==",
+    "expected": "\"\u0026\""
+  },
+  {
+    "input": "Jw==",
+    "expected": "\"'\""
+  },
+  {
+    "input": "KA==",
+    "expected": "\"(\""
+  },
+  {
+    "input": "KQ==",
+    "expected": "\")\""
+  },
+  {
+    "input": "Kg==",
+    "expected": "\"*\""
+  },
+  {
+    "input": "Kw==",
+    "expected": "\"+\""
+  },
+  {
+    "input": "LA==",
+    "expected": "\",\""
+  },
+  {
+    "input": "LQ==",
+    "expected": "\"-\""
+  },
+  {
+    "input": "Lg==",
+    "expected": "\".\""
+  },
+  {
+    "input": "Lw==",
+    "expected": "\"/\""
+  },
+  {
+    "input": "MA==",
+    "expected": "\"0\""
+  },
+  {
+    "input": "MQ==",
+    "expected": "\"1\""
+  },
+  {
+    "input": "Mg==",
+    "expected": "\"2\""
+  },
+  {
+    "input": "Mw==",
+    "expected": "\"3\""
+  },
+  {
+    "input": "NA==",
+    "expected": "\"4\""
+  },
+  {
+    "input": "NQ==",
+    "expected": "\"5\""
+  },
+  {
+    "input": "Ng==",
+    "expected": "\"6\""
+  },
+  {
+    "input": "Nw==",
+    "expected": "\"7\""
+  },
+  {
+    "input": "OA==",
+    "expected": "\"8\""
+  },
+  {
+    "input": "OQ==",
+    "expected": "\"9\""
+  },
+  {
+    "input": "Og==",
+    "expected": "\":\""
+  },
+  {
+    "input": "Ow==",
+    "expected": "\";\""
+  },
+  {
+    "input": "PA==",
+    "expected": "\"\u003c\""
+  },
+  {
+    "input": "PQ==",
+    "expected": "\"=\""
+  },
+  {
+    "input": "Pg==",
+    "expected": "\"\u003e\""
+  },
+  {
+    "input": "Pw==",
+    "expected": "\"?\""
+  },
+  {
+    "input": "QA==",
+    "expected": "\"@\""
+  },
+  {
+    "input": "QQ==",
+    "expected": "\"A\""
+  },
+  {
+    "input": "Qg==",
+    "expected": "\"B\""
+  },
+  {
+    "input": "Qw==",
+    "expected": "\"C\""
+  },
+  {
+    "input": "RA==",
+    "expected": "\"D\""
+  },
+  {
+    "input": "RQ==",
+    "expected": "\"E\""
+  },
+  {
+    "input": "Rg==",
+    "expected": "\"F\""
+  },
+  {
+    "input": "Rw==",
+    "expected": "\"G\""
+  },
+  {
+    "input": "SA==",
+    "expected": "\"H\""
+  },
+  {
+    "input": "SQ==",
+    "expected": "\"I\""
+  },
+  {
+    "input": "Sg==",
+    "expected": "\"J\""
+  },
+  {
+    "input": "Sw==",
+    "expected": "\"K\""
+  },
+  {
+    "input": "TA==",
+    "expected": "\"L\""
+  },
+  {
+    "input": "TQ==",
+    "expected": "\"M\""
+  },
+  {
+    "input": "Tg==",
+    "expected": "\"N\""
+  },
+  {
+    "input": "Tw==",
+    "expected": "\"O\""
+  },
+  {
+    "input": "UA==",
+    "expected": "\"P\""
+  },
+  {
+    "input": "UQ==",
+    "expected": "\"Q\""
+  },
+  {
+    "input": "Ug==",
+    "expected": "\"R\""
+  },
+  {
+    "input": "Uw==",
+    "expected": "\"S\""
+  },
+  {
+    "input": "VA==",
+    "expected": "\"T\""
+  },
+  {
+    "input": "VQ==",
+    "expected": "\"U\""
+  },
+  {
+    "input": "Vg==",
+    "expected": "\"V\""
+  },
+  {
+    "input": "Vw==",
+    "expected": "\"W\""
+  },
+  {
+    "input": "WA==",
+    "expected": "\"X\""
+  },
+  {
+    "input": "WQ==",
+    "expected": "\"Y\""
+  },
+  {
+    "input": "Wg==",
+    "expected": "\"Z\""
+  },
+  {
+    "input": "Ww==",
+    "expected": "\"[\""
+  },
+  {
+    "input": "XA==",
+    "expected": "\"\\\\\""
+  },
+  {
+    "input": "XQ==",
+    "expected": "\"]\""
+  },
+  {
+    "input": "Xg==",
+    "expected": "\"^\""
+  },
+  {
+    "input": "Xw==",
+    "expected": "\"_\""
+  },
+  {
+    "input": "YA==",
+    "expected": "\"`\""
+  },
+  {
+    "input": "YQ==",
+    "expected": "\"a\""
+  },
+  {
+    "input": "Yg==",
+    "expected": "\"b\""
+  },
+  {
+    "input": "Yw==",
+    "expected": "\"c\""
+  },
+  {
+    "input": "ZA==",
+    "expected": "\"d\""
+  },
+  {
+    "input": "ZQ==",
+    "expected": "\"e\""
+  },
+  {
+    "input": "Zg==",
+    "expected": "\"f\""
+  },
+  {
+    "input": "Zw==",
+    "expected": "\"g\""
+  },
+  {
+    "input": "aA==",
+    "expected": "\"h\""
+  },
+  {
+    "input": "aQ==",
+    "expected": "\"i\""
+  },
+  {
+    "input": "ag==",
+    "expected": "\"j\""
+  },
+  {
+    "input": "aw==",
+    "expected": "\"k\""
+  },
+  {
+    "input": "bA==",
+    "expected": "\"l\""
+  },
+  {
+    "input": "bQ==",
+    "expected": "\"m\""
+  },
+  {
+    "input": "bg==",
+    "expected": "\"n\""
+  },
+  {
+    "input": "bw==",
+    "expected": "\"o\""
+  },
+  {
+    "input": "cA==",
+    "expected": "\"p\""
+  },
+  {
+    "input": "cQ==",
+    "expected": "\"q\""
+  },
+  {
+    "input": "cg==",
+    "expected": "\"r\""
+  },
+  {
+    "input": "cw==",
+    "expected": "\"s\""
+  },
+  {
+    "input": "dA==",
+    "expected": "\"t\""
+  },
+  {
+    "input": "dQ==",
+    "expected": "\"u\""
+  },
+  {
+    "input": "dg==",
+    "expected": "\"v\""
+  },
+  {
+    "input": "dw==",
+    "expected": "\"w\""
+  },
+  {
+    "input": "eA==",
+    "expected": "\"x\""
+  },
+  {
+    "input": "eQ==",
+    "expected": "\"y\""
+  },
+  {
+    "input": "eg==",
+    "expected": "\"z\""
+  },
+  {
+    "input": "ew==",
+    "expected": "\"{\""
+  },
+  {
+    "input": "fA==",
+    "expected": "\"|\""
+  },
+  {
+    "input": "fQ==",
+    "expected": "\"}\""
+  },
+  {
+    "input": "fg==",
+    "expected": "\"~\""
+  },
+  {
+    "input": "fw==",
+    "expected": "\"\\x7f\""
+  },
+  {
+    "input": "gA==",
+    "expected": "\"\\x80\""
+  },
+  {
+    "input": "gQ==",
+    "expected": "\"\\x81\""
+  },
+  {
+    "input": "gg==",
+    "expected": "\"\\x82\""
+  },
+  {
+    "input": "gw==",
+    "expected": "\"\\x83\""
+  },
+  {
+    "input": "hA==",
+    "expected": "\"\\x84\""
+  },
+  {
+    "input": "hQ==",
+    "expected": "\"\\x85\""
+  },
+  {
+    "input": "hg==",
+    "expected": "\"\\x86\""
+  },
+  {
+    "input": "hw==",
+    "expected": "\"\\x87\""
+  },
+  {
+    "input": "iA==",
+    "expected": "\"\\x88\""
+  },
+  {
+    "input": "iQ==",
+    "expected": "\"\\x89\""
+  },
+  {
+    "input": "ig==",
+    "expected": "\"\\x8a\""
+  },
+  {
+    "input": "iw==",
+    "expected": "\"\\x8b\""
+  },
+  {
+    "input": "jA==",
+    "expected": "\"\\x8c\""
+  },
+  {
+    "input": "jQ==",
+    "expected": "\"\\x8d\""
+  },
+  {
+    "input": "jg==",
+    "expected": "\"\\x8e\""
+  },
+  {
+    "input": "jw==",
+    "expected": "\"\\x8f\""
+  },
+  {
+    "input": "kA==",
+    "expected": "\"\\x90\""
+  },
+  {
+    "input": "kQ==",
+    "expected": "\"\\x91\""
+  },
+  {
+    "input": "kg==",
+    "expected": "\"\\x92\""
+  },
+  {
+    "input": "kw==",
+    "expected": "\"\\x93\""
+  },
+  {
+    "input": "lA==",
+    "expected": "\"\\x94\""
+  },
+  {
+    "input": "lQ==",
+    "expected": "\"\\x95\""
+  },
+  {
+    "input": "lg==",
+    "expected": "\"\\x96\""
+  },
+  {
+    "input": "lw==",
+    "expected": "\"\\x97\""
+  },
+  {
+    "input": "mA==",
+    "expected": "\"\\x98\""
+  },
+  {
+    "input": "mQ==",
+    "expected": "\"\\x99\""
+  },
+  {
+    "input": "mg==",
+    "expected": "\"\\x9a\""
+  },
+  {
+    "input": "mw==",
+    "expected": "\"\\x9b\""
+  },
+  {
+    "input": "nA==",
+    "expected": "\"\\x9c\""
+  },
+  {
+    "input": "nQ==",
+    "expected": "\"\\x9d\""
+  },
+  {
+    "input": "ng==",
+    "expected": "\"\\x9e\""
+  },
+  {
+    "input": "nw==",
+    "expected": "\"\\x9f\""
+  },
+  {
+    "input": "oA==",
+    "expected": "\"\\xa0\""
+  },
+  {
+    "input": "oQ==",
+    "expected": "\"\\xa1\""
+  },
+  {
+    "input": "og==",
+    "expected": "\"\\xa2\""
+  },
+  {
+    "input": "ow==",
+    "expected": "\"\\xa3\""
+  },
+  {
+    "input": "pA==",
+    "expected": "\"\\xa4\""
+  },
+  {
+    "input": "pQ==",
+    "expected": "\"\\xa5\""
+  },
+  {
+    "input": "pg==",
+    "expected": "\"\\xa6\""
+  },
+  {
+    "input": "pw==",
+    "expected": "\"\\xa7\""
+  },
+  {
+    "input": "qA==",
+    "expected": "\"\\xa8\""
+  },
+  {
+    "input": "qQ==",
+    "expected": "\"\\xa9\""
+  },
+  {
+    "input": "qg==",
+    "expected": "\"\\xaa\""
+  },
+  {
+    "input": "qw==",
+    "expected": "\"\\xab\""
+  },
+  {
+    "input": "rA==",
+    "expected": "\"\\xac\""
+  },
+  {
+    "input": "rQ==",
+    "expected": "\"\\xad\""
+  },
+  {
+    "input": "rg==",
+    "expected": "\"\\xae\""
+  },
+  {
+    "input": "rw==",
+    "expected": "\"\\xaf\""
+  },
+  {
+    "input": "sA==",
+    "expected": "\"\\xb0\""
+  },
+  {
+    "input": "sQ==",
+    "expected": "\"\\xb1\""
+  },
+  {
+    "input": "sg==",
+    "expected": "\"\\xb2\""
+  },
+  {
+    "input": "sw==",
+    "expected": "\"\\xb3\""
+  },
+  {
+    "input": "tA==",
+    "expected": "\"\\xb4\""
+  },
+  {
+    "input": "tQ==",
+    "expected": "\"\\xb5\""
+  },
+  {
+    "input": "tg==",
+    "expected": "\"\\xb6\""
+  },
+  {
+    "input": "tw==",
+    "expected": "\"\\xb7\""
+  },
+  {
+    "input": "uA==",
+    "expected": "\"\\xb8\""
+  },
+  {
+    "input": "uQ==",
+    "expected": "\"\\xb9\""
+  },
+  {
+    "input": "ug==",
+    "expected": "\"\\xba\""
+  },
+  {
+    "input": "uw==",
+    "expected": "\"\\xbb\""
+  },
+  {
+    "input": "vA==",
+    "expected": "\"\\xbc\""
+  },
+  {
+    "input": "vQ==",
+    "expected": "\"\\xbd\""
+  },
+  {
+    "input": "vg==",
+    "expected": "\"\\xbe\""
+  },
+  {
+    "input": "vw==",
+    "expected": "\"\\xbf\""
+  },
+  {
+    "input": "wA==",
+    "expected": "\"\\xc0\""
+  },
+  {
+    "input": "wQ==",
+    "expected": "\"\\xc1\""
+  },
+  {
+    "input": "wg==",
+    "expected": "\"\\xc2\""
+  },
+  {
+    "input": "ww==",
+    "expected": "\"\\xc3\""
+  },
+  {
+    "input": "xA==",
+    "expected": "\"\\xc4\""
+  },
+  {
+    "input": "xQ==",
+    "expected": "\"\\xc5\""
+  },
+  {
+    "input": "xg==",
+    "expected": "\"\\xc6\""
+  },
+  {
+    "input": "xw==",
+    "expected": "\"\\xc7\""
+  },
+  {
+    "input": "yA==",
+    "expected": "\"\\xc8\""
+  },
+  {
+    "input": "yQ==",
+    "expected": "\"\\xc9\""
+  },
+  {
+    "input": "yg==",
+    "expected": "\"\\xca\""
+  },
+  {
+    "input": "yw==",
+    "expected": "\"\\xcb\""
+  },
+  {
+    "input": "zA==",
+    "expected": "\"\\xcc\""
+  },
+  {
+    "input": "zQ==",
+    "expected": "\"\\xcd\""
+  },
+  {
+    "input": "zg==",
+    "expected": "\"\\xce\""
+  },
+  {
+    "input": "zw==",
+    "expected": "\"\\xcf\""
+  },
+  {
+    "input": "0A==",
+    "expected": "\"\\xd0\""
+  },
+  {
+    "input": "0Q==",
+    "expected": "\"\\xd1\""
+  },
+  {
+    "input": "0g==",
+    "expected": "\"\\xd2\""
+  },
+  {
+    "input": "0w==",
+    "expected": "\"\\xd3\""
+  },
+  {
+    "input": "1A==",
+    "expected": "\"\\xd4\""
+  },
+  {
+    "input": "1Q==",
+    "expected": "\"\\xd5\""
+  },
+  {
+    "input": "1g==",
+    "expected": "\"\\xd6\""
+  },
+  {
+    "input": "1w==",
+    "expected": "\"\\xd7\""
+  },
+  {
+    "input": "2A==",
+    "expected": "\"\\xd8\""
+  },
+  {
+    "input": "2Q==",
+    "expected": "\"\\xd9\""
+  },
+  {
+    "input": "2g==",
+    "expected": "\"\\xda\""
+  },
+  {
+    "input": "2w==",
+    "expected": "\"\\xdb\""
+  },
+  {
+    "input": "3A==",
+    "expected": "\"\\xdc\""
+  },
+  {
+    "input": "3Q==",
+    "expected": "\"\\xdd\""
+  },
+  {
+    "input": "3g==",
+    "expected": "\"\\xde\""
+  },
+  {
+    "input": "3w==",
+    "expected": "\"\\xdf\""
+  },
+  {
+    "input": "4A==",
+    "expected": "\"\\xe0\""
+  },
+  {
+    "input": "4Q==",
+    "expected": "\"\\xe1\""
+  },
+  {
+    "input": "4g==",
+    "expected": "\"\\xe2\""
+  },
+  {
+    "input": "4w==",
+    "expected": "\"\\xe3\""
+  },
+  {
+    "input": "5A==",
+    "expected": "\"\\xe4\""
+  },
+  {
+    "input": "5Q==",
+    "expected": "\"\\xe5\""
+  },
+  {
+    "input": "5g==",
+    "expected": "\"\\xe6\""
+  },
+  {
+    "input": "5w==",
+    "expected": "\"\\xe7\""
+  },
+  {
+    "input": "6A==",
+    "expected": "\"\\xe8\""
+  },
+  {
+    "input": "6Q==",
+    "expected": "\"\\xe9\""
+  },
+  {
+    "input": "6g==",
+    "expected": "\"\\xea\""
+  },
+  {
+    "input": "6w==",
+    "expected": "\"\\xeb\""
+  },
+  {
+    "input": "7A==",
+    "expected": "\"\\xec\""
+  },
+  {
+    "input": "7Q==",
+    "expected": "\"\\xed\""
+  },
+  {
+    "input": "7g==",
+    "expected": "\"\\xee\""
+  },
+  {
+    "input": "7w==",
+    "expected": "\"\\xef\""
+  },
+  {
+    "input": "8A==",
+    "expected": "\"\\xf0\""
+  },
+  {
+    "input": "8Q==",
+    "expected": "\"\\xf1\""
+  },
+  {
+    "input": "8g==",
+    "expected": "\"\\xf2\""
+  },
+  {
+    "input": "8w==",
+    "expected": "\"\\xf3\""
+  },
+  {
+    "input": "9A==",
+    "expected": "\"\\xf4\""
+  },
+  {
+    "input": "9Q==",
+    "expected": "\"\\xf5\""
+  },
+  {
+    "input": "9g==",
+    "expected": "\"\\xf6\""
+  },
+  {
+    "input": "9w==",
+    "expected": "\"\\xf7\""
+  },
+  {
+    "input": "+A==",
+    "expected": "\"\\xf8\""
+  },
+  {
+    "input": "+Q==",
+    "expected": "\"\\xf9\""
+  },
+  {
+    "input": "+g==",
+    "expected": "\"\\xfa\""
+  },
+  {
+    "input": "+w==",
+    "expected": "\"\\xfb\""
+  },
+  {
+    "input": "/A==",
+    "expected": "\"\\xfc\""
+  },
+  {
+    "input": "/Q==",
+    "expected": "\"\\xfd\""
+  },
+  {
+    "input": "/g==",
+    "expected": "\"\\xfe\""
+  },
+  {
+    "input": "/w==",
+    "expected": "\"\\xff\""
+  }
+]

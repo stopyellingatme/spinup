@@ -87,6 +87,9 @@ func generate(t *testing.T) map[string][]byte {
 	fixtures["templates-v1.2.3.tar.zst.sig"] = ed25519.Sign(private, archive.Bytes())
 	fixtures["test-key.pub"] = private.Public().(ed25519.PublicKey)
 	fixtures["archive-entries.json"] = jsonBytes(t, archiveEntries(t, archive.Bytes()))
+	for name, data := range generateR1(t) {
+		fixtures[name] = data
+	}
 	return fixtures
 }
 

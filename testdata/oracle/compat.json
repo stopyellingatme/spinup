@@ -1,0 +1,412 @@
+{
+  "kit": [
+    {
+      "cli": "dev",
+      "other": "bad",
+      "error": ""
+    },
+    {
+      "cli": "bad",
+      "other": "v1.2.3",
+      "error": "cannot check CLI compatibility: invalid version \"bad\": expected X.Y.Z\nTry: spinup upgrade"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "bad",
+      "error": "cannot check kit compatibility: invalid version \"bad\": expected X.Y.Z\nTry: go get github.com/stopyellingatme/spinup/kit@v1.2.x"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v1.2.99",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "other": "1.2.3-rc.1",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v1.3.0",
+      "error": "CLI v1.2.3 is incompatible with kit v1.3.0: major and minor versions must match\nTry: spinup upgrade or go get github.com/stopyellingatme/spinup/kit@v1.2.x"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v2.2.3",
+      "error": "CLI v1.2.3 is incompatible with kit v2.2.3: major and minor versions must match\nTry: spinup upgrade or go get github.com/stopyellingatme/spinup/kit@v1.2.x"
+    },
+    {
+      "cli": "1.2.3",
+      "other": "v1.2.3",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.2",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.4",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "other": "1.2.3",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.3-alpha",
+      "error": ""
+    }
+  ],
+  "min_cli": [
+    {
+      "cli": "dev",
+      "other": "bad",
+      "error": ""
+    },
+    {
+      "cli": "bad",
+      "other": "v1.2.3",
+      "error": "cannot check CLI version: invalid version \"bad\": expected X.Y.Z\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "bad",
+      "error": "cannot check minimum CLI version: invalid version \"bad\": expected X.Y.Z\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v1.2.99",
+      "error": "CLI v1.2.3 is older than required version v1.2.99\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "other": "1.2.3-rc.1",
+      "error": "CLI v1.2.3-alpha is older than required version v1.2.3-rc.1\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v1.3.0",
+      "error": "CLI v1.2.3 is older than required version v1.3.0\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "v2.2.3",
+      "error": "CLI v1.2.3 is older than required version v2.2.3\nTry: spinup self-update"
+    },
+    {
+      "cli": "1.2.3",
+      "other": "v1.2.3",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.2",
+      "error": ""
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.4",
+      "error": "CLI v1.2.3 is older than required version v1.2.4\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "other": "1.2.3",
+      "error": "CLI v1.2.3-alpha is older than required version v1.2.3\nTry: spinup self-update"
+    },
+    {
+      "cli": "v1.2.3",
+      "other": "1.2.3-alpha",
+      "error": ""
+    }
+  ],
+  "supported": [
+    {
+      "cli": "dev",
+      "released": null,
+      "expected": []
+    },
+    {
+      "cli": "dev",
+      "released": [],
+      "expected": []
+    },
+    {
+      "cli": "dev",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "dev",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": [
+        "v2.0.0",
+        "v1.2.4",
+        "1.2.3"
+      ]
+    },
+    {
+      "cli": "dev",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": [
+        "1.0.0",
+        "v1.0.0",
+        "v1.0.0"
+      ]
+    },
+    {
+      "cli": "bad",
+      "released": null,
+      "expected": null
+    },
+    {
+      "cli": "bad",
+      "released": [],
+      "expected": null
+    },
+    {
+      "cli": "bad",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": null
+    },
+    {
+      "cli": "bad",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": null
+    },
+    {
+      "cli": "bad",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": null
+    },
+    {
+      "cli": "v0.0.0",
+      "released": null,
+      "expected": []
+    },
+    {
+      "cli": "v0.0.0",
+      "released": [],
+      "expected": []
+    },
+    {
+      "cli": "v0.0.0",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v0.0.0",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v0.0.0",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "released": null,
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "released": [],
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": [
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0"
+      ]
+    },
+    {
+      "cli": "v1.2.3-alpha",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": [
+        "1.0.0",
+        "v1.0.0",
+        "v1.0.0"
+      ]
+    },
+    {
+      "cli": "v1.2.3",
+      "released": null,
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3",
+      "released": [],
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v1.2.3",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": [
+        "1.2.3",
+        "v1.2.3",
+        "v1.2.3-alpha"
+      ]
+    },
+    {
+      "cli": "v1.2.3",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": [
+        "1.0.0",
+        "v1.0.0",
+        "v1.0.0"
+      ]
+    },
+    {
+      "cli": "v2.0.0",
+      "released": null,
+      "expected": []
+    },
+    {
+      "cli": "v2.0.0",
+      "released": [],
+      "expected": []
+    },
+    {
+      "cli": "v2.0.0",
+      "released": [
+        "bad",
+        "v1.2.3+build"
+      ],
+      "expected": []
+    },
+    {
+      "cli": "v2.0.0",
+      "released": [
+        "v2.0.0",
+        "v1.2.4",
+        "v1.2.3",
+        "1.2.3",
+        "v1.2.3-alpha",
+        "v1.2.2",
+        "v1.1.0",
+        "bad"
+      ],
+      "expected": [
+        "v2.0.0",
+        "v1.2.4",
+        "1.2.3"
+      ]
+    },
+    {
+      "cli": "v2.0.0",
+      "released": [
+        "v1.0.0",
+        "v1.0.0",
+        "1.0.0",
+        "v0.9.0"
+      ],
+      "expected": [
+        "1.0.0",
+        "v1.0.0",
+        "v1.0.0"
+      ]
+    }
+  ]
+}
