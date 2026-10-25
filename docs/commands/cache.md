@@ -35,7 +35,9 @@ Use `--json` to receive the list as JSON.
 `spinup cache clean` removes the directory for downloaded archives and signatures.
 It prints the directory that it removed.
 Use `--dry-run` to preview the removal.
-The cache directory is `<os.UserCacheDir()>/spinup/templates`.
+The cache directory is `spinup/templates` in the cache directory of the user.
+On macOS, this is `~/Library/Caches/spinup/templates`.
+On Linux, this is `$XDG_CACHE_HOME/spinup/templates` or `~/.cache/spinup/templates`.
 
 `--offline` prevents downloads.
 `SPINUP_OFFLINE=1` also enables offline mode.
