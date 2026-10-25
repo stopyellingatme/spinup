@@ -46,7 +46,8 @@ case $id in
   r0-13) fields=(peak_disk_gb load1_max swap_gb) ;;
   *) fields=() ;;
 esac
-python3 - "$verdict_file" "$id" "$md_verdict" "${fields[@]}" <<'PY' || fail "$verdict_file is not valid"
+# ${fields[@]+...}: bash 3.2 (macOS) treats an empty array as unbound under set -u.
+python3 - "$verdict_file" "$id" "$md_verdict" ${fields[@]+"${fields[@]}"} <<'PY' || fail "$verdict_file is not valid"
 import sys, tomllib
 path, spike, md, *fields = sys.argv[1:]
 with open(path, "rb") as f:
