@@ -47,4 +47,5 @@
 
 [dev]
 # The golden tests of the packs render through spinup-render and compare through spinup-testutil.
-"spinup-packs" = ["spinup-testutil", "spinup-render"]
+# They lint Compose files with spinup-doctor and run the optional tool checks through spinup-exec.
+"spinup-packs" = ["spinup-testutil", "spinup-render", "spinup-doctor", "spinup-exec"]
