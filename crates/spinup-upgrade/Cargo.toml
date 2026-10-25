@@ -24,6 +24,7 @@ spinup-exec = { workspace = true }
 spinup-manifest = { workspace = true }
 spinup-merge = { workspace = true }
 spinup-migrate = { workspace = true }
+spinup-packs = { workspace = true }
 spinup-plugin-api = { workspace = true }
 spinup-project = { workspace = true }
 spinup-render = { workspace = true }
