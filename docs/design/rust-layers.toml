@@ -32,7 +32,7 @@
   "spinup-merge", "spinup-migrate", "spinup-packs", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",
   "spinup-project", "spinup-manifest", "spinup-vfs", "spinup-exec", "spinup-compat", "spinup-editors", "spinup-ui",
 ]
-"spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs"]
+"spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-exec", "spinup-compat"]
 "spinup-newapp" = [
   "spinup-render", "spinup-packs", "spinup-tplstore", "spinup-stack", "spinup-manifest", "spinup-vfs", "spinup-exec",
   "spinup-ui", "spinup-plugin-api",
