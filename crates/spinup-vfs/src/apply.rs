@@ -138,7 +138,16 @@ fn apply_change(
         hook(&change.path, "before-mode")?;
         let file = entry.parent.open(&entry.name)?;
         entry.permissions = Some(file.metadata()?.permissions());
+        #[cfg(unix)]
         set_mode(&file, change.new_mode)?;
+        #[cfg(not(unix))]
+        {
+            // A read-only handle cannot change attributes on Windows: set them by path.
+            let mut permissions = file.metadata()?.permissions();
+            drop(file);
+            permissions.set_readonly(change.new_mode & 0o200 == 0);
+            entry.parent.set_permissions(&entry.name, permissions)?;
+        }
         applied.push(entry);
         return Ok(());
     }

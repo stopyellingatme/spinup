@@ -298,7 +298,7 @@ pub(crate) fn compare(
                             ChangeKind::Remove
                         } else if change.old != change.new {
                             ChangeKind::Update
-                        } else if change.old_mode != change.new_mode {
+                        } else if !same_mode(change.old_mode, change.new_mode) {
                             ChangeKind::ModeOnly
                         } else {
                             ChangeKind::Unchanged
@@ -318,6 +318,16 @@ pub(crate) fn compare(
             result.map_err(|e: anyhow::Error| user_error(&operation, e))
         })
         .collect()
+}
+
+/// Reports whether two modes are equal on this platform. Windows stores only the read-only
+/// attribute, so there only the owner-write bit counts, and no other mode change is planned.
+fn same_mode(old: u32, new: u32) -> bool {
+    if cfg!(windows) {
+        old & 0o200 == new & 0o200
+    } else {
+        old == new
+    }
 }
 
 pub(crate) fn permission_mode(permissions: &cap_std::fs::Permissions) -> u32 {
