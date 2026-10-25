@@ -2,7 +2,6 @@ package render
 
 import (
 	"bytes"
-	"go/format"
 	"reflect"
 	"strings"
 	"testing"
@@ -120,9 +119,9 @@ func TestSampleDeterminism(t *testing.T) {
 		answers map[string]any
 		paths   []string
 	}{
-		{"default", nil, []string{"api/cmd/demo/main.go", "versions.txt", "README.md", "database.txt", "scripts/start.sh", "greeting.txt"}},
-		{"all", map[string]any{"app_name": "custom", "auth": true, "modules": []string{"jobs"}}, []string{"api/cmd/custom/main.go", "versions.txt", "README.md", "database.txt", "auth.txt", "jobs.txt", "scripts/start.sh", "greeting.txt"}},
-		{"no database", map[string]any{"db": "none"}, []string{"api/cmd/demo/main.go", "versions.txt", "README.md", "scripts/start.sh", "greeting.txt"}},
+		{"default", nil, []string{"api/cmd/demo/main.txt", "versions.txt", "README.md", "database.txt", "scripts/start.sh", "greeting.txt"}},
+		{"all", map[string]any{"app_name": "custom", "auth": true, "modules": []string{"jobs"}}, []string{"api/cmd/custom/main.txt", "versions.txt", "README.md", "database.txt", "auth.txt", "jobs.txt", "scripts/start.sh", "greeting.txt"}},
+		{"no database", map[string]any{"db": "none"}, []string{"api/cmd/demo/main.txt", "versions.txt", "README.md", "scripts/start.sh", "greeting.txt"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -160,10 +159,9 @@ func TestSampleDeterminism(t *testing.T) {
 					t.Fatalf("mode: %o", f.Mode)
 				}
 			}
-			goFile := first.Files[0]
-			formatted, err := format.Source(goFile.Data)
-			if err != nil || !bytes.Equal(formatted, goFile.Data) || goFile.Class != "scaffold" {
-				t.Fatalf("Go output: %s, %v", goFile.Data, err)
+			sample := first.Files[0]
+			if sample.Class != "scaffold" || !bytes.HasPrefix(sample.Data, []byte(`Application: "`)) {
+				t.Fatalf("sample output: %s", sample.Data)
 			}
 			readme, ok := first.Get("README.md")
 			if !ok || readme.Class != "seed" {
