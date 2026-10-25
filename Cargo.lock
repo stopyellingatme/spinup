@@ -1402,6 +1402,7 @@ dependencies = [
  "spinup-manifest",
  "spinup-merge",
  "spinup-migrate",
+ "spinup-packs",
  "spinup-plugin-api",
  "spinup-project",
  "spinup-render",
