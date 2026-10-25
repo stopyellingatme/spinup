@@ -3,6 +3,11 @@
 `spinup upgrade` applies template changes in a separate Git worktree.
 The main checkout keeps its files and branch.
 
+The Rust R1 CLI supports template upgrades, conflict recovery, codemods, and `--ui`.
+It requires lock schema 3 and templates with the `minijinja` engine marker.
+It rejects Go locks and Go template archives.
+Cargo dependency changes and build verification begin in R2.
+
 ```console
 $ spinup upgrade --plan --continue
 Error: Invalid upgrade flags
@@ -32,7 +37,7 @@ Add `.spinup/` to `.gitignore` before the upgrade.
 The worktree uses `.spinup/upgrade/<target>`.
 The branch uses `spinup/upgrade-<target>`.
 Each step commits the template changes and the lock separately.
-If `go fix` changes files, the command creates a separate commit.
+The Go CLI creates a separate commit when `go fix` changes files.
 
 If files conflict, the command exits with code 3 and lists the paths.
 Resolve the markers in the upgrade worktree.
@@ -58,6 +63,11 @@ The upgrade branch remains available for inspection.
 The upgrade runs codemods before and after the template changes.
 Each codemod prints its ID and description.
 The lock records completed codemods to prevent repeated changes.
+
+### Go dependency steps
+
+These dependency and verification steps apply to the Go CLI.
+The Rust R1 CLI does not run them.
 
 If `SPINUP_KIT_REPLACE` is set, the upgrade restores the local kit replacement in `api/go.mod`.
 If the variable is not set, the upgrade keeps a local kit replace that the current `api/go.mod` has.
