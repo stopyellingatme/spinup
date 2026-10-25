@@ -146,8 +146,9 @@ fn apply_change(
         hook(&change.path, "before-backup")?;
         let backup_name = applied.len().to_string();
         // Move the original into the backups, as Go does. The write below then renames into a
-        // free name: Windows denies a rename that replaces an existing file.
-        entry.parent.rename(&entry.name, backups, &backup_name)?;
+        // free name.
+        retry(|| entry.parent.rename(&entry.name, backups, &backup_name))
+            .map_err(|e| step("move the original to the backups", e))?;
         entry.backup = Some(backup_name);
         if change.kind == ChangeKind::Remove {
             applied.push(entry);
@@ -162,17 +163,51 @@ fn apply_change(
         temp.sync_all()?;
         drop(temp);
         hook(&change.path, "before-rename")?;
-        entry
-            .parent
-            .rename(&temp_name, &entry.parent, &entry.name)?;
+        retry(|| entry.parent.rename(&temp_name, &entry.parent, &entry.name))
+            .map_err(|e| step("rename the new content into place", e))?;
         Ok(())
     })();
-    let _ = entry.parent.remove_file(&temp_name);
+    let _ = retry(|| entry.parent.remove_file(&temp_name));
     // Record the entry also on failure when it holds a backup, so the rollback restores it.
     if result.is_ok() || entry.backup.is_some() {
         applied.push(entry);
     }
     result
+}
+
+/// Runs a rename or a removal. On Windows it retries for up to two seconds while the error is
+/// "access denied" or a sharing violation: right after a write, a scanner or the indexer can
+/// hold the file open without delete sharing (as the Go toolchain's robustio and cargo do).
+fn retry<T>(mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    #[cfg(windows)]
+    {
+        use std::time::{Duration, Instant};
+        const ERROR_SHARING_VIOLATION: i32 = 32;
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut delay = Duration::from_millis(5);
+        loop {
+            match op() {
+                Err(error)
+                    if (error.kind() == io::ErrorKind::PermissionDenied
+                        || error.raw_os_error() == Some(ERROR_SHARING_VIOLATION))
+                        && Instant::now() < deadline =>
+                {
+                    std::thread::sleep(delay);
+                    delay = (delay * 2).min(Duration::from_millis(200));
+                }
+                result => return result,
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        op()
+    }
+}
+
+/// Names the apply step in an I/O error and keeps its kind.
+fn step(label: &str, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{label}: {error}"))
 }
 
 fn create_temporary(parent: &Dir) -> io::Result<(String, cap_std::fs::File)> {
@@ -217,12 +252,12 @@ fn rollback(
     let mut errors = Vec::new();
     for entry in applied.into_iter().rev() {
         let result = match entry.kind {
-            ChangeKind::Create => entry.parent.remove_file(&entry.name),
+            ChangeKind::Create => retry(|| entry.parent.remove_file(&entry.name)),
             ChangeKind::Remove | ChangeKind::Update => {
                 // Remove the replacement before restoring the saved file, as Go does.
                 // An update that failed before its rename left no replacement to remove.
                 let remove = if entry.kind == ChangeKind::Update {
-                    match entry.parent.remove_file(&entry.name) {
+                    match retry(|| entry.parent.remove_file(&entry.name)) {
                         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
                         other => other,
                     }
@@ -230,11 +265,13 @@ fn rollback(
                     Ok(())
                 };
                 remove.and_then(|()| {
-                    backups.rename(
-                        entry.backup.as_ref().expect("saved backup"),
-                        &entry.parent,
-                        &entry.name,
-                    )
+                    retry(|| {
+                        backups.rename(
+                            entry.backup.as_ref().expect("saved backup"),
+                            &entry.parent,
+                            &entry.name,
+                        )
+                    })
                 })
             }
             ChangeKind::ModeOnly => entry
