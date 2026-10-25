@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -22,30 +21,15 @@ import (
 
 func TestScripts(t *testing.T) {
 	root := testutil.RepoRoot(t)
-	candidates, err := filepath.Glob(filepath.Join(root, "testdata", "script", "*.txtar"))
-	if err != nil {
-		t.Fatal(err)
+	rust := os.Getenv("SPINUP_BIN") != ""
+	implementation := "go"
+	if rust {
+		implementation = "rust"
 	}
 	pattern := os.Getenv("SPINUP_SCRIPT_RUN")
-	if _, err := path.Match(pattern, ""); err != nil {
-		t.Fatalf("select scripts: %v\nTry: use a valid SPINUP_SCRIPT_RUN glob", err)
-	}
-	var files []string
-	for _, file := range candidates {
-		name := strings.TrimSuffix(filepath.Base(file), ".txtar")
-		if strings.HasPrefix(name, "app_gate_") && os.Getenv("SPINUP_APP_GATE") != "1" {
-			continue
-		}
-		if pattern != "" {
-			matches, err := path.Match(pattern, name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !matches {
-				continue
-			}
-		}
-		files = append(files, file)
+	files, err := selectScripts(root, pattern, rust)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if len(files) == 0 {
 		t.Skipf("no scripts match SPINUP_SCRIPT_RUN=%q (app gates require SPINUP_APP_GATE=1)", pattern)
@@ -55,11 +39,28 @@ func TestScripts(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
 	}
-	// Building this test binary is the permitted os/exec exception.
-	cmd := exec.CommandContext(t.Context(), "go", "build", "-o", binary, filepath.Join(root, "cmd", "spinup"))
-	cmd.Dir = root
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build spinup: %v\n%s\nTry: correct the build failure", err, output)
+	if source := os.Getenv("SPINUP_BIN"); source != "" {
+		if err := copyBinary(root, source, binary); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		// Building this test binary is the permitted os/exec exception.
+		cmd := exec.CommandContext(t.Context(), "go", "build", "-o", binary, filepath.Join(root, "cmd", "spinup"))
+		cmd.Dir = root
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("build spinup: %v\n%s\nTry: correct the build failure", err, output)
+		}
+	}
+	if rust && os.Getenv("SPINUP_KIT_DIR") != "" {
+		files = prepareRustScripts(t, files)
+	}
+	limit, err := scriptParallel(os.Getenv("SPINUP_SCRIPT_PARALLEL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var slots chan struct{}
+	if limit > 0 {
+		slots = make(chan struct{}, limit)
 	}
 	// Scripts get their own HOME, so pin the Go caches to the real ones. Otherwise an
 	// app-gate build would start with an empty module cache and fail offline.
@@ -73,15 +74,12 @@ func TestScripts(t *testing.T) {
 	if len(caches) != 2 {
 		t.Fatalf("go env printed %q, want two lines", out)
 	}
-	testscript.Run(t, testscript.Params{
-		Files: files,
-		// [env:NAME] is true when the environment variable NAME is set and not empty.
+	deadline, _ := t.Deadline()
+	testscript.RunT(scriptT{T: t, slots: slots}, testscript.Params{
+		Files:    files,
+		Deadline: deadline,
 		Condition: func(cond string) (bool, error) {
-			name, ok := strings.CutPrefix(cond, "env:")
-			if !ok || name == "" {
-				return false, fmt.Errorf("unknown condition %q\nTry: use [env:NAME] or a built-in condition", cond)
-			}
-			return os.Getenv(name) != "", nil
+			return scriptCondition(implementation, cond)
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
 			// dofake start runs the DigitalOcean API fake and points the CLI at it.
@@ -102,7 +100,7 @@ func TestScripts(t *testing.T) {
 				if neg || len(args) < 1 || len(args) > 2 {
 					ts.Fatalf("usage: mkversion <version> [overlay-dir]")
 				}
-				if err := makeVersion(root, ts.MkAbs("templates"), args[0], overlayArg(ts, args)); err != nil {
+				if err := makeVersion(root, ts.MkAbs("templates"), args[0], overlayArg(ts, args), ts.Getenv); err != nil {
 					ts.Fatalf("mkversion: %v", err)
 				}
 			},
@@ -122,8 +120,14 @@ func TestScripts(t *testing.T) {
 			for key, value := range nodeCaches() {
 				env.Setenv(key, value)
 			}
-			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
+			for key, value := range rustCaches() {
+				env.Setenv(key, value)
+			}
+			for _, key := range []string{"SPINUP_PACKS_SRC", "SPINUP_STACK_SRC", "SPINUP_KIT_DIR", "RUSTUP_TOOLCHAIN", "RUSTUP_AUTO_INSTALL", "CARGO_NET_OFFLINE", "CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "SQLX_OFFLINE", "GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
 				if value, ok := os.LookupEnv(key); ok {
+					if value != "" && (key == "SPINUP_PACKS_SRC" || key == "SPINUP_STACK_SRC" || key == "SPINUP_KIT_DIR") {
+						value = sourcePath(root, value, "")
+					}
 					env.Setenv(key, value)
 				}
 			}
@@ -157,14 +161,16 @@ func overlayArg(ts *testscript.TestScript, args []string) string {
 // <dir>/<version>/packs and stackversions.yaml copied from the repository, then the files of
 // overlay (which mirrors that layout) copied on top. Each line of <overlay>/DELETE names a
 // path, relative to the version directory, to remove.
-func makeVersion(root, dir, version, overlay string) error {
+func makeVersion(root, dir, version, overlay string, getenv func(string) string) error {
+	packs := sourcePath(root, getenv("SPINUP_PACKS_SRC"), "internal/templates/packs")
+	stackSource := sourcePath(root, getenv("SPINUP_STACK_SRC"), "internal/stackversions/stackversions.yaml")
 	target := filepath.Join(dir, version)
-	if err := os.CopyFS(filepath.Join(target, "packs"), os.DirFS(filepath.Join(root, "internal", "templates", "packs"))); err != nil {
-		return err
+	if err := os.CopyFS(filepath.Join(target, "packs"), os.DirFS(packs)); err != nil {
+		return fmt.Errorf("copy template packs from %q: %w\nTry: set SPINUP_PACKS_SRC to a readable pack directory", packs, err)
 	}
-	stack, err := os.ReadFile(filepath.Join(root, "internal", "stackversions", "stackversions.yaml"))
+	stack, err := os.ReadFile(stackSource)
 	if err != nil {
-		return err
+		return fmt.Errorf("read stack versions from %q: %w\nTry: set SPINUP_STACK_SRC to a readable YAML file", stackSource, err)
 	}
 	if err := os.WriteFile(filepath.Join(target, "stackversions.yaml"), stack, 0o644); err != nil {
 		return err
