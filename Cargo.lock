@@ -1148,6 +1148,7 @@ dependencies = [
 name = "spinup-editors"
 version = "0.0.0"
 dependencies = [
+ "regex",
  "serde_json",
  "thiserror",
  "toml_edit",
@@ -1313,6 +1314,7 @@ dependencies = [
 name = "spinup-stack"
 version = "0.0.0"
 dependencies = [
+ "regex",
  "serde",
  "thiserror",
  "yaml_serde",
