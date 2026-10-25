@@ -1,0 +1,26 @@
+{
+  "id": "codemod-delete",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "delete",
+      "path": [
+        "app",
+        "items"
+      ],
+      "value": ""
+    }
+  ],
+  "comments": [
+    "# File comment.",
+    "# Mapping comment.",
+    "# Name comment.",
+    "# List comment.",
+    "# Item comment.",
+    "# End comment.",
+    "# Other comment."
+  ]
+}

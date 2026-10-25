@@ -1,0 +1,3 @@
+services:
+    postgres:
+        image: demo-postgres:18-pgbackrest2.57

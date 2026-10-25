@@ -1,0 +1,13 @@
+# Custom alerts
+groups:
+  - name: custom
+    rules:
+      - alert: Existing # keep alert
+        expr: up == 0
+      - alert: HighErrors
+        expr: rate(errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Too many errors

@@ -1,0 +1,22 @@
+{
+  "id": "edge-ssh",
+  "family": "server",
+  "mode": "server",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "users",
+        "0",
+        "ssh_authorized_keys",
+        "0"
+      ],
+      "value": "'ssh-ed25519 AAAATEST operator # comment'\n"
+    }
+  ],
+  "comments": [
+    "#cloud-config"
+  ]
+}

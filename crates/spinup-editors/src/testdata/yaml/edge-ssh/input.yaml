@@ -1,0 +1,4 @@
+#cloud-config
+users:
+  - ssh_authorized_keys:
+      - SPINUP_DEPLOY_SSH_KEY

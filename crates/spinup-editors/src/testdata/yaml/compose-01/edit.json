@@ -1,0 +1,51 @@
+{
+  "id": "compose-01",
+  "family": "compose",
+  "mode": "map",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "services",
+        "postgres",
+        "image"
+      ],
+      "value": "demo-postgres:18-pgbackrest2.57"
+    },
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "services",
+        "postgres",
+        "environment",
+        "PGDATA"
+      ],
+      "value": "/var/lib/postgresql/18/docker"
+    },
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "volumes",
+        "postgres_data"
+      ],
+      "value": "external: true\nname: demo_pgdata_18\n"
+    },
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "services",
+        "postgres",
+        "volumes"
+      ],
+      "value": "- postgres_data:/var/lib/postgresql\n"
+    }
+  ],
+  "comments": [
+    "# Compose image"
+  ]
+}

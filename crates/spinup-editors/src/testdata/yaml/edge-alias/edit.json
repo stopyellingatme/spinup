@@ -1,0 +1,20 @@
+{
+  "id": "edge-alias",
+  "family": "codemod",
+  "mode": "node",
+  "input": "",
+  "actions": [
+    {
+      "block": false,
+      "op": "set",
+      "path": [
+        "defaults",
+        "name"
+      ],
+      "value": "new"
+    }
+  ],
+  "comments": [
+    "# Anchor"
+  ]
+}
