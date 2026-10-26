@@ -31,8 +31,12 @@ app=$work/app
 (cd "$work" && SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR "$SPINUP_BIN" new app "${flags[@]}" --no-git --non-interactive) \
   || fail "spinup new failed for the $set_name set" "run the command of app-check.sh by hand"
 if [[ -n $resource ]]; then
+  # The generated .env files name a database URL, and the resolver reads them (ADR 0021 §6). Hide
+  # them, so the no-database rule applies and the check needs no Postgres.
+  for e in "$app/.env" "$app/api/.env"; do [[ -f $e ]] && mv "$e" "$e.app-check"; done
   (cd "$app" && env -u DATABASE_URL -u DATABASE_URL_FILE "$SPINUP_BIN" g resource todo title:string done:bool 'due:date?' --non-interactive) \
     || fail "g resource todo failed" "check the generator output"
+  for e in "$app/.env" "$app/api/.env"; do [[ -f $e.app-check ]] && mv "$e.app-check" "$e"; done
   mkdir -p "$app/api/.sqlx"
   cp "$repo"/testdata/reference/todo-rs/.sqlx/*.json "$app/api/.sqlx/"
 fi
