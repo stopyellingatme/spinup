@@ -1,6 +1,6 @@
 # todo
 
-Made with spinup: a Go API, PostgreSQL, and (unless the app is API-only) a SvelteKit web app.
+Made with spinup: a Rust API, PostgreSQL, and (unless the app is API-only) a SvelteKit web app.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ spinup dev
 ```
 
 Open the app URL that `spinup dev` prints (http://localhost:5173 by default).
-Press Ctrl-C to stop. The Docker services keep running; `spinup dev --down` stops them too.
+Press Ctrl-C to stop. The Docker services continue to run. Use `spinup dev --down` to stop them.
 
 ## Everyday commands
 

@@ -1,0 +1,30 @@
+[golden."ci/full"]
+packs = ["ci", "base", "api", "web"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,backups", ci_deploy_on_push = false }
+prefixes = [".github/"]
+mode = "0644"
+
+[golden."ci/deploy-on-push"]
+packs = ["ci", "base", "api", "web"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,backups", ci_deploy_on_push = true }
+prefixes = [".github/"]
+mode = "0644"
+
+[golden."ci/api-only"]
+packs = ["ci"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci", ci_deploy_on_push = false }
+prefixes = [".github/"]
+mode = "0644"
+
+[golden."ci/web-scaffold/auth"]
+packs = ["base", "api", "web", "auth"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,auth" }
+paths = ["web/e2e/smoke.spec.ts", "web/vite.config.js"]
+mode = "0644"
+
+[golden."ci/web-scaffold/no-auth"]
+packs = ["base", "api", "web"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci" }
+paths = ["web/e2e/smoke.spec.ts", "web/vite.config.js"]
+mode = "0644"
+

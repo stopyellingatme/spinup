@@ -4,8 +4,7 @@
 .spinup/*
 !.spinup/plugins.allow
 !.spinup/plugins.history
-api/bin/
-api/tmp/
+api/target/
 node_modules/
 .DS_Store
 coverage/

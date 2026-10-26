@@ -5,9 +5,9 @@
   "schedule": ["before 5am on Monday"],
   "packageRules": [
     {
-      "description": "Group Go minor and patch updates.",
-      "groupName": "gomod minor and patch",
-      "matchManagers": ["gomod"],
+      "description": "Group Cargo minor and patch updates.",
+      "groupName": "cargo minor and patch",
+      "matchManagers": ["cargo"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
@@ -30,13 +30,13 @@
     {
       "description": "spinup upgrade owns this kit dependency.",
       "enabled": false,
-      "matchDepNames": ["github.com/stopyellingatme/spinup/kit"]
+      "matchDepNames": ["spinup-kit"]
     },
     {
-      "description": "spinup upgrade owns these generated Go dependencies.",
+      "description": "spinup upgrade owns these generated Cargo dependencies.",
       "enabled": false,
-      "matchFileNames": ["api/go.mod"],
-      "matchManagers": ["gomod"]
+      "matchFileNames": ["api/Cargo.toml"],
+      "matchManagers": ["cargo"]
     },
     {
       "description": "spinup upgrade owns these generated Docker images.",
