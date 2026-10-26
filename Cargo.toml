@@ -29,9 +29,16 @@ members = [
   "crates/spinup-cli",
   "crates/spinup",
   "crates/spinup-testutil",
+  "crates/spinup-kit",
+  "crates/spinup-db",
+  "crates/spinup-build",
+  "crates/spinup-appcmd",
+  "crates/spinup-gen-web",
+  "crates/spinup-gen-app",
 ]
-# Each spike in spikes-rs/ is its own workspace (ADR 0019).
-exclude = ["spikes-rs"]
+# Each spike in spikes-rs/ is its own workspace (ADR 0019). testdata holds the reference app,
+# the golden-rs trees, and the corpus, which have their own Cargo.toml files (ADR 0021).
+exclude = ["spikes-rs", "testdata"]
 
 [workspace.package]
 version = "0.0.0"
@@ -79,6 +86,12 @@ spinup-drift = { path = "crates/spinup-drift" }
 spinup-newapp = { path = "crates/spinup-newapp" }
 spinup-cli = { path = "crates/spinup-cli" }
 spinup-testutil = { path = "crates/spinup-testutil" }
+spinup-kit = { path = "crates/spinup-kit" }
+spinup-db = { path = "crates/spinup-db" }
+spinup-build = { path = "crates/spinup-build" }
+spinup-appcmd = { path = "crates/spinup-appcmd" }
+spinup-gen-web = { path = "crates/spinup-gen-web" }
+spinup-gen-app = { path = "crates/spinup-gen-app" }
 
 # External crates (R1). The R0 spike that chose each version is in the comment.
 anyhow = "=1.0.104"                                                       # all spikes
@@ -113,6 +126,46 @@ zstd = "=0.14.3"                                                          # R0.5
 
 # Test-only crates.
 similar = "=3.2.1"                                                        # R0.2 golden diffs
+
+# R2: the kit (crates/spinup-kit). The kit manifest repeats these versions as caret requirements.
+# It does not inherit these lines (ADR 0021 §2). They are the pin record that kit_manifest.rs
+# checks, and the versions that the root lock must hold.
+argon2 = { version = "=0.6.0", default-features = false, features = ["alloc"] }        # R0.7
+async-trait = "=0.1.92"                                                               # R0.7
+aws-lc-rs = { version = "=1.18.2", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] } # R0.7; prebuilt-nasm for Windows
+axum = { version = "=0.8.9", features = ["macros"] }                                  # R0.6
+fastrand = "=2.5.0"                                                                   # R0.8
+flate2 = "=1.1.10"                                                                    # R0.9 apidocs
+form_urlencoded = "=1.2.2"                                                            # R0.6
+futures = "=0.3.34"                                                                   # R0.8
+http-body-util = "=0.1.5"                                                             # R0.6
+jsonwebtoken = { version = "=11.1.0", default-features = false, features = ["aws_lc_rs"] } # R0.7; aws_lc_rs (ADR 0019 §3)
+lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1", "tokio1-rustls", "ring", "webpki-roots", "file-transport", "hostname"] } # R0.7
+mime_guess = "=2.0.5"                                                                 # spa Content-Type
+oauth2 = { version = "=5.0.0", default-features = false }                             # R0.7
+opentelemetry = { version = "=0.33.1", features = ["trace", "metrics", "logs"] }      # R0.8
+opentelemetry-appender-tracing = "=0.33.1"                                            # R0.8
+opentelemetry-otlp = { version = "=0.33.1", default-features = false, features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] } # R0.8
+opentelemetry-proto = { version = "=0.33.1", default-features = false, features = ["gen-tonic-messages", "trace", "metrics", "logs"] } # R0.8 (kit tests)
+opentelemetry_sdk = { version = "=0.33.1", features = ["rt-tokio", "trace", "metrics", "logs", "experimental_trace_batch_span_processor_with_async_runtime", "experimental_metrics_periodicreader_with_async_runtime", "experimental_logs_batch_log_processor_with_async_runtime"] } # R0.8
+prost = "=0.14.4"                                                                     # R0.8 (kit tests)
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "rustls", "form"] } # R0.7, R0.8
+serde_path_to_error = "=0.1.20"                                                       # R0.6
+serde_urlencoded = "=0.7.1"                                                           # R0.6
+sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json", "derive"] } # R0.6
+subtle = "=2.6.1"                                                                     # R0.7
+time = { version = "=0.3.55", features = ["serde", "serde-human-readable", "formatting", "parsing", "macros"] } # R0.6
+tokio = { version = "=1.54.1", features = ["full"] }                                  # R0.6
+tower = { version = "=0.5.3", features = ["util"] }                                   # R0.6
+tower-http = { version = "=0.7.1", features = ["catch-panic", "limit"] }              # R2 pre-seed (not in a spike lock)
+tower-sessions = { version = "=0.15.0", default-features = false, features = ["axum-core"] } # R0.7
+tracing = "=0.1.44"                                                                   # R0.6
+tracing-opentelemetry = "=0.34.0"                                                     # R0.8
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json", "fmt"] } # R0.6
+url = "=2.5.8"                                                                        # R0.7
+utoipa = { version = "=6.0.0", features = ["yaml", "uuid", "time", "axum_extras"] }   # R0.6; never preserve_order
+utoipa-axum = "=0.3.0"                                                                # R0.6; generated apps only (pin record)
+uuid = { version = "=1.29.0", features = ["v4", "v7", "serde"] }                     # R0.6
 
 # R0.12: the release profile of the CLI.
 [profile.release]

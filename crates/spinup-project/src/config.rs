@@ -35,6 +35,10 @@ pub struct App {
     pub name: String,
     /// The application module path.
     pub module: String,
+    /// The owner of the container images in the registry, lowercase (ADR 0021 §5). Empty:
+    /// `spinup build --push` and `spinup deploy` fail with a `Try:` line.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub registry_owner: String,
 }
 
 /// A deployment environment.
@@ -199,6 +203,12 @@ impl Config {
         if self.app.module.is_empty() {
             problems.push("app module must not be empty".into());
         }
+        if !valid_registry_owner(&self.app.registry_owner) {
+            problems.push(format!(
+                "invalid registry_owner {:?} in spinup.toml: use the lowercase GitHub owner, such as acme",
+                self.app.registry_owner
+            ));
+        }
         if !matches!(self.monitoring.profile.as_str(), "lite" | "full" | "none") {
             problems.push(format!(
                 "monitoring profile {:?} must be lite, full, or none",
@@ -273,6 +283,20 @@ impl Config {
     }
 }
 
+/// Reports whether `owner` is empty or a lowercase GitHub owner:
+/// `^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$` (ADR 0021 §5).
+fn valid_registry_owner(owner: &str) -> bool {
+    let bytes = owner.as_bytes();
+    if bytes.is_empty() {
+        return true;
+    }
+    let alnum = |c: &u8| c.is_ascii_lowercase() || c.is_ascii_digit();
+    bytes.len() <= 39
+        && bytes.first().is_some_and(alnum)
+        && bytes.last().is_some_and(alnum)
+        && bytes.iter().all(|c| alnum(c) || *c == b'-')
+}
+
 fn valid_name(name: &str) -> bool {
     name.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
         && name
@@ -321,6 +345,35 @@ mod tests {
             let index = err.find(text).unwrap();
             assert!(index >= previous);
             previous = index;
+        }
+    }
+
+    #[test]
+    fn registry_owner_rules() {
+        for (owner, ok) in [
+            ("", true),
+            ("acme", true),
+            ("a", true),
+            ("acme-co2", true),
+            (&"a".repeat(39) as &str, true),
+            (&"a".repeat(40) as &str, false),
+            ("Acme", false),
+            ("-acme", false),
+            ("acme-", false),
+            ("ac_me", false),
+        ] {
+            let c = parse(format!("[app]\nname = 'demo'\nmodule = 'example.com/demo'\nregistry_owner = '{owner}'\n").as_bytes()).unwrap();
+            assert_eq!(c.app.registry_owner, owner);
+            let result = c.validate();
+            assert_eq!(result.is_ok(), ok, "{owner}");
+            if !ok {
+                let err = result.unwrap_err().to_string();
+                assert!(
+                    err.contains(&format!("invalid registry_owner {owner:?} in spinup.toml")),
+                    "{err}"
+                );
+                assert!(err.contains("\nTry:"), "{err}");
+            }
         }
     }
 

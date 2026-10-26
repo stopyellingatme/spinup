@@ -4,5 +4,6 @@
 
 pub mod config;
 pub mod confirm;
+pub mod env;
 pub mod root;
 pub mod webtool;

@@ -15,6 +15,7 @@ disallowed-methods = [
   { path = "std::fs::create_dir_all", reason = "generators return a plan; spinup-vfs applies it" },
   { path = "std::fs::remove_file", reason = "generators return a plan; spinup-vfs applies it" },
   { path = "std::fs::remove_dir_all", reason = "generators return a plan; spinup-vfs applies it" },
+  { path = "std::fs::remove_dir", reason = "generators return a plan; destroy uses spinup_vfs::apply::remove_dirs" },
   { path = "std::fs::rename", reason = "generators return a plan; spinup-vfs applies it" },
   { path = "std::fs::OpenOptions::open", reason = "generators return a plan; spinup-vfs applies it" },
 ]

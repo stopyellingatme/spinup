@@ -12,15 +12,20 @@ new_web
 check
 diff
 eject
+# R2 (ADR 0021 §11). Twins in testdata/script/rust/ replace the shared scripts. gen_dashboard is shared.
+new_api
+embed          # the twin has no build --image lines (R3a)
+db_cmds
+routes
+gen_*          # gen_picker (R1), gen_dashboard, gen_job, gen_mailer, gen_page, gen_resource
+destroy
+auth_*
+upgrade_*      # upgrade_flow and upgrade_ui (R1), upgrade_apply, upgrade_generated
+module_add
+web_variants
+app_gate_*     # selected only with SPINUP_APP_GATE=1 (make rs-app-gate)
 #
-# Due later. These scripts run `build`, `db`, `routes`, `generate` for Go, the upgrade
-# dependency phase, or operate commands:
-# R2: new_api, embed, db_cmds, routes, gen_*, destroy, auth_*, upgrade_*, module_add,
-#     web_variants, app_gate_*
-# R3: secrets, deploy_digitalocean
-# R4: ci_verify, plugin, plugin_new, plugin_render
-# The R1 exit test (rust-plan.md §5 "R1 gate"): conflict, --continue, --abort. Rust twin in rust/.
-upgrade_flow
-upgrade_ui
-# Due at R2: upgrade_apply (the kit replace of the upgrade apply phase, R2.10) and
-# upgrade_generated (spinup g resource).
+# Due later (Go-only after R2):
+# R3a: secrets, and the build --image lines of embed
+# R3b: deploy_digitalocean
+# R4:  ci_verify, plugin, plugin_new, plugin_render

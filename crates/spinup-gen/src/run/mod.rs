@@ -160,6 +160,8 @@ pub fn run(
         lock: &lock,
         args,
         matches,
+        runner,
+        cancel,
     })
     .map_err(|e| {
         with_hint(

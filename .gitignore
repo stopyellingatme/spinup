@@ -36,3 +36,5 @@ credentials/
 # rust
 /target/
 /spikes-rs/*/target/
+/testdata/reference/todo-rs/target/
+/testdata/corpus-rs/**/target/

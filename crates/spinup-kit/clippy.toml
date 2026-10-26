@@ -1,0 +1,23 @@
+# spinup-kit: runtime sqlx queries only (ADR 0021 §2). This file replaces the root
+# clippy.toml for this crate, so it repeats the subprocess bans.
+disallowed-types = [
+  { path = "std::process::Command", reason = "the kit runs no subprocess; a test that must, allows the lint with a reason" },
+  { path = "tokio::process::Command", reason = "the kit runs no subprocess", allow-invalid = true },
+]
+disallowed-methods = [
+  { path = "std::process::Command::new", reason = "the kit runs no subprocess; a test that must, allows the lint with a reason" },
+  { path = "tokio::process::Command::new", reason = "the kit runs no subprocess", allow-invalid = true },
+]
+disallowed-macros = [
+  { path = "sqlx::query", reason = "the kit uses runtime queries: a published crate cannot read the .sqlx/ of the app" },
+  { path = "sqlx::query_as", reason = "use sqlx::query_as::<_, T> with FromRow" },
+  { path = "sqlx::query_scalar", reason = "use the function sqlx::query_scalar" },
+  { path = "sqlx::query_unchecked", reason = "runtime queries only" },
+  { path = "sqlx::query_as_unchecked", reason = "runtime queries only" },
+  { path = "sqlx::query_scalar_unchecked", reason = "runtime queries only" },
+  { path = "sqlx::query_file", reason = "runtime queries only" },
+  { path = "sqlx::query_file_as", reason = "runtime queries only" },
+  { path = "sqlx::query_file_scalar", reason = "runtime queries only" },
+  { path = "sqlx::query_file_unchecked", reason = "runtime queries only" },
+  { path = "sqlx::query_file_as_unchecked", reason = "runtime queries only" },
+]

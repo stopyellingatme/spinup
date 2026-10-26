@@ -8,6 +8,10 @@ use crate::validate::clean_path;
 /// Applies replacements, additions, removals, and fragments from an overlay tree.
 /// Both trees are rooted at the directory that contains all packs.
 /// Overlay fragments receive `~overlay-` prefixes for portable load order.
+///
+/// `remove.txt` lists converted paths to delete, and `question:<key>` lines. The merge copies
+/// it to `<pack>/~removed.txt`, so the loader drops the `[[files]]` entries of the removed
+/// sources and the listed questions of the converted metadata (ADR 0021, map-packs §1.6).
 pub fn merge(converted: &Tree, overlay: &Tree) -> Result<Tree> {
     let mut result = converted.clone();
     for pack in overlay.children("") {
@@ -35,7 +39,7 @@ pub fn merge(converted: &Tree, overlay: &Tree) -> Result<Tree> {
             })?;
             for line in text.lines() {
                 let path = line.split('#').next().unwrap_or("").trim();
-                if path.is_empty() {
+                if path.is_empty() || path.starts_with(crate::loader::REMOVED_QUESTION) {
                     continue;
                 }
                 clean_path(path)?;
@@ -46,6 +50,11 @@ pub fn merge(converted: &Tree, overlay: &Tree) -> Result<Tree> {
                     );
                 }
             }
+            result.insert(
+                format!("{pack}/{}", crate::loader::REMOVED_FILE),
+                remove.data.clone(),
+                remove.mode,
+            )?;
         }
         for (path, file) in files.iter() {
             if path == "remove.txt" {
@@ -126,6 +135,7 @@ mod tests {
         assert_eq!(result.get("example/.hidden").unwrap().data.as_ref(), b"new");
         assert!(!result.contains("example/files/delete"));
         assert!(!result.contains("example/remove.txt"));
+        assert!(result.contains("example/~removed.txt"));
         assert!(result.contains("example/pack.d/~overlay-a.toml"));
         assert!(!result.contains("example/pack.d/a.toml"));
         assert_eq!(result.get("ENGINE"), converted.get("ENGINE"));
@@ -142,6 +152,27 @@ mod tests {
             b"old"
         );
         assert!(converted.contains("example/files/delete"));
+    }
+
+    #[test]
+    fn remove_question_line_merges() {
+        let converted = tree(&[
+            (
+                "example/pack.toml",
+                "name='example'\n[[questions]]\nkey='module'\ntype='string'\n[[files]]\npath='out'\nsource='files/a'\nclass='managed'",
+            ),
+            ("example/files/a", "a"),
+        ]);
+        let overlay = tree(&[("example/remove.txt", "question:module # the crate slug\n")]);
+        let result = super::merge(&converted, &overlay).unwrap();
+        assert!(result.contains("example/files/a"));
+        assert_eq!(
+            result.get("example/~removed.txt").unwrap().data.as_ref(),
+            b"question:module # the crate slug\n"
+        );
+        let p = crate::loader::load(&result, "example").unwrap();
+        assert!(p.questions.is_empty());
+        assert_eq!(p.files.len(), 1);
     }
 
     #[test]

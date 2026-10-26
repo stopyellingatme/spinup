@@ -336,8 +336,13 @@ mod tests {
             first.lock.marshal().unwrap(),
             second.lock.marshal().unwrap()
         );
-        assert_eq!(first.lock.kit.crate_name, crate::kit::KIT_MODULE);
-        assert_eq!(first.lock.kit.version, "v0.1.0");
+        assert_eq!(first.lock.kit.crate_name, "spinup-kit");
+        assert_eq!(
+            first.lock.kit.version,
+            spinup_stack::load::embedded()
+                .crate_version("spinup-kit")
+                .unwrap()
+        );
         assert_eq!(first.lock.template_version, "0.0.0-dev");
         assert_eq!(first.lock.behavior_version, 1);
         assert_eq!(first.lock.engine, "minijinja");

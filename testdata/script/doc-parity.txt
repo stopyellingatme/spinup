@@ -15,3 +15,18 @@ docs/commands/check.md
 docs/commands/diff.md
 docs/commands/eject.md
 docs/commands/restore.md
+#
+# R2 (ADR 0021 §11): the pages of the R2 commands. Rust blocks use <!-- doctest: only rust -->.
+docs/commands/db.md
+docs/commands/db-lint.md
+docs/commands/destroy.md
+docs/commands/generate-resource.md
+docs/commands/generate-page.md
+docs/commands/generate-client.md
+docs/commands/generate-openapi.md
+docs/commands/generate-job.md
+docs/commands/generate-mailer.md
+docs/commands/generate-dashboard.md
+docs/commands/build.md
+docs/commands/test.md
+docs/commands/routes.md

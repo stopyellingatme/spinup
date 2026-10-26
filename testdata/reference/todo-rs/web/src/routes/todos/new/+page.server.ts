@@ -1,0 +1,46 @@
+import { fail, redirect } from '@sveltejs/kit';
+import {
+	message,
+	setError,
+	superValidate,
+	type ErrorStatus,
+	type FormPathLeavesWithErrors,
+	type SuperValidated
+} from 'sveltekit-superforms';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { api } from '#lib/api/client.js';
+import { requireUser } from '#lib/server/auth.js';
+import { problemMessage, schema, toBody, type Problem, type Values } from '../schema';
+import type { Actions, PageServerLoad } from './$types';
+
+// failure returns the answer of an action whose API call failed. The field errors of the problem
+// show at their inputs. Any other problem shows above the form.
+function failure(form: SuperValidated<Values>, problem: Problem | undefined, status: number) {
+	const code = (status >= 400 && status <= 599 ? status : 500) as ErrorStatus;
+	const errors = (problem?.errors ?? []).filter((e) => e.field in form.data);
+	if (errors.length === 0) return message(form, problemMessage(problem, status), { status: code });
+	for (const e of errors) {
+		setError(form, e.field as FormPathLeavesWithErrors<Values>, e.message, { status: code });
+	}
+	return fail(code, { form });
+}
+
+export const load: PageServerLoad = async ({ locals, url }) => {
+	requireUser(locals, url);
+	return { form: await superValidate(zod4(schema)) };
+};
+
+export const actions: Actions = {
+	default: async ({ request, fetch, locals, url }) => {
+		requireUser(locals, url);
+		const form = await superValidate(request, zod4(schema));
+		if (!form.valid) return fail(400, { form });
+		const { data, error: problem, response } = await api.POST('/api/todos', {
+			fetch,
+			baseUrl: __PUBLIC_ORIGIN__,
+			body: toBody(form.data)
+		});
+		if (!data) return failure(form, problem, response.status);
+		redirect(303, `/todos/${data.id}?created=1`);
+	}
+};

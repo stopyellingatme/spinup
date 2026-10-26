@@ -116,6 +116,8 @@ images:
   node:              { image: node, tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0
   golang:            { image: golang, tag: "1.27-alpine", digest: "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d" }   # recheck: tag moved 2026-10-14
   distroless-static: { image: gcr.io/distroless/static-debian12, tag: "nonroot", digest: "sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab" }
+  rust:              { image: rust, tag: "1.99.1-alpine3.24", digest: "sha256:b1d5dd5a22a09404d3e798c0cf051b689077360374eb505fa5bb93c479693d87" }   # the Rust API builder (musl), R2
+  distroless-static-debian13: { image: gcr.io/distroless/static-debian13, tag: "nonroot", digest: "sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99" }   # the Rust API runtime, R2
   docker-dind:       { image: docker, tag: "29.9.0-dind", digest: "sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c2218643d03ccfddc65995470" }
   trivy:             { image: aquasec/trivy, tag: "0.75.0", digest: "sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa" }
 
@@ -206,7 +208,12 @@ rust:
   min: "1.99"                  # rust-version of the workspace and of generated crates
   components: [rustfmt, clippy]
 
-crates:   # generated-app crates, from the R0 spike locks (2026-10-24). The R2 pre-seed rechecks them and adds the kit pin.
+crates:   # generated-app crates, from the R0 spike locks (2026-10-24). Each entry equals its root pin (kit_manifest.rs).
+  spinup-kit: 0.1.0
+  anyhow: 1.0.104
+  time: 0.3.55
+  tracing: 0.1.44
+  uuid: 1.29.0
   axum: 0.8.9
   tokio: 1.54.1
   tower-http: 0.7.1

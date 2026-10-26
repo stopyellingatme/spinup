@@ -10,6 +10,10 @@
 # - spinup-tplstore -> spinup-vfs: Version.packs is a spinup_vfs::tree::Tree.
 # - spinup-testutil -> spinup-stack: the golden render loads the stack versions.
 # - spinup -> the crates of the wire list (src/wire_gen.rs).
+#
+# R2 (ADR 0021 §9): the kit has no workspace edge, and no CLI crate depends on it. The kit
+# has a self dev-dependency with every feature ([dev]). New edges beyond the crate table:
+# gen-web -> exec, render, ui; gen-app -> exec, ui; upgrade -> stack.
 
 [normal]
 "spinup-ui" = []
@@ -28,9 +32,16 @@
 "spinup-plugin-api" = ["spinup-manifest", "spinup-vfs"]
 "spinup-migrate" = ["spinup-compat", "spinup-exec", "spinup-manifest", "spinup-stack", "spinup-packs", "spinup-editors", "spinup-project"]
 "spinup-gen" = ["spinup-vfs", "spinup-manifest", "spinup-exec", "spinup-ui", "spinup-project"]
+"spinup-kit" = []
+"spinup-db" = ["spinup-exec", "spinup-project", "spinup-ui"]
+"spinup-build" = ["spinup-exec", "spinup-manifest", "spinup-project", "spinup-stack", "spinup-ui"]
+"spinup-appcmd" = ["spinup-exec", "spinup-manifest", "spinup-project", "spinup-stack", "spinup-gen", "spinup-doctor", "spinup-ui"]
+"spinup-gen-web" = ["spinup-gen", "spinup-vfs", "spinup-manifest", "spinup-project", "spinup-editors", "spinup-exec", "spinup-render", "spinup-ui"]
+"spinup-gen-app" = ["spinup-gen", "spinup-gen-web", "spinup-db", "spinup-render", "spinup-vfs", "spinup-manifest", "spinup-project", "spinup-exec", "spinup-ui"]
 "spinup-upgrade" = [
   "spinup-merge", "spinup-migrate", "spinup-packs", "spinup-render", "spinup-tplstore", "spinup-plugin-api", "spinup-doctor",
   "spinup-project", "spinup-manifest", "spinup-vfs", "spinup-exec", "spinup-compat", "spinup-editors", "spinup-ui",
+  "spinup-stack",
 ]
 "spinup-drift" = ["spinup-upgrade", "spinup-doctor", "spinup-tplstore", "spinup-vfs", "spinup-manifest", "spinup-project", "spinup-ui", "spinup-exec", "spinup-compat"]
 "spinup-newapp" = [
@@ -41,11 +52,15 @@
   "spinup-ui", "spinup-compat", "spinup-vfs", "spinup-manifest", "spinup-stack", "spinup-editors", "spinup-exec",
   "spinup-project", "spinup-packs", "spinup-tplstore", "spinup-render", "spinup-merge", "spinup-doctor",
   "spinup-plugin-api", "spinup-migrate", "spinup-gen", "spinup-upgrade", "spinup-drift", "spinup-newapp",
+  "spinup-db", "spinup-build", "spinup-appcmd", "spinup-gen-web", "spinup-gen-app",
 ]
-"spinup" = ["spinup-cli", "spinup-doctor", "spinup-gen", "spinup-migrate", "spinup-upgrade"]
+"spinup" = ["spinup-cli", "spinup-doctor", "spinup-gen", "spinup-migrate", "spinup-upgrade", "spinup-gen-web", "spinup-gen-app"]
 "spinup-testutil" = ["spinup-render", "spinup-packs", "spinup-vfs", "spinup-stack"]
 
 [dev]
 # The golden tests of the packs render through spinup-render and compare through spinup-testutil.
 # They lint Compose files with spinup-doctor and run the optional tool checks through spinup-exec.
 "spinup-packs" = ["spinup-testutil", "spinup-render", "spinup-doctor", "spinup-exec"]
+"spinup-kit" = ["spinup-kit"]                     # self dev-dependency with every feature
+"spinup-gen-web" = ["spinup-testutil", "spinup-packs", "spinup-stack"]
+"spinup-gen-app" = ["spinup-testutil", "spinup-packs", "spinup-stack"]

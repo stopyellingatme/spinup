@@ -41,11 +41,12 @@ pub fn run(name: &str) -> Result<Option<Tree>> {
     let render = || config.select(name, &render_pack(&case.packs, &case.answers)?);
     let got = render()?;
     deterministic(render)?;
-    let dir = golden_directory(name)?;
+    let go = case.origin == crate::filter::Origin::Go;
+    let dir = golden_directory(name, case.origin)?;
     if std::env::var("SPINUP_GOLDEN_UPDATE").as_deref() == Ok("1") {
         // R1 does not format Go files. Preserve their frozen oracle bytes on update.
         let mut updated = got.clone();
-        if dir.exists() {
+        if go && dir.exists() {
             for (path, file) in read_golden(&dir)?
                 .iter()
                 .filter(|(path, _)| config.skips(path))
@@ -63,7 +64,7 @@ pub fn run(name: &str) -> Result<Option<Tree>> {
         })?;
         let skipped = want
             .iter()
-            .filter(|(path, _)| config.skips(path))
+            .filter(|(path, _)| go && config.skips(path))
             .map(|(path, _)| path.to_owned())
             .collect::<Vec<_>>();
         for path in skipped {
@@ -81,12 +82,50 @@ pub fn run(name: &str) -> Result<Option<Tree>> {
     Ok(Some(got))
 }
 
-fn golden_directory(name: &str) -> Result<std::path::PathBuf> {
+fn golden_directory(name: &str, origin: crate::filter::Origin) -> Result<std::path::PathBuf> {
     let mut check = Tree::new();
     check.insert(name, Vec::new(), 0o644).map_err(|_| {
         anyhow::anyhow!("compare golden: invalid name {name:?}\nTry: use a relative pack path")
     })?;
-    Ok(crate::repo::repo_root()?.join("testdata/golden").join(name))
+    let base = match origin {
+        crate::filter::Origin::Go => "testdata/golden",
+        crate::filter::Origin::Rs => "testdata/golden-rs",
+    };
+    Ok(crate::repo::repo_root()?.join(base).join(name))
+}
+
+/// Compares generator output without a pack filter with `testdata/golden-rs/<name>`, with the
+/// diff and `SPINUP_GOLDEN_UPDATE=1` rules of [`run`] (R2.14). `files` holds (path, bytes,
+/// mode). A group that `SPINUP_GOLDEN_PACK` does not select passes without a compare.
+///
+/// # Errors
+/// Returns an error with a `Try:` line when the trees differ or a file cannot be read.
+pub fn compare_rs(name: &str, files: &[(String, Vec<u8>, u32)]) -> Result<()> {
+    if !selected(name) {
+        return Ok(());
+    }
+    let mut got = Tree::new();
+    for (path, data, mode) in files {
+        got.insert(path.as_str(), data.clone(), *mode)?;
+    }
+    let dir = golden_directory(name, crate::filter::Origin::Rs)?;
+    let group = name.split('/').next().unwrap_or(name);
+    if std::env::var("SPINUP_GOLDEN_UPDATE").as_deref() == Ok("1") {
+        return write_golden(&dir, &got);
+    }
+    let want = read_golden(&dir).map_err(|error| {
+        anyhow::anyhow!(
+            "read golden {name}: {error:#}\nTry: run make rs-golden PACK={group} UPDATE=1"
+        )
+    })?;
+    let reports = compare_trees(&want, &got);
+    if !reports.is_empty() {
+        bail!(
+            "golden {name}: {}\nTry: inspect the generator or run make rs-golden PACK={group} UPDATE=1",
+            reports.join("\n")
+        );
+    }
+    Ok(())
 }
 
 /// Renders twice and compares bytes, paths, and permissions.

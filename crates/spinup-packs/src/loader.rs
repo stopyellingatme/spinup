@@ -114,8 +114,54 @@ struct Metadata {
     files: Vec<FileSpec>,
 }
 
+/// The file that the overlay merge writes from `overlay/<pack>/remove.txt`, at the pack root.
+pub const REMOVED_FILE: &str = "~removed.txt";
+/// The line prefix of a removed question in `remove.txt`.
+pub const REMOVED_QUESTION: &str = "question:";
+
+/// The removed sources and questions of `~removed.txt` (see [`REMOVED_FILE`]).
+#[derive(Default)]
+struct Removed {
+    sources: std::collections::BTreeSet<String>,
+    questions: BTreeMap<String, bool>,
+}
+
+impl Removed {
+    fn read(fs: &Tree, name: &str) -> Result<Self> {
+        let mut removed = Self::default();
+        let Some(file) = fs.get(REMOVED_FILE) else {
+            return Ok(removed);
+        };
+        let text = std::str::from_utf8(&file.data).map_err(|error| {
+            anyhow::anyhow!(
+                "read {name}/{REMOVED_FILE}: {error}\nTry: use UTF-8 lines in overlay/{name}/remove.txt"
+            )
+        })?;
+        for line in text.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if line.is_empty() {
+                continue;
+            }
+            match line.strip_prefix(REMOVED_QUESTION) {
+                Some(key) => {
+                    removed.questions.insert(key.trim().to_string(), false);
+                }
+                None => {
+                    removed.sources.insert(line.to_string());
+                }
+            }
+        }
+        Ok(removed)
+    }
+}
+
 /// Reads `pack.toml`, then `pack.d/*.toml` in file-name order.
 /// The tree is rooted at the directory that contains all packs.
+///
+/// When the pack has `~removed.txt` (from the overlay merge), the loader drops the
+/// `[[files]]` entries of `pack.toml` and of the converted fragments whose `source` the file
+/// lists, and the questions that a `question:<key>` line lists. Overlay fragments
+/// (`pack.d/~overlay-*.toml`) are not filtered, so they can declare a question again.
 pub fn load(tree: &Tree, name: &str) -> Result<Pack> {
     if !valid_name(name) {
         bail!(
@@ -135,9 +181,11 @@ pub fn load(tree: &Tree, name: &str) -> Result<Pack> {
             .filter(|path| path.ends_with(".toml"))
             .map(|path| format!("pack.d/{path}")),
     );
+    let mut removed = Removed::read(&pack.fs, name)?;
     let mut question_sources = BTreeMap::new();
     let mut file_sources = BTreeMap::new();
     for (i, source) in sources.iter().enumerate() {
+        let filtered = !source.starts_with("pack.d/~overlay-");
         let origin = format!("{name}/{source}");
         let data = pack.fs.get(source).ok_or_else(|| {
             anyhow::anyhow!(
@@ -172,6 +220,10 @@ pub fn load(tree: &Tree, name: &str) -> Result<Pack> {
             );
         }
         for raw in meta.questions {
+            if filtered && let Some(dropped) = removed.questions.get_mut(&raw.key) {
+                *dropped = true;
+                continue;
+            }
             check_duplicate(&mut question_sources, "question", &raw.key, &origin)?;
             let default_set = raw.default.is_some();
             let default = match raw.default {
@@ -202,9 +254,19 @@ pub fn load(tree: &Tree, name: &str) -> Result<Pack> {
             });
         }
         for file in meta.files {
+            if filtered && removed.sources.contains(&file.source) {
+                continue;
+            }
             check_duplicate(&mut file_sources, "output path", &file.path, &origin)?;
             pack.files.push(file);
         }
+    }
+    if let Some((key, _)) = removed.questions.iter().find(|(_, dropped)| !**dropped) {
+        bail!(
+            "load pack {}: {REMOVED_FILE} lists question {}, which the converted metadata does not declare\nTry: remove the line from overlay/{name}/remove.txt",
+            quote(name),
+            quote(key)
+        );
     }
     pack.validate()
         .map_err(|error| anyhow::anyhow!("load pack {}: {error}", quote(name)))?;
@@ -284,6 +346,59 @@ mod tests {
         assert_eq!(p.fs.get("files/a").unwrap().data.as_ref(), b"a");
         assert_eq!(list(&tree).unwrap(), ["example"]);
         assert!(p.files[0].condition.is_some());
+    }
+
+    fn removed_fixture(removed: &str) -> Tree {
+        fixture(&[
+            (
+                "example/pack.toml",
+                "name='example'\n[[questions]]\nkey='module'\ntype='string'\n[[files]]\npath='go.mod'\nsource='files/go.mod.tmpl'\nclass='managed'",
+            ),
+            (
+                "example/pack.d/deps.toml",
+                "[[files]]\npath='go.sum'\nsource='files/go.sum'\nclass='managed'\n[[files]]\npath='keep.txt'\nsource='files/keep'\nclass='seed'",
+            ),
+            (
+                "example/pack.d/~overlay-deps.toml",
+                "[[questions]]\nkey='module'\ntype='string'\ndefault='example.com/app'\n[[files]]\npath='Cargo.toml'\nsource='files/Cargo.toml.tmpl'\nclass='scaffold'",
+            ),
+            ("example/files/keep", "keep"),
+            ("example/files/Cargo.toml.tmpl", "[package]"),
+            ("example/~removed.txt", removed),
+        ])
+    }
+
+    #[test]
+    fn removed_sources_and_questions() {
+        let tree = removed_fixture(
+            "# removed by the overlay\nfiles/go.mod.tmpl\nfiles/go.sum # comment\nquestion:module\n",
+        );
+        let p = load(&tree, "example").unwrap();
+        assert_eq!(
+            p.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            ["keep.txt", "Cargo.toml"]
+        );
+        // The overlay fragment declares the dropped question again.
+        assert_eq!(p.questions.len(), 1);
+        assert_eq!(p.questions[0].key, "module");
+        assert_eq!(p.questions[0].default, "example.com/app");
+    }
+
+    #[test]
+    fn removed_question_must_exist() {
+        let tree =
+            removed_fixture("files/go.mod.tmpl\nfiles/go.sum\nquestion:module\nquestion:missing\n");
+        let error = load(&tree, "example").unwrap_err().to_string();
+        assert!(error.contains("lists question \"missing\""), "{error}");
+        assert!(error.contains("\nTry:"), "{error}");
+    }
+
+    #[test]
+    fn without_removed_lines_the_sources_stay() {
+        let tree = removed_fixture("");
+        let error = load(&tree, "example").unwrap_err().to_string();
+        // The converted entries stay, so their missing sources fail validation.
+        assert!(error.contains("\nTry:"), "{error}");
     }
 }
 

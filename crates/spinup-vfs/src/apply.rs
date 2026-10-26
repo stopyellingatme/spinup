@@ -300,6 +300,185 @@ fn rollback(
     errors
 }
 
+/// Returns the directories that become empty when the `deleted` files are gone, deepest
+/// first, then by name (Go `internal/gen/destroy/dirs.go`, ADR 0021 §7).
+///
+/// A directory qualifies when each of its entries is a deleted file or another directory
+/// that qualifies. The project root, symbolic links, and directories that hold anything
+/// else are never listed. Paths are slash paths relative to `root`.
+///
+/// # Errors
+/// Returns an error with a `Try:` line when a directory cannot be read.
+pub fn emptied_dirs(root: &Path, deleted: &[String]) -> Result<Vec<String>> {
+    use std::collections::BTreeSet;
+    let mut gone: BTreeSet<String> = deleted.iter().cloned().collect();
+    let mut candidates = BTreeSet::new();
+    for path in deleted {
+        let mut dir = path.as_str();
+        while let Some((parent, _)) = dir.rsplit_once('/') {
+            if parent.is_empty() {
+                break;
+            }
+            candidates.insert(parent.to_string());
+            dir = parent;
+        }
+    }
+    let mut ordered: Vec<String> = candidates.into_iter().collect();
+    // Deeper directories first, so a parent sees which children are already gone.
+    ordered.sort_by(|a, b| {
+        let (da, db) = (a.matches('/').count(), b.matches('/').count());
+        db.cmp(&da).then_with(|| a.cmp(b))
+    });
+    let destroy_error = |error: io::Error| {
+        anyhow::anyhow!(
+            "cannot destroy generated files: {error}\nTry: check the project files and permissions, then repeat spinup destroy"
+        )
+    };
+    let mut dirs = Vec::new();
+    for dir in ordered {
+        let disk = root.join(&dir);
+        let metadata = match std::fs::symlink_metadata(&disk) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(destroy_error(error)),
+        };
+        if !metadata.is_dir() {
+            continue;
+        }
+        let mut empty = true;
+        for entry in std::fs::read_dir(&disk).map_err(destroy_error)? {
+            let name = entry.map_err(destroy_error)?.file_name();
+            let name = name.to_string_lossy();
+            if !gone.contains(&format!("{dir}/{name}")) {
+                empty = false;
+                break;
+            }
+        }
+        if empty {
+            gone.insert(dir.clone());
+            dirs.push(dir);
+        }
+    }
+    Ok(dirs)
+}
+
+/// Removes the directories that [`emptied_dirs`] listed, in order. A missing directory is
+/// not an error. A directory that is not empty (a file appeared after the plan) fails.
+///
+/// # Errors
+/// Returns `remove empty directory <dir>: <error>` with a `Try:` line.
+pub fn remove_dirs(root: &Path, dirs: &[String]) -> Result<()> {
+    for dir in dirs {
+        match std::fs::remove_dir(root.join(dir)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => bail!(
+                "remove empty directory {dir}: {error}\nTry: check the directory, then delete it by hand"
+            ),
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod dirs_tests {
+    use super::{emptied_dirs, remove_dirs};
+    use std::path::Path;
+
+    const PAGES: [&str; 5] = [
+        "web/src/routes/todos/+page.svelte",
+        "web/src/routes/todos/[id]/+page.svelte",
+        "web/src/routes/todos/[id]/edit/+page.svelte",
+        "web/src/routes/todos/new/+page.svelte",
+        "api/openapi/paths/todos.yaml",
+    ];
+
+    fn write(root: &Path, path: &str) {
+        let file = root.join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, b"x").unwrap();
+    }
+
+    #[test]
+    fn emptied_dirs_cases() {
+        let base = ["web/src/routes/+page.svelte", "api/openapi/paths/.gitkeep"];
+        for (extra, want) in [
+            (
+                vec![],
+                vec![
+                    "web/src/routes/todos/[id]/edit",
+                    "web/src/routes/todos/[id]",
+                    "web/src/routes/todos/new",
+                    "web/src/routes/todos",
+                ],
+            ),
+            (
+                vec!["web/src/routes/todos/notes.md"],
+                vec![
+                    "web/src/routes/todos/[id]/edit",
+                    "web/src/routes/todos/[id]",
+                    "web/src/routes/todos/new",
+                ],
+            ),
+            (
+                vec!["web/src/routes/todos/[id]/extra/x.ts"],
+                vec!["web/src/routes/todos/[id]/edit", "web/src/routes/todos/new"],
+            ),
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path();
+            let extra: Vec<&str> = base.iter().copied().chain(extra).collect();
+            for path in PAGES.iter().chain(extra.iter()) {
+                write(root, path);
+            }
+            let deleted: Vec<String> = PAGES.iter().map(|p| (*p).to_string()).collect();
+            let got = emptied_dirs(root, &deleted).unwrap();
+            assert_eq!(got, want);
+            for path in PAGES {
+                std::fs::remove_file(root.join(path)).unwrap();
+            }
+            remove_dirs(root, &got).unwrap();
+            for dir in &got {
+                assert!(!root.join(dir).exists(), "{dir} still exists");
+            }
+            for path in &extra {
+                assert!(root.join(path).exists(), "user file {path}");
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn emptied_dirs_skips_links() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("web/src/routes")).unwrap();
+        std::os::unix::fs::symlink(target.path(), temp.path().join("web/src/routes/todos"))
+            .unwrap();
+        let got = emptied_dirs(
+            temp.path(),
+            &["web/src/routes/todos/+page.svelte".to_string()],
+        )
+        .unwrap();
+        assert!(!got.iter().any(|d| d == "web/src/routes/todos"), "{got:?}");
+    }
+
+    #[test]
+    fn remove_dirs_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        remove_dirs(temp.path(), &["missing".to_string()]).unwrap();
+        write(temp.path(), "full/file");
+        let error = remove_dirs(temp.path(), &["full".to_string()])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.starts_with("remove empty directory full: "),
+            "{error}"
+        );
+        assert!(error.contains("\nTry: check the directory"), "{error}");
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/apply.rs"]
 mod tests;

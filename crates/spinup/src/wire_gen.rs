@@ -6,5 +6,7 @@
 
 use spinup_doctor as _;
 use spinup_gen as _;
+use spinup_gen_app as _;
+use spinup_gen_web as _;
 use spinup_migrate as _;
 use spinup_upgrade as _;

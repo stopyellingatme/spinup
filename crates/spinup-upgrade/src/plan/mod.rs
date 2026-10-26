@@ -294,9 +294,9 @@ pub fn build_plan(input: &PlanInput<'_>) -> Result<Plan> {
                 d.class = entry.class;
                 d.template.clone_from(&entry.template);
             }
-            // The dependency step reads the NEW render of a kept Go module file. The write of
-            // the plan never writes the data of a keep.
-            if d.reason != GO_MOD_KEEP_REASON {
+            // The dependency step reads the NEW render of a kept dependency manifest. The write
+            // of the plan never writes the data of a keep.
+            if crate::cargo::kept_manifest(&d.path) != Some(d.reason.as_str()) {
                 d.data.clear();
             }
         }
@@ -455,12 +455,12 @@ fn decide_tracked(
         d.reason = UNMERGEABLE.into();
         return Ok(d);
     }
-    if !rename && go_module_file(&d.path) {
-        // The app runs go mod tidy, so its require block differs from the render. A text
-        // merge conflicts at every pin change. The dependency step applies the template
-        // changes with go mod edit.
+    if !rename && let Some(reason) = crate::cargo::kept_manifest(&d.path) {
+        // The app changes its dependency manifest (go mod tidy, cargo update), so it differs
+        // from the render. A text merge conflicts at every pin change. The dependency step
+        // applies the template changes.
         d.action = Action::Keep;
-        d.reason = GO_MOD_KEEP_REASON.into();
+        d.reason = reason.into();
         return Ok(d);
     }
     if !rename && d.class == Class::Managed && input.force_managed {
@@ -482,12 +482,6 @@ fn decide_tracked(
         merged.action = Action::Rename;
     }
     Ok(merged)
-}
-
-/// Reports the Go module files that an upgrade never merges as text (Go `goModuleFile`).
-/// `api/tools.mod` and `api/tools.sum` still merge as text.
-fn go_module_file(name: &str) -> bool {
-    matches!(name, "api/go.mod" | "api/go.sum")
 }
 
 fn unmergeable(inputs: &[&[u8]]) -> bool {
