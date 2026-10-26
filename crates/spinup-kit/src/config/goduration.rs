@@ -2,7 +2,7 @@
 //!
 //! The settings use the Go duration text (`20s`, `1h30m`, `250ms`), and error texts name
 //! durations in the Go form (`3s`, `24h0m0s`). A Go duration is a signed count of
-//! nanoseconds, so [`parse`] and [`format`] use `i64`. [`parse_std`] and [`format_std`]
+//! nanoseconds, so [`parse`] and [`format()`] use `i64`. [`parse_std`] and [`format_std`]
 //! convert from and to [`std::time::Duration`].
 
 use std::time::Duration;
