@@ -1,4 +1,4 @@
-//! The deploy pack must match the Go golden tree and keep the contracts of ADR 0003 and
+//! The deploy pack must match the Rust golden tree and keep the contracts of ADR 0003 and
 //! ADR 0009 §6 (Go `internal/templates/golden_deploy_test.go`).
 //!
 //! As in Go, the test runs `docker compose config` and `caddy adapt` only when the tool is
@@ -319,6 +319,7 @@ fn check_deploy_tree(tree: &Tree, web: bool) -> Result<()> {
         lint_compose(name, &read(tree, name)?)?;
     }
     let compose = read(tree, "deploy/compose.yml")?;
+    assert!(!compose.contains("SPINUP_BEHAVIOR_VERSION"));
     let edge = read(tree, "deploy/compose.edge.yml")?;
     let caddyfile = read(tree, "deploy/Caddyfile")?;
     let stack = spinup_stack::load::embedded();

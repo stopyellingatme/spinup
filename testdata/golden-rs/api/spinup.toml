@@ -1,4 +1,4 @@
-# Select the kit behavior defaults.
+# Record the spinup configuration behavior version.
 behavior_version = 1
 # Enable these optional modules.
 modules = [ "ci", "deploy" ]
@@ -6,8 +6,10 @@ modules = [ "ci", "deploy" ]
 [app]
 # Name the application.
 name = "todo"
-# Set the root Go module path.
+# Set the repository path.
 module = "example.com/todo"
+# Set the owner for registry images.
+registry_owner = ""
 
 [monitoring]
 # Pick the monitoring stack: lite, full, or none.

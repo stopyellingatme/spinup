@@ -1,0 +1,16 @@
+# Record the spinup configuration behavior version.
+behavior_version = 1
+# Enable these optional modules.
+modules = [ [% for _item1 in go_items(data.modules) %][% set v_i = _item1[0] %][% set v_module = _item1[1] %][% if v_i %], [% endif %][[ quote(v_module) ]][% endfor %] ]
+
+[app]
+# Name the application.
+name = [[ quote(data.app_name) ]]
+# Set the repository path.
+module = [[ quote(data.module) ]]
+# Set the owner for registry images.
+registry_owner = [% if data.module is startingwith("github.com/") %][[ quote((data.module | split("/"))[1] | lower) ]][% else %]""[% endif %]
+
+[monitoring]
+# Pick the monitoring stack: lite, full, or none.
+profile = [% set _with2 = get(data, "monitoring_profile") %][% if _with2 %][[ quote(_with2) ]][% else %]"lite"[% endif %]
