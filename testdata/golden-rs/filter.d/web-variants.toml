@@ -1,0 +1,62 @@
+[golden."web-variants/node-pnpm-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "pnpm", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/pnpm/heyapi
+[golden."web-variants/node-pnpm-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "pnpm", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/bun/openapi-fetch
+[golden."web-variants/node-bun-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "bun", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/node/bun/heyapi
+[golden."web-variants/node-bun-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "node", package_manager = "bun", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/pnpm/openapi-fetch
+[golden."web-variants/embed-pnpm-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "pnpm", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/pnpm/heyapi
+[golden."web-variants/embed-pnpm-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "pnpm", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/bun/openapi-fetch
+[golden."web-variants/embed-bun-openapi-fetch"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "bun", api_client = "openapi-fetch" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"
+
+# TestGoldenWebVariants/embed/bun/heyapi
+[golden."web-variants/embed-bun-heyapi"]
+packs = ["base", "api", "web", "ci", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed", package_manager = "bun", api_client = "heyapi" }
+prefixes = ["web/src/lib/api/"]
+paths = ["web/package.json", "web/pnpm-lock.yaml", "web/pnpm-workspace.yaml", "web/bun.lock", "deploy/Dockerfile.web", ".github/workflows/ci.yml", ".github/workflows/e2e.yml"]
+mode = "0644"

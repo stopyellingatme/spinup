@@ -1,6 +1,4 @@
-//! The web pack must match the Go golden tree, take every version from the stack versions,
-//! and keep the file classes that upgrades depend on (Go
-//! `internal/templates/golden_web_test.go`).
+//! The Rust web pack keeps stack pins and the file classes needed for upgrades.
 
 use crate::golden_deploy::{read, render};
 use anyhow::{Context, Result};
@@ -31,6 +29,19 @@ fn golden_web_pins() -> Result<()> {
         &["base", "api", "web"],
         serde_json::json!({"app_name": "todo", "module": "example.com/todo"}),
     )?;
+    for path in [
+        "web/vite.config.js",
+        "web/src/hooks.server.ts",
+        "web/src/env.ts",
+        "web/src/instrumentation.server.ts",
+        "web/src/lib/api/client.ts",
+        "web/src/routes/+page.svelte",
+    ] {
+        let data = read(&tree, path)?;
+        for absent in ["Go API", "Go spans", "sends /api to Go."] {
+            assert!(!data.contains(absent), "{path} includes {absent:?}");
+        }
+    }
     let package: Package = serde_json::from_str(&read(&tree, "web/package.json")?)
         .context("parse web/package.json")?;
     let mut errors = Vec::new();

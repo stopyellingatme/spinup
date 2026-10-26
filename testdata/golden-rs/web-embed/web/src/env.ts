@@ -4,7 +4,7 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 // PUBLIC_ORIGIN is not here: it is a build input (see vite.config.js).
 export const variables = defineEnvVars({
 	API_URL: {
-		description: 'The base URL where server-side code reaches the Go API.',
+		description: 'The base URL where server-side code reaches the API.',
 		schema: (value) => (value === undefined || value === '' ? 'http://localhost:8080' : value)
 	}
 });
