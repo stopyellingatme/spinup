@@ -17,6 +17,7 @@ generator alert
 generator client
 generator component
 generator dashboard
+generator model
 generator page
 generator resource
 migration 0001_web_svmigrate
