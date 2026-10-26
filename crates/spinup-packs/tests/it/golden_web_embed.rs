@@ -31,6 +31,11 @@ fn golden_web_embed() -> Result<()> {
             assert!(!data.contains(absent), "{name} includes {absent}");
         }
     }
+    let vite = crate::golden_deploy::read(&files, "web/vite.config.js")?;
+    assert!(vite.contains("const dist = '../api/webdist/';"));
+    assert!(!vite.contains("internal/webdist"));
+    let layout = crate::golden_deploy::read(&files, "web/src/routes/+layout.ts")?;
+    assert!(layout.contains("the API binary serves index.html"));
     let dockerfile = crate::golden_deploy::read(&files, "deploy/Dockerfile.api")?;
     assert!(dockerfile.contains("COPY --from=web-build /web/build ./webdist"));
     assert!(files.contains("api/build.rs"));

@@ -10,7 +10,7 @@
 			<h1 class="text-lg font-semibold tracking-tight">Welcome to todo</h1>
 		</Card.Title>
 		<Card.Description>
-			A SvelteKit app on the same origin as its Go API.
+			A SvelteKit app on the same origin as its API.
 		</Card.Description>
 	</Card.Header>
 	<Card.Content class="text-sm">

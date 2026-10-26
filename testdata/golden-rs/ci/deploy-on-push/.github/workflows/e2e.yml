@@ -33,16 +33,25 @@ jobs:
       API_URL: http://127.0.0.1:8080
       E2E_BASE_URL: http://127.0.0.1:3000
       SPINUP_ENV: dev
-      GOTOOLCHAIN: local
+      SQLX_OFFLINE: "true"
       CI: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Install the Rust toolchain
+        run: |
+          set -euo pipefail
+          toolchain=$(sed -n 's/^channel = "\(.*\)"/\1/p' api/rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          go-version-file: api/go.mod
-          cache-dependency-path: api/go.sum
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            api/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('api/Cargo.lock', 'api/rust-toolchain.toml') }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -59,7 +68,7 @@ jobs:
         working-directory: api
         run: |
           set -euo pipefail
-          go run ./cmd/api migrate up
+          cargo run --locked -- migrate up
       - name: Build the web app
         working-directory: web
         run: |
@@ -69,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          (cd api && PORT=8080 go run ./cmd/api) > "$RUNNER_TEMP/api.log" 2>&1 &
+          (cd api && PORT=8080 cargo run --locked) > "$RUNNER_TEMP/api.log" 2>&1 &
           api_pid=$!
           (cd web && PORT=3000 HOST=127.0.0.1 node build) > "$RUNNER_TEMP/web.log" 2>&1 &
           web_pid=$!

@@ -1,5 +1,4 @@
-//! The web variants (frontend mode, package manager, API client) must match the Go golden
-//! trees (Go `internal/templates/golden_web_variants_test.go`).
+//! The Rust web variants cover frontend modes, package managers, and API clients.
 
 use crate::golden_deploy::read;
 use anyhow::{Context, Result};
@@ -41,6 +40,20 @@ fn check_variant(mode: &str, pm: &str, api: &str) -> Result<()> {
                     && !data.contains("pnpm")),
             "bun workflow {path}:\n{data}"
         );
+    }
+    let e2e = read(&tree, ".github/workflows/e2e.yml")?;
+    for expected in [
+        "api/rust-toolchain.toml",
+        "rustup toolchain install",
+        "api/Cargo.lock",
+        "SQLX_OFFLINE: \"true\"",
+        "cargo run --locked -- migrate up",
+        "PORT=8080 cargo run --locked)",
+    ] {
+        assert!(e2e.contains(expected), "e2e workflow lacks {expected:?}");
+    }
+    for absent in ["setup-go", "GOTOOLCHAIN", " go run", "-tags embedweb"] {
+        assert!(!e2e.contains(absent), "e2e workflow includes {absent:?}");
     }
     let client = read(&tree, "web/src/lib/api/client.ts")?;
     assert!(

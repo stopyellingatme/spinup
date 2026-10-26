@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
 	const origin = env.PUBLIC_ORIGIN || 'http://localhost:5173';
 
 	// API_URL is where the Vite dev server sends /api. The browser stays on one origin, so the
-	// session cookie of the Go API is a first-party cookie.
+	// session cookie of the API is a first-party cookie.
 	const apiURL = env.API_URL || 'http://localhost:8080';
 
 	return {
@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
 					async adapt(builder) {
 						await adapter({ fallback: 'index.html' }).adapt(builder);
 						// Replace the generated assets so old hashes cannot survive a build.
-						const dist = '../api/internal/webdist/dist';
+						const dist = '../api/webdist/';
 						await rm(dist, { recursive: true, force: true });
 						await mkdir(dist, { recursive: true });
 						await cp('build', dist, { recursive: true });
