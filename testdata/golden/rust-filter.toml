@@ -22,12 +22,6 @@ packs = ["_sample"]
 answers = { app_name = "demo", db = "postgres", auth = true, modules = ["jobs", "mail"], greeting = "Hello" }
 mode = "keep"
 
-# TestGoldenBase
-[golden."base"]
-packs = ["base"]
-answers = { app_name = "todo", module = "example.com/todo" }
-mode = "keep"
-
 # TestGoldenSecrets
 [golden."secrets"]
 packs = ["base", "api", "secrets"]
@@ -40,14 +34,6 @@ mode = "0644"
 packs = ["base", "api", "deploy", "tofu"]
 answers = { app_name = "todo", module = "example.com/todo", modules = "deploy,tofu" }
 sub = "deploy/infra/tofu"
-mode = "keep"
-
-# TestGoldenDeploy (deployGoldenPath: the api and web packs own the other deploy/ files)
-[golden."deploy"]
-packs = ["base", "api", "web", "deploy"]
-answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy" }
-prefixes = ["deploy/"]
-exclude = ["deploy/compose.dev.yml", "deploy/Dockerfile.api", "deploy/Dockerfile.web"]
 mode = "keep"
 
 # TestGoldenBackups (backupsFiles)

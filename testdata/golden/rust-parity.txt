@@ -5,15 +5,13 @@
 # R1: the neutral packs. R1 renders .go outputs without go/format, so the Rust tests skip
 # them (rust-filter.toml, skip_suffixes).
 _sample          # R1.14
-base             # R1.14
 secrets          # R1.14
 tofu             # R1.14
-deploy           # R1.15
 backups          # R1.15
 monitoring       # R1.15 (lite, full)
 web              # R1.16
 web-variants     # R1.16 (8 variants)
 #
-# In testdata/golden-rs/ (R2, filter.d): api, api-openapi, web-embed, auth, jobs, mail,
-# gen-resource-rs. Still to move in R2: ci (R2.20), web and web-variants (R2.22).
+# In testdata/golden-rs/ (R2, filter.d): api, api-openapi, web-embed, auth, jobs, mail, base,
+# deploy, ci, gen-resource-rs. Still to move in R2: web and web-variants (R2.22).
 # R2 rule: when a unit changes a pack, its entry moves from this file to golden-rs.
