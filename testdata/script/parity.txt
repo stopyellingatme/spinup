@@ -4,7 +4,7 @@
 # the same name replaces the shared script.
 #
 # R1 (ADR 0020 §8): the harness scripts, the picker, and the scripts that need only
-# `new` with the converted Go api pack plus the R1 commands check, diff, eject, restore.
+# `new` with the api pack plus the R1 commands check, diff, eject, restore.
 version
 harness_mkversion
 gen_picker

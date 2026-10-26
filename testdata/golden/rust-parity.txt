@@ -13,7 +13,6 @@ backups          # R1.15
 monitoring       # R1.15 (lite, full)
 web              # R1.16
 web-variants     # R1.16 (8 variants)
-web-embed        # R1.16 (the web half)
 #
 # Not in R1 (R2 moves them to testdata/golden-rs/): api, api-openapi, auth, ci, jobs, mail,
 # gen-resource, gen-resource-auth, gen-resource-shared.

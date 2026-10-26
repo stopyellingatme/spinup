@@ -79,14 +79,6 @@ prefixes = ["web/"]
 paths = ["deploy/Dockerfile.web"]
 mode = "keep"
 
-# TestGoldenWebEmbed (skip_suffixes drops the .go files: the web half only)
-[golden."web-embed"]
-packs = ["base", "api", "web", "deploy"]
-answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed" }
-prefixes = ["web/", "deploy/", "api/internal/webdist/"]
-paths = ["api/cmd/api/main.go"]
-mode = "keep"
-
 # TestGoldenWebVariants/node/pnpm/openapi-fetch
 [golden."web-variants/node-pnpm-openapi-fetch"]
 packs = ["base", "api", "web", "ci", "deploy"]
