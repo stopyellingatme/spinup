@@ -1,0 +1,6 @@
+[golden."mail"]
+packs = ["base", "api", "web", "auth", "mail", "jobs"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "auth,mail,jobs" }
+prefixes = ["api/src/mail/", "api/templates/mail/", "web/src/routes/reset/"]
+paths = ["api/migrations/00003_password_resets.up.sql", "api/migrations/00003_password_resets.down.sql", "api/src/main.rs", "api/src/reset.rs", "api/src/jobs/mod.rs"]
+mode = "0644"
