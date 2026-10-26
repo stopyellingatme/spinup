@@ -142,6 +142,21 @@ func TestHarnessRustCaches(t *testing.T) {
 	}
 }
 
+func TestHarnessPassEnvKeys(t *testing.T) {
+	seen := map[string]bool{}
+	for _, key := range passEnvKeys {
+		if seen[key] {
+			t.Fatalf("passEnvKeys lists %s twice", key)
+		}
+		seen[key] = true
+	}
+	for _, key := range []string{"CARGO_PROFILE_RELEASE_LTO", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "CARGO_TARGET_DIR", "SPINUP_KIT_DIR", "DATABASE_URL"} {
+		if !seen[key] {
+			t.Fatalf("passEnvKeys does not pass %s", key)
+		}
+	}
+}
+
 func TestHarnessParallel(t *testing.T) {
 	for _, value := range []string{"0", "-1", "bad"} {
 		if _, err := scriptParallel(value); err == nil {

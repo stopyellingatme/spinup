@@ -163,6 +163,16 @@ func rustCaches() map[string]string {
 	return values
 }
 
+// passEnvKeys are the variables that a script inherits from the test process. The two
+// release-profile keys let make rs-script build generated apps with a cheap release
+// profile (ADR 0021 §11).
+var passEnvKeys = []string{
+	"SPINUP_PACKS_SRC", "SPINUP_STACK_SRC", "SPINUP_KIT_DIR",
+	"RUSTUP_TOOLCHAIN", "RUSTUP_AUTO_INSTALL", "CARGO_NET_OFFLINE", "CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "SQLX_OFFLINE",
+	"CARGO_PROFILE_RELEASE_LTO", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
+	"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI",
+}
+
 func scriptParallel(value string) (int, error) {
 	if value == "" {
 		return 0, nil

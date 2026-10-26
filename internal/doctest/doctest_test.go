@@ -192,6 +192,7 @@ func TestDocs(t *testing.T) {
 	if value := os.Getenv("DATABASE_URL"); value != "" {
 		vars = append(vars, "DATABASE_URL="+value)
 	}
+	vars = append(vars, rustBuildVars(os.LookupEnv)...)
 	for _, path := range paths {
 		path := path
 		t.Run(path, func(t *testing.T) {
@@ -207,6 +208,43 @@ func TestDocs(t *testing.T) {
 				t.Errorf("%s:%d: %s: %s", failure.Path, failure.Line, failure.Command, failure.Message)
 			}
 		})
+	}
+}
+
+// rustBuildKeys are the Rust build settings that a page command inherits, as the script
+// harness passes them (ADR 0021 §11). Without them, a page that builds an app compiles the
+// kit cold in a new target directory with the release profile of the pack.
+var rustBuildKeys = []string{
+	"RUSTUP_TOOLCHAIN", "CARGO_NET_OFFLINE", "CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "SQLX_OFFLINE",
+	"SPINUP_KIT_DIR", "CARGO_PROFILE_RELEASE_LTO", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
+}
+
+// rustBuildVars returns KEY=value for each set key of rustBuildKeys, in list order.
+func rustBuildVars(lookup func(string) (string, bool)) []string {
+	var vars []string
+	for _, key := range rustBuildKeys {
+		if value, ok := lookup(key); ok {
+			vars = append(vars, key+"="+value)
+		}
+	}
+	return vars
+}
+
+func TestRustBuildVars(t *testing.T) {
+	env := map[string]string{
+		"CARGO_TARGET_DIR":                    "/tmp/apps",
+		"CARGO_PROFILE_RELEASE_LTO":           "false",
+		"CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+		"SQLX_OFFLINE":                        "",
+		"UNRELATED":                           "x",
+	}
+	got := rustBuildVars(func(key string) (string, bool) {
+		value, ok := env[key]
+		return value, ok
+	})
+	want := []string{"CARGO_TARGET_DIR=/tmp/apps", "SQLX_OFFLINE=", "CARGO_PROFILE_RELEASE_LTO=false", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("rustBuildVars = %q, want %q", got, want)
 	}
 }
 

@@ -123,7 +123,7 @@ func TestScripts(t *testing.T) {
 			for key, value := range rustCaches() {
 				env.Setenv(key, value)
 			}
-			for _, key := range []string{"SPINUP_PACKS_SRC", "SPINUP_STACK_SRC", "SPINUP_KIT_DIR", "RUSTUP_TOOLCHAIN", "RUSTUP_AUTO_INSTALL", "CARGO_NET_OFFLINE", "CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "SQLX_OFFLINE", "GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
+			for _, key := range passEnvKeys {
 				if value, ok := os.LookupEnv(key); ok {
 					if value != "" && (key == "SPINUP_PACKS_SRC" || key == "SPINUP_STACK_SRC" || key == "SPINUP_KIT_DIR") {
 						value = sourcePath(root, value, "")
