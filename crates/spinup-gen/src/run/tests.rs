@@ -1,5 +1,7 @@
 //! The runner tests (ports of Go `run_test.go` and `commands_test.go`).
 
+mod r2;
+
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -167,6 +169,7 @@ fn run_with(
     let mut command_out = Vec::new();
     let cancel = Cancellation::new();
     let mut options = Options::new(root.path(), &mut out, fake, &cancel);
+    options.database_url = Some("postgres://test".into());
     options.dry_run = flags.dry;
     options.diff = flags.diff;
     options.force = flags.force;
@@ -598,6 +601,10 @@ fn post_steps_run_once_in_order() {
     ] {
         let root = Root::new();
         let fake = Fake::new();
+        fake.expect("rustfmt", ["--edition", "2024"])
+            .returns("", "", 0);
+        fake.expect("rustfmt", ["--version"])
+            .returns("rustfmt 1.9.0", "", 0);
         if !dry && !diff {
             fake.expect("migrate-tool", ["api/x.rs"]).returns("", "", 0);
             fake.expect("sqlx-tool", ["api/x.rs"]).returns(
@@ -642,7 +649,12 @@ fn post_steps_run_once_in_order() {
             );
         }
         for call in fake.calls() {
-            assert_eq!(call.dir, Some(root.path().join("api")), "{name}");
+            let dir = if call.program == "rustfmt" {
+                root.path().to_path_buf()
+            } else {
+                root.path().join("api")
+            };
+            assert_eq!(call.dir, Some(dir), "{name}");
         }
         fake.assert_done().unwrap();
     }
@@ -653,6 +665,10 @@ fn post_steps_in_json() {
     let root = Root::new();
     set_output(Ok(step_output()));
     let fake = Fake::new();
+    fake.expect("rustfmt", ["--edition", "2024"])
+        .returns("", "", 0);
+    fake.expect("rustfmt", ["--version"])
+        .returns("rustfmt 1.9.0", "", 0);
     let flags = Flags {
         dry: true,
         json: true,

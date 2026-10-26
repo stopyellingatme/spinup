@@ -6,9 +6,9 @@
 //! the post-steps. The runner refuses to overwrite a file with different content unless
 //! `--force` is set, the generator owns the file, or the generator marks it as an edit.
 
-mod commands;
+pub(crate) mod commands;
 mod json;
-mod steps;
+pub(crate) mod steps;
 #[cfg(test)]
 mod tests;
 
@@ -30,9 +30,9 @@ pub use steps::{POST_STEPS, StepInput, StepRunner, step_name};
 pub struct Options<'a> {
     /// The project root (the directory that holds `spinup.lock`).
     pub root: &'a Path,
-    /// List the file actions. Do not write, and do not run tools.
+    /// List the formatted file actions without applying the plan or running post-steps.
     pub dry_run: bool,
-    /// Print unified diffs. Do not write, and do not run tools.
+    /// Print formatted diffs without applying the plan or running post-steps.
     pub diff: bool,
     /// Allow changes to existing files with different content.
     pub force: bool,
@@ -49,6 +49,10 @@ pub struct Options<'a> {
     pub cancel: &'a Cancellation,
     /// The post-step runners. [`Options::new`] sets the [`POST_STEPS`] slice.
     pub post_steps: &'a [StepRunner],
+    /// The resolved database URL. Tests can supply this value without process changes.
+    pub database_url: Option<String>,
+    // The constructor stays infallible for the CLI. The runner reports resolver errors.
+    database_url_error: Option<anyhow::Error>,
 }
 
 impl<'a> Options<'a> {
@@ -59,7 +63,14 @@ impl<'a> Options<'a> {
         runner: &'a dyn Runner,
         cancel: &'a Cancellation,
     ) -> Self {
+        let (database_url, database_url_error) =
+            match spinup_project::env::database_url_from_process(root) {
+                Ok(url) => (url, None),
+                Err(error) => (None, Some(error)),
+            };
         Self {
+            database_url,
+            database_url_error,
             root,
             dry_run: false,
             diff: false,
@@ -118,7 +129,7 @@ pub struct FileResult {
 pub struct RunResult {
     /// Every planned file, in path order.
     pub files: Vec<FileResult>,
-    /// Each requested post-step once, in run order.
+    /// Each active post-step once, in run order. Previews retain every requested step.
     pub post_steps: Vec<PostStep>,
     /// The suggested commands of the generator.
     pub next: Vec<String>,
@@ -152,7 +163,12 @@ pub fn run(
         runner,
         cancel,
         post_steps,
+        database_url,
+        database_url_error,
     } = options;
+    if let Some(error) = database_url_error {
+        return Err(error);
+    }
     let lock_path = root.join("spinup.lock");
     let mut lock = Lock::load(&lock_path)?;
     let output = (generator.run)(&Input {
@@ -170,7 +186,8 @@ pub fn run(
             &format!("spinup g {} --help", generator.name),
         )
     })?;
-    let plan = validate_plan(&output.plan)?;
+    let mut plan = validate_plan(&output.plan)?;
+    let formatter = crate::rustfmt::format(root, &mut plan, runner, cancel)?;
     let commands = commands::validate(generator.name, &output.commands)?;
     let changes = spinup_vfs::diff::diff(root, &plan).map_err(|e| {
         with_hint(
@@ -259,6 +276,14 @@ pub fn run(
             };
             lock.set_file(&file.path, entry)?;
         }
+    }
+    let formatter_changed = formatter
+        .as_ref()
+        .is_some_and(|value| *value != lock.formatter);
+    if let Some(formatter) = formatter {
+        lock.formatter = formatter;
+    }
+    if !writes.files.is_empty() || formatter_changed {
         lock.save(&lock_path)?;
     }
     let mut stderr = std::io::stderr();
@@ -268,24 +293,57 @@ pub fn run(
         (true, None) => &mut stderr,
     };
     commands::run_all(root, &result.commands, runner, cancel, command_sink)?;
-    let runners = steps::runners(&result.post_steps, post_steps)?;
+    let skipped = if database_url.is_none() {
+        let skip_client = result.post_steps.contains(&PostStep::OpenApiEmit);
+        let skipped: Vec<_> = result
+            .post_steps
+            .iter()
+            .copied()
+            .filter(|step| {
+                matches!(
+                    step,
+                    PostStep::Migrate
+                        | PostStep::SqlxPrepare
+                        | PostStep::Build
+                        | PostStep::OpenApiEmit
+                ) || (*step == PostStep::Client && skip_client)
+            })
+            .collect();
+        result.post_steps.retain(|step| !skipped.contains(step));
+        if !skipped.is_empty() {
+            for next in ["spinup db prepare", "spinup g openapi"] {
+                if !result.next.iter().any(|s| s == next) {
+                    result.next.push(next.into());
+                }
+            }
+        }
+        skipped
+    } else {
+        Vec::new()
+    };
+    if !skipped.is_empty() {
+        writeln!(
+            command_sink,
+            "Skipped post-steps: DATABASE_URL is not set ({})",
+            skipped
+                .iter()
+                .map(|step| step_name(*step))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .map_err(|e| output_error("write skipped post-steps", &e))?;
+    }
     let paths = plan.paths();
-    for (step, step_runner) in result.post_steps.iter().zip(runners) {
-        let input = StepInput {
+    crate::poststeps::run_registered(
+        &result.post_steps,
+        &StepInput {
             root,
             files: &paths,
             runner,
             cancel,
-        };
-        if let Err(e) = (step_runner.run)(&input) {
-            return Err(anyhow!(
-                "generator post-step {:?} failed: {}\nTry: {}",
-                step_name(*step),
-                commands::reason(&format!("{e:#}")),
-                (step_runner.retry)(&paths)
-            ));
-        }
-    }
+        },
+        post_steps,
+    )?;
     if json {
         json::print(out, &result)?;
         return Ok(result);

@@ -123,7 +123,7 @@ pub(super) fn run_all(
 
 /// Returns the error text without its `Try:` lines and without an inline ` Try: ` hint, so
 /// that the caller adds the one `Try:` line.
-pub(super) fn reason(text: &str) -> String {
+pub(crate) fn reason(text: &str) -> String {
     let lines: Vec<&str> = text
         .split('\n')
         .filter(|line| !line.trim().starts_with("Try:"))

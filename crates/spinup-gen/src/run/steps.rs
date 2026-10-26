@@ -58,7 +58,7 @@ pub fn step_name(step: PostStep) -> &'static str {
 }
 
 /// Returns each requested step once, in [`PostStep`] order (ADR 0019 §4).
-pub(super) fn ordered(requested: &[PostStep]) -> Vec<PostStep> {
+pub(crate) fn ordered(requested: &[PostStep]) -> Vec<PostStep> {
     let mut steps = requested.to_vec();
     steps.sort_unstable();
     steps.dedup();
@@ -66,7 +66,7 @@ pub(super) fn ordered(requested: &[PostStep]) -> Vec<PostStep> {
 }
 
 /// Finds the runner of each step before any step runs.
-pub(super) fn runners<'a>(
+pub(crate) fn runners<'a>(
     steps: &[PostStep],
     registered: &'a [StepRunner],
 ) -> anyhow::Result<Vec<&'a StepRunner>> {
