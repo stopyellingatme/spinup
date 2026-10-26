@@ -14,6 +14,6 @@ monitoring       # R1.15 (lite, full)
 web              # R1.16
 web-variants     # R1.16 (8 variants)
 #
-# Not in R1 (R2 moves them to testdata/golden-rs/): api, api-openapi, auth, ci, jobs, mail,
-# gen-resource, gen-resource-auth, gen-resource-shared.
+# In testdata/golden-rs/ (R2, filter.d): api, api-openapi, web-embed, auth, jobs, mail,
+# gen-resource-rs. Still to move in R2: ci (R2.20), web and web-variants (R2.22).
 # R2 rule: when a unit changes a pack, its entry moves from this file to golden-rs.
