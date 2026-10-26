@@ -1,0 +1,3 @@
+# Read the committed query cache when a build has no database.
+[env]
+SQLX_OFFLINE = "true"

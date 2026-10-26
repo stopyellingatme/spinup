@@ -1,0 +1,17 @@
+# Rust twin of testdata/script/diff.txtar (Go blob c232d6290d9b40f8e297bf7d8fd3f24448990cd4).
+env SPINUP_KIT_REPLACE=
+exec spinup new app --api-only --no-git --module example.com/app --non-interactive
+cd app
+exec spinup diff
+! stdout .
+cp ../edited deploy/compose.dev.yml
+cp ../edited api/src/main.rs
+exec spinup diff
+stdout '--- a/deploy/compose.dev.yml'
+stdout '--- a/api/src/main.rs'
+stdout '\+edited'
+exec spinup diff --json
+stdout '"files": \['
+stdout '"state": "modified"'
+-- edited --
+edited

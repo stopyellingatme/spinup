@@ -1,0 +1,4 @@
+[golden."api"]
+packs = ["base", "api"]
+answers = { app_name = "todo", module = "example.com/todo" }
+mode = "keep"

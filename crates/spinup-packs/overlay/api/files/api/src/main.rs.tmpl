@@ -1,0 +1,127 @@
+//! The API commands: serve, migrate, openapi, healthcheck, and version.
+
+use std::process::ExitCode;
+
+[% if has("jobs", data.modules) %]#[cfg(feature = "jobs")]
+use api::jobs;
+[% endif %][% if has("mail", data.modules) %]#[cfg(feature = "mail")]
+use api::mail;
+[% endif %][% if has("auth", data.modules) and has("mail", data.modules) %]#[cfg(all(feature = "auth", feature = "mail"))]
+use api::reset;
+[% endif %]use kit::app::App;
+use kit::config::Base;
+
+[% if data.frontend_mode == "embed" %]#[cfg(feature = "embedweb")]
+include!(concat!(env!("OUT_DIR"), "/webdist.rs"));
+
+[% endif %]fn main() -> ExitCode {
+    kit::app::main(api::openapi::openapi, start)
+}
+
+async fn start() -> anyhow::Result<App> {
+    let config: Base = kit::config::load()?;
+    #[cfg(feature = "telemetry")]
+    let telemetry = kit::telemetry::init(
+        &config,
+        &kit::telemetry::Options {
+            service_version: option_env!("SPINUP_APP_VERSION").unwrap_or("dev").into(),
+            environment: config.env.clone(),
+            ..kit::telemetry::Options::new([[ quote(data.app_name ~ "-api") ]])
+        },
+    )?;
+    #[cfg(not(feature = "telemetry"))]
+    kit::logx::init(&config)?;
+
+    let pool = kit::db::pool(&config)?;
+[% if has("mail", data.modules) %]    #[cfg(feature = "mail")]
+    let mailers = crate::mail::Mailers::new(&pool)?;
+[% endif %][% if has("auth", data.modules) %]    #[cfg(feature = "auth")]
+    let (auth, routes) = {
+        use kit::config::FromEnv;
+
+        struct Web {
+            public_origin: String,
+        }
+
+        impl FromEnv for Web {
+            fn from_env(env: &mut kit::config::Env<'_>) -> Self {
+                Self {
+                    public_origin: env.value("PUBLIC_ORIGIN", "http://localhost:5173".into()),
+                }
+            }
+        }
+
+        let Web { public_origin } = kit::config::load()?;
+        let auth = kit::auth::Auth::new(
+            pool.clone(),
+            kit::auth::Options {
+                secure: !config.is_dev(),
+                origins: vec![public_origin.clone()],
+                ..kit::auth::Options::default()
+            },
+        )?;
+        let routes = api::router(pool.clone()).merge(auth.routes());
+        #[cfg(feature = "oidc")]
+        let routes = routes.merge(kit::auth::oidc::routes(
+            &auth,
+            kit::auth::oidc::OidcOptions::load(),
+        ));
+[% if has("mail", data.modules) %]        #[cfg(feature = "mail")]
+        let routes = routes.merge(crate::reset::routes(&auth, &mailers, &public_origin)?);
+[% endif %]        let routes = auth.layer(routes);
+        (auth, routes)
+    };
+    #[cfg(not(feature = "auth"))]
+[% endif %]    let routes = api::router(pool.clone());
+    let app = App::new(&config)
+        .name([[ quote(data.app_name) ]])
+        .version(option_env!("SPINUP_APP_VERSION").unwrap_or("dev"))
+        .git_sha(option_env!("SPINUP_APP_GIT_SHA").unwrap_or_default())
+        .rust_version(option_env!("SPINUP_APP_RUST").unwrap_or_default())
+        .routes(routes)
+        .readiness("db", kit::db::readiness(pool.clone()))
+        .command(
+            "migrate",
+            kit::db::migrate_command(
+                kit::db::Migrations::new(sqlx::migrate!())
+                    .database_url(config.database_url.clone()),
+            ),
+        )
+        .shutdown({
+            let pool = pool.clone();
+            move || async move {
+                pool.close().await;
+                Ok(())
+            }
+        });
+[% if has("auth", data.modules) %]    #[cfg(feature = "auth")]
+    let app = app.shutdown(move || async move {
+        auth.close().await;
+        Ok(())
+    });
+[% endif %][% if has("jobs", data.modules) %]    #[cfg(feature = "jobs")]
+    let app = app.command(
+        "worker",
+        kit::jobs::worker_command(pool.clone(), kit::jobs::Config::from_base(&config), {
+            let pool = pool.clone();
+            move |worker| {
+                crate::jobs::register(worker, &pool)?;
+[% if has("mail", data.modules) %]                #[cfg(feature = "mail")]
+                mailers.register_jobs(worker)?;
+[% endif %]                Ok(())
+            }
+        }),
+    );
+[% endif %][% if has("mail", data.modules) %][% if has("jobs", data.modules) %]    #[cfg(all(feature = "mail", not(feature = "jobs")))]
+[% else %]    #[cfg(feature = "mail")]
+[% endif %]    let _ = mailers; // Pass this dependency to handlers that send mail.
+[% endif %]    #[cfg(feature = "telemetry")]
+    let app = app.with_telemetry(&telemetry);
+    #[cfg(feature = "apidocs")]
+    let app = app.with_api_docs(api::openapi::openapi().to_yaml()?);
+    #[cfg(feature = "devtools")]
+    let app = app.with_devtools(Some(kit::db::migration_status(pool)));
+[% if data.frontend_mode == "embed" %]    #[cfg(feature = "embedweb")]
+    let app = app.with_spa(&WEB_FILES);
+[% endif %]    Ok(app)
+}
