@@ -18,6 +18,7 @@ generator client
 generator component
 generator dashboard
 generator page
+generator resource
 migration 0001_web_svmigrate
 post-step build
 post-step client
