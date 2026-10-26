@@ -1,0 +1,5 @@
+# Rust mailers and templates replace the Go package.
+files/api/internal/mail/mailers.go.tmpl
+files/api/internal/mail/templates.go.tmpl
+files/api/internal/mail/worker.go.tmpl
+files/api/internal/mail/templates/README.txt

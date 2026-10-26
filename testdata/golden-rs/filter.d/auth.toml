@@ -1,0 +1,12 @@
+[golden."auth"]
+packs = ["base", "api", "web", "auth"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,auth" }
+prefixes = ["web/src/routes/login/", "web/src/routes/register/", "web/src/routes/logout/", "web/src/routes/account/"]
+paths = ["api/migrations/00002_create_auth.up.sql", "api/migrations/00002_create_auth.down.sql", "api/src/main.rs", "web/src/lib/server/auth.ts", "web/src/lib/server/auth.test.ts"]
+mode = "keep"
+
+[golden."auth/oidc"]
+packs = ["base", "api", "web", "auth"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,auth", auth_oidc = true }
+paths = ["api/migrations/00004_oidc_identities.up.sql", "api/migrations/00004_oidc_identities.down.sql", "api/src/main.rs", "web/src/lib/components/OidcButtons.svelte", "web/src/routes/login/+page.svelte"]
+mode = "0644"
