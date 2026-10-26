@@ -33,8 +33,10 @@ pub fn db_layer<S>() -> impl Layer<S> + Send + Sync + 'static
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
+    // Not `is_event()`: sqlx first asks `tracing::enabled!`, whose metadata has the kind
+    // `HINT`. A filter that rejects it stops sqlx from emitting the event at all.
     DbLayer(()).with_filter(filter_fn(|meta: &Metadata<'_>| {
-        meta.is_event() && meta.target() == SQLX_TARGET
+        !meta.is_span() && meta.target() == SQLX_TARGET
     }))
 }
 

@@ -974,6 +974,10 @@ async fn telemetry_metric_names_match_the_monitoring_pack() {
 async fn telemetry_db_span_from_the_sqlx_event() {
     let mem = Mem::install("test-api");
     let _cap = mem.subscribe();
+    assert!(
+        tracing::enabled!(target: "sqlx::query", tracing::Level::DEBUG),
+        "sqlx checks tracing::enabled! before it emits the event"
+    );
     let parent = tracing::info_span!("request");
     async {
         tracing::debug!(
