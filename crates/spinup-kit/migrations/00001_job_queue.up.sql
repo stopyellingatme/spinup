@@ -1,5 +1,5 @@
 -- The kit job queue. It follows the River schema: an enum, one job table with
--- its indexes, the leader table, and a NOTIFY trigger in PL/pgSQL. The kit
+-- its indexes, the leader table, the queue table, and a NOTIFY trigger in PL/pgSQL. The kit
 -- migrator owns it through its own table, _spinup_kit_migrations.
 CREATE TYPE kit_job_state AS ENUM (
     'available', 'cancelled', 'completed', 'discarded', 'pending', 'retryable', 'running', 'scheduled'
@@ -19,6 +19,8 @@ CREATE TABLE kit_job (
     attempted_by text[] NOT NULL DEFAULT '{}',
     errors jsonb[] NOT NULL DEFAULT '{}',
     kind text NOT NULL,
+    -- traceparent (the trace of the insert) and cancel_attempted_at (a cancel of
+    -- a running job).
     metadata jsonb NOT NULL DEFAULT '{}',
     queue text NOT NULL DEFAULT 'default',
     tags varchar(255)[] NOT NULL DEFAULT '{}',
@@ -56,6 +58,16 @@ CREATE UNLOGGED TABLE kit_leader (
     name text PRIMARY KEY DEFAULT 'default',
     CONSTRAINT name_length CHECK (name = 'default'),
     CONSTRAINT leader_id_length CHECK (char_length(leader_id) > 0 AND char_length(leader_id) < 128)
+);
+
+-- One row for each queue that a client paused or resumed. A worker fetches no
+-- job from a queue with paused_at set. A queue without a row is not paused.
+CREATE TABLE kit_queue (
+    name text PRIMARY KEY,
+    paused_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT name_length CHECK (char_length(name) > 0 AND char_length(name) < 128)
 );
 
 -- An insert of an available job wakes the workers of its queue. A lost
