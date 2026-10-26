@@ -1,0 +1,24 @@
+//! The [[ snake ]] HTTP handler.
+
+use axum::Json;
+use serde_json::{Value, json};
+
+/// Handles GET /api/[[ snake ]]. Replace the response with application logic.
+#[utoipa::path(
+    get,
+    path = "/[[ snake ]]",
+    operation_id = "[[ snake ]]",
+    responses((status = 200, description = "Handler response", body = Value))
+)]
+pub async fn handle() -> Json<Value> {
+    Json(json!({"message": "[[ snake ]]"}))
+}
+
+/// Returns the handler route for the generated API router.
+pub fn routes() -> utoipa_axum::router::OpenApiRouter<kit::db::PgPool> {
+    utoipa_axum::router::OpenApiRouter::new().routes(utoipa_axum::routes!(handle))
+}
+
+#[cfg(test)]
+#[path = "[[ snake ]]_tests.rs"]
+mod tests;
