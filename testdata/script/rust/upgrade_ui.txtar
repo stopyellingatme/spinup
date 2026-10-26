@@ -1,0 +1,276 @@
+# Rust twin of testdata/script/upgrade_ui.txtar (Go blob 28bb0764157099403508aea4110e3af9f80d952e).
+# The local kit keeps every upgrade offline.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+
+# Normal upgrades preserve seeds and report the registry change once.
+exec spinup new ordinary --module example.com/ordinary --non-interactive
+cd ordinary
+cp web/src/lib/components/ui/button/button.svelte $WORK/original-button.svelte
+exec spinup upgrade --yes --no-verify
+stdout 'Registry 1.8.0 is available.*--ui'
+cmp $WORK/original-button.svelte .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+grep '"shadcn_registry": "1.7.0"' .spinup/upgrade/0.0.1/spinup.lock
+exec git status --porcelain
+! stdout .
+
+# Opting in updates the seed and records the new registry in the lock.
+cd $WORK
+exec spinup new opted --module example.com/opted --non-interactive
+cd opted
+exec spinup upgrade --ui --yes --no-verify
+grep 'upgraded-button' .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
+cmp $WORK/original-button.svelte web/src/lib/components/ui/button/button.svelte
+exec git show spinup/upgrade-0.0.1:web/src/lib/components/ui/button/button.svelte
+stdout 'upgraded-button'
+exec git status --porcelain
+! stdout .
+
+# Competing edits stop with code 3 and list the component.
+cd $WORK
+exec spinup new edited --module example.com/edited --non-interactive
+cd edited
+exec sed 's/group.button inline-flex/user-button inline-flex/' web/src/lib/components/ui/button/button.svelte
+cp stdout web/src/lib/components/ui/button/button.svelte
+exec git add .
+exec git commit -m 'Customize button'
+exec sh -c 'spinup upgrade --ui --yes --no-verify; test $? -eq 3'
+stderr 'web/src/lib/components/ui/button/button.svelte'
+grep '^<<<<<<<' .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+exec git status --porcelain
+! stdout .
+
+# Recovery must retain the UI conflict without requiring --ui again.
+exec sh -c 'spinup upgrade --continue --yes --no-verify; test $? -eq 3'
+stderr 'web/src/lib/components/ui/button/button.svelte'
+cp $WORK/original-button.svelte .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+exec spinup upgrade --continue --yes --no-verify
+! exists .spinup/upgrade.json
+grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
+cmp $WORK/original-button.svelte .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+
+# An earlier plan conflict must preserve the UI choice across CLI processes.
+cd $WORK
+exec spinup new early --module example.com/early --non-interactive
+cd early
+exec sed 's/The application routes./My application routes./' api/src/routes.rs
+cp stdout api/src/routes.rs
+cp api/src/routes.rs $WORK/resolved-routes.rs
+exec git add .
+exec git commit -m 'Customize routes'
+exec sh -c 'spinup upgrade --ui --yes --no-verify; test $? -eq 3'
+stderr 'api/src/routes.rs'
+grep '"ui": true' .spinup/upgrade.json
+cp $WORK/resolved-routes.rs .spinup/upgrade/0.0.1/api/src/routes.rs
+exec spinup upgrade --continue --yes --no-verify
+! stdout 'Skipped go fix'
+! stdout 'Registry 1.8.0 is available'
+grep 'upgraded-button' .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
+grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
+! exists .spinup/upgrade.json
+
+-- overlay/packs/web/pack.toml --
+name = "web"
+description = "SvelteKit 3 web app with Tailwind, shadcn-svelte, and a same-origin API client."
+requires = ["api"]
+
+# The lock records the shadcn-svelte registry version of the seed components (critic resolution 6).
+# `spinup upgrade --ui` compares it with the registry version of a newer spinup.
+[[questions]]
+key = "shadcn_registry"
+prompt = "shadcn-svelte registry version"
+type = "string"
+default = "1.8.0"
+pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+# The npm inputs, the lockfile, and the shadcn-svelte components are in pack.d/deps.toml and
+# pack.d/shadcn.toml (main loop only).
+
+[[files]]
+path = "web/vite.config.js"
+source = "files/web/vite.config.js"
+class = "managed"
+
+[[files]]
+path = "web/tsconfig.json"
+source = "files/web/tsconfig.json"
+class = "managed"
+
+[[files]]
+path = "web/.gitignore"
+source = "files/web/gitignore"
+class = "managed"
+
+[[files]]
+path = "web/.dockerignore"
+source = "files/web/dockerignore"
+class = "managed"
+
+[[files]]
+path = "web/components.json"
+source = "files/web/components.json"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.html"
+source = "files/web/src/app.html.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.css"
+source = "files/web/src/app.css"
+class = "scaffold"
+
+[[files]]
+path = "web/src/app.d.ts"
+source = "files/web/src/app.d.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/env.ts"
+source = "files/web/src/env.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/hooks.server.ts"
+source = "files/web/src/hooks.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/utils.ts"
+source = "files/web/src/lib/utils.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/lib/api/client.ts"
+source = "files/web/src/lib/api/client.ts"
+class = "scaffold"
+
+# Tool output: the client post-step overwrites it with openapi-typescript output.
+[[files]]
+path = "web/src/lib/api/schema.d.ts"
+source = "files/web/src/lib/api/schema.d.ts"
+class = "seed"
+
+[[files]]
+path = "web/src/routes/+layout.svelte"
+source = "files/web/src/routes/+layout.svelte.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/+layout.server.ts"
+source = "files/web/src/routes/+layout.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/+page.svelte"
+source = "files/web/src/routes/+page.svelte.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/healthz/+server.ts"
+source = "files/web/src/routes/healthz/+server.ts"
+class = "managed"
+
+[[files]]
+path = "deploy/Dockerfile.web"
+source = "files/deploy/Dockerfile.web.tmpl"
+class = "managed"
+
+-- overlay/packs/web/files/web/src/lib/components/ui/button/button.svelte --
+<script lang="ts" module>
+	import { type VariantProps, tv } from "tailwind-variants";
+	import { cn, type WithElementRef } from "#lib/utils.js";
+	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
+
+	export const buttonVariants = tv({
+		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-lg border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 upgraded-button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		variants: {
+			variant: {
+				default: "bg-primary text-primary-foreground hover:bg-primary/80",
+				outline: "border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground",
+				secondary: "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+				ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
+				destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
+				link: "text-primary underline-offset-4 hover:underline",
+			},
+			size: {
+				default: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+				xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+				sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+				lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+				icon: "size-8",
+				"icon-xs": "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+				"icon-sm": "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
+				"icon-lg": "size-9",
+			},
+		},
+		defaultVariants: {
+			variant: "default",
+			size: "default",
+		},
+	});
+
+	export type ButtonVariant = VariantProps<typeof buttonVariants>["variant"];
+	export type ButtonSize = VariantProps<typeof buttonVariants>["size"];
+
+	export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
+		WithElementRef<HTMLAnchorAttributes> & {
+			variant?: ButtonVariant;
+			size?: ButtonSize;
+		};
+</script>
+
+<script lang="ts">
+	let {
+		class: className,
+		variant = "default",
+		size = "default",
+		ref = $bindable(null),
+		href = undefined,
+		type = "button",
+		disabled,
+		children,
+		...restProps
+	}: ButtonProps = $props();
+</script>
+
+{#if href}
+	<a
+		bind:this={ref}
+		data-slot="button"
+		class={cn(buttonVariants({ variant, size }), className)}
+		href={disabled ? undefined : href}
+		aria-disabled={disabled}
+		role={disabled ? "link" : undefined}
+		tabindex={disabled ? -1 : undefined}
+		{...restProps}
+	>
+		{@render children?.()}
+	</a>
+{:else}
+	<button
+		bind:this={ref}
+		data-slot="button"
+		class={cn(buttonVariants({ variant, size }), className)}
+		{type}
+		{disabled}
+		{...restProps}
+	>
+		{@render children?.()}
+	</button>
+{/if}
+
+-- overlay/packs/api/files/api/src/routes.rs --
+//! The upgraded application routes.
+
+use axum::Router;
+use kit::db::PgPool;
+
+/// Registers the application routes.
+pub fn routes() -> Router<PgPool> {
+    // Add application routes here. Generators never edit this file.
+    Router::new()
+}

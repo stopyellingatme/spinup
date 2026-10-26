@@ -1,8 +1,7 @@
-# Rust twin (main loop): the overlay templates of testdata/script/upgrade_flow.txtar converted to minijinja
-# with scripts/rust/convert-templates. The commands are unchanged.
+# Rust twin of testdata/script/upgrade_flow.txtar (Go blob eb098bcef4340b4450b5095864bd595da24ba051).
 # The plan leaves the main checkout clean.
 # The kit is not published yet, so the pin-only dependency step resolves it locally.
-env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
 mkversion 0.0.1 overlay
 env SPINUP_TEMPLATES_DIR=$WORK/templates
 exec spinup new demo --api-only --module example.com/demo --non-interactive
@@ -20,23 +19,23 @@ exec git status --porcelain
 ! stdout .
 
 # Competing edits stop only the upgrade worktree.
-exec sed 's/Package routes registers the application routes./Package routes registers my application routes./' api/internal/routes/routes.go
-cp stdout api/internal/routes/routes.go
-cp api/internal/routes/routes.go $WORK/resolved-routes.go
-exec git add api/internal/routes/routes.go
+exec sed 's/The application routes./My application routes./' api/src/routes.rs
+cp stdout api/src/routes.rs
+cp api/src/routes.rs $WORK/resolved-routes.rs
+exec git add api/src/routes.rs
 exec git commit -m 'Edit route comment'
 exec sh -c 'spinup upgrade --yes --no-verify; test $? -eq 3'
-stderr 'api/internal/routes/routes.go'
-grep '^<<<<<<<' .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+stderr 'api/src/routes.rs'
+grep '^<<<<<<<' .spinup/upgrade/0.0.1/api/src/routes.rs
 exists .spinup/upgrade.json
 exec git status --porcelain
 ! stdout .
-grep 'registers my application' api/internal/routes/routes.go
+grep 'My application' api/src/routes.rs
 ! exec spinup upgrade --yes --no-verify
 stderr '--continue'
 exec sh -c 'spinup upgrade --continue; test $? -eq 3'
-stderr 'api/internal/routes/routes.go'
-cp $WORK/resolved-routes.go .spinup/upgrade/0.0.1/api/internal/routes/routes.go
+stderr 'api/src/routes.rs'
+cp $WORK/resolved-routes.rs .spinup/upgrade/0.0.1/api/src/routes.rs
 exec spinup upgrade --continue --yes --no-verify
 ! stdout 'Skipped go fix'
 stdout 'git merge spinup/upgrade-0.0.1'
@@ -68,11 +67,11 @@ exec git status --porcelain
 cd $WORK
 exec spinup new aborted --api-only --module example.com/aborted --non-interactive
 cd aborted
-cp $WORK/resolved-routes.go api/internal/routes/routes.go
-exec git add api/internal/routes/routes.go
+cp $WORK/resolved-routes.rs api/src/routes.rs
+exec git add api/src/routes.rs
 exec git commit -m 'Edit route comment'
 exec sh -c 'spinup upgrade --yes --no-verify; test $? -eq 3'
-stderr 'api/internal/routes/routes.go'
+stderr 'api/src/routes.rs'
 ! exec spinup upgrade --abort
 stderr '--yes'
 exec spinup upgrade --abort --yes
@@ -95,33 +94,23 @@ exec git worktree list --porcelain
 
 # Committed conflicts require a warning before the merge instruction.
 exec spinup upgrade --yes --no-verify --commit-conflicts
-stdout 'Warning: committed conflict markers in: api/internal/routes/routes.go'
+stdout 'Warning: committed conflict markers in: api/src/routes.rs'
 stdout 'Resolve these files before running git merge'
 ! stdout 'Next: git merge'
 ! exists .spinup/upgrade.json
-exec git show spinup/upgrade-0.0.1:api/internal/routes/routes.go
+exec git show spinup/upgrade-0.0.1:api/src/routes.rs
 stdout '<<<<<<<'
 
--- overlay/packs/api/files/api/internal/routes/routes.go.tmpl --
-// Package routes registers the upgraded application routes.
-package routes
+-- overlay/packs/api/files/api/src/routes.rs --
+//! The upgraded application routes.
 
-import (
- "net/http"
+use axum::Router;
+use kit::db::PgPool;
 
- "github.com/jackc/pgx/v5/pgxpool"
-)
-
-// Deps contains the dependencies for route handlers.
-type Deps struct {
- DB *pgxpool.Pool
-}
-
-// Register adds generated routes and application routes to mux.
-func Register(mux *http.ServeMux, d Deps) {
- registerGenerated(mux, d)
-
- // Add your application routes here. Generators never edit this file.
+/// Registers the application routes.
+pub fn routes() -> Router<PgPool> {
+    // Add application routes here. Generators never edit this file.
+    Router::new()
 }
 
 -- overlay/packs/api/files/deploy/compose.dev.yml.tmpl --

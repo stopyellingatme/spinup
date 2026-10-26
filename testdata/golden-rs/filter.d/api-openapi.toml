@@ -1,0 +1,6 @@
+[golden."api-openapi"]
+packs = ["base", "api"]
+answers = { app_name = "todo", module = "example.com/todo" }
+prefixes = ["api/openapi/"]
+paths = ["api/src/openapi.rs", "api/src/routes_gen.rs", "api/src/handlers/mod.rs", "api/src/models/mod.rs"]
+mode = "keep"
