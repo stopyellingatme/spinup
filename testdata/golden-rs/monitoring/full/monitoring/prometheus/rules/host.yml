@@ -1,0 +1,41 @@
+# Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
+# monitoring/alerts/custom.yml.
+#
+# The host and container alerts (profile full): node-exporter and cAdvisor.
+groups:
+  - name: host
+    rules:
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs"}
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs"}
+          ) < 0.10
+          and
+          node_filesystem_readonly == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.mountpoint }}: less than 10% disk space is free"
+          description: "{{ $labels.mountpoint }} ({{ $labels.device }}) has {{ $value | humanizePercentage }} free space."
+
+      - alert: DiskWillFillIn24Hours
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs"}[6h], 24 * 3600) < 0
+          and
+          node_filesystem_readonly == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }}: the disk fills up in less than 24 hours at the current rate"
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name!=""}[15m]) >= 3
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.name }}: the container restarted {{ $value }} times in 15 minutes"
+          description: "Read its logs with spinup server logs."

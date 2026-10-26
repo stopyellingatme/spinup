@@ -1,4 +1,4 @@
-//! The backups pack must match the Go golden tree and keep the pgBackRest contracts (Go
+//! The backups pack must match the Rust golden tree and keep the pgBackRest contracts (Go
 //! `internal/templates/golden_backups_test.go`).
 //!
 //! As in Go, the test merges the Compose files with `docker compose config` and runs
@@ -49,6 +49,15 @@ fn golden_backups_postgres_16() -> Result<()> {
 /// Checks the contracts that a golden diff does not explain: the Compose security lint, the
 /// merged Compose configuration, the stanza, and the secret loader (Go `checkBackupsTree`).
 fn check_backups_tree(all: &Tree, pgdata: &str) -> Result<()> {
+    let script = read(all, "deploy/backups/run.sh")?;
+    assert!(
+        script.contains("SELECT count(*) FROM _sqlx_migrations"),
+        "the WAL-G verification must check the app migration table"
+    );
+    assert!(
+        !script.contains("goose_db_version"),
+        "the WAL-G verification still checks the Go migration table"
+    );
     let override_file = read(all, "deploy/compose.backups.yml")?;
     lint_compose("deploy/compose.backups.yml", &override_file)?;
     let conf = read(all, "deploy/pgbackrest/pgbackrest.conf")?;

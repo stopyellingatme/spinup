@@ -1,0 +1,171 @@
+#!/bin/sh
+# Managed by spinup. The VM does not need the spinup binary.
+set -eu
+export LC_ALL=C
+app='todo'
+base="/opt/$app/backups"
+metrics="$base/metrics/backup.prom"
+retention=''
+backend=pgbackrest
+if [ -f "$base/backend" ]; then backend=$(cat "$base/backend"); fi
+case "$backend" in pgbackrest|pgdump|walg) ;; *) echo 'Unknown backup backend' >&2; exit 1 ;; esac
+if [ -z "$retention" ]; then
+    if [ "$backend" = pgdump ]; then retention=7; else retention=4; fi
+fi
+kind=${1-}
+case "$kind" in full|diff|verify) ;; *) echo 'Usage: run.sh full|diff|verify' >&2; exit 1 ;; esac
+umask 077
+mkdir -p "$base"
+# Serialize scheduled backups and verification for this app.
+exec 9>"$base/run.lock"
+flock 9
+# The current release contains the base project's Compose files and environment.
+cd "/opt/$app/current"
+COMPOSE_FILE=compose.edge.yml
+if [ "$backend" = pgbackrest ] && [ -f compose.backups.yml ]; then COMPOSE_FILE="$COMPOSE_FILE:compose.backups.yml"; fi
+if [ "$backend" = walg ]; then COMPOSE_FILE="$COMPOSE_FILE:compose.backups-walg.yml"; fi
+export COMPOSE_FILE
+compose() { docker compose -p "$app" exec -T postgres "$@"; }
+pgbackrest() {
+    compose sh -c 'for f in /run/secrets/PGBACKREST_*; do [ -f "$f" ] && export "${f##*/}=$(cat "$f")"; done; exec pgbackrest "$@"' pgbackrest "--stanza=$app" "$@"
+}
+
+walg() {
+    compose sh -c 'set -eu; for f in /run/secrets/WALG_* /run/secrets/AWS_*; do [ -f "$f" ] || continue; value=$(cat "$f"); export "${f##*/}=$value"; done; : "${WALG_S3_PREFIX:?WALG_S3_PREFIX is required}" "${WALG_LIBSODIUM_KEY:?WALG_LIBSODIUM_KEY is required}"; exec wal-g "$@"' wal-g "$@"
+}
+walg_verify() (
+    set -eu
+    label=$(walg backup-list --json --detail | python3 -c 'import json,re,sys; b=max(json.load(sys.stdin),key=lambda b:(b.get("finish_time") or b["time"],b["backup_name"])); n=b["backup_name"]; assert re.fullmatch(r"base_[0-9A-F]{24}(_D_[0-9A-F]{24})?",n); print(n)') || exit 1
+    id=$(docker compose -p "$app" ps -aq postgres) || exit 1
+    # Inspect only non-secret metadata. Never copy the live container environment.
+    values=$(docker inspect --format '{{json .}}' "$id" | python3 -c 'import json,sys; p=json.load(sys.stdin); e=dict(v.split("=",1) for v in p["Config"]["Env"]); d=e["PGDATA"]; m=next(m["Destination"] for m in p["Mounts"] if m["Destination"] in ("/var/lib/postgresql","/var/lib/postgresql/data") and d.startswith(m["Destination"]+"/")); v=[p["Image"],p["Config"]["User"],d,m,e["POSTGRES_USER"],e["POSTGRES_DB"]]; assert all(v) and not any(any(c.isspace() for c in s) for s in v); print(" ".join(v))') || exit 1
+    set -f
+    set -- $values
+    [ "$#" -eq 6 ] || exit 1
+    image=$1 user=$2 pgdata=$3 mount=$4 dbuser=$5 db=$6
+    name="$app-verify-$label"
+    owner="scheduled-$$-$started"
+    cleanup() {
+        owned=$(docker ps -aq --filter "name=^/$name$" --filter "label=spinup.walg.operation=$owner") || return 1
+        if [ -n "$owned" ]; then docker rm -fv -- "$owned"; fi
+    }
+    trap 'cleanup || exit 1' 0
+    trap 'exit 1' HUP INT TERM
+    recovery=$(cat <<'WALG_RECOVERY'
+set -eu; for f in /run/secrets/WALG_* /run/secrets/AWS_*; do [ -f "$f" ] || continue; value=$(cat "$f"); export "${f##*/}=$value"; done; : "${WALG_S3_PREFIX:?WALG_S3_PREFIX is required}" "${WALG_LIBSODIUM_KEY:?WALG_LIBSODIUM_KEY is required}";
+wal-g backup-fetch "$PGDATA" "$1"
+# Remove settings inherited from a previous recovery.
+if [ -f "$PGDATA/postgresql.auto.conf" ]; then
+ sed '/^[ 	]*recovery_target/d; /^[ 	]*restore_command[ 	]*=/d' "$PGDATA/postgresql.auto.conf" > "$PGDATA/spinup.auto.conf"
+ mv "$PGDATA/spinup.auto.conf" "$PGDATA/postgresql.auto.conf"
+fi
+printf '%s\n' 'restore_command = '\''wal-g wal-fetch "%f" "%p"'\''' "recovery_target_timeline = 'latest'" "recovery_target_action = 'promote'" >> "$PGDATA/postgresql.auto.conf"
+if [ -n "$2" ]; then
+ printf "recovery_target_time = '%s'\n" "$2" >> "$PGDATA/postgresql.auto.conf"
+else
+ printf "recovery_target = 'immediate'\n" >> "$PGDATA/postgresql.auto.conf"
+fi
+rm -f "$PGDATA/standby.signal"
+touch "$PGDATA/recovery.signal"
+exec postgres -c archive_mode=off
+WALG_RECOVERY
+    )
+    docker create --name "$name" --pull never --network "$app-backup" \
+        --label "spinup.walg.operation=$owner" --env "PGDATA=$pgdata" \
+        --mount "type=volume,dst=$mount" \
+        --mount "type=bind,src=/opt/$app/secrets,dst=/run/secrets,readonly" \
+        --entrypoint sh "$image" -c '
+        set -eu
+        mkdir -p "$PGDATA"; chmod 0700 "$PGDATA"; chown -R "$1" "$2"; user=$1; shift 2
+        exec gosu "$user" sh -c "$@"
+        ' walg "$user" "$mount" "$recovery" walg "$label" '' > /dev/null || exit 1
+    docker start "$name" > /dev/null || exit 1
+    count=$(docker exec --user "$user" "$name" sh -c '
+        set -eu; i=0
+        until pg_isready -U "$1" -d "$2" >/dev/null 2>&1 && [ "$(psql -U "$1" -d "$2" -XAt -v ON_ERROR_STOP=1 -c "SELECT pg_is_in_recovery()")" = f ]; do
+            i=$((i+1)); [ "$i" -lt 120 ] || exit 1; sleep 1
+        done
+        exec psql -U "$1" -d "$2" -XAt -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM _sqlx_migrations"
+        ' walg "$dbuser" "$db") || exit 1
+    case "$count" in ''|*[!0-9]*) exit 1 ;; esac
+)
+
+# Replace the series in this update. Preserve all other series and metadata.
+write_metrics() (
+    mkdir -p "$base/metrics" || exit 1
+    if ! chmod 0755 "$base/metrics"; then
+        # Docker can create a missing bind source as root.
+        sudo -n chown --reference="$base" "$base/metrics" || exit 1
+        chmod 0755 "$base/metrics" || exit 1
+    fi
+    exec 8>"$base/metrics/.lock" || exit 1
+    flock 8 || exit 1
+    tmp=$(mktemp "$metrics.tmp.XXXXXX") || exit 1
+    trap 'rm -f "$tmp" "$tmp.old" "$tmp.new"' 0
+    trap 'exit 1' HUP INT TERM
+    if [ -e "$metrics" ]; then cat "$metrics" > "$tmp.old" || exit 1; else : > "$tmp.old"; fi
+    if [ "$kind" = verify ]; then
+        awk '$1 != "backup_last_verify_timestamp_seconds" && $1 != "backup_last_verify_ok" && $1 != "backup_last_verify_rto_seconds"' "$tmp.old" > "$tmp.new" || exit 1
+        printf 'backup_last_verify_timestamp_seconds %s\nbackup_last_verify_ok %s\nbackup_last_verify_rto_seconds %s\n' "$finished" "$ok" "$elapsed" >> "$tmp.new" || exit 1
+    else
+        awk -v label="{kind=\"$kind\"}" '$1 != "backup_last_success_timestamp_seconds" label && $1 != "backup_last_size_bytes" label' "$tmp.old" > "$tmp.new" || exit 1
+        printf 'backup_last_success_timestamp_seconds{kind="%s"} %s\nbackup_last_size_bytes{kind="%s"} %s\n' "$kind" "$finished" "$kind" "$size" >> "$tmp.new" || exit 1
+    fi
+    sort "$tmp.new" > "$tmp" || exit 1
+    chmod 0644 "$tmp" || exit 1
+    mv -f "$tmp" "$metrics" || exit 1
+)
+
+started=$(date +%s)
+ok=1
+if [ "$kind" = verify ]; then
+    if [ "$backend" = pgbackrest ]; then
+        if ! pgbackrest verify; then ok=0; fi
+    elif [ "$backend" = walg ]; then
+        if ! walg_verify; then ok=0; fi
+    else
+        newest=
+        for dump in "$base"/pgdump/*.dump; do [ ! -f "$dump" ] || newest=$dump; done
+        if [ -z "$newest" ]; then
+            echo 'No dump exists to verify' >&2
+            ok=0
+        elif ! compose pg_restore --list < "$newest" > /dev/null; then
+            ok=0
+        fi
+    fi
+elif [ "$backend" = pgbackrest ]; then
+    pgbackrest stanza-create
+    pgbackrest "--type=$kind" backup
+    # Bootstrap installs Python. No secret enters these numeric results.
+    info=$(pgbackrest --output=json info)
+    values=$(printf '%s' "$info" | python3 -c 'import json,sys; b=json.load(sys.stdin)[0]["backup"][-1]; print(b["type"], int(b["info"]["size"]))')
+    set -- $values
+    kind=$1
+    size=$2
+    case "$kind" in full|diff|incr) ;; *) echo 'Invalid backup kind' >&2; exit 1 ;; esac
+elif [ "$backend" = walg ]; then
+    compose sh -c 'set -eu; for f in /run/secrets/WALG_* /run/secrets/AWS_*; do [ -f "$f" ] || continue; value=$(cat "$f"); export "${f##*/}=$value"; done; : "${WALG_S3_PREFIX:?WALG_S3_PREFIX is required}" "${WALG_LIBSODIUM_KEY:?WALG_LIBSODIUM_KEY is required}"; if [ "$1" = full ]; then export WALG_DELTA_MAX_STEPS=0; fi; exec wal-g backup-push "$PGDATA"' wal-g "$kind"
+    values=$(walg backup-list --json --detail | python3 -c 'import json,sys; b=max(json.load(sys.stdin),key=lambda b:(b.get("finish_time") or b["time"],b["backup_name"])); print("incr" if "_D_" in b["backup_name"] else "full",int(b["uncompressed_size"]))')
+    set -- $values
+    kind=$1 size=$2
+    case "$size" in ''|*[!0-9]*) echo 'Invalid WAL-G backup size' >&2; exit 1 ;; esac
+    walg delete retain FULL "$retention" --confirm
+else
+    kind=full
+    mkdir -p "$base/pgdump"
+    label=$(date -u +%Y%m%dT%H%M%SZ)F
+    dump_tmp=$(mktemp "$base/pgdump/.dump.XXXXXX")
+    trap 'rm -f "$dump_tmp"' 0
+    trap 'exit 1' HUP INT TERM
+    compose pg_dump -U app -d app -Fc > "$dump_tmp"
+    chmod 0600 "$dump_tmp"
+    mv "$dump_tmp" "$base/pgdump/$label.dump"
+    size=$(wc -c < "$base/pgdump/$label.dump" | tr -d ' ')
+    # UTC labels sort from oldest to newest. Never include incomplete dumps.
+    set -- "$base"/pgdump/*.dump
+    while [ "$#" -gt "$retention" ]; do rm -f "$1"; shift; done
+fi
+finished=$(date +%s)
+elapsed=$((finished - started))
+if ! write_metrics; then echo 'warning: backup metrics could not be written' >&2; fi
+[ "$ok" -eq 1 ]
