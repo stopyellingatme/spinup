@@ -158,7 +158,6 @@ time = { version = "=0.3.55", features = ["serde", "serde-human-readable", "form
 tokio = { version = "=1.54.1", features = ["full"] }                                  # R0.6
 tower = { version = "=0.5.3", features = ["util"] }                                   # R0.6
 tower-http = { version = "=0.7.1", features = ["catch-panic", "limit"] }              # R2 pre-seed (not in a spike lock)
-tower-sessions = { version = "=0.15.0", default-features = false, features = ["axum-core"] } # R0.7
 tracing = "=0.1.44"                                                                   # R0.6
 tracing-opentelemetry = "=0.34.0"                                                     # R0.8
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json", "fmt"] } # R0.6
