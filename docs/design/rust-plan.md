@@ -160,15 +160,14 @@ The `PluginSource` trait lives in `spinup-plugin-api`. It has three methods: tru
 
 | Crate | Path | Replaces | Notes |
 |---|---|---|---|
-| `spinup-kit` | `crates/spinup-kit` | Go `kit/*` | One crate with features: `auth`, `oidc`, `jobs`, `mail`, `telemetry`, `devtools`, `embedweb`, `apidocs`. Default features: app, config, db, httpx, logx, secrets, deployx. |
-| `spinup-kit-testkit` | `crates/spinup-kit-testkit` | `kit/testkit`, `kit/auth/authtest` | A dev-dependency. It keeps testcontainers out of app builds. |
+| `spinup-kit` | `crates/spinup-kit` | Go `kit/*`, `kit/testkit`, `kit/auth/authtest` | One crate with features: `db` (default), `auth`, `oidc`, `jobs`, `mail`, `telemetry`, `devtools`, `embedweb`, `apidocs`, `testkit`. `app`, `config`, `httpx`, `logx`, `secrets`, and `deployx` always compile. The testkit is the feature `testkit`, not a crate (ADR 0021 §2). |
 | `spinup-plugin-sdk` | `crates/spinup-plugin-sdk` | `plugin-sdk/sdk`, `conformance` | serde, serde_json, base64 only. |
 
 Kit package dispositions:
 - `kit/backup` and `kit/deprecation` are dropped. No pack wires them. Backup metrics come from the VM textfile (ADR 0011 §4).
 - `kit/MIGRATION.json` moves to `crates/spinup-kit/`.
 - The Go kit has no ETag layer. The Rust kit adds none. `spa` sets `Cache-Control` only.
-- `kit/api`: R2.1 reads it and records its place in ADR 0021. The default is to fold it into `httpx`.
+- `kit/api`: it holds no Go code. It is the public API baseline for `internal/apicompat`. R2 does not port it. R4.9 makes the Rust baseline (ADR 0021 §2).
 
 The names `spinup-kit` and `spinup-plugin-sdk` are free on crates.io (checked 2026-10-24). The name `spinup` has another owner. The CLI crate name, if we publish it, is `spinup-cli`. The binary name stays `spinup`. R0.14 confirms.
 
@@ -488,81 +487,119 @@ The R1 exit test: a Rust-only upgrade of a `base`+`api`+`web` app, from a synthe
 
 ### R2: Kit and Rust API pack. `g resource` gives a working Rust CRUD API that equals the reference app.
 
-**R2 pre-seed commit**
-- All R2 crates in the workspace: `spinup-kit`, `spinup-kit-testkit`, `spinup-db`, `spinup-build`, `spinup-appcmd`, `spinup-gen-web`, `spinup-gen-app`.
-- Crates: axum 0.8.9, tokio 1.54.1 or newer, tower-http 0.7.1, sqlx 0.9.0, utoipa 6.0.0, utoipa-axum 0.3.0, tower-sessions 0.15.0, argon2 0.6.0, `oauth2` 5 and `jsonwebtoken` 11 (R0.7), lettre 0.11.23, opentelemetry 0.33.x with tracing-opentelemetry 0.34.0, garde 0.23.0, testcontainers (exact pair), and the others from the reference app.
-- The `api` pack `Cargo.toml.tmpl`, `Cargo.lock` (produced as R0.6 and R0.15 decided), and `pack.d/deps.toml`. The vendored Scalar bundle.
-- `stackversions.yaml`: the rust builder image, distroless static, new Action pins (toolchain action, rust-cache), and the kit crate pin.
-- Move the code of R0.6 to R0.9 to `testdata/reference/todo-rs/` (frozen).
-- Empty directories in `testdata/golden-rs/`.
-- A new `spinup.toml` field for the registry owner. ADR 0021 fixes its name. The Go code reads this value from the `module` line in `api/go.mod`. The Rust code reads it from `spinup.toml`.
+ADR 0021 (`docs/adr/0021-r2-contracts.md`) fixes the R2 contracts. Where this section and ADR 0021 differ, ADR 0021 wins.
 
-**Rule:** when an R2 unit changes a pack, its R1 parity entry in `rust-parity.txt` moves to `golden-rs` in the same unit. The same unit updates `parity.txt` for scripts that change.
+**R2 pre-seed commit**
+- All R2 crates in the workspace: `spinup-kit` (with the testkit as the feature `testkit`), `spinup-db`, `spinup-build`, `spinup-appcmd`, `spinup-gen-web`, `spinup-gen-app`. There is no `spinup-kit-testkit` crate.
+- The kit manifest is self-contained (its own version 0.1.0 and lints tables). A Docker build with `SPINUP_KIT_REPLACE` copies only the kit directory. `crates/spinup-newapp/tests/it/kit_manifest.rs` checks the kit pins against the root pins, the root lock, the stack file, and the pack lock.
+- Crates: axum 0.8.9, tokio 1.54.1, tower-http 0.7.1, sqlx 0.9.0, utoipa 6.0.0, utoipa-axum 0.3.0 (pin record only), tower-sessions 0.15.0, argon2 0.6.0, `oauth2` 5 and `jsonwebtoken` 11 (`aws_lc_rs`), lettre 0.11.23, opentelemetry 0.33.x with tracing-opentelemetry 0.34.0, mime_guess 2.0.5, and the others from the reference app. Not added: garde, testcontainers, `syn`, a decimal crate, `dotenvy`, `rust-embed`.
+- The `api` pack `Cargo.toml.tmpl`, `Cargo.lock` (one union lock, made by `make rs-pack-lock`), and `pack.d/deps.toml`, in `overlay/api/`. The vendored Scalar bundle.
+- `stackversions.yaml`: the rust builder image, distroless static (debian13), and the kit crate pin. No new Action pins: workflows use `rustup` and the pinned `actions/cache`.
+- Copy the code of R0.9 to `testdata/reference/todo-rs/` (frozen). The root workspace excludes `testdata`.
+- Empty directories in `testdata/golden-rs/` and `testdata/golden-rs/filter.d/`.
+- The `spinup.toml` field `registry_owner` in the `[app]` table (ADR 0021 §5).
+- Main-loop additions to R1 crates: `spinup_project::env` (the database URL resolver and the sqlx hint constants), `spinup_vfs::apply::{emptied_dirs, remove_dirs}`, the `crate` render helper, the removed-source marker of the overlay, and the `golden-rs` reader of `spinup-testutil`.
+- `deny.toml` checks the whole workspace with all features and no longer bans `tokio` or `aws-lc-*`. `scripts/rust/cli-graph-check.sh` keeps these crates out of the `spinup` binary.
+
+**Rule:** `rust-parity.txt`, `rust-filter.toml`, and `parity.txt` are main-loop files. When an R2 unit changes a pack, it writes `testdata/golden-rs/filter.d/<name>.toml` and the tree, and reports the stale lines. The main loop removes the R1 entries at the merge. A unit that changes a script writes a twin in `testdata/script/rust/` and reports the `parity.txt` change.
 
 **Kit units (lane work, offline)**
 
+Each kit unit also runs `make rs-kit-features FEATURES='<its sets>'` and `make rs-lint CRATES="-p spinup-kit"`. A test that needs Postgres has a name that starts with `pg_`.
+
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| R2.1 | Kit core: `app` (routes, readiness, commands `migrate`, `openapi`, `healthcheck`, `worker`, shutdown), `config` (env loader with aggregated errors, `_FILE`, dotenv rules), `secrets`, `httpx` (Problem, `ValidJson`, layers), `logx`, `deployx`. Records the `kit/api` disposition. | `RT spinup-kit` (Go test cases ported) | `crates/spinup-kit/src/{app,config,secrets,httpx,logx,deployx}/` | none |
-| R2.2 | Kit `db` (pool options, `in_tx`, migrator wrapper with `up/down/status/redo/to/version` and the exact output lines) and `spinup-kit-testkit` (`#[sqlx::test]` helpers, template databases, HTTP helpers). | `RT spinup-kit spinup-kit-testkit` † | `crates/spinup-kit/src/db/`, `crates/spinup-kit-testkit/src/` | R2.1 |
-| R2.3 | Kit `telemetry`: tracing setup, OTLP over HTTP, HTTP metric layer, DB span layer, log redaction layer. | `RT spinup-kit :: test(telemetry)` | `crates/spinup-kit/src/telemetry/` | R2.1 |
-| R2.4 | Kit `apidocs` (Scalar routes, CSP, cache), `devtools` (`/_dev`), `embedweb` (SPA rules, no ETag). | `RT spinup-kit :: test(apidocs) \| test(devtools) \| test(spa)` | `crates/spinup-kit/src/{apidocs,devtools,spa}/` | R2.1 |
-| R2.5 | Kit `auth` core: session store, password hashing with a bounded pool, `Required` layer, `AuthUser` extractor, cross-origin check, register/login/logout/session routes, `testkit::as_user`. | `RT spinup-kit :: test(auth)` † | `crates/spinup-kit/src/auth/{store,password,routes,required}/` | R2.2 |
-| R2.6 | Kit rate limit and client address (ADR 0016, port of the Go table tests). | `RT spinup-kit :: test(ratelimit) \| test(clientip)` | `crates/spinup-kit/src/auth/{ratelimit,clientip}/` | R2.1, R2.3 |
-| R2.7 | Kit `mail` (lettre, minijinja templates, Log and Capture mailers) and auth `reset` and `oidc`. | `RT spinup-kit :: test(mail) \| test(reset) \| test(oidc)` † | `crates/spinup-kit/src/{mail,auth/reset,auth/oidc}/` | R2.5, R2.6 |
-| R2.8 | Kit `jobs`: the own queue, kit migration, worker, periodic jobs, uniqueness, metrics. The `mail.send` job runs on the queue. | `RT spinup-kit :: test(jobs)` † | `crates/spinup-kit/src/jobs/` | R2.2, R2.3 |
+| R2.1 | Kit core: `app` (routes, readiness, shutdown, command dispatch, `healthcheck`, `openapi` before the config load, `version`), `config` (env loader with aggregated errors, `_FILE`, dotenv rules, `goduration`), `secrets`, `httpx` (Problem, `ValidJson`, layers), `logx`, `deployx`. The shared types `app::{Command, Migration, MigrationStatusFn}`. Records the `kit/api` disposition. | `RT spinup-kit` with `NOPG=1`, `rs-kit-features FEATURES='db'` | `crates/spinup-kit/src/{app,config,secrets,httpx,logx,deployx}/`, `tests/it/{app,config,deployx,httpx,logx,secrets}.rs` | none |
+| R2.2 | Kit `db` (pool options, `in_tx`, `migrate_command`, `migration_status`) and the testkit (`db`, `http`, `template`) with the Go skip rule. | `RT spinup-kit :: test(db) \| test(testkit)` † | `crates/spinup-kit/src/db/`, `src/testkit/{db,http,template}.rs`, `tests/it/db.rs` | R2.1 |
+| R2.3 | Kit `telemetry`: tracing setup, OTLP over HTTP, HTTP metric layer, DB span layer, log redaction layer. | `RT spinup-kit :: test(telemetry)` with `NOPG=1` | `crates/spinup-kit/src/telemetry/`, `tests/it/telemetry.rs` | R2.1 |
+| R2.4 | Kit `apidocs` (Scalar routes, CSP, cache), `devtools` (`/_dev`, takes `Option<MigrationStatusFn>`), `embedweb` (SPA rules, no ETag). | `RT spinup-kit :: test(apidocs) \| test(devtools) \| test(spa)` with `NOPG=1` | `crates/spinup-kit/src/{apidocs,devtools,spa}/`, `tests/it/{apidocs,devtools,spa}.rs` | R2.1 |
+| R2.5 | Kit `auth` core: session store, password hashing with a bounded pool, `Required` layer, `AuthUser` extractor, cross-origin check, register/login/logout/session routes, `testkit::auth`. The load test is an `#[ignore]` test. | `RT spinup-kit :: test(auth)` † | `crates/spinup-kit/src/auth/{store,password,routes,required}/`, `src/testkit/auth.rs`, `tests/it/auth.rs`, `tests/it/migrations/` | R2.2, R2.6 |
+| R2.6 | Kit rate limit and client address (ADR 0016, port of the Go table tests), and `auth::error::AuthError`. | `RT spinup-kit :: test(ratelimit) \| test(clientip)` with `NOPG=1` | `crates/spinup-kit/src/auth/{ratelimit,clientip,error}/`, `tests/it/{clientip,ratelimit}.rs` | R2.1, R2.3 |
+| R2.7 | Kit `mail` (lettre, minijinja templates, Log and Capture mailers, the `async_trait` re-export) and auth `reset` and `oidc`. Test helpers are behind the `testkit` feature. | `RT spinup-kit :: test(mail) \| test(reset) \| test(oidc)` † | `crates/spinup-kit/src/{mail,auth/reset,auth/oidc}/`, `tests/it/{mail,oidc,reset}.rs` | R2.5, R2.6 |
+| R2.8 | Kit `jobs`: the own queue, the kit migration, the worker, `worker_command`, periodic jobs, uniqueness, metrics. The `mail.send` job moves to R2.19. | `RT spinup-kit :: test(jobs)` † | `crates/spinup-kit/src/jobs/`, `crates/spinup-kit/migrations/`, `tests/it/jobs.rs` | R2.2, R2.3 |
 
 **CLI-side units**
 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| R2.9 | `spinup-db`: `db migrate` (runs the app binary), `NextMigrationName` (sqlx `up/down` pairs), `db lint` (up files only), `db new/status/redo/to/reset/seed/psql/dump/restore/doctor`, `db prepare`. | `RT spinup-db` | `crates/spinup-db/src/` | R1 gate |
-| R2.10 | Upgrade cargo phases: `Cargo.toml` edits with `toml_edit`, `Cargo.lock` never merged as text, kit path and `[patch]` keep rule (ADR 0018 §3), `rust-version` raise, verify (`cargo check` or `clippy` and `test`, per R0.13), placeholder kit rule. | `RT spinup-upgrade :: test(deps) \| test(apply) \| test(verify)` | `crates/spinup-upgrade/src/cargo/` | R1.18 |
-| R2.11 | `spinup-gen`: Rust field types, naming rules, post-steps in the order `migrate`, `sqlx-prepare`, build, `openapi-emit`, `client` (rustfmt runs in the plan step, R0.10), retry hints, `Try: spinup db prepare`. | `RT spinup-gen :: test(fields) \| test(poststeps)` | `crates/spinup-gen/src/{fields,poststeps}/` | R1.10 |
-| R2.12 | `spinup-gen-web`: the resource `pages` part, `nav.gen.ts`, `page`, `component`, `client`, `dashboard`, `alert`. Checked against the existing neutral goldens. | `RT spinup-gen-web`, `RG gen-resource :: test(web) \| test(paths)` | `crates/spinup-gen-web/src/` | R2.11 |
-| R2.13 | `gen-app` resource core: spec parsing, ownership, reserved names, migration SQL, `Part` registry, `Next:` lines. | `RT spinup-gen-app :: test(resource)` | `crates/spinup-gen-app/src/resource_core/` | R2.9, R2.11 |
-| R2.14 | `gen-app` Rust templates: handlers (axum and `#[utoipa::path]`), `ToSchema` types, store module, `routes_gen.rs`, generated test. The output equals the todo module of the reference app. | `RT spinup-gen-app :: test(handlers)`, `RG gen-resource-rs`, `make rs-ref-check` | `crates/spinup-gen-app/src/resource_rs/`, `crates/spinup-gen-app/templates/`, `testdata/golden-rs/gen-resource-rs/` | R2.13 |
-| R2.15 | `gen-app` other generators: `model`, `migration`, `handler`, `job`, `mailer`, `openapi` (emit), `destroy`. | `RT spinup-gen-app :: test(model) \| test(migration) \| test(handler) \| test(job) \| test(mailer) \| test(openapi) \| test(destroy)` | `crates/spinup-gen-app/src/{model,migration,handler,job,mailer,openapi,destroy}/` | R2.13 |
-| R2.16 | `spinup-build`: local build, `--dry-run`, version injection through env, kit path context, registry owner from `spinup.toml`. | `RT spinup-build` | `crates/spinup-build/src/` | R2.1 |
-| R2.17 | `spinup-appcmd`: `routes` (`api routes` through the app) and `apptest` (`cargo nextest`). | `RT spinup-appcmd :: test(routes) \| test(apptest)` | `crates/spinup-appcmd/src/{routes,apptest}/` | R2.1, R2.9 |
+| R2.9 | `spinup-db`: `db migrate` runs `sqlx-cli` (kit migrations first, with the table `_spinup_kit_migrations`), `NextMigrationName` (sqlx `up/down` pairs), `db lint` (up files only), `db new/status/redo/to/reset/seed/psql/dump/restore/doctor`, `db prepare` (`-- --all-targets`). The database URL comes from `spinup_project::env`. | `RT spinup-db` | `crates/spinup-db/src/` (not `src/lib.rs`) | none |
+| R2.10 | Upgrade phases for Rust apps, all six slots: codemod migrations in `before` and `after`, the kit patch keep rule in `apply` (ADR 0018 §3), `toml_edit` dependency edits, `rust-version`, and `cargo update --precise` in `deps`, an empty `fix`, `clippy`, `test`, and the local doctor in `verify`. The `kept_manifest` hook. A `core.autocrlf` test. | `RT spinup-upgrade :: test(cargo) \| test(deps) \| test(apply) \| test(verify) \| test(migrations) \| test(plan)`, `RS upgrade_flow`, `RS upgrade_ui` | `crates/spinup-upgrade/src/cargo/` | R2.18 |
+| R2.11 | `spinup-gen`: Rust field types, naming rules, the runner rules (rustfmt of every planned `.rs` file, `lock.formatter`, the no-database rule), the post-step order `migrate`, `sqlx-prepare`, build, `openapi-emit`, `client`, retry hints, `Try: spinup db prepare`. Registers only `build`. | `RT spinup-gen :: test(fields) \| test(poststeps) \| test(rustfmt) \| test(run)` | `crates/spinup-gen/src/{fields,poststeps,rustfmt,run}/` | none |
+| R2.12 | `spinup-gen-web`: the resource `pages` part, `nav.gen.ts`, `page`, `component`, `client` (registers the `client` post-step), `dashboard`, `alert`. Checked against the existing neutral goldens. | `RT spinup-gen-web`, `RG gen-resource :: test(web) \| test(paths)`, `RG gen-resource-auth` | `crates/spinup-gen-web/src/` (not `src/lib.rs`), `templates/`, `tests/it/golden_gen_resource.rs` | R2.11 |
+| R2.13 | `gen-app` resource core: spec parsing, ownership, reserved names, migration SQL, the part runner, the module-list planner, `Next:` lines. | `RT spinup-gen-app :: test(/^resource_core::/)` | `crates/spinup-gen-app/src/resource_core/` | R2.9, R2.11, R2.12 |
+| R2.14 | `gen-app` Rust templates and the `model` generator: handlers (axum and `#[utoipa::path]`), `ToSchema` types with the spec names of ADR 0021 §3, queries, the generated test. Every SQL text equals the reference `.sqlx/` query. | `RT spinup-gen-app :: test(/^resource_rs::/) \| test(/^model::/) \| test(reference_sql)`, `RG gen-resource-rs` | `crates/spinup-gen-app/src/{resource_rs,model}/`, `templates/{resource,model}/`, `tests/it/golden_gen_resource_rs.rs`, `testdata/golden-rs/gen-resource-rs/` | R2.13 |
+| R2.15 | `gen-app` other generators: `migration`, `handler`, `job`, `mailer`, `openapi` (emit), and the `destroy` library (with `spinup_vfs::apply::{emptied_dirs, remove_dirs}`). Registers `migrate`, `sqlx-prepare`, and `openapi-emit`. | `RT spinup-gen-app :: test(/^migration::/) \| test(/^handler::/) \| test(/^job::/) \| test(/^mailer::/) \| test(/^openapi::/) \| test(/^destroy::/)` | `crates/spinup-gen-app/src/{migration,handler,job,mailer,openapi,destroy}/`, `templates/{handler,job,mailer}/` | R2.13, R2.14 |
+| R2.16 | `spinup-build`: local build, `--dry-run`, version injection through env, kit path context, registry owner from `spinup.toml`. Finds the binary through the cargo JSON messages. | `RT spinup-build` | `crates/spinup-build/src/` (not `src/lib.rs`) | none |
+| R2.17 | `spinup-appcmd`: `routes` (reads the bundle, the kit routes, and literal routes in `api/src/routes.rs`, without a build) and `apptest` (`cargo nextest`). | `RT spinup-appcmd :: test(routes) \| test(apptest)` | `crates/spinup-appcmd/src/` (not `src/lib.rs`) | none |
 
 **Pack units (overlay and Rust-only content)**
 
-Each unit writes only its own `overlay/<pack>/` directories and its own `testdata/golden-rs/<pack>/` subtrees. No unit edits `Cargo.toml.tmpl`, `Cargo.lock`, or `pack.d/deps.toml`.
+Each unit writes only its own `overlay/<pack>/` directories, its own `testdata/golden-rs/` trees, and its `filter.d` entries. No unit edits `Cargo.toml.tmpl`, `Cargo.lock`, or `pack.d/deps.toml` of the `api` overlay. Each pack unit also runs `make rs-lint CRATES="-p spinup-packs"`.
 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| R2.18 | `api` pack: `remove.txt` for the Go files, `rust-toolchain.toml`, `.cargo/config.toml`, `src/{main,lib,routes,openapi}.rs`, `migrations/00001_init.{up,down}.sql`, `Dockerfile.api` (cargo-chef, musl, `SQLX_OFFLINE`, kit patch context), `compose.dev.yml`, embed feature. | `RG api`, `RG api-openapi` (Rust trees) | `crates/spinup-packs/overlay/api/`, `testdata/golden-rs/{api,api-openapi}/` | R2.1 |
-| R2.19 | `auth`, `jobs`, `mail` packs: SQL for sqlx, `reset.rs`, worker subcommand wiring, minijinja mail templates. | `RG auth`, `RG jobs`, `RG mail` | `crates/spinup-packs/overlay/{auth,jobs,mail}/`, `testdata/golden-rs/{auth,jobs,mail}/` | R2.5, R2.7, R2.8, R2.18 |
-| R2.20 | `base` (the `module` question stays and feeds the crate slug, new registry owner field), `deploy` (drops `SPINUP_BEHAVIOR_VERSION`), and `ci` (Rust `api` job, cargo cache, `sqlx prepare --check`, spec drift check). | `RG base`, `RG deploy`, `RG ci` (Rust trees) | `crates/spinup-packs/overlay/{base,deploy,ci}/`, `testdata/golden-rs/{base,deploy,ci}/` | R2.18 |
-| R2.21 | `backups` `run.sh` (`_sqlx_migrations`) and `monitoring` (tokio runtime dashboard next to the unchanged Go dashboard until R5). | `RG backups`, `RG monitoring` (Rust trees) | `crates/spinup-packs/overlay/{backups,monitoring}/`, `testdata/golden-rs/{backups,monitoring}/` | R2.18 |
-| R2.22 | `web` pack overlay: `embed.toml`, `vite.config.js` (copy target for the Rust embed path), `e2e.yml` (rust toolchain, `api migrate`, `api` run), and the "Go API" comments. | `RG web`, `RG web-embed` (Rust trees) | `crates/spinup-packs/overlay/web/`, `testdata/golden-rs/{web,web-embed}/` | R2.18 |
+| R2.18 | `api` pack: `remove.txt` for the Go files, `rust-toolchain.toml`, `.cargo/config.toml`, `src/{main,lib,routes,openapi}.rs`, the zero-resource module lists, `migrations/00001_init.{up,down}.sql`, `Dockerfile.api` (cargo-chef, musl, `SQLX_OFFLINE`, kit patch context), `compose.dev.yml`, embed feature. The R1 twins that the removal breaks, with `--no-verify` at `upgrade_ui:66`. | `RG api`, `RG api-openapi`, `RG web-embed`, `RS check`, `RS diff`, `RS eject`, `RS upgrade_flow`, `RS upgrade_ui`, `rs-doctest PAGE=docs/commands/new.md`, `rs-app-check SET=small`, `rs-app-check SET=embed` | `crates/spinup-packs/overlay/api/` (not the three main-loop files), `crates/spinup-packs/tests/it/golden_{api,api_openapi,web_embed}.rs`, `testdata/golden-rs/{api,api-openapi,web-embed}/` with their `filter.d` entries, `testdata/script/rust/{check,diff,eject,upgrade_flow,upgrade_ui}.txtar`, `docs/commands/new.md` | R2.1, R2.2, R2.3, R2.4, R2.5, R2.7, R2.8, R2.13, R2.14 |
+| R2.19 | `auth`, `jobs`, `mail` packs: SQL for sqlx (the kit test migrations, byte for byte), `reset.rs`, worker wiring, the `mail.send` job, the app-side names of ADR 0021 §3, minijinja mail templates. | `RG auth`, `RG jobs`, `RG mail`, `rs-app-check SET=full RESOURCE=1`, `rs-app-check SET=auth`, `SET=jobs`, `SET=mail`, `SET=auth-mail` | `crates/spinup-packs/overlay/{auth,jobs,mail}/`, `crates/spinup-packs/tests/it/golden_{auth,jobs,mail}.rs`, `testdata/golden-rs/{auth,jobs,mail}/` with their `filter.d` entries | R2.5, R2.7, R2.8, R2.15, R2.18 |
+| R2.20 | `base` (the `module` question feeds `registry_owner`, the package name is `api`), `deploy` (drops `SPINUP_BEHAVIOR_VERSION`), and `ci` (Rust `api` job, cargo cache, `sqlx prepare --check`, spec drift check). | `RG base`, `RG deploy`, `RG ci`, `RG api`, `RG web-embed`, `RT spinup-stack :: test(pins)` | `crates/spinup-packs/overlay/{base,deploy,ci}/`, `crates/spinup-packs/tests/it/golden_{base,deploy,ci}.rs`, `testdata/golden-rs/{base,deploy,ci}/` with their `filter.d` entries, `testdata/golden-rs/{api,web-embed}/` (regenerate only) | R2.18 |
+| R2.21 | `backups` `run.sh` (`_sqlx_migrations`) and `monitoring` (tokio runtime dashboard next to the unchanged Go dashboard until R5). | `RG backups`, `RG monitoring` | `crates/spinup-packs/overlay/{backups,monitoring}/`, `crates/spinup-packs/tests/it/golden_{backups,monitoring}.rs`, `testdata/golden-rs/{backups,monitoring}/` with their `filter.d` entries | R2.3, R2.18 |
+| R2.22 | `web` pack overlay: `vite.config.js` (copy target for the Rust embed path), `e2e.yml` (rust toolchain, `api migrate`, `api` run), and the "Go API" comments. No new `embed.toml`. The only owner of `web-variants`. | `RG web`, `RG web-embed`, `RG web-variants`, `RG ci` | `crates/spinup-packs/overlay/web/` (not the main-loop web files), `crates/spinup-packs/tests/it/golden_{web,web_embed,web_variants}.rs`, `testdata/golden-rs/{web,web-embed,web-variants,ci}/` with the `filter.d` entries of `web` and `web-variants` | R2.18, R2.20 |
 
 **Wiring and scripts**
 
 | Unit | Outcome | Check | File set | Deps |
 |---|---|---|---|---|
-| R2.23 | CLI wiring for `db`, `generate` (resource and others), `destroy`. | `RT spinup-cli`, `RS db_cmds` | `crates/spinup-cli/src/cmd/{db,generate_rs,destroy}.rs`, `docs/commands/{db,generate-*,destroy}.md` | R2.9, R2.14, R2.15 |
-| R2.24 | CLI wiring for `build`, `test`, `routes`. | `RT spinup-cli`, `RS routes` | `crates/spinup-cli/src/cmd/{build,test,routes}.rs`, `docs/commands/{build,test,routes}.md` | R2.16, R2.17, R2.23 |
-| R2.25 | Script twins, family `gen_*` and `destroy`. Each script is shared with `[impl:rust]` blocks, or forked to `testdata/script/rust/`. Entries in `parity.txt`. | `RS gen_*`, `RS destroy` | the named `testdata/script/gen_*.txtar` and `destroy.txtar` files, `testdata/script/rust/gen_*.txtar` | R2.20, R2.23 |
-| R2.26 | Script twins, family `auth_*`. | `RS auth_*` | the named `testdata/script/auth_*.txtar` files, `testdata/script/rust/auth_*.txtar` | R2.19, R2.23 |
-| R2.27 | Script twins, family `new_api`, `embed`, `db_cmds`, `routes`. | `RS new_api`, `RS embed`, `RS db_cmds`, `RS routes` | the named files, `testdata/script/rust/` | R2.22, R2.24 |
-| R2.28 | Script twins, family `upgrade_*` and `module_add`. | `RS upgrade_*`, `RS module_add` | the named files, `testdata/script/rust/` | R2.10, R2.24 |
-| R2.29 | E2E port. `testdata/e2e/{web,trace,monitoring}/run.sh` and `testdata/e2e/trace/app` accept `SPINUP_BIN` and build the Rust API. | `bash testdata/e2e/web/run.sh` † (static part: `shellcheck`) | `testdata/e2e/` | R2.22, R2.24 |
-| R2.30 | App gate and kit-compat workflow source: generate, build, test, `/healthz`, and `app openapi` equals the committed spec. | `make rs-app-gate` † | `testdata/script/rust/app_gate_api.txtar`, `testdata/script/rust/app_gate_web.txtar` | R2.18, R2.19, R2.27 |
+| R2.23 | CLI wiring for `db` and `destroy`. `generate` needs no new file (R1.22 wires every registered generator). | `RT spinup-cli`, `RS db_cmds` †, `rs-doctest` of the ten pages | `crates/spinup-cli/src/cmd/{db,destroy}.rs`, `docs/commands/{db,db-lint,destroy,generate-resource,generate-page,generate-client,generate-openapi,generate-job,generate-mailer,generate-dashboard}.md`, `testdata/script/rust/db_cmds.txtar` | R2.9, R2.12, R2.14, R2.15, R2.18 |
+| R2.24 | CLI wiring for `build`, `test`, `routes`. | `RT spinup-cli`, `RS routes` †, `RS destroy` †, `rs-doctest` of the three pages | `crates/spinup-cli/src/cmd/{build,test,routes}.rs`, `docs/commands/{build,test,routes}.md`, `testdata/script/rust/{routes,destroy}.txtar` | R2.16, R2.17, R2.23 |
+| R2.25 | Script twins, family `gen_*`. `gen_dashboard` stays shared. | `RS gen_*` † | `testdata/script/rust/{gen_job,gen_mailer,gen_page,gen_resource}.txtar` | R2.19, R2.20, R2.22, R2.23 |
+| R2.26 | Script twins, family `auth_*`. | `RS auth_*` † | `testdata/script/rust/{auth_app,auth_ratelimit}.txtar` | R2.6, R2.19, R2.24 |
+| R2.27 | Script twins `new_api`, `embed` (without the `build --image` lines, R3a), and `web_variants`. | `RS new_api`, `RS embed`, `RS web_variants` † | `testdata/script/rust/{new_api,embed,web_variants}.txtar` | R2.22, R2.24 |
+| R2.28 | Script twins, family `upgrade_*` and `module_add`, and the text of the `upgrade` and `module` pages. The serial owner of the R2.18 twins `upgrade_flow` and `upgrade_ui`. | `RS upgrade_*` †, `RS module_add` †, `rs-doctest` of the two pages | `testdata/script/rust/{upgrade_apply,upgrade_generated,module_add,upgrade_flow,upgrade_ui}.txtar`, `docs/commands/{upgrade,module}.md` | R2.10, R2.18, R2.24 |
+| R2.29 | E2E port. `testdata/e2e/{web,trace,monitoring}/run.sh` and `testdata/e2e/trace/app` accept `SPINUP_BIN` and build the Rust API. | `make rs-shellcheck FILES='...'` (static part), `make rs-e2e` † | `testdata/e2e/` | R2.22, R2.24 |
+| R2.30 | App gate: generate, build, test, `/healthz`, and the emitted spec equals `todo-api/openapi.gen.yaml` of the reference app, except `info`. The kit-compat workflow source moves to R4.9. | `SPINUP_APP_GATE=1 make rs-script RUN=app_gate_api` †, `make rs-app-gate` † | `testdata/script/rust/{app_gate_api,app_gate_web}.txtar` | R2.18, R2.19, R2.27 |
 
-**R2 lane schedule.** Kit units first: (R2.1, R2.9 is blocked on R1 so use R2.1 with R2.11), (R2.2, R2.3), (R2.4, R2.5), (R2.6, R2.8), (R2.7, R2.12), (R2.9, R2.16), (R2.13, R2.17), (R2.14, R2.15), (R2.10, R2.18), (R2.19, R2.20), (R2.21, R2.22). Then R2.23, R2.24 one at a time. Then (R2.25, R2.26), (R2.27, R2.28), (R2.29, R2.30).
+**Go parity changes that R2 accepts**
+
+| Command or file | Go | Rust (R2) |
+|---|---|---|
+| `spinup test --race` | race detector | flag removed (Rust has no race detector) |
+| `spinup db migrate`, `db status` | Go kit output lines | `sqlx-cli` text (kit, then app) |
+| `api/openapi/bundle.gen.yaml` | untracked output | tracked `seed` file |
+| `spinup routes` | literal routes of every `api/internal/routes/*.go` | literal routes of `api/src/routes.rs` only |
+| auth tables | `sessions(data bytea)`, no `user_id` | the spike schema (`user_id`, `data jsonb`), ADR 0019 §4 |
+
+**R2 lane schedule (2 lanes).** Every slot respects the deps above. R2.16 and R2.17 have no dependency and can fill an earlier free slot. R2.1 and R2.3 move to claude lanes when the codex loopback probe of the pre-seed fails.
+
+| Slot | Units |
+|---|---|
+| 1 | R2.1, R2.11 |
+| 2 | R2.3, R2.9 |
+| 3 | R2.2 (claude, Postgres), R2.4 |
+| 4 | R2.6, R2.12 |
+| 5 | R2.5 (claude), R2.8 (claude) |
+| 6 | R2.7 (claude), R2.13 |
+| 7 | R2.14, R2.17 |
+| 8 | R2.15, R2.18 |
+| 9 | R2.19, R2.20 |
+| 10 | R2.10, R2.16 |
+| 11 | R2.22, R2.23 (claude) |
+| 12 | R2.24 (claude), R2.21 |
+| 13 | R2.25, R2.26 |
+| 14 | R2.27, R2.28 |
+| 15 | R2.29, R2.30 |
 
 ### R2 gate
 
-1. `make rs-build rs-lint rs-test rs-deny rs-digest rs-golden rs-script rs-doctest rs-cover` (the `upgrade` floor of 70 percent applies now)
-2. `make rs-app-gate` †: generate a full app (auth, jobs, mail), run `g resource todo`, build, test, run, and compare with `testdata/reference/todo-rs/`.
-3. The e2e scripts from R2.29 †.
-4. Re-measure the dev loop with the real kit and compare with the R0.11 number. The limit of 5 s for handler-body edits still applies. If it fails, stop and open an R0.11 re-run.
-5. Re-measure disk use with the R0.13 commands. The 40 GB limit still applies.
-6. The main loop removes the Go sections from the stack schema and runs the strict-undefined render.
+1. `make rs-build rs-lint rs-test rs-deny rs-digest rs-golden rs-script rs-doctest rs-cover`. `rs-deny` runs `cli-graph-check.sh`. `rs-cover` applies the 70 percent floor to each crate, `spinup-upgrade` included. The main loop runs the full `make rs-golden` after each pack merge.
+2. `make rs-app-gate` †: generate a full app (auth, jobs, mail), run `g resource todo`, build, test, run, and compare with `testdata/reference/todo-rs/`. Also `make rs-ref-check`, and `make rs-app-check` for every set (`RESOURCE=1` for `full`).
+3. The e2e scripts from R2.29 † (`make rs-e2e`).
+4. Re-measure the dev loop with the real kit (`make rs-devloop`, `scripts/rust/devloop.py`) and compare with the R0.11 number. The limit of 5 s for handler-body edits still applies. If it fails, stop and open an R0.11 re-run.
+5. Re-measure disk use with the R0.13 commands and `make rs-disk`. The 40 GB limit still applies.
+6. The main loop removes `Go`, `GoModules`, and `GoTools` from `spinup_stack::Stack` and from `data.Stack`, removes the `gomod` helper, filters the Go sections in `gen-stack.sh`, and renders every pack set with strict undefined.
 7. `make rs-vuln` †. The Go gate still passes.
-8. Freeze a generated app as `testdata/corpus-rs/0.1.0/` for the upgrade matrix.
+8. Freeze a generated app as `testdata/corpus-rs/0.1.0/` for the upgrade matrix (`make rs-corpus-freeze`).
+9. `make rs-kit-features`, `make rs-pack-lock` (the offline proof of the union lock), `make rs-twin-check`, and `cargo test -p spinup-newapp --test it kit_manifest`.
+10. `make oracle` with no diff, and `make rs-convert-check`.
+11. `rust.yml` is green on Linux, macOS, and Windows with the kit. This needs a push of `rust`, which the user approves (ADR 0021, decision 3 of the main loop).
 
 ### R3: Operate commands (three runs)
 
