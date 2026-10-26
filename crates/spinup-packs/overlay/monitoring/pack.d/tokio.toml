@@ -1,0 +1,6 @@
+# The Tokio dashboard uses the runtime metrics from the Rust kit.
+[[files]]
+path = "monitoring/grafana/dashboards/stack/tokio-runtime.json"
+source = "files/monitoring/grafana/dashboards/stack/tokio-runtime.json"
+class = "managed"
+when = "monitoring_profile != 'none'"

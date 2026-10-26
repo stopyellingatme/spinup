@@ -1,0 +1,158 @@
+// Managed by spinup: `spinup upgrade` keeps this file current.
+//
+// Alloy is the only collector of the stack (profile lite). The app sends OTLP
+// to alloy:4317 (gRPC) or alloy:4318 (HTTP) on the todo-app network. Alloy removes
+// secret values, batches the data, and sends metrics to Prometheus and logs to Loki.
+// The lite profile has no Tempo, so Alloy drops traces.
+// It also scrapes the stack: Caddy, Loki, Grafana, and itself.
+//
+// The kit sends its metrics over OTLP. It serves no /metrics endpoint, so Alloy does not scrape
+// the api or web services.
+
+logging {
+	level  = "info"
+	format = "logfmt"
+}
+
+// ---------------------------------------------------------------------------------------------
+// OTLP from the app
+// ---------------------------------------------------------------------------------------------
+
+otelcol.receiver.otlp "app" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		metrics = [otelcol.processor.transform.redact.input]
+		logs    = [otelcol.processor.transform.redact.input]
+	}
+}
+
+// The redaction stage (docs/adr/0010-m6-contracts.md §1). The kit logx redactor masks secret
+// values before export. This stage is the second line: it removes every attribute whose key
+// looks secret, and it masks values that look like credentials in attributes and log bodies.
+otelcol.processor.transform "redact" {
+	error_mode = "ignore"
+
+	trace_statements {
+		context    = "span"
+		statements = [
+			`delete_matching_keys(attributes, "(?i).*(password|passwd|secret|token|api_?key|access_?key|private_?key|authorization|cookie|session).*")`,
+			`replace_all_patterns(attributes, "value", "(?i)^(bearer|basic) [a-z0-9._~+/=-]+$", "$1 [REDACTED]")`,
+			`replace_all_patterns(attributes, "value", "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@")`,
+			`replace_all_patterns(attributes, "value", "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key)=)[^&\\s]+", "$1[REDACTED]")`,
+			`replace_all_patterns(attributes, "value", "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+", "[REDACTED_JWT]")`,
+		]
+	}
+
+	log_statements {
+		context    = "log"
+		statements = [
+			`delete_matching_keys(attributes, "(?i).*(password|passwd|secret|token|api_?key|access_?key|private_?key|authorization|cookie|session).*")`,
+			`replace_all_patterns(attributes, "value", "(?i)^(bearer|basic) [a-z0-9._~+/=-]+$", "$1 [REDACTED]")`,
+			`replace_all_patterns(attributes, "value", "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@")`,
+			`replace_all_patterns(attributes, "value", "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key)=)[^&\\s]+", "$1[REDACTED]")`,
+			`replace_all_patterns(attributes, "value", "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+", "[REDACTED_JWT]")`,
+			`replace_pattern(body, "(?i)(bearer|basic) [a-z0-9._~+/=-]{8,}", "$1 [REDACTED]") where IsString(body)`,
+			`replace_pattern(body, "(?i)((password|passwd|secret|token|api_key|apikey|access_key|private_key|authorization)[\"']?\\s*[:=]\\s*)(?:\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|(?:(?:bearer|basic)\\s+)?[^\"'&\\s,}]+)", "$1[REDACTED]") where IsString(body)`,
+			`replace_pattern(body, "([a-z][a-z0-9+.-]*://[^:/@\\s]+):[^@\\s]+@", "$1:[REDACTED]@") where IsString(body)`,
+			`replace_pattern(body, "eyJ[a-zA-Z0-9_-]+\\.eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+", "[REDACTED_JWT]") where IsString(body)`,
+		]
+	}
+
+	output {
+		metrics = [otelcol.processor.batch.default.input]
+		logs    = [otelcol.processor.batch.default.input]
+	}
+}
+
+otelcol.processor.batch "default" {
+	output {
+		metrics = [otelcol.exporter.prometheus.default.input]
+		logs    = [otelcol.exporter.otlphttp.loki.input]
+	}
+}
+
+// ---------------------------------------------------------------------------------------------
+// Exporters
+// ---------------------------------------------------------------------------------------------
+
+// OTLP metrics become Prometheus series: http.server.request.duration is
+// http_server_request_duration_seconds, and the job label is the service name.
+otelcol.exporter.prometheus "default" {
+	forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+	endpoint {
+		url = "http://prometheus:9090/api/v1/write"
+	}
+}
+
+// Loki stores OTLP logs natively. trace_id and span_id become structured metadata.
+otelcol.exporter.otlphttp "loki" {
+	client {
+		endpoint = "http://loki:3100/otlp"
+	}
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scrapes
+// ---------------------------------------------------------------------------------------------
+
+prometheus.exporter.self "alloy" { }
+
+// The self exporter sets job="integrations/self". Replace it before the scrape.
+discovery.relabel "alloy" {
+	targets = prometheus.exporter.self.alloy.targets
+	rule {
+		target_label = "job"
+		replacement = "alloy"
+	}
+}
+
+prometheus.scrape "alloy" {
+	targets         = discovery.relabel.alloy.output
+	job_name        = "alloy"
+	scrape_interval = "30s"
+	forward_to      = [prometheus.remote_write.default.receiver]
+}
+
+// Caddy serves its metrics on caddy:2020 of the app network (deploy/Caddyfile).
+prometheus.scrape "stack" {
+	targets = [
+		{"__address__" = "caddy:2020", "job" = "caddy"},
+		{"__address__" = "loki:3100", "job" = "loki"},
+		{"__address__" = "grafana:3000", "job" = "grafana"},
+	]
+	scrape_interval = "30s"
+	forward_to      = [prometheus.remote_write.default.receiver]
+}
+
+// Backups use a text file on the VM in both monitoring profiles.
+prometheus.exporter.unix "backups" {
+    set_collectors = ["textfile"]
+    textfile {
+        directory = "/var/lib/spinup/backup-metrics"
+    }
+}
+
+discovery.relabel "backups" {
+    targets = prometheus.exporter.unix.backups.targets
+    rule {
+        target_label = "job"
+        replacement = "backups"
+    }
+}
+
+prometheus.scrape "backups" {
+    targets         = discovery.relabel.backups.output
+    job_name        = "backups"
+    scrape_interval = "30s"
+    forward_to      = [prometheus.remote_write.default.receiver]
+}

@@ -1,0 +1,11 @@
+# Managed by spinup.
+[Unit]
+Description=Backup verify timer for todo
+
+[Timer]
+OnCalendar=Sat *-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

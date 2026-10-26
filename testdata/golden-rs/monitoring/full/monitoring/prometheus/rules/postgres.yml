@@ -1,0 +1,43 @@
+# Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
+# monitoring/alerts/custom.yml.
+#
+# The Postgres alerts (profile full): postgres-exporter.
+groups:
+  - name: postgres
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The postgres-exporter cannot connect to Postgres"
+
+      - alert: PostgresConnectionsHigh
+        expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres uses more than 80% of max_connections"
+          description: "{{ $value | humanizePercentage }} of max_connections are in use."
+
+      # archive_timeout is 300 s (compose.backups.yml), so a healthy archiver is never 15
+      # minutes behind. The metric exists only when WAL archiving is on.
+      - alert: WalArchiveLag
+        expr: pg_stat_archiver_last_archive_age > 900
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The last WAL segment was archived {{ $value | humanizeDuration }} ago"
+          description: "pgBackRest does not archive WAL. Point-in-time recovery loses data from this point. Read the postgres logs with spinup server logs."
+
+      - alert: WalArchiveFailing
+        expr: increase(pg_stat_archiver_failed_count[15m]) > 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The WAL archive command fails"
+          description: "{{ $value }} archive attempts failed in 15 minutes."
