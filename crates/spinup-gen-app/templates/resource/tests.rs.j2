@@ -1,0 +1,135 @@
+//! The HTTP tests of [[ plural ]].
+
+use kit::testkit::http::{Req, send};
+use serde_json::{Value, json};
+
+#[tokio::test]
+async fn pg_[[ plural ]]_crud() {
+    let Some(db) = kit::testkit::db::db().await else {
+        return;
+    };
+    kit::db::kit_migrator().run(db.pool()).await.unwrap();
+    sqlx::migrate!("./migrations")
+        .run(db.pool())
+        .await
+        .unwrap();
+[% if auth %]
+    let user_id: i64 = sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash) VALUES ('resource@example.test', 'unused') RETURNING id",
+    )
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+[% endif %]
+[% for p in parents %]
+    sqlx::query([[ p.sql ]])
+        .execute(db.pool())
+        .await
+        .unwrap();
+[% endfor %]
+    let app = super::routes().split_for_parts().0.with_state(db.pool().clone());
+[% if auth %]
+    let auth = kit::auth::Auth::new(
+        db.pool().clone(),
+        kit::auth::Options {
+            secure: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let answer = send(&auth.layer(app.clone()), Req::get("/[[ plural ]]")).await;
+    assert_eq!(answer.status, 401);
+[% if owned %]
+    let anonymous = app.clone();
+[% endif %]
+    let app = auth.layer(app.layer(axum::Extension(kit::auth::User {
+        id: user_id,
+        email: "resource@example.test".into(),
+    })));
+[% endif %]
+    let [% if mutable_sample %]mut [% endif %]input: Value = serde_json::from_str(r#"[[ sample ]]"#).unwrap();
+[% for f in fields %]
+[% if f.kind == "ref" and not f.nullable %]
+    input["[[ f.name ]]"] = json!(sqlx::query_scalar::<_, i64>("SELECT max(id) FROM [[ f.ref_table ]]")
+        .fetch_one(db.pool()).await.unwrap());
+[% endif %]
+[% endfor %]
+    let answer = send(&app, Req::post("/[[ plural ]]").json_value(&input)).await;
+    assert_eq!(answer.status, 201, "{}", answer.body);
+    let created = answer.json();
+    let id = created["id"].as_i64().unwrap();
+    let path = format!("/[[ plural ]]/{id}");
+    let answer = send(&app, Req::get(&path)).await;
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json(), created);
+    let answer = send(&app, Req::get("/[[ plural ]]?limit=1&offset=0")).await;
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["total"], 1);
+    assert_eq!(answer.json()["items"], json!([created]));
+[% if owned %]
+    let other_id: i64 = sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash) VALUES ('other@example.test', 'unused') RETURNING id",
+    )
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+    let other = auth.layer(anonymous.layer(axum::Extension(kit::auth::User {
+        id: other_id,
+        email: "other@example.test".into(),
+    })));
+    let answer = send(&other, Req::get("/[[ plural ]]")).await;
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["total"], 0);
+    let answer = send(&other, Req::get(&path)).await;
+    assert_eq!(answer.status, 404);
+    let answer = send(&other, Req::put(&path).json_value(&input)).await;
+    assert_eq!(answer.status, 404);
+    let answer = send(&other, Req::delete(&path)).await;
+    assert_eq!(answer.status, 404);
+[% endif %]
+    let answer = send(&app, Req::put(&path).json_value(&input)).await;
+    assert_eq!(answer.status, 200, "{}", answer.body);
+    for (field, value) in input.as_object().unwrap() {
+        assert_eq!(&answer.json()[field], value);
+    }
+    let answer = send(&app, Req::get("/[[ plural ]]?offset=1")).await;
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["total"], 1);
+    assert_eq!(answer.json()["items"], json!([]));
+[% for f in fields %]
+[% if f.nullable %]
+    let mut nullable = input.clone();
+    nullable["[[ f.name ]]"] = Value::Null;
+    let answer = send(&app, Req::put(&path).json_value(&nullable)).await;
+    assert_eq!(answer.status, 200, "{}", answer.body);
+    assert_eq!(answer.json()["[[ f.name ]]"], Value::Null);
+[% endif %]
+[% if f.kind in ["decimal", "json", "uuid", "date", "time", "enum"] %]
+    let mut invalid = input.clone();
+    invalid["[[ f.name ]]"] = [% if f.kind == "json" %]json!([])[% else %]json!("invalid-value")[% endif %];
+    let answer = send(&app, Req::post("/[[ plural ]]").json_value(&invalid)).await;
+    assert_eq!(answer.status, 422, "{}", answer.body);
+[% endif %]
+[% endfor %]
+    let answer = send(&app, Req::get("/[[ plural ]]?limit=0")).await;
+    assert_eq!(answer.status, 422);
+    assert!(!answer.problem().errors.is_empty());
+    let answer = send(&app, Req::get("/[[ plural ]]/invalid")).await;
+    assert_eq!(answer.status, 400);
+    let answer = send(&app, Req::post("/[[ plural ]]").json("{")).await;
+    assert_eq!(answer.status, 400);
+[% for f in fields %]
+[% if not f.nullable %]
+    let mut missing = input.clone();
+    missing.as_object_mut().unwrap().remove("[[ f.name ]]");
+    let answer = send(&app, Req::post("/[[ plural ]]").json_value(&missing)).await;
+    assert_eq!(answer.status, 422, "{}", answer.body);
+[% endif %]
+[% endfor %]
+    let answer = send(&app, Req::delete(&path)).await;
+    assert_eq!(answer.status, 204);
+    let answer = send(&app, Req::get(&path)).await;
+    assert_eq!(answer.status, 404);
+    let answer = send(&app, Req::delete(&path)).await;
+    assert_eq!(answer.status, 404);
+}
