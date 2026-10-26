@@ -1,0 +1,8 @@
+openapi: 3.1.0
+paths:
+  /api/todos:
+    post:
+      operationId: createTodo
+    get:
+      operationId: listTodos
+    parameters: []
