@@ -9,9 +9,7 @@ secrets          # R1.14
 tofu             # R1.14
 backups          # R1.15
 monitoring       # R1.15 (lite, full)
-web              # R1.16
-web-variants     # R1.16 (8 variants)
 #
-# In testdata/golden-rs/ (R2, filter.d): api, api-openapi, web-embed, auth, jobs, mail, base,
-# deploy, ci, gen-resource-rs. Still to move in R2: web and web-variants (R2.22).
+# In testdata/golden-rs/ (R2, filter.d): api, api-openapi, web, web-embed, web-variants, auth,
+# jobs, mail, base, deploy, ci, gen-resource-rs.
 # R2 rule: when a unit changes a pack, its entry moves from this file to golden-rs.
