@@ -3,7 +3,9 @@
 Run `spinup g openapi` from the application root to bundle the OpenAPI files and generate Go code.
 The command also accepts the name `spinup generate openapi`.
 It takes no positional arguments.
+The Go API and the Rust API make the bundle in different ways (see the Rust API section).
 
+<!-- doctest: only go -->
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 ...
@@ -17,6 +19,21 @@ Created 0, updated 0 files
 Next: cd api && go build ./...
 $ test -s api/openapi/bundle.gen.yaml
 $ test ! -e api/internal/gen/api.gen.go
+```
+
+<!-- doctest: only rust -->
+```console
+$ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+...
+$ cd todo
+$ spinup g openapi --dry-run
+$ test -s api/openapi/bundle.gen.yaml
+$ spinup g openapi
+...
+Created 0, updated 0 files
+Next: cd api && cargo build --locked
+$ head -1 api/openapi/bundle.gen.yaml
+openapi: 3.1.0
 ```
 
 The root document is `api/openapi/openapi.yaml`.
@@ -64,3 +81,17 @@ The fragment directories contain seed `.gitkeep` files.
 Use `--dry-run` or `--diff` to preview without writing or running tools.
 Use `--json` for structured results.
 After generation, run `cd api && go build ./...`.
+
+## Rust API
+
+A Rust API has no OpenAPI fragment files and no oapi-codegen.
+The handlers carry utoipa annotations, and the app builds the document from them.
+`api/openapi/bundle.gen.yaml` is a tracked `seed` file, so a new app already has it.
+
+`spinup g openapi` returns an empty plan.
+Its post-step `openapi-emit` builds the app and writes the document of the app to `api/openapi/bundle.gen.yaml`.
+`spinup g resource` runs the same post-step.
+The post-step skips when no database URL is set, because the build needs the query cache or a database.
+Then the command prints `Skipped post-steps: DATABASE_URL is not set (openapi-emit)` and the `Next:` lines.
+Run `spinup db prepare`, and then `spinup g openapi` again.
+After generation, run `cd api && cargo build --locked`.

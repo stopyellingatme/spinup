@@ -8,6 +8,7 @@ The app must have the `jobs` module.
 Create the app with `--modules ci,jobs` to get it.
 A command to add a module to an existing app arrives in a later spinup version.
 
+<!-- doctest: only go -->
 ```console
 $ spinup new todo --api-only --module example.com/todo --modules ci,jobs --no-git --non-interactive
 ...
@@ -101,6 +102,7 @@ It waits for the running jobs until `SHUTDOWN_TIMEOUT` (default 20s) ends, and t
 
 If the app has no `jobs` module, the command fails:
 
+<!-- doctest: only go -->
 ```console
 $ spinup new plain --api-only --module example.com/plain --no-git --non-interactive
 ...
@@ -111,7 +113,25 @@ Error: generator "job" failed: cannot generate a job: the app has no jobs module
 [exit 1]
 ```
 
+<!-- doctest: only rust -->
+```console
+$ spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+...
+$ cd plain
+$ spinup g job send_digest
+Error: generator "job" failed: cannot generate a job: the app has no jobs module
+  Try: spinup module add jobs
+[exit 1]
+```
+
 If a job file exists with different content, the command fails and lists the file.
 Pass `--force` to replace it.
 Use `--dry-run` or `--diff` to preview without writing or running tools.
 Use `--json` for structured results.
+
+## Rust API
+
+In a Rust API, `spinup g job <name>` writes the scaffold file `api/src/jobs/<name>.rs`.
+It also rewrites the managed module list `api/src/jobs/mod.rs`, with one sorted line for each job.
+The generator finds the existing jobs by their file names in `api/src/jobs/`.
+It does not parse the Rust code.

@@ -12,8 +12,14 @@ Without `--force`, a generator does not change a file that you edited.
 | `spinup g handler <name>` | A plain `net/http` handler and its test |
 | `spinup g migration <snake_name>` | An empty goose migration |
 
+The long forms are `spinup generate resource`, `spinup generate model`, `spinup generate handler`, and `spinup generate migration`.
+The Go API and the Rust API get different files.
+Each section shows the Go output first, and then the Rust output.
+The Rust API section near the end of this page lists the Rust files.
+
 ## Resource
 
+<!-- doctest: only go -->
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 ...
@@ -36,26 +42,59 @@ $ test -s api/internal/store/todos.sql.go
 $ test -s api/internal/gen/api.gen.go
 ```
 
+<!-- doctest: only rust -->
+```console
+$ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+...
+$ cd todo
+$ spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high' --dry-run
+create api/migrations/00002_create_todos.down.sql (seed)
+create api/migrations/00002_create_todos.up.sql (seed)
+update api/src/handlers/mod.rs (managed)
+create api/src/handlers/todos.rs (scaffold)
+create api/src/handlers/todos_tests.rs (scaffold)
+update api/src/models/mod.rs (managed)
+create api/src/models/todo.rs (scaffold)
+update api/src/routes_gen.rs (managed)
+```
+
+A Rust resource needs a database for its post-steps (see the Rust API section).
+
+<!-- doctest: only rust -->
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high'
+...
+Created 5, updated 3 files
+Next: spinup db migrate up
+Next: cd api && cargo nextest run
+$ test -s api/openapi/bundle.gen.yaml
+$ ls api/.sqlx | grep -c '^query-.*[.]json$'
+...
+```
+
 The resource name can be singular or plural, in snake, kebab, or camel case.
 The table and the URL use the plural snake case name, such as `todos` and `/api/todos`.
 Each field is `<name>:<type>`. These are the types:
 
-| Type | SQL | OpenAPI | Go API type |
-| --- | --- | --- | --- |
-| `string`, `text` | `text` | `string` | `string` |
-| `int` | `integer` | `integer` (int32) | `int32` |
-| `bigint` | `bigint` | `integer` (int64) | `int64` |
-| `bool` | `boolean` | `boolean` | `bool` |
-| `float` | `double precision` | `number` (double) | `float64` |
-| `decimal` | `numeric` | `string` (decimal) | `string` |
-| `time` | `timestamptz` | `string` (date-time) | `time.Time` |
-| `date` | `date` | `string` (date) | `openapi_types.Date` |
-| `uuid` | `uuid` | `string` (uuid) | `uuid.UUID` |
-| `json` | `jsonb` | `object` | `map[string]interface{}` |
-| `ref:<model>` | `bigint REFERENCES <models> (id)` | `integer` (int64) | `int64` |
-| `enum:a\|b` | `text CHECK (... IN ('a', 'b'))` | `string` with `enum` | a named string type |
+| Type | SQL | OpenAPI | Go API type | Rust API type |
+| --- | --- | --- | --- | --- |
+| `string`, `text` | `text` | `string` | `string` | `String` |
+| `int` | `integer` | `integer` (int32) | `int32` | `i32` |
+| `bigint` | `bigint` | `integer` (int64) | `int64` | `i64` |
+| `bool` | `boolean` | `boolean` | `bool` | `bool` |
+| `float` | `double precision` | `number` (double) | `float64` | `f64` |
+| `decimal` | `numeric` | `string` (decimal) | `string` | `String` |
+| `time` | `timestamptz` | `string` (date-time) | `time.Time` | `time::OffsetDateTime` |
+| `date` | `date` | `string` (date) | `openapi_types.Date` | `time::Date` |
+| `uuid` | `uuid` | `string` (uuid) | `uuid.UUID` | `uuid::Uuid` |
+| `json` | `jsonb` | `object` | `map[string]interface{}` | `serde_json::Value` |
+| `ref:<model>` | `bigint REFERENCES <models> (id)` | `integer` (int64) | `int64` | `i64` |
+| `enum:a\|b` | `text CHECK (... IN ('a', 'b'))` | `string` with `enum` | a named string type | a named Rust `enum` |
 
 Put `?` after a type to make the field nullable.
+A nullable field has the Rust type `Option<T>`.
+The Rust API reads a `decimal` value as text and writes it with a `::text::numeric` cast, so it needs no decimal crate.
 A `ref:<model>` field adds a `<name>_id` column with a foreign key and an index.
 The referenced table must exist in a migration.
 
@@ -96,9 +135,19 @@ Pass `--force` to write the files again.
 With `--force`, the generator writes the `NNNNN_create_<plural>.sql` migration again in place.
 If you applied that migration, run `spinup db redo --i-know` after the change.
 
+<!-- doctest: only go -->
 ```console
 $ spinup g resource todo title:string
 Error: generator "resource" failed: the table todos already exists in api/db/migrations/00002_create_todos.sql
+  Try: pass --force to generate the files again, or choose another name
+[exit 1]
+```
+
+<!-- doctest: only rust -->
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ spinup g resource todo title:string
+Error: generator "resource" failed: the table todos already exists in api/migrations/00002_create_todos.up.sql
   Try: pass --force to generate the files again, or choose another name
 [exit 1]
 ```
@@ -154,6 +203,7 @@ Error: generator "model" failed: resource name "openapi" is reserved for the API
 `spinup g model` writes the migration, the queries, and the OpenAPI schemas, but no API paths or handlers.
 Use it for a table that other resources refer to.
 
+<!-- doctest: only go -->
 ```console
 $ spinup g model tag name:string
 Created 3, updated 0 files
@@ -161,11 +211,24 @@ Next: spinup db migrate up
 Next: cd api && go build ./...
 ```
 
+In a Rust API, `g model` writes the migration pair and `api/src/models/<name>.rs`, and adds the module to `api/src/models/mod.rs`.
+
+<!-- doctest: only rust -->
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ spinup g model tag name:string
+...
+Created 3, updated 1 files
+Next: spinup db migrate up
+Next: cd api && cargo build
+```
+
 ## Handler
 
 `spinup g handler` writes a plain `http.HandlerFunc` and its test.
 Generators do not edit `routes.go`, so the generator shows the line to add.
 
+<!-- doctest: only go -->
 ```console
 $ spinup g handler ping
 Created 2, updated 0 files
@@ -173,15 +236,50 @@ Next: add mux.HandleFunc("GET /api/ping", handlers.Ping) to Register in api/inte
 Next: cd api && go test ./internal/handlers/...
 ```
 
+In a Rust API, `g handler` writes `api/src/handlers/<name>.rs` and `api/src/handlers/<name>_tests.rs`.
+It adds the module to `api/src/handlers/mod.rs` and the route to the managed file `api/src/routes_gen.rs`.
+
+<!-- doctest: only rust -->
+```console
+$ spinup g handler pong --dry-run
+update api/src/handlers/mod.rs (managed)
+create api/src/handlers/pong.rs (scaffold)
+create api/src/handlers/pong_tests.rs (scaffold)
+unchanged api/src/models/mod.rs (managed)
+update api/src/routes_gen.rs (managed)
+```
+
+<!-- doctest: only rust -->
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ spinup g handler ping
+...
+Created 2, updated 2 files
+Next: cd api && cargo test --locked ping
+```
+
 ## Migration
 
 `spinup g migration` writes an empty goose migration.
 The number is the highest number in `api/db/migrations` plus one.
 
+<!-- doctest: only go -->
 ```console
 $ spinup g migration add_index
 Created 1, updated 0 files
 Next: edit api/db/migrations/00004_add_index.sql
+Next: spinup db migrate up
+```
+
+In a Rust API, `g migration` writes an empty sqlx pair in `api/migrations`, as `spinup db new` does.
+
+<!-- doctest: only rust -->
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ spinup g migration add_index
+...
+Created 2, updated 0 files
+Next: edit api/migrations/00004_add_index.up.sql
 Next: spinup db migrate up
 ```
 
@@ -190,3 +288,30 @@ Next: spinup db migrate up
 The handler tests need PostgreSQL.
 They use the server in `DATABASE_URL` when it is set.
 Run `spinup db migrate up`, then `cd api && go test ./...`.
+In a Rust API, run `spinup db migrate up`, then `cd api && cargo nextest run`.
+
+## Rust API
+
+A Rust resource writes these files:
+
+| File | Class | Contents |
+| --- | --- | --- |
+| `api/migrations/NNNNN_create_<plural>.up.sql` | seed | The table with `id`, the fields, `created_at`, and `updated_at`. |
+| `api/migrations/NNNNN_create_<plural>.down.sql` | seed | The `DROP TABLE` statement. |
+| `api/src/models/<singular>.rs` | scaffold | The row type, the input type, and the `query_as!` queries. |
+| `api/src/handlers/<plural>.rs` | scaffold | The axum handlers with their utoipa annotations. |
+| `api/src/handlers/<plural>_tests.rs` | scaffold | A create, get, list, update, and delete round trip, and the error cases. |
+| `api/src/handlers/mod.rs`, `api/src/models/mod.rs` | managed | One sorted `mod` line for each resource. |
+| `api/src/routes_gen.rs` | managed | The routes of every resource. |
+
+The generator formats every planned `.rs` file with `rustfmt` before it writes.
+After the write, it runs these post-steps in order: `migrate`, `sqlx-prepare`, `build`, and `openapi-emit`.
+An app with the web pack also gets the `client` step.
+`sqlx-prepare` is `spinup db prepare`, and it refreshes the query cache in `api/.sqlx`.
+`openapi-emit` writes `api/openapi/bundle.gen.yaml` from the built app.
+
+The post-steps need a database.
+The URL comes from `DATABASE_URL`, then the file that `DATABASE_URL_FILE` names, then `api/.env`, then `.env`.
+If no URL is set, the generator writes the files and skips the post-steps.
+Then it prints `Skipped post-steps: DATABASE_URL is not set` with `Next: spinup db prepare` and `Next: spinup g openapi`.
+After you edit a query, run `spinup db prepare`, and then `spinup g openapi`.

@@ -2,6 +2,8 @@
 
 Use `spinup g dashboard` to create Grafana dashboards.
 Use `spinup g alert` to add Prometheus alert rules.
+The long forms are `spinup generate dashboard` and `spinup generate alert`.
+Both generators work the same for a Go API and a Rust API.
 The app must include the monitoring pack.
 
 The generators write only user-owned files.
