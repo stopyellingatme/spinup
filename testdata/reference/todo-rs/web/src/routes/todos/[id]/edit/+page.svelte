@@ -1,0 +1,57 @@
+<script lang="ts">
+	import { untrack } from 'svelte';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import { superForm } from 'sveltekit-superforms';
+	import PageHeader from '#lib/components/app/page-header.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Fields from '../../fields.svelte';
+	import { itemTitle } from '../../schema';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+
+	// superForm reads the first form data once. Later page data reaches it through the page store.
+	// The server checks the values with the schema, and the errors show at the inputs.
+	const form = superForm(untrack(() => data.form));
+	const { enhance, message, submitting } = form;
+</script>
+
+<svelte:head>
+	<title>Edit {itemTitle(data.item)}</title>
+</svelte:head>
+
+<div class="max-w-2xl">
+	<a
+		href="/todos/{data.item.id}"
+		class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+	>
+		<ArrowLeftIcon aria-hidden="true" class="size-4" />
+		{itemTitle(data.item)}
+	</a>
+
+	<PageHeader title="Edit todo" description="Change the fields, then save the changes." />
+
+	<Card.Root>
+		<Card.Content>
+			<form method="POST" use:enhance novalidate class="grid gap-6">
+				{#if $message}
+					<div role="alert" class="border-destructive/50 text-destructive flex items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						<p>{$message}</p>
+					</div>
+				{/if}
+				<Fields {form} />
+				<div class="flex flex-wrap gap-2">
+					<Button type="submit" disabled={$submitting}>
+						{#if $submitting}<LoaderCircleIcon aria-hidden="true" class="animate-spin" />{/if}
+						Save changes
+					</Button>
+					<Button href="/todos/{data.item.id}" variant="outline">Cancel</Button>
+				</div>
+			</form>
+		</Card.Content>
+	</Card.Root>
+</div>

@@ -1,0 +1,38 @@
+//! The [[ snake ]] job.
+
+/// The arguments stored as JSON for this job kind.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct [[ pascal ]]Args {}
+
+impl kit::jobs::Args for [[ pascal ]]Args {
+    const KIND: &'static str = "[[ snake ]]";
+}
+
+/// Registers the job handler. Keep the handler idempotent.
+pub fn register(worker: &mut kit::jobs::Worker, pool: &kit::db::PgPool) -> anyhow::Result<()> {
+    let pool = pool.clone();
+    worker.register(move |job: kit::jobs::Job<[[ pascal ]]Args>| {
+        let pool = pool.clone();
+        async move { handle(job, &pool).await }
+    });
+    Ok(())
+}
+
+/// Handles one job. Return an error to retry it later.
+pub async fn handle(job: kit::jobs::Job<[[ pascal ]]Args>, _pool: &kit::db::PgPool) -> anyhow::Result<()> {
+    tracing::info!(job_id = job.id, attempt = job.attempt, "job [[ snake ]]");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kit::jobs::Args;
+
+    #[test]
+    fn kind_and_json_are_stable() {
+        assert_eq!([[ pascal ]]Args::KIND, "[[ snake ]]");
+        let encoded = serde_json::to_value([[ pascal ]]Args {}).unwrap();
+        let _: [[ pascal ]]Args = serde_json::from_value(encoded).unwrap();
+    }
+}

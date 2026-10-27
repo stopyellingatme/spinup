@@ -1,0 +1,56 @@
+# cargo-deny for the R0.7 spike. Run it offline only:
+#   cargo deny --offline check advisories bans licenses
+# The advisory database is $CARGO_HOME/advisory-dbs (fetched by the main loop).
+
+[graph]
+all-features = false
+
+[advisories]
+ignore = [
+    # rsa 0.9 (Marvin attack, RUSTSEC-2023-0071): a timing side channel in
+    # RSA private-key operations (decryption and signing). Two crates pull
+    # rsa: jsonwebtoken 11 with the rust_crypto backend (the kit) and
+    # openidconnect 4 (only the oidc-compare member). Both use rsa only to
+    # verify ID token signatures with the public key of the provider, which
+    # the attack does not affect. The kit never holds an RSA private key.
+    # Remove this entry when jsonwebtoken uses the aws_lc_rs backend: it
+    # drops rsa, but it needs untrusted 0.7.1, which was not in the offline
+    # cache of R0.7.
+    { id = "RUSTSEC-2023-0071", reason = "verify-only use of rsa; see the comment above" },
+    # crypto-bigint 0.5 (RUSTSEC-2026-0387): operations meant to be constant
+    # time may branch on secret values. It comes through p256 and p384
+    # (elliptic-curve 0.13) for ES256 and ES384 ID tokens, in jsonwebtoken
+    # rust_crypto and in openidconnect. The fix is only in crypto-bigint
+    # 0.7.6, which elliptic-curve 0.13 cannot use. The kit only verifies
+    # signatures with public keys, so no secret value goes through it. The
+    # aws_lc_rs backend of jsonwebtoken drops this crate too.
+    { id = "RUSTSEC-2026-0387", reason = "verify-only use of p256/p384; see the comment above" },
+]
+
+[licenses]
+# The workspace crates are not published (publish = false).
+private = { ignore = true }
+confidence-threshold = 0.9
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# The path dependencies of the workspace have no version requirement.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

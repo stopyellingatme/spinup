@@ -2,8 +2,8 @@
 
 `spinup new <name>` composes template packs and creates an application directory.
 The default packs are `base`, `api`, `web`, `ci`, and `deploy`.
-Pass `--api-only` to create the Go API without the web frontend.
-The Rust R1 CLI still renders the Go API pack.
+Pass `--api-only` to create the API without the web frontend.
+The Rust CLI generates an axum API with sqlx and utoipa.
 It writes lock schema 3 with the `minijinja` engine marker.
 
 ```console
@@ -27,8 +27,8 @@ It excludes `.env` and `spinup.lock`.
 
 | Flag | Purpose |
 | --- | --- |
-| `--api-only` | Create the Go API without a web frontend. |
-| `--module <path>` | Set the Go module path. The API module adds `/api`. |
+| `--api-only` | Create the API without a web frontend. |
+| `--module <path>` | Set the Go module path or the Rust registry owner input. The Rust package name is `api`. |
 | `--modules <names>` | Select optional packs with comma-separated names. The default is `ci,deploy`. Use `--modules=''` for none. |
 | `--db-version <major>` | Select PostgreSQL `18`, `17`, or `16`. The default is `18`. |
 | `--shadcn-registry <version>` | Record the shadcn-svelte registry version of the web components. The default is `1.7.0`. |
@@ -66,10 +66,19 @@ An image build passes the local kit directory to Docker as the build context `ki
 The CLI sends no telemetry.
 Set `SPINUP_NO_UPDATE_CHECK=1` to disable update checks.
 
+<!-- doctest: only go -->
 ```console
 $ spinup new preview --api-only --module example.com/preview --no-git --non-interactive --dry-run
 ...
 api/cmd/api/main.go (scaffold)
+...
+```
+
+<!-- doctest: only rust -->
+```console
+$ spinup new preview --api-only --module example.com/preview --no-git --non-interactive --dry-run
+...
+api/src/main.rs (scaffold)
 ...
 ```
 
@@ -127,4 +136,4 @@ $ pnpm check
 $ pnpm build
 ```
 
-See [the web app](../web.md) for the layout and for how the web app talks to the Go API.
+See [the web app](../web.md) for the layout and for how the web app talks to the API.

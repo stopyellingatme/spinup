@@ -360,7 +360,7 @@ pub(crate) fn register(env: &mut Environment<'static>, stack: Option<&Stack>) {
         v.len().ok_or_else(|| invalid("len requires a collection"))
     });
     let stack = stack.cloned().map(Arc::new);
-    for name in ["image", "npm", "gomod", "uses"] {
+    for name in ["image", "npm", "crate", "uses"] {
         let stack = stack.clone();
         env.add_function(name, move |key: &str| -> Result<String, Error> {
             let stack = stack
@@ -369,7 +369,7 @@ pub(crate) fn register(env: &mut Environment<'static>, stack: Option<&Stack>) {
             match name {
                 "image" => stack.image(key).map(|image| image.reference()),
                 "npm" => stack.npm_version(key).map(str::to_owned),
-                "gomod" => stack.go_module(key).map(str::to_owned),
+                "crate" => stack.crate_version(key).map(str::to_owned),
                 "uses" => stack.action(key).map(|action| action.uses(key)),
                 _ => unreachable!(),
             }
@@ -425,9 +425,7 @@ mod tests {
             },
         );
         stack.npm.insert("svelte".into(), "5.0".into());
-        stack
-            .go_modules
-            .insert("example.com/module".into(), "v1.0.0".into());
+        stack.crates.insert("axum".into(), "0.8.9".into());
         stack.actions.insert(
             "owner/repo".into(),
             spinup_stack::stack::Action {
@@ -450,7 +448,7 @@ mod tests {
             ("[[ default('fallback', 'value') ]]", "value"),
             ("[[ image('postgres') ]]", "postgres:18@sha256:abc"),
             ("[[ npm('svelte') ]]", "5.0"),
-            ("[[ gomod('example.com/module') ]]", "v1.0.0"),
+            ("[[ crate('axum') ]]", "0.8.9"),
             ("[[ uses('owner/repo') ]]", "owner/repo@abc # v4"),
             ("[[ has('jobs', ['jobs', 1]) ]]", "true"),
             ("[[ has('auth', ['jobs']) ]]", "false"),
@@ -476,7 +474,8 @@ mod tests {
         for source in [
             "[[ image('missing') ]]",
             "[[ npm('missing') ]]",
-            "[[ gomod('missing') ]]",
+            "[[ gomod('example.com/module') ]]",
+            "[[ crate('missing') ]]",
             "[[ uses('missing') ]]",
             "[[ get([1], 2) ]]",
             "[[ get([1], -1) ]]",
@@ -494,7 +493,7 @@ mod tests {
             );
         }
         let env = crate::env::environment(None);
-        for helper in ["image", "npm", "gomod", "uses"] {
+        for helper in ["image", "npm", "crate", "uses"] {
             let source = format!("[[ {helper}('missing') ]]");
             assert!(
                 env.render_str(&source, Serde(json!({})))

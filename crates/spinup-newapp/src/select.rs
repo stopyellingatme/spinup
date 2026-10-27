@@ -336,8 +336,13 @@ mod tests {
             first.lock.marshal().unwrap(),
             second.lock.marshal().unwrap()
         );
-        assert_eq!(first.lock.kit.crate_name, crate::kit::KIT_MODULE);
-        assert_eq!(first.lock.kit.version, "v0.1.0");
+        assert_eq!(first.lock.kit.crate_name, "spinup-kit");
+        assert_eq!(
+            first.lock.kit.version,
+            spinup_stack::load::embedded()
+                .crate_version("spinup-kit")
+                .unwrap()
+        );
         assert_eq!(first.lock.template_version, "0.0.0-dev");
         assert_eq!(first.lock.behavior_version, 1);
         assert_eq!(first.lock.engine, "minijinja");
@@ -345,7 +350,7 @@ mod tests {
         assert!(!first.lock.stack_versions.is_empty());
         assert!(!first.lock.files.contains_key(".env"));
         assert_eq!(
-            first.lock.files["api/cmd/api/main.go"].class,
+            first.lock.files["api/src/main.rs"].class,
             spinup_manifest::lock::Class::Scaffold
         );
         for file in &first.plan.files {
@@ -354,8 +359,9 @@ mod tests {
                 spinup_manifest::hash::hash(&file.data)
             );
         }
-        let module = String::from_utf8(first.plan.get("api/go.mod").unwrap().data).unwrap();
-        assert!(module.contains("replace github.com/stopyellingatme/spinup/kit => "));
+        let manifest = String::from_utf8(first.plan.get("api/Cargo.toml").unwrap().data).unwrap();
+        assert!(manifest.contains("[patch.crates-io]"));
+        assert!(manifest.contains("spinup-kit = { path = "));
     }
 
     #[test]

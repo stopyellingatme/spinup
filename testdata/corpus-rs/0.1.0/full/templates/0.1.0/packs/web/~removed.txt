@@ -1,0 +1,3 @@
+# The converted prompt of frontend_mode names the Go binary. pack.d/modes.toml declares the
+# question again with the Rust text. The api overlay (pack.d/rust.toml) uses the same text.
+question:frontend_mode

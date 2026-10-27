@@ -23,7 +23,10 @@
 #   BOOT_BUDGET_MIB    the memory budget in MiB. The defaults are lite 1024, full 2560.
 #   BOOT_LOG_DIR       a directory for the logs of a failed run (CI uploads it).
 #   BOOT_TIMEOUT       the seconds to wait for each check. The default is 180.
-# Needs: Docker with Compose v2.24 or later, Go, curl, and python3.
+#   SPINUP_BIN         a built spinup binary (the Rust CLI). Without it, run.sh builds
+#                      ./cmd/spinup with Go.
+#   SPINUP_KIT_DIR     the kit directory for SPINUP_KIT_REPLACE. The default is $repo/kit.
+# Needs: Docker with Compose v2.24 or later, Go (without SPINUP_BIN), curl, and python3.
 set -euo pipefail
 
 profile="${1:-lite}"
@@ -41,7 +44,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
 check="$here/check.py"
 
-for tool in docker go curl python3; do
+tools=(docker curl python3)
+if [[ -z "${SPINUP_BIN:-}" ]]; then tools+=(go); fi
+for tool in "${tools[@]}"; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "run.sh: the command $tool is not on PATH." >&2
     echo "  Try: install $tool, then run $0 again" >&2
@@ -55,14 +60,29 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 export GOTOOLCHAIN="${GOTOOLCHAIN:-local}"
+kit_dir="${SPINUP_KIT_DIR:-$repo/kit}"
+if [[ -n "${SPINUP_BIN:-}" && ! -x "$SPINUP_BIN" ]]; then
+  echo "run.sh: SPINUP_BIN ($SPINUP_BIN) is not an executable file." >&2
+  echo "  Try: build the CLI (make rs-build), or unset SPINUP_BIN to build the Go CLI" >&2
+  exit 1
+fi
+if [[ ! -d "$kit_dir" ]]; then
+  echo "run.sh: the kit directory $kit_dir does not exist." >&2
+  echo "  Try: set SPINUP_KIT_DIR to the kit directory, such as $repo/crates/spinup-kit" >&2
+  exit 1
+fi
+
+# The stack versions of the CLI under test.
+stack="internal/stackversions/stackversions.yaml"
+if [[ -n "${SPINUP_BIN:-}" ]]; then stack="crates/spinup-stack/stackversions.yaml"; fi
 
 # image NAME prints the pinned image of NAME in stackversions.yaml as image:tag@digest.
 image() {
   local ref
   ref="$(sed -nE "s/^ *$1: *\\{ *image: *([^,]+), *tag: *\"([^\"]+)\", *digest: *\"([^\"]+)\".*/\\1:\\2@\\3/p" \
-    "$repo/internal/stackversions/stackversions.yaml")"
+    "$repo/$stack")"
   if [[ -z "$ref" ]]; then
-    echo "run.sh: cannot find the image $1 in internal/stackversions/stackversions.yaml." >&2
+    echo "run.sh: cannot find the image $1 in $stack." >&2
     echo "  Try: check the images section of that file" >&2
     return 1
   fi
@@ -171,11 +191,16 @@ mkdir -p "$work/logs" "$work/http" "$work/secrets" "$work/metrics" "$work/caddy/
 # Remove what an interrupted run left.
 remove_all
 
-echo "==> build the CLI"
-(cd "$repo" && go build -o "$work/spinup" ./cmd/spinup)
+if [[ -n "${SPINUP_BIN:-}" ]]; then
+  echo "==> use the CLI $SPINUP_BIN"
+  cp "$SPINUP_BIN" "$work/spinup"
+else
+  echo "==> build the CLI"
+  (cd "$repo" && go build -o "$work/spinup" ./cmd/spinup)
+fi
 
 echo "==> render $app (profile $profile)"
-(cd "$work" && SPINUP_KIT_REPLACE="$repo/kit" ./spinup new "$app" --api-only \
+(cd "$work" && SPINUP_KIT_REPLACE="$kit_dir" ./spinup new "$app" --api-only \
   --module "example.com/$app" --modules ci,deploy,monitoring --monitoring-profile "$profile" \
   --no-git --non-interactive >"$work/logs/new.log" 2>&1) || {
   cat "$work/logs/new.log" >&2

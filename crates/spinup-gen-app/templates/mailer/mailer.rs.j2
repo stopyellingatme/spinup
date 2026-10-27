@@ -1,0 +1,23 @@
+//! The [[ snake ]] mailer. spinup owns this file.
+
+/// The template data for the [[ snake ]] email.
+#[derive(Debug, serde::Serialize)]
+pub struct [[ pascal ]]Data {
+[% for field in fields %]
+    /// The [[ field.name ]] template value.
+    pub [[ field.name ]]: [[ field.rust ]],
+[% endfor %]
+}
+
+impl super::Mailers {
+    /// Renders and sends the [[ snake ]] email.
+    pub async fn send_[[ snake ]](&self, to: &str, data: &[[ pascal ]]Data) -> anyhow::Result<()> {
+        let templates = kit::mail::Templates::new([
+[% for suffix in ["subject", "txt", "html"] %]
+            ("[[ snake ]].[[ suffix ]].tmpl", include_str!("../../templates/mail/[[ snake ]].[[ suffix ]].tmpl")),
+[% endfor %]
+        ]);
+        let message = kit::mail::render(&templates, "[[ snake ]]", &self.from, to, data)?;
+        self.send(&message).await
+    }
+}

@@ -1,0 +1,22 @@
+[[files]]
+path = "api/src/mail/mod.rs"
+source = "files/api/src/mail/mod.rs"
+class = "managed"
+
+[[files]]
+path = "api/src/mail/mailers.rs"
+source = "files/api/src/mail/mailers.rs"
+class = "scaffold"
+
+[[files]]
+path = "api/src/mail/worker.rs"
+source = "files/api/src/mail/worker.rs"
+# The module list gates this source with cfg(feature = "jobs").
+# rustfmt must find the file even when that feature is disabled.
+class = "managed"
+
+[[files]]
+path = "api/templates/mail/README.txt"
+source = "files/api/templates/mail/README.txt"
+class = "seed"
+

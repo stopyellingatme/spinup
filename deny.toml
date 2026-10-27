@@ -3,12 +3,18 @@
 #   make rs-deny   (cargo deny --offline check bans licenses sources; gate only)
 #   make rs-vuln   (cargo deny check advisories; needs the advisory database)
 # The advisory database is $CARGO_HOME/advisory-dbs (the main loop fetches it).
+#
+# R2 (ADR 0021 §9): this file checks the whole workspace, the kit included, with all
+# features. The kit needs tokio and aws-lc (jsonwebtoken, reqwest), so they are not banned
+# here. scripts/rust/cli-graph-check.sh (make rs-deny) keeps tokio, aws-lc, openssl, and
+# native-tls out of the graph of the spinup binary.
 
 [graph]
-all-features = false
+all-features = true
 
 [advisories]
-# No ignores in R1. Each later ignore names the advisory and the reason.
+# No ignores (R2: jsonwebtoken uses aws_lc_rs, without rsa). Each later ignore names the
+# advisory and the reason.
 ignore = []
 
 [licenses]
@@ -23,6 +29,7 @@ allow = [
   "CDLA-Permissive-2.0",
   "ISC",
   "MIT",
+  "0BSD",
   "Unicode-3.0",
   "Unlicense",
   "Zlib",
@@ -38,14 +45,9 @@ wildcards = "deny"
 # The path dependencies of the workspace have no version requirement.
 allow-wildcard-paths = true
 deny = [
-  # The CLI uses rustls with ring (R0.4, ADR 0019 §3). The kit decides aws-lc in R2.
-  { crate = "aws-lc-rs", reason = "the CLI TLS provider is ring (ADR 0019 §3)" },
-  { crate = "aws-lc-sys", reason = "the CLI TLS provider is ring (ADR 0019 §3)" },
   { crate = "openssl", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
   { crate = "openssl-sys", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
   { crate = "native-tls", reason = "no system C library at runtime (CLAUDE.md, No CGO)" },
-  # One async runtime: the CLI is synchronous (R0.4).
-  { crate = "tokio", reason = "the CLI is synchronous (R0.4); the kit is a separate graph in R2" },
 ]
 
 [sources]

@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.spinup/*
+!.spinup/plugins.allow
+!.spinup/plugins.history
+api/target/
+node_modules/
+.DS_Store
+coverage/
+coverage.out
+coverage.html
+*.coverprofile

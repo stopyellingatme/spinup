@@ -1,0 +1,103 @@
+# Heyapi keeps the resource page interface and replaces its own generated output.
+
+[[files]]
+path = "[[ \"web/src/lib/api/client.ts\" ]]"
+source = "variants/api.ts"
+class = "scaffold"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/client/client.gen.ts"
+source = "variants/client/client/client.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/client/index.ts"
+source = "variants/client/client/index.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/client/types.gen.ts"
+source = "variants/client/client/types.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/client/utils.gen.ts"
+source = "variants/client/client/utils.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/client.gen.ts"
+source = "variants/client/client.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/auth.gen.ts"
+source = "variants/client/core/auth.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/bodySerializer.gen.ts"
+source = "variants/client/core/bodySerializer.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/params.gen.ts"
+source = "variants/client/core/params.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/pathSerializer.gen.ts"
+source = "variants/client/core/pathSerializer.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/queryKeySerializer.gen.ts"
+source = "variants/client/core/queryKeySerializer.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/serverSentEvents.gen.ts"
+source = "variants/client/core/serverSentEvents.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/types.gen.ts"
+source = "variants/client/core/types.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/core/utils.gen.ts"
+source = "variants/client/core/utils.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/index.ts"
+source = "variants/client/index.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/sdk.gen.ts"
+source = "variants/client/sdk.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"
+
+[[files]]
+path = "web/src/lib/api/client/types.gen.ts"
+source = "variants/client/types.gen.ts"
+class = "seed"
+when = "api_client == 'heyapi'"

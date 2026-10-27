@@ -31,7 +31,7 @@ fn build() -> Command {
                     .help("add a trusted pack source with optional @version (repeatable)"),
             )
             .arg(boolean("trust", "trust plugin sources and hashes", false))
-            .arg(boolean("api-only", "create only the Go API", false))
+            .arg(boolean("api-only", "create only the API", false))
             .arg(boolean(
                 "no-git",
                 "do not initialize a git repository",

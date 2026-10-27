@@ -1,0 +1,12 @@
+//! HTTP tests for [[ snake ]].
+
+#[tokio::test]
+async fn responds_with_the_handler_name() {
+    let app = axum::Router::new().route("/api/[[ snake ]]", axum::routing::get(super::handle));
+    let answer = kit::testkit::http::send(
+        &app,
+        kit::testkit::http::Req::get("/api/[[ snake ]]"),
+    ).await;
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["message"], "[[ snake ]]");
+}

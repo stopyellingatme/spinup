@@ -3,9 +3,11 @@
 # internal/stackversions/stackversions.yaml (schema 1). Main loop only (rust-plan.md
 # decision 11, ADR 0020 §3).
 #
-# The lines above the marker line are generated: the Go sections, unchanged, with
-# `schema: 2`. The lines below the marker are the Rust sections (`rust`, `crates`,
-# `cargo_tools`). The script keeps them as they are. Edit them by hand.
+# The lines above the marker line are generated: the shared sections of the Go file,
+# unchanged, with `schema: 2`. The script removes the Go sections (`go`, `go_modules`,
+# `go_tools`): schema 2 has none (R2 gate, decision 11). The lines below the marker are the
+# Rust sections (`rust`, `crates`, `cargo_tools`). The script keeps them as they are. Edit
+# them by hand.
 #
 #   scripts/rust/gen-stack.sh          rewrite the generated part
 #   scripts/rust/gen-stack.sh --check  fail when the generated part is stale
@@ -40,12 +42,15 @@ trap 'rm -f "$tmp"' EXIT
   cat <<'HEADER'
 # Pinned stack versions for the Rust CLI, schema 2 (ADR 0020 §3). Main loop only.
 # Do not edit the lines above the marker line: scripts/rust/gen-stack.sh copies them from
-# internal/stackversions/stackversions.yaml (the Go file, schema 1). Schema 2 is additive in
-# R1: it keeps the Go sections, because the converted Go `api` pack reads them. The R2 gate
-# removes the Go sections.
+# internal/stackversions/stackversions.yaml (the Go file, schema 1), without the Go sections
+# (go, go_modules, go_tools). Schema 2 has no Go sections: the R2 gate removed them, and the
+# strict decode rejects them.
 HEADER
-  # The Go file without its leading comment block, with schema 2.
-  awk 'started || (!/^#/ && !/^$/) { started = 1 } started' "$go_file" | sed 's/^schema: 1$/schema: 2/'
+  # The Go file without its leading comment block and without the Go sections, with schema 2.
+  # A top-level key starts a section, and a Go section ends at the next top-level key.
+  awk 'started || (!/^#/ && !/^$/) { started = 1 } started' "$go_file" \
+    | sed 's/^schema: 1$/schema: 2/' \
+    | awk '/^[^ #]/ { key = $0; sub(/:.*/, "", key); skip = (key == "go" || key == "go_modules" || key == "go_tools") } !skip'
   echo
   echo "$marker"
   # The Rust sections: everything after the marker line.

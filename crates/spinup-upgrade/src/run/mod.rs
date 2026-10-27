@@ -80,7 +80,7 @@ impl<'a> Runner<'a> {
             cli_version: "dev".into(),
             matches: None,
             #[cfg(test)]
-            phases: None,
+            phases: Some(Phases::default()),
         }
     }
 

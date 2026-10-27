@@ -10,6 +10,9 @@ use spinup_ui::printer::Printer;
 use spinup_vfs::plan::{File, Plan};
 use std::path::{Path, PathBuf};
 
+/// The crate name of the kit in the lock and in `api/Cargo.toml`.
+pub const KIT_CRATE: &str = "spinup-kit";
+
 /// Records all render inputs and the hashes of the final planned bytes.
 pub fn new_lock(
     cli_version: &str,
@@ -28,9 +31,17 @@ pub fn new_lock(
         .into(),
         template_version: version.into(),
         min_cli: version.into(),
+        // The kit crate of the generated API (ADR 0021 §2). Its version is the stack pin.
         kit: KitRef {
-            crate_name: crate::kit::KIT_MODULE.into(),
-            version: "v0.1.0".into(),
+            crate_name: KIT_CRATE.into(),
+            version: stack
+                .crate_version(KIT_CRATE)
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "cannot lock the kit: {e}\nTry: add {KIT_CRATE} to the crates section of stackversions.yaml"
+                    )
+                })?
+                .into(),
         },
         behavior_version: 1,
         engine: "minijinja".into(),

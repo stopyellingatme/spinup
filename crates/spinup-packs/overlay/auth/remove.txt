@@ -1,0 +1,8 @@
+# Replace the Go schema with the kit schema for Rust.
+files/api/db/migrations/00002_create_auth.sql
+files/api/db/migrations/00003_password_resets.sql
+files/api/db/migrations/00004_oidc_identities.sql
+files/api/cmd/api/reset.go.tmpl
+files/api/internal/mail/templates/password_reset.subject.tmpl
+files/api/internal/mail/templates/password_reset.txt.tmpl
+files/api/internal/mail/templates/password_reset.html.tmpl

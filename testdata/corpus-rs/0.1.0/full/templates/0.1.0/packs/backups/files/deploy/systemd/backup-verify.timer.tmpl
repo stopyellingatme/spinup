@@ -1,0 +1,11 @@
+# Managed by spinup.
+[Unit]
+Description=Backup verify timer for [[ data.app_name ]]
+
+[Timer]
+OnCalendar=[[ go_default("Sat *-*-* 04:00:00", (get(data, "schedule_verify"))) ]]
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+# Rust twin of testdata/script/eject.txtar (Go blob 9d6636068ad62b81ab40a5891ab9b461b7e9e7ed).
+env SPINUP_KIT_REPLACE=
+exec spinup new app --api-only --no-git --module example.com/app --non-interactive
+cd app
+exec spinup eject deploy/compose.dev.yml
+exec cat spinup.lock
+stdout '"deploy/compose.dev.yml": \{\n[[:space:]]+"class": "scaffold"'
+cp ../edited deploy/compose.dev.yml
+exec spinup check
+! exec spinup eject api/src/main.rs
+stderr 'Try:'
+rm deploy/compose.dev.yml
+exec spinup diff deploy/compose.dev.yml
+stdout 'missing'
+exec spinup restore deploy/compose.dev.yml
+exists deploy/compose.dev.yml
+exec spinup check
+-- edited --
+edited

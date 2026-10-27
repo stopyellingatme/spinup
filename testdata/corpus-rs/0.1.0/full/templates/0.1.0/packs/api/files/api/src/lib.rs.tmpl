@@ -1,0 +1,26 @@
+//! The API of [[ data.app_name ]].
+
+use axum::Router;
+use kit::db::PgPool;
+use sqlx::migrate::Migrator;
+
+pub mod handlers;
+[% if has("jobs", data.modules) %]#[cfg(feature = "jobs")]
+pub mod jobs;
+[% endif %][% if has("mail", data.modules) %]#[cfg(feature = "mail")]
+pub mod mail;
+[% endif %]pub mod models;
+pub mod openapi;
+[% if has("auth", data.modules) and has("mail", data.modules) %]#[cfg(all(feature = "auth", feature = "mail"))]
+pub mod reset;
+[% endif %]pub mod routes;
+pub mod routes_gen;
+
+/// The app migrations, embedded from `migrations/`.
+pub static MIGRATOR: Migrator = sqlx::migrate!();
+
+/// Returns the API routes with the pool as state.
+pub fn router(pool: PgPool) -> Router {
+    let (generated, _) = openapi::api().split_for_parts();
+    generated.merge(routes::routes()).with_state(pool)
+}

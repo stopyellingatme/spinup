@@ -1,0 +1,24 @@
+name = "mail"
+description = "Typed email templates, SMTP delivery, Mailpit, and optional River retries."
+requires = ["api"]
+
+[[files]]
+path = "api/internal/mail/mailers.go"
+source = "files/api/internal/mail/mailers.go.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/internal/mail/templates.go"
+source = "files/api/internal/mail/templates.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/internal/mail/templates/README.txt"
+source = "files/api/internal/mail/templates/README.txt"
+class = "seed"
+
+[[files]]
+path = "api/internal/mail/worker.go"
+source = "files/api/internal/mail/worker.go.tmpl"
+class = "managed"
+when = "modules contains 'jobs'"

@@ -1,0 +1,118 @@
+# Rust twin of testdata/script/upgrade_apply.txtar (Go blob d4f6ee444e71b3e574f1e0b2b1485ebb4b50c672).
+# Upgrade a local app and verify it without downloads. This is the one upgrade script with
+# verify on: the step runs cargo clippy and cargo test in the upgrade worktree (ADR 0021 §8).
+[!exec:cargo] skip 'cargo is missing'
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+# The 0.0.1 step pins an older kit than the app has.
+exec sed 's/^  spinup-kit: 0\.1\.0$/  spinup-kit: 0.0.9/' $SPINUP_STACK_SRC
+cp stdout overlay/stackversions.yaml
+grep '^  spinup-kit: 0.0.9$' overlay/stackversions.yaml
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+cp api/Cargo.lock $WORK/before.lock
+# An edited manifest stays out of the text merge. The dependency step edits it instead.
+exec sed 's/^anyhow = "1\.0\.104"$/anyhow = "1.0.100"/' api/Cargo.toml
+cp stdout api/Cargo.toml
+grep '^anyhow = "1.0.100"$' api/Cargo.toml
+exec git commit -q -am 'Lower the anyhow requirement'
+
+# Without SPINUP_KIT_REPLACE, the upgrade keeps the kit patch of the app (the keep rule).
+env SPINUP_KIT_REPLACE=
+exec spinup upgrade --yes
+stdout 'git merge spinup/upgrade-0.0.1'
+! exists .spinup/upgrade.json
+grep '^\[patch\.crates-io\]$' .spinup/upgrade/0.0.1/api/Cargo.toml
+grep '^spinup-kit = \{ path = "'$SPINUP_KIT_DIR'" \}$' .spinup/upgrade/0.0.1/api/Cargo.toml
+# The pin-only step raises a pin to the stack and never lowers one: anyhow returns to 1.0.104,
+# the kit stays at 0.1.0, and the lock does not change.
+stdout '^Dependency anyhow: 1\.0\.104 -> 1\.0\.104$'
+grep '^anyhow = "1\.0\.104"$' .spinup/upgrade/0.0.1/api/Cargo.toml
+grep '^kit = \{ package = "spinup-kit", version = "=0\.1\.0",' .spinup/upgrade/0.0.1/api/Cargo.toml
+! grep '0\.0\.9' .spinup/upgrade/0.0.1/api/Cargo.toml
+cmp $WORK/before.lock .spinup/upgrade/0.0.1/api/Cargo.lock
+grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
+grep 'The upgraded application routes' .spinup/upgrade/0.0.1/api/src/routes.rs
+grep '^const VERSION: &str = "dev";$' .spinup/upgrade/0.0.1/api/src/main.rs
+exec git log spinup/upgrade-0.0.1 --format=%s
+stdout 'spinup upgrade 0.0.0-dev -> 0.0.1'
+stdout 'spinup upgrade: lock 0.0.1'
+exec git status --porcelain
+! stdout .
+# Verification (cargo clippy and cargo test) leaves the upgrade worktree clean.
+cd .spinup/upgrade/0.0.1/api
+exec git status --porcelain
+! stdout .
+
+-- overlay/packs/api/files/api/src/routes.rs --
+//! The upgraded application routes.
+
+use axum::Router;
+use kit::db::PgPool;
+
+/// Registers the application routes.
+pub fn routes() -> Router<PgPool> {
+    // Add application routes here. Generators never edit this file.
+    Router::new()
+}
+
+-- overlay/packs/api/files/api/src/main.rs.tmpl --
+//! The API commands: serve, migrate, openapi, healthcheck, and version.
+
+use std::process::ExitCode;
+
+use kit::app::App;
+use kit::config::Base;
+
+const VERSION: &str = "dev";
+
+fn main() -> ExitCode {
+    kit::app::main(api::openapi::openapi, start)
+}
+
+async fn start() -> anyhow::Result<App> {
+    let config: Base = kit::config::load()?;
+    #[cfg(feature = "telemetry")]
+    let telemetry = kit::telemetry::init(
+        &config,
+        &kit::telemetry::Options {
+            service_version: option_env!("SPINUP_APP_VERSION").unwrap_or(VERSION).into(),
+            environment: config.env.clone(),
+            ..kit::telemetry::Options::new([[ quote(data.app_name ~ "-api") ]])
+        },
+    )?;
+    #[cfg(not(feature = "telemetry"))]
+    kit::logx::init(&config)?;
+
+    let pool = kit::db::pool(&config)?;
+    let routes = api::router(pool.clone());
+    let app = App::new(&config)
+        .name([[ quote(data.app_name) ]])
+        .version(option_env!("SPINUP_APP_VERSION").unwrap_or(VERSION))
+        .git_sha(option_env!("SPINUP_APP_GIT_SHA").unwrap_or_default())
+        .rust_version(option_env!("SPINUP_APP_RUST").unwrap_or_default())
+        .routes(routes)
+        .readiness("db", kit::db::readiness(pool.clone()))
+        .command(
+            "migrate",
+            kit::db::migrate_command(
+                kit::db::Migrations::new(sqlx::migrate!())
+                    .database_url(config.database_url.clone()),
+            ),
+        )
+        .shutdown({
+            let pool = pool.clone();
+            move || async move {
+                pool.close().await;
+                Ok(())
+            }
+        });
+    #[cfg(feature = "telemetry")]
+    let app = app.with_telemetry(&telemetry);
+    #[cfg(feature = "apidocs")]
+    let app = app.with_api_docs(api::openapi::openapi().to_yaml()?);
+    #[cfg(feature = "devtools")]
+    let app = app.with_devtools(Some(kit::db::migration_status(pool)));
+    Ok(app)
+}

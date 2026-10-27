@@ -1,0 +1,24 @@
+<!-- The inputs of a [[ data.Words ]]. The new and edit pages share them. -->
+<script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import Field from '#lib/components/app/field.svelte';[% if data.Checkbox %]
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';[% endif %][% if data.Input %]
+	import { Input } from '#lib/components/ui/input/index.js';[% endif %]
+	import { [% for _item1 in go_items(data.Enums) %][[ _item1[1].Labels ]], [% endfor %]type Values } from './schema';
+
+	let { form }: { form: SuperForm<Values> } = $props();
+
+	// The stores of the form. A page creates its form once.
+	const values = $derived(form.form);
+	const errors = $derived(form.errors);[% if data.Control %]
+
+	// The look of the Input component, for the native textarea and select elements.
+	const control =
+		'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 w-full min-w-0 rounded-lg border bg-transparent px-2.5 py-1 text-base outline-none transition-colors focus-visible:ring-3 aria-invalid:ring-3 md:text-sm';[% endif %]
+</script>
+[% for _item2 in go_items(data.Fields) %]
+<Field label="[[ _item2[1].Label ]]" name="[[ _item2[1].Col ]]" errors={$errors.[[ _item2[1].Col ]]}[% if _item2[1].Description %] description="[[ _item2[1].Description ]]"[% endif %]>
+	{#snippet children({ props })}
+		[[ page_indent(_item2[1].Control, "\t\t") ]]
+	{/snippet}
+</Field>[% endfor %]

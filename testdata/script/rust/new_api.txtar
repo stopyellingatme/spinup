@@ -1,0 +1,62 @@
+# Rust twin of testdata/script/new_api.txtar (Go blob 150a72b8a0ba29e584fc4002670a136c8d1f8e4f).
+# Compose the default public packs and write a validated lock. The API is a Rust crate (ADR 0021 §3).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+stdout 'Created todo \([0-9]+ files\) from packs base, api, ci, deploy'
+stdout 'Next:'
+stdout '  spinup dev'
+exists todo/spinup.lock todo/spinup.toml todo/api/Cargo.toml todo/api/Cargo.lock
+exists todo/api/src/main.rs todo/deploy/compose.dev.yml
+exists todo/.github/workflows/ci.yml todo/.env
+! exists todo/api/go.mod
+exec cat todo/spinup.lock
+stdout '"api/src/main.rs": \{\n[[:space:]]+"class": "scaffold"'
+! stdout '"\.env":'
+exec cat todo/api/Cargo.toml
+stdout '^name = "api"$'
+stdout '^\[patch\.crates-io\]$'
+
+# Occupied targets and unavailable packs give actionable errors.
+! exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+stderr 'Try:'
+# Without --api-only the app also gets the web pack.
+exec spinup new frontend --module example.com/frontend --no-git --non-interactive
+exists frontend/web/package.json
+! exec spinup new unknown --api-only --modules nope --no-git --non-interactive
+stderr 'available modules: backups, ci, deploy, jobs'
+! exec spinup new needsweb --api-only --modules ci,auth --no-git --non-interactive
+stderr 'needs the web frontend'
+
+# Preview creates no directory. JSON has the machine-readable result fields.
+exec spinup new preview --api-only --module example.com/preview --no-git --non-interactive --dry-run
+stdout 'api/src/main.rs \(scaffold\)'
+! exists preview
+exec spinup new jsonapp --api-only --module example.com/jsonapp --no-git --non-interactive --json
+stdout '"dir": '
+stdout '"packs": \['
+stdout '"files": [0-9]+'
+
+# Local kit overrides reach the patch table of the crate.
+mkdir kit
+mkdir 'kit/path with spaces'
+# A path with spaces stays one quoted TOML string.
+env 'SPINUP_KIT_REPLACE=kit/path with spaces'
+exec spinup new local --api-only --module example.com/local --no-git --non-interactive
+exec cat local/api/Cargo.toml
+stdout '^\[patch\.crates-io\]$'
+stdout '^spinup-kit = \{ path = ".*/kit/path with spaces" \}$'
+env SPINUP_KIT_REPLACE=
+
+# App operations use the API directory and protect destructive migrations.
+cd todo
+! exec spinup db migrate down
+stderr 'Try: spinup db migrate down --i-know'
+exec spinup db migrate up --dry-run
+stdout '^sqlx migrate run --source ''<kit>/migrations'' --config ''<tmp>/kit-migrations\.toml''$'
+stdout '^sqlx migrate run --source migrations$'
+exec spinup build --dry-run
+stdout '^env SPINUP_APP_VERSION=dev .*cargo build --release --locked'
+exists api/openapi/bundle.gen.yaml
+cd api
+# The app builds offline from the pack lock and the local kit (a cold kit build in the shared app target).
+exec cargo build --offline --locked

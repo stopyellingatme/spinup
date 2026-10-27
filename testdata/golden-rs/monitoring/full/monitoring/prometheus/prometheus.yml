@@ -1,0 +1,20 @@
+# Managed by spinup: `spinup upgrade` keeps this file current.
+#
+# Alloy collects every metric and writes it here with remote write. Prometheus scrapes only
+# itself. It evaluates the default rules (rules/*.yml, managed) and your rules
+# (monitoring/alerts/*.yml, seed). Grafana sends the notifications for the firing alerts
+# (grafana/provisioning/alerting/). The retention is set by flags in compose.monitoring.yml.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    app: todo
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]

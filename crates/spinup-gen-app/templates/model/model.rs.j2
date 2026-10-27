@@ -1,0 +1,291 @@
+//! The [[ human ]] model and its queries.
+
+use kit::db::PgPool;
+use kit::httpx::{ApiError, ApiResult[% if validate %], FieldError[% endif %]};
+use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
+use utoipa::ToSchema;
+[% if date %]
+
+time::serde::format_description!(date_format, Date, "[year]-[month]-[day]");
+[% endif %]
+[% for f in fields %]
+[% if f.enum_type %]
+
+/// The allowed values of `[[ f.name ]]`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum [[ f.enum_type ]] {
+[% for v in f.variants %]
+    /// The stored value `[[ v.value ]]`.
+    #[serde(rename = "[[ v.value ]]")]
+    [[ v.name ]],
+[% endfor %]
+}
+
+impl [[ f.enum_type ]] {
+    /// Returns the stored value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+[% for v in f.variants %]
+            Self::[[ v.name ]] => "[[ v.value ]]",
+[% endfor %]
+        }
+    }
+
+    /// Parses a value from the database.
+    ///
+    /// # Errors
+    /// Returns an internal error if the value violates the database constraint.
+    pub fn parse(value: &str) -> ApiResult<Self> {
+        match value {
+[% for v in f.variants %]
+            "[[ v.value ]]" => Ok(Self::[[ v.name ]]),
+[% endfor %]
+            _ => Err(ApiError::internal()),
+        }
+    }
+}
+[% endif %]
+[% endfor %]
+
+// Doc macros preserve Rust documentation without adding schema descriptions.
+#[doc = concat!("One [[ human ]] row.")]
+#[derive(Debug, Clone, PartialEq, [% if eq %]Eq, [% endif %]Serialize, Deserialize, ToSchema)]
+#[schema(as = [[ type ]])]
+pub struct [[ type ]] {
+    #[doc = concat!("The primary key.")]
+    pub id: i64,
+[% for f in fields %]
+[% if f.nullable %]
+    #[schema(required = true)]
+[% endif %]
+[% if f.enum_type %]
+    #[schema(inline)]
+[% endif %]
+[% if f.kind == "json" %]
+    #[schema(value_type = [% if f.nullable %]Option<Object>[% else %]Object[% endif %])]
+[% endif %]
+[% if f.kind == "decimal" %]
+    #[schema(format = "decimal")]
+[% endif %]
+[% if f.serde %]
+    #[serde(with = "[[ f.serde ]]")]
+[% endif %]
+    #[doc = concat!("The value of [[ f.name ]].")]
+    pub [[ f.name ]]: [[ f.rust_type ]],
+[% endfor %]
+    #[serde(with = "time::serde::rfc3339")]
+    #[doc = concat!("The creation time.")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[doc = concat!("The last update time.")]
+    pub updated_at: OffsetDateTime,
+}
+
+#[doc = concat!("The writable fields of a [[ human ]].")]
+#[derive(Debug, Clone, PartialEq, [% if eq %]Eq, [% endif %]Serialize, Deserialize, ToSchema)]
+#[schema(as = [[ type ]]Input)]
+pub struct [[ type ]]Input {
+[% for f in fields %]
+[% if f.nullable %]
+    #[serde(default)]
+[% endif %]
+[% if f.enum_type %]
+    #[schema(inline)]
+[% endif %]
+[% if f.kind == "json" %]
+    #[schema(value_type = [% if f.nullable %]Option<Object>[% else %]Object[% endif %])]
+[% endif %]
+[% if f.kind == "decimal" %]
+    #[schema(format = "decimal")]
+[% endif %]
+[% if f.serde %]
+    #[serde(with = "[[ f.serde ]]")]
+[% endif %]
+    #[doc = concat!("The value of [[ f.name ]].")]
+    pub [[ f.name ]]: [[ f.rust_type ]],
+[% endfor %]
+}
+
+#[doc = concat!("A page of [[ plural_human ]].")]
+#[derive(Debug, Clone, PartialEq, [% if eq %]Eq, [% endif %]Serialize, Deserialize, ToSchema)]
+#[schema(as = [[ type ]]List)]
+pub struct [[ type ]]List {
+    #[doc = concat!("The rows of this page.")]
+    pub items: Vec<[[ type ]]>,
+    #[doc = concat!("The total number of rows.")]
+    pub total: i64,
+}
+
+struct [[ type ]]Row {
+    id: i64,
+[% for f in fields %]
+    [[ f.name ]]: [[ f.row_type ]],
+[% endfor %]
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+}
+
+impl TryFrom<[[ type ]]Row> for [[ type ]] {
+    type Error = ApiError;
+
+    fn try_from(row: [[ type ]]Row) -> ApiResult<Self> {
+        Ok(Self {
+            id: row.id,
+[% for f in fields %]
+            [[ f.name ]]: [[ f.from_row ]],
+[% endfor %]
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+    }
+}
+[% if validate %]
+
+impl [[ type ]]Input {
+    fn validate(&self) -> ApiResult<()> {
+        let mut errors = Vec::new();
+[% for f in fields %]
+[% if f.kind == "json" or f.kind == "decimal" %]
+[% if f.nullable %]
+        if let Some(value) = &self.[[ f.name ]] {
+[% else %]
+        {
+            let value = &self.[[ f.name ]];
+[% endif %]
+[% if f.kind == "json" %]
+            if !value.is_object() {
+                errors.push(FieldError::new("[[ f.name ]]", "must be a JSON object"));
+            }
+[% else %]
+            if value.trim() != value || value.parse::<f64>().is_err() {
+                errors.push(FieldError::new("[[ f.name ]]", "must be a decimal number"));
+            }
+[% endif %]
+        }
+[% endif %]
+[% endfor %]
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(ApiError::invalid(errors))
+        }
+    }
+}
+[% endif %]
+
+/// Returns a page in ID order and the total count.
+///
+/// # Errors
+/// Returns a database or row conversion error.
+pub async fn list(db: &PgPool, [% if owned %]user_id: i64, [% endif %]limit: i64, offset: i64) -> ApiResult<[[ type ]]List> {
+    let rows = sqlx::query_as!(
+        [[ type ]]Row,
+        r#"[[ queries.list ]]"#,
+[% if owned %]
+        user_id,
+[% endif %]
+        limit,
+        offset
+    )
+    .fetch_all(db)
+    .await?;
+    let total = sqlx::query_scalar!(
+        r#"[[ queries.count ]]"#[% if owned %],
+        user_id[% endif %]
+
+    )
+    .fetch_one(db)
+    .await?;
+    let items = rows
+        .into_iter()
+        .map([[ type ]]::try_from)
+        .collect::<Result<_, _>>()?;
+    Ok([[ type ]]List { items, total })
+}
+
+/// Creates a row from validated input.
+///
+/// # Errors
+/// Returns a validation, database, or row conversion error.
+pub async fn create(db: &PgPool, [% if owned %]user_id: i64, [% endif %]input: [[ type ]]Input) -> ApiResult<[[ type ]]> {
+[% if validate %]
+    input.validate()?;
+[% endif %]
+    let row = sqlx::query_as!(
+        [[ type ]]Row,
+        r#"[[ queries.create ]]"#,
+[% for f in fields %]
+        [[ f.bind ]][% if owned or not loop.last %],[% endif %]
+
+[% endfor %]
+[% if owned %]
+        user_id
+[% endif %]
+    )
+    .fetch_one(db)
+    .await?;
+    row.try_into()
+}
+
+/// Returns one row by ID.
+///
+/// # Errors
+/// Returns a database or row conversion error, including a missing row.
+pub async fn get(db: &PgPool, [% if owned %]user_id: i64, [% endif %]id: i64) -> ApiResult<[[ type ]]> {
+    let row = sqlx::query_as!(
+        [[ type ]]Row,
+        r#"[[ queries.get ]]"#,
+        id[% if owned %],
+        user_id[% endif %]
+
+    )
+    .fetch_one(db)
+    .await?;
+    row.try_into()
+}
+
+/// Replaces the writable fields of a row.
+///
+/// # Errors
+/// Returns a validation, database, or row conversion error.
+pub async fn update(db: &PgPool, [% if owned %]user_id: i64, [% endif %]id: i64, input: [[ type ]]Input) -> ApiResult<[[ type ]]> {
+[% if validate %]
+    input.validate()?;
+[% endif %]
+    let row = sqlx::query_as!(
+        [[ type ]]Row,
+        r#"[[ queries.update ]]"#,
+        id,
+[% for f in fields %]
+        [[ f.bind ]][% if owned or not loop.last %],[% endif %]
+
+[% endfor %]
+[% if owned %]
+        user_id
+[% endif %]
+    )
+    .fetch_one(db)
+    .await?;
+    row.try_into()
+}
+
+/// Deletes one row by ID.
+///
+/// # Errors
+/// Returns a database error or a missing row error.
+pub async fn delete(db: &PgPool, [% if owned %]user_id: i64, [% endif %]id: i64) -> ApiResult<()> {
+    let done = sqlx::query!(
+        r#"[[ queries.delete ]]"#,
+        id[% if owned %],
+        user_id[% endif %]
+
+    )
+    .execute(db)
+    .await
+    .map_err(kit::db::on_delete)?;
+    if done.rows_affected() == 0 {
+        return Err(ApiError::not_found());
+    }
+    Ok(())
+}

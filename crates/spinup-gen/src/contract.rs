@@ -15,6 +15,7 @@
 
 use std::path::Path;
 
+use spinup_exec::runner::{Cancellation, Runner};
 use spinup_manifest::lock::Lock;
 use spinup_vfs::plan::Plan;
 
@@ -36,7 +37,7 @@ pub enum PostStep {
 }
 
 /// What a generator reads. Generators never write to disk.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Input<'a> {
     /// The project root (the directory that holds `spinup.toml`).
     pub root: &'a Path,
@@ -46,6 +47,21 @@ pub struct Input<'a> {
     pub args: &'a [String],
     /// The parsed arguments of the generator subcommand, including its own flags.
     pub matches: &'a clap::ArgMatches,
+    /// Runs the read-only tools of the plan step, such as `promtool check rules`
+    /// (ADR 0021 §7). A generator never runs a tool that writes the project. The runner,
+    /// not the generator, formats the planned Rust files.
+    pub runner: &'a dyn Runner,
+    /// The cancel signal of the CLI.
+    pub cancel: &'a Cancellation,
+}
+
+impl std::fmt::Debug for Input<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Input")
+            .field("root", &self.root)
+            .field("args", &self.args)
+            .finish_non_exhaustive()
+    }
 }
 
 /// One external command that a generator asks the runner to run after the write and

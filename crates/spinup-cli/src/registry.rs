@@ -18,6 +18,11 @@ pub fn ids() -> Vec<String> {
             .map(|generator| format!("generator {}", generator.name)),
     );
     ids.extend(
+        spinup_gen::part::RESOURCE_PARTS
+            .iter()
+            .map(|part| format!("resource-part {}", part.name)),
+    );
+    ids.extend(
         spinup_doctor::registry::CHECKS
             .iter()
             .map(|check| format!("doctor-check {}", check.id)),

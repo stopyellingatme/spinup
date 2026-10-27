@@ -3,9 +3,9 @@
 //! Seam (ADR 0020 §1): the contract files name [`Stack`]. The path stays
 //! `spinup_stack::stack::Stack`, with the derives `Debug` and `Clone`.
 //!
-//! Schema 2 is additive in R1. It keeps the Go sections of schema 1 (`go`, `go_modules`,
-//! `go_tools`), because the converted Go `api` pack reads them. It adds the Rust sections
-//! `rust`, `crates`, and `cargo_tools`. The R2 gate removes the Go sections.
+//! Schema 2 shares its sections with schema 1, except the Go sections. The R2 gate removed
+//! the Go sections (`go`, `go_modules`, `go_tools`, rust-plan.md decision 11): no pack reads
+//! them. Schema 2 adds the Rust sections `rust`, `crates`, and `cargo_tools`.
 //!
 //! The decode is strict: an unknown field is an error, as with Go `KnownFields(true)`.
 //! A missing field takes its zero value, as in Go.
@@ -95,21 +95,6 @@ impl Action {
     }
 }
 
-/// The Go toolchain section (schema 1, kept in R1).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, default)]
-pub struct Go {
-    /// The toolchain, such as `go1.27.2`.
-    #[serde(rename(serialize = "Toolchain", deserialize = "toolchain"))]
-    pub toolchain: String,
-    /// The minimum Go version of generated apps.
-    #[serde(rename(serialize = "Min", deserialize = "min"))]
-    pub min: String,
-    /// Free notes.
-    #[serde(rename(serialize = "Notes", deserialize = "notes"))]
-    pub notes: Vec<String>,
-}
-
 /// The Rust toolchain section (new in schema 2).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -162,15 +147,6 @@ pub struct Stack {
     /// The date of the last verification of the pins, `YYYY-MM-DD`.
     #[serde(rename(serialize = "Verified", deserialize = "verified"))]
     pub verified: String,
-    /// The Go toolchain (R1 only).
-    #[serde(rename(serialize = "Go", deserialize = "go"))]
-    pub go: Go,
-    /// Go module versions, by module path (R1 only).
-    #[serde(rename(serialize = "GoModules", deserialize = "go_modules"))]
-    pub go_modules: BTreeMap<String, String>,
-    /// Go tool versions, by package path (R1 only).
-    #[serde(rename(serialize = "GoTools", deserialize = "go_tools"))]
-    pub go_tools: BTreeMap<String, String>,
     /// npm package versions.
     #[serde(rename(serialize = "NPM", deserialize = "npm"))]
     pub npm: BTreeMap<String, String>,
@@ -222,9 +198,6 @@ pub enum NotFound {
     /// No npm package has this name.
     #[error("stack NPM package {0:?} was not found")]
     Npm(String),
-    /// No Go module has this path.
-    #[error("stack Go module {0:?} was not found")]
-    GoModule(String),
     /// No crate has this name.
     #[error("stack crate {0:?} was not found")]
     Crate(String),
@@ -246,8 +219,6 @@ pub enum NotFound {
 
 impl Stack {
     /// Reports every invalid field (Go `Stack.Validate`), in a stable order.
-    ///
-    /// The Go section is checked when it is present. The R2 gate removes it.
     pub fn validate(&self) -> Result<(), Invalid> {
         let mut problems = Vec::new();
         if self.schema != SCHEMA {
@@ -255,17 +226,6 @@ impl Stack {
         }
         if self.verified.trim().is_empty() {
             problems.push("verified must not be empty".to_string());
-        }
-        if self.go != Go::default() || !self.go_modules.is_empty() || !self.go_tools.is_empty() {
-            if !self.go.toolchain.starts_with("go") {
-                problems.push(format!(
-                    "go.toolchain must start with go, got {:?}",
-                    self.go.toolchain
-                ));
-            }
-            if self.go.min.trim().is_empty() {
-                problems.push("go.min must not be empty".to_string());
-            }
         }
         if self.rust.toolchain.trim().is_empty() {
             problems.push("rust.toolchain must not be empty".to_string());
@@ -277,8 +237,6 @@ impl Stack {
             problems.push("rust.min must not be empty".to_string());
         }
         for (group, versions) in [
-            ("go_modules", &self.go_modules),
-            ("go_tools", &self.go_tools),
             ("npm", &self.npm),
             ("apt", &self.apt),
             ("tools", &self.tools),
@@ -352,14 +310,6 @@ impl Stack {
             .ok_or_else(|| NotFound::Npm(package.to_string()))
     }
 
-    /// Returns the version of the named Go module (R1 only).
-    pub fn go_module(&self, path: &str) -> Result<&str, NotFound> {
-        self.go_modules
-            .get(path)
-            .map(String::as_str)
-            .ok_or_else(|| NotFound::GoModule(path.to_string()))
-    }
-
     /// Returns the version of the named crate of generated apps.
     pub fn crate_version(&self, name: &str) -> Result<&str, NotFound> {
         self.crates
@@ -400,13 +350,6 @@ mod tests {
         Stack {
             schema: 2,
             verified: "2026-10-13".into(),
-            go: Go {
-                toolchain: "go1.27.2".into(),
-                min: "1.26".into(),
-                notes: vec![],
-            },
-            go_modules: [("example/module".into(), "v1.0.0".into())].into(),
-            go_tools: [("example/tool".into(), "v1.0.0".into())].into(),
             npm: [("example".into(), "1.0.0".into())].into(),
             apt: [("example".into(), "1.0.0".into())].into(),
             tools: [("example".into(), "1.0.0".into())].into(),
@@ -472,17 +415,11 @@ mod tests {
                 "verified must not be empty",
             ),
             (
-                "toolchain",
-                |s| s.go.toolchain = "1.27.2".into(),
-                "go.toolchain",
-            ),
-            ("minimum-go", |s| s.go.min.clear(), "go.min"),
-            (
-                "module-version",
+                "npm-version",
                 |s| {
-                    s.go_modules.insert("example/module".into(), String::new());
+                    s.npm.insert("example".into(), String::new());
                 },
-                "go_modules.example/module",
+                "npm.example",
             ),
             (
                 "rust-toolchain",
@@ -566,12 +503,11 @@ mod tests {
     }
 
     #[test]
-    fn validate_skips_an_absent_go_section() {
-        let mut stack = valid();
-        stack.go = Go::default();
-        stack.go_modules.clear();
-        stack.go_tools.clear();
-        assert_eq!(stack.validate(), Ok(()));
+    fn serialize_has_no_go_sections() {
+        let value = yaml_serde::to_value(valid()).unwrap();
+        for name in ["Go", "GoModules", "GoTools", "go", "go_modules", "go_tools"] {
+            assert!(value.get(name).is_none(), "the template data has {name}");
+        }
     }
 
     #[test]
@@ -621,14 +557,12 @@ mod tests {
         let stack = valid();
         assert!(stack.image("example").is_ok());
         assert!(stack.npm_version("example").is_ok());
-        assert!(stack.go_module("example/module").is_ok());
         assert!(stack.crate_version("axum").is_ok());
         assert!(stack.action("example/action").is_ok());
         assert!(stack.asset("example", "darwin-arm64").is_ok());
         let errors = [
             stack.image("missing").unwrap_err(),
             stack.npm_version("missing").unwrap_err(),
-            stack.go_module("missing").unwrap_err(),
             stack.crate_version("missing").unwrap_err(),
             stack.action("missing").unwrap_err(),
             stack.asset("missing", "darwin-arm64").unwrap_err(),

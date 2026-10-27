@@ -1,0 +1,147 @@
+# Rust twin of testdata/script/web_variants.txtar (Go blob 89c5f03612199f2844ee4e31bcc2fc2909719df2).
+# Exercise both clients with Bun, then check the pnpm/heyapi combination.
+# g resource runs its post-steps (migrate, sqlx-prepare, build, openapi-emit) only with a database,
+# so the resource and client blocks need DATABASE_URL (ADR 0021 §7, §11). Without it, each app
+# loses its .env, so that the no-database rule applies to the other generators.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+env BUN_INSTALL_CACHE_DIR=$WORK/bun-cache
+env npm_config_offline=true
+env TMPDIR=$WORK
+exec spinup new bunapp --module example.com/bunapp --package-manager bun --no-git --non-interactive
+cd bunapp
+[!env:DATABASE_URL] rm .env
+exists web/bun.lock
+! exists web/pnpm-lock.yaml web/pnpm-workspace.yaml
+grep 'bun install --frozen-lockfile' .github/workflows/ci.yml
+grep 'bun run build' deploy/Dockerfile.web
+cd web
+exec bun $WORK/cache.ts bun.lock $SPINUP_PNPM_HOME/.bun/install/cache $WORK/bun-cache
+exec bun install --frozen-lockfile --backend=copyfile --cache-dir $WORK/bun-cache
+exec bun run check
+stdout '(?i)\b0 errors\b'
+cd ..
+[env:DATABASE_URL] exec spinup g resource todo title:string
+[env:DATABASE_URL] exec spinup g client
+[env:DATABASE_URL] exists web/src/lib/api/schema.d.ts
+exec spinup g component dialog --dry-run
+stdout 'bunx shadcn-svelte@'
+exec spinup g page about
+stdout 'bun run check'
+cd web
+exec bun run check
+stdout '(?i)\b0 errors\b'
+cd ../..
+
+exec spinup new heyapp --module example.com/heyapp --package-manager bun --api-client heyapi --no-git --non-interactive
+cd heyapp
+[!env:DATABASE_URL] rm .env
+cd web
+exec bun install --frozen-lockfile --backend=copyfile --cache-dir $WORK/bun-cache
+exec bun run check
+stdout '(?i)\b0 errors\b'
+cd ..
+[env:DATABASE_URL] exec spinup g resource todo title:string
+[env:DATABASE_URL] exec spinup g client
+[env:DATABASE_URL] exists web/src/lib/api/client/client.gen.ts web/src/lib/api/client/types.gen.ts
+# Regeneration must be deterministic.
+[env:DATABASE_URL] cp web/src/lib/api/client/types.gen.ts $WORK/first-types.ts
+[env:DATABASE_URL] exec spinup g client
+[env:DATABASE_URL] cmp web/src/lib/api/client/types.gen.ts $WORK/first-types.ts
+cd web
+exec bun run check
+stdout '(?i)\b0 errors\b'
+[env:DATABASE_URL] cp $WORK/verify-client.ts verify-client.ts
+[env:DATABASE_URL] exec bun verify-client.ts
+[env:DATABASE_URL] rm verify-client.ts
+cd ../..
+
+exec spinup new embedded --module example.com/embedded --frontend-mode embed --package-manager bun --api-client heyapi --no-git --non-interactive
+cd embedded
+[!env:DATABASE_URL] rm .env
+cd web
+exec bun install --frozen-lockfile --backend=copyfile --cache-dir $WORK/bun-cache
+exec bun run check
+stdout '(?i)\b0 errors\b'
+cd ..
+[env:DATABASE_URL] exec spinup g client
+cd web
+exec bun run check
+stdout '(?i)\b0 errors\b'
+exec bun run build
+# The Vite plugin copies the static build to the Rust embed directory.
+exists build/index.html ../api/webdist/index.html
+cd ../..
+
+exec spinup new pnpmhey --module example.com/pnpmhey --api-client heyapi --no-git --non-interactive
+cd pnpmhey
+[!env:DATABASE_URL] rm .env
+cd web
+exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_STORE
+exec pnpm check
+stdout '(?i)\b0 errors\b'
+cd ..
+[env:DATABASE_URL] exec spinup g resource todo title:string
+[env:DATABASE_URL] exec spinup g client
+cd web
+exec pnpm check
+stdout '(?i)\b0 errors\b'
+-- verify-client.ts --
+import assert from 'node:assert/strict';
+import { api, client } from './src/lib/api/client';
+
+let seen: Request | undefined;
+const fetch = async (request: Request) => {
+ seen = request;
+ return new Response(JSON.stringify({ id: 7, title: 'Example' }), {
+  headers: { 'content-type': 'application/json' }
+ });
+};
+const response = await api.GET('/api/todos/{id}', {
+ baseUrl: 'https://example.test', fetch,
+ params: { path: { id: 7 } }, headers: { Cookie: 'session=test' }
+});
+assert.equal(response.data?.title, 'Example');
+assert.equal(seen?.url, 'https://example.test/api/todos/7');
+assert.equal(seen?.headers.get('Cookie'), 'session=test');
+await api.GET('/api/todos', {
+ baseUrl: 'https://example.test', fetch,
+ params: { query: { limit: 10 } }
+});
+assert.equal(seen?.url, 'https://example.test/api/todos?limit=10');
+await api.POST('/api/todos', {
+ baseUrl: 'https://example.test', fetch, body: { title: 'Example' }
+});
+assert.equal(seen?.method, 'POST');
+assert.equal(seen?.headers.get('Content-Type'), 'application/json');
+assert.equal(await seen?.text(), '{"title":"Example"}');
+const failure = await api.GET('/api/todos', {
+ baseUrl: 'https://example.test',
+ fetch: async () => new Response('{"detail":"denied"}', {
+  status: 403, headers: { 'Content-Type': 'application/problem+json' }
+ })
+});
+assert.equal(failure.response.status, 403);
+assert.equal(failure.error?.detail, 'denied');
+await assert.rejects(api.GET('/api/todos', {
+ baseUrl: 'https://example.test', fetch: async () => { throw new Error('offline'); }
+}), /offline/);
+assert.equal(typeof client.request, 'function');
+
+-- cache.ts --
+// Copy the exact cached packages into a writable cache. Never change the shared cache.
+import { cpSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+const [lockfile, source, target] = process.argv.slice(2);
+mkdirSync(target, { recursive: true });
+const text = readFileSync(lockfile, 'utf8');
+for (const match of text.matchAll(/^\s+"[^"]+": \["([^"]+)"/gm)) {
+ const spec = match[1];
+ const pkg = spec.slice(0, spec.lastIndexOf('@'));
+ const parent = dirname(pkg);
+ let names: string[];
+ try { names = readdirSync(join(source, parent)); } catch { continue; }
+ for (const name of names.filter((name) => name.startsWith(basename(pkg) + '@') && name.includes('@@@'))) {
+  mkdirSync(join(target, parent), { recursive: true });
+  cpSync(join(source, parent, name), join(target, parent, name), { recursive: true });
+ }
+}

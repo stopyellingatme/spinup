@@ -1,0 +1,64 @@
+# The API of [[ data.app_name ]]. spinup upgrade edits this file with toml_edit (ADR 0021 §4, §8).
+[workspace]
+# The empty table makes api/ its own workspace, also inside another Cargo tree.
+
+[package]
+name = "api"
+version = "0.1.0"
+edition = "[[ data.Stack.Rust.Edition ]]"
+rust-version = "[[ data.Stack.Rust.Min ]]"
+publish = false
+
+[features]
+default = ["telemetry", "apidocs", "devtools"
+  [%- if has("auth", data.modules) %], "auth"[% endif %]
+  [%- if data.auth_oidc is defined and data.auth_oidc %], "oidc"[% endif %]
+  [%- if has("jobs", data.modules) %], "jobs"[% endif %]
+  [%- if has("mail", data.modules) %], "mail"[% endif %]
+  [%- if data.frontend_mode == "embed" %], "embedweb"[% endif %]]
+auth = ["kit/auth"]
+oidc = ["auth", "kit/oidc"]
+jobs = ["kit/jobs"]
+mail = ["kit/mail"]
+telemetry = ["kit/telemetry"]
+apidocs = ["kit/apidocs"]
+devtools = ["kit/devtools"]
+embedweb = ["kit/embedweb"]
+
+[dependencies]
+anyhow = "[[ crate("anyhow") ]]"
+axum = { version = "[[ crate("axum") ]]", features = ["macros"] }
+kit = { package = "spinup-kit", version = "=[[ crate("spinup-kit") ]]", default-features = false, features = ["db"] }
+serde = { version = "[[ crate("serde") ]]", features = ["derive"] }
+serde_json = "[[ crate("serde_json") ]]"
+sqlx = { version = "[[ crate("sqlx") ]]", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json"] }
+time = { version = "[[ crate("time") ]]", features = ["serde", "formatting", "parsing", "macros"] }
+tokio = { version = "[[ crate("tokio") ]]", features = ["full"] }
+tracing = "[[ crate("tracing") ]]"
+utoipa = { version = "[[ crate("utoipa") ]]", features = ["yaml", "uuid", "time", "axum_extras"] }
+utoipa-axum = "[[ crate("utoipa-axum") ]]"
+uuid = { version = "[[ crate("uuid") ]]", features = ["v4", "v7", "serde"] }
+
+[dev-dependencies]
+kit = { package = "spinup-kit", version = "=[[ crate("spinup-kit") ]]", default-features = false, features = ["db", "testkit"] }
+
+# ADR 0019 §4: the dev profile. Without it the dev loop fails the 5 s limit (R0.11).
+[profile.dev]
+debug = 0
+strip = "symbols"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
+# R0.12: the release profile of the image.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

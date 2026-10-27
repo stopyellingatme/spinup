@@ -1,0 +1,49 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "semanticCommits": "disabled",
+  "schedule": ["before 5am on Monday"],
+  "packageRules": [
+    {
+      "description": "Group Cargo minor and patch updates.",
+      "groupName": "cargo minor and patch",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group npm minor and patch updates.",
+      "groupName": "npm minor and patch",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group GitHub Actions updates.",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "spinup upgrade owns these managed workflows.",
+      "enabled": false,
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/**"]
+    },
+    {
+      "description": "spinup upgrade owns this kit dependency.",
+      "enabled": false,
+      "matchDepNames": ["spinup-kit"]
+    },
+    {
+      "description": "spinup upgrade owns these generated Cargo dependencies.",
+      "enabled": false,
+      "matchFileNames": ["api/Cargo.toml"],
+      "matchManagers": ["cargo"]
+    },
+    {
+      "description": "spinup upgrade owns these generated Docker images.",
+      "enabled": false,
+      "matchFileNames": ["deploy/**", "monitoring/**"],
+      "matchManagers": ["dockerfile", "docker-compose"]
+    }
+  ],
+  "pinDigests": true
+}

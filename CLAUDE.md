@@ -21,6 +21,7 @@ The CLI, the kit, the plugin SDK, and the generated API move to Rust. The plan i
 - Rust 1.99.1 (edition 2024) is pinned in `rust-toolchain.toml`. Lanes set `RUSTUP_TOOLCHAIN=1.99.1` and never install a toolchain.
 - After the R0 gate (tag `go-freeze-r0`), Go gets bug fixes only. Each fix adds a txtar or golden case. Only the units R1.0a, R1.0b, R3.0a, and R3.0b may refactor Go.
 - The Cargo workspace is the root `Cargo.toml`, with the crates in `crates/<name>/`. The R1 contracts (the contract files and seam types, lock schema 3, the engine marker, converted packs and overlays, stack schema 2, the plugin seam, registration and layering, the error text mapper, parity) are in `docs/adr/0020-r1-contracts.md`.
+- The R2 contracts are in `docs/adr/0021-r2-contracts.md`: the kit crate and its features, the sqlx rule, the kit migrations table, the `api` pack layout and the union lock, `registry_owner`, the database commands through sqlx-cli, the post-step order and the no-database rule, the upgrade cargo phases, the deny scope, `golden-rs`, and the script twins.
 
 ## Corrections to architecture.md (Step 0 verification, 2026-10-13)
 
@@ -69,18 +70,25 @@ Rust targets (`rust-plan.md` §3). `CRATES="-p a -p b"` narrows to crates (defau
 | Command | What it does |
 |---|---|
 | `make rs-lint` | `cargo fmt --check` and `cargo clippy --locked --all-targets -- -D warnings`. `CRATES` narrows. This is the lane lint. |
-| `make rs-test` | `cargo nextest run --locked` plus the doc tests. `CRATES` narrows, `TEST='<filterset>'` filters. It never runs `packs_digest`. |
-| `make rs-golden` | Rust golden tests. `PACK=<name>` narrows, `FILTER='<filterset>'` narrows inside a pack, `UPDATE=1` rewrites. |
+| `make rs-test` | `cargo nextest run --locked` plus the doc tests. `CRATES` narrows, `TEST='<filterset>'` filters. It never runs `packs_digest`. `NOPG=1` skips the Postgres tests (names that start with `pg_`). |
+| `make rs-golden` | Rust golden tests (`spinup-packs`, `spinup-gen-web`, `spinup-gen-app`). `PACK=<name>` narrows, `FILTER='<filterset>'` narrows inside a pack, `UPDATE=1` rewrites. |
 | `make rs-script` | builds the Rust binary and runs the Go script harness with `SPINUP_BIN` and `testdata/script/parity.txt`. `RUN=<glob>` narrows. |
-| `make rs-doctest` | the Go `TestDocs` with `SPINUP_BIN` (until R5) |
-| `make rs-build`, `make rs-deny`, `make rs-digest` | gate only: build all targets, `cargo deny` (bans, licenses, sources), the `packs_digest` test |
+| `make rs-doctest` | the Go `TestDocs` with `SPINUP_BIN` (until R5). `PAGE='<pages>'` narrows. With `DATABASE_URL`, each page gets its own database. |
+| `make rs-build`, `make rs-deny`, `make rs-digest` | gate only: build all targets, `cargo deny` (bans, licenses, sources) and `cli-graph-check.sh`, the `packs_digest` test |
 | `make rs-vuln`, `make rs-fetch` | network: `cargo deny check advisories` (gate), `cargo fetch --locked` (main loop) |
-| `make rs-cover` | `cargo llvm-cov`, 70 percent floor (`COVER_CRATES`, R1: merge, manifest, migrate) |
+| `make rs-cover` | `cargo llvm-cov`, 70 percent floor for each crate of `COVER_CRATES` (merge, manifest, migrate, upgrade) |
 | `make rs-convert-packs` | converts the Go packs into `crates/spinup-packs/packs/`. `PACK=<name>` narrows. |
 | `make rs-convert-check` | fails when a new conversion differs from `crates/spinup-packs/packs/` |
 | `make rs-pack-tree` | writes the merged pack tree (converted plus overlay) to `target/pack-tree/` |
 | `make rs-tools-check` | checks the Rust tool versions |
-| `make rs-install`, `make rs-ref-check` | `bin/spinup-rs` with its templates in `DEV_TEMPLATES_RS`; the reference app check (from R2) |
+| `make rs-install`, `make rs-ref-check` | `bin/spinup-rs` with its templates in `DEV_TEMPLATES_RS`; `cargo check` of the frozen reference app `testdata/reference/todo-rs/` |
+| `make rs-kit-features` | `cargo check` of the kit without default features, then each feature set. `FEATURES='<sets>'` narrows. |
+| `make rs-app-check` | renders one app and runs `rustfmt --check` and `cargo check --offline --locked`. `SET=small\|embed\|full\|auth\|jobs\|mail\|auth-mail`, `RESOURCE=1` adds `g resource todo`. |
+| `make rs-shellcheck` | `shellcheck` and `bash -n` on `FILES='<paths>'` |
+| `make rs-pack-lock` | main loop: makes the `api` pack `Cargo.lock` again (`FETCH=1` allows the network) and proves it offline |
+| `make rs-twin-check` | fails when a Go script changed after its Rust twin recorded it |
+| `make rs-app-gate`, `make rs-e2e`, `make rs-devloop` | † gate: the `app_gate_*` scripts, the e2e scripts, the dev loop measure |
+| `make rs-disk`, `make rs-corpus-freeze` | gate: disk use against the 40 GB limit; freeze a generated app in `testdata/corpus-rs/` |
 | `make oracle` | writes the Go oracle fixtures in `testdata/oracle/` again (the gate wants no diff) |
 | `make parity` | runs the scripts with Go and with Rust, one line for each script |
 
@@ -111,7 +119,8 @@ Test contracts:
 | golangci-lint | 2.14.0 | config: `.golangci.yml` |
 | goreleaser, actionlint, syft, cosign, promtool, sops, age, docker | see `scripts/tools-check.sh` | |
 | Rust | 1.99.1 (edition 2024) | `rust-toolchain.toml`. Lanes set `RUSTUP_TOOLCHAIN=1.99.1` and never install a toolchain. |
-| cargo-nextest, cargo-llvm-cov, cargo-deny, sqlx-cli | 0.9.146, 0.9.1, 0.20.2, 0.9.0 | see `scripts/rust/tools-check.sh` (`make rs-tools-check`) |
+| cargo-nextest, cargo-llvm-cov, cargo-deny, sqlx-cli | 0.9.146, 0.9.1, 0.20.2, 0.9.0 | see `scripts/rust/tools-check.sh` (`make rs-tools-check`). sqlx-cli has the features `postgres,rustls,sqlx-toml` and is in `~/.cargo/bin`. |
+| bun | see `scripts/tools-check.sh` | `~/.bun/bin` (the `web_variants` script uses `--package-manager bun`) |
 
 ## Lane environment (orchestrate lanes)
 
@@ -126,6 +135,8 @@ Rust lanes (ADR 0019 §5):
 - Each lane has its own `CARGO_TARGET_DIR`, an APFS clone (`cp -c -R`) of the milestone seed target. No sccache: `RUSTC_WRAPPER` stays unset. `CARGO_INCREMENTAL` stays at the cargo default. `SQLX_OFFLINE=true`.
 - If you need a crate, a feature, or a version that is not in `Cargo.toml` and `Cargo.lock`, stop. Report `blocked: <crate>`. Do not run `cargo add`, `cargo update`, `cargo install`, `rustup`, or `brew`.
 - If the converter core or a pack that you do not own is wrong, report `blocked: converter`.
+- Claude lanes of † units get `DATABASE_URL`. Codex lanes get `NOPG=1`. A test that needs Postgres has a name that starts with `pg_`.
+- Scripts run one at a time (`SPINUP_SCRIPT_PARALLEL=1`), because every generated app package is `api` and the app target directory is shared.
 
 ## Shared files (main loop only)
 
@@ -151,6 +162,7 @@ Rust shared files (`rust-plan.md` §2), main loop only as well:
 - `crates/spinup-packs/packs/` and the converter core in `scripts/rust/convert-templates/`. Exception: a golden unit converts its own pack with `make rs-convert-packs PACK=<name>` and owns `scripts/rust/convert-templates/rules/<pack>.go`.
 - every other file in `scripts/rust/`, `.github/workflows/*`, `.github/actions/*`
 - `testdata/script/parity.txt`, `testdata/golden/rust-parity.txt`, `testdata/golden/rust-filter.toml`, `docs/design/rust-plan.md`
+- R2 (ADR 0021): the kit module lists (`crates/spinup-kit/src/lib.rs`, `src/auth/mod.rs`, `src/testkit/mod.rs`), `crates/spinup-kit/{Cargo.toml,clippy.toml,assets/,MIGRATION.json}`, the contract `crates/spinup-gen/src/part.rs`, `crates/spinup-project/src/env.rs`, the directory functions of `crates/spinup-vfs/src/apply.rs`, the `api` overlay files `files/api/Cargo.toml.tmpl`, `files/api/Cargo.lock`, and `pack.d/deps.toml`, the `testdata/golden-rs/filter.d/` entries of trees that a unit does not own, `testdata/reference/todo-rs/`, and `scripts/rust/*.sh`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
 In Rust, the stubs are module files and `mod.rs` files with a doc comment, plus a few seam placeholders (`spinup_vfs::plan::Plan`, `spinup_manifest::lock::{Lock, Class}`, `spinup_stack::stack::Stack`, `spinup_cli::root::execute`). Keep the path and the derives of a seam placeholder when you replace it. If you need a new module, add it inside your own module or directory. Never edit a module list.
@@ -171,7 +183,11 @@ In Rust, the stubs are module files and `mod.rs` files with a doc comment, plus 
 - **Parity.** Files and golden trees are byte-equal with Go. Console text is equal at regex level only: never expect equal `Usage:` text. The algorithms (lock JSON, diff, quote, case words, semver, `when`, the lock hash, `clean_path`) must match the Go oracle fixtures in `testdata/oracle/`. Never edit an oracle fixture by hand: `make oracle` writes them from Go.
 - **Docs.** Each command or feature unit adds its own page under `docs/` with runnable code blocks. `make doctest` runs them.
 - **No CGO.** No custom DSL, no ORM, no telemetry from the CLI.
-  In Rust: no system C library at runtime. C code that `cc` builds into the binary is allowed (zstd, ring). The CLI uses rustls with `ring`. `deny.toml` bans `aws-lc`, `openssl`, and `native-tls` in the CLI graph.
+  In Rust: no system C library at runtime. C code that `cc` builds into the binary is allowed (zstd, ring). The CLI uses rustls with `ring`. `deny.toml` bans `openssl` and `native-tls`. `scripts/rust/cli-graph-check.sh` keeps `tokio` and `aws-lc` out of the `spinup` binary. Build the binary with `-p spinup` only: a workspace build unifies the `rustls` features and links aws-lc into it.
+- **Kit (R2).** Metric and span-link calls outside `src/telemetry/` are `#[cfg(feature = "telemetry")]`. A doc example that needs a database or a network is `no_run`. The kit uses runtime sqlx queries only (`crates/spinup-kit/clippy.toml` bans the query macros). No CLI crate depends on the kit.
+- **Database URL (R2).** The CLI reads the database URL only through `spinup_project::env::database_url`.
+- **Generated apps (R2).** Pack Rust code uses runtime queries. Only generated resource code uses `query_as!`.
+- **Golden trees (R2).** A unit that changes a pack writes `testdata/golden-rs/filter.d/<name>.toml` and the tree, and reports the stale lines. The main loop removes the R1 entries at the merge. A unit that changes a script writes a twin in `testdata/script/rust/` whose first line names the Go blob.
 
 ## Orchestrate lanes: commit discipline
 

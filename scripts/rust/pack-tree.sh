@@ -5,6 +5,8 @@
 #   1. An overlay file with the path of a converted file replaces it.
 #   2. An overlay file with a new path is added.
 #   3. overlay/<pack>/remove.txt lists converted paths to delete. A missing path fails.
+#      Lines `question:<key>` remove a question. The file lands as <pack>/~removed.txt, so
+#      the loader drops the [[files]] entries of the removed sources and the questions.
 #   4. overlay/<pack>/pack.d/<name>.toml lands as pack.d/~overlay-<name>.toml, so it loads
 #      after the converted fragments, in file-name order.
 #   5. An overlay cannot replace pack.toml.
@@ -41,9 +43,11 @@ for dir in "$overlay"/*/; do
       line=${line%%#*}
       line=$(echo "$line" | xargs)
       [[ -n $line ]] || continue
+      [[ $line == question:* ]] && continue
       [[ -f $out/$pack/$line ]] || fail "overlay/$pack/remove.txt lists $line, which does not exist" "remove the line from remove.txt"
       rm "$out/$pack/$line"
     done < "$dir/remove.txt"
+    cp "$dir/remove.txt" "$out/$pack/~removed.txt"
   fi
   (cd "$dir" && find . -type f ! -path ./remove.txt -print0 | while IFS= read -r -d '' f; do
     f=${f#./}

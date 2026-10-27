@@ -1,0 +1,15 @@
+//! The application jobs. spinup owns this file.
+[% for name in names %]
+pub mod [[ name ]];
+[% endfor %]
+
+/// Registers each application job in name order.
+pub fn register(worker: &mut kit::jobs::Worker, pool: &kit::db::PgPool) -> anyhow::Result<()> {
+[% if not names %]
+    let _ = (worker, pool);
+[% endif %]
+[% for name in names %]
+    [[ name ]]::register(worker, pool)?;
+[% endfor %]
+    Ok(())
+}

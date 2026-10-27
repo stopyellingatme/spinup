@@ -1,0 +1,1 @@
+-- This initial migration creates no database objects.

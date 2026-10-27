@@ -1,7 +1,10 @@
 # The registered IDs of the spinup binary, one `<kind> <id>` line each, sorted.
 # Main loop only (ADR 0020 §5). The registry test ignores lines that start with `#`.
+command build
 command cache
 command check
+command db
+command destroy
 command diff
 command docs
 command eject
@@ -9,9 +12,29 @@ command generate
 command module
 command new
 command restore
+command routes
+command test
 command upgrade
 command version
 doctor-check compose-security
 doctor-check plaintext-secrets
+generator alert
+generator client
+generator component
+generator dashboard
+generator handler
+generator job
+generator mailer
+generator migration
+generator model
+generator openapi
+generator page
+generator resource
 migration 0001_web_svmigrate
+post-step build
+post-step client
+post-step migrate
+post-step openapi-emit
+post-step sqlx-prepare
+resource-part pages
 upgrade-extension ui

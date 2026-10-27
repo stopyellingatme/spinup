@@ -1,0 +1,195 @@
+//! The [[ human ]] handlers.
+
+use axum::Json;
+use axum::extract::State;
+use axum::http::StatusCode;
+[% if auth %]
+use kit::auth::AuthUser;
+[% endif %]
+use kit::db::PgPool;
+use kit::httpx::{ApiResult, Path, Problem, Query, ValidJson, page};
+use serde::Deserialize;
+use utoipa::IntoParams;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+
+use crate::models::[[ singular ]]::{self, [[ type ]], [[ type ]]Input, [[ type ]]List};
+
+/// The page parameters. Invalid values produce a 422 response.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ListParams {
+    /// The number of [[ plural_human ]] to return.
+    #[param(minimum = 1, maximum = 200, default = 50, nullable = false)]
+    pub limit: Option<i32>,
+    /// The number of [[ plural_human ]] to skip.
+    #[param(minimum = 0, default = 0, nullable = false)]
+    pub offset: Option<i32>,
+}
+
+/// Returns the operations of this resource.
+pub fn routes() -> OpenApiRouter<PgPool> {
+    OpenApiRouter::new()
+        .routes(routes!(list_[[ plural ]], create_[[ singular ]]))
+        .routes(routes!(get_[[ singular ]], update_[[ singular ]], delete_[[ singular ]]))
+}
+
+#[utoipa::path(
+    get,
+    path = "/[[ plural ]]",
+    operation_id = "list[[ plural_type ]]",
+    summary = "List [[ plural_human ]]",
+    tag = "[[ plural ]]",
+    params(ListParams),
+    responses(
+        (status = 200, description = "A page of [[ plural_human ]] in id order.", body = [[ type ]]List),
+        (status = 400, description = "The request is malformed.", body = Problem, content_type = "application/problem+json"),
+[% if auth %]
+        (status = 401, description = "A signed-in user is required.", body = Problem, content_type = "application/problem+json"),
+[% endif %]
+        (status = 422, description = "The request has invalid values.", body = Problem, content_type = "application/problem+json"),
+        (status = "default", description = "An unexpected error.", body = Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn list_[[ plural ]](
+    State(db): State<PgPool>,
+[% if owned %]
+    AuthUser(user): AuthUser,
+[% elif auth %]
+    AuthUser(_user): AuthUser,
+[% endif %]
+    Query(params): Query<ListParams>,
+) -> ApiResult<Json<[[ type ]]List>> {
+    let (limit, offset) = page::resolve(params.limit, params.offset)?;
+    Ok(Json([[ singular ]]::list(&db, [% if owned %]user.id, [% endif %]limit, offset).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/[[ plural ]]",
+    operation_id = "create[[ type ]]",
+    summary = "Create [[ article ]] [[ human ]]",
+    tag = "[[ plural ]]",
+    request_body = [[ type ]]Input,
+    responses(
+        (status = 201, description = "The new [[ human ]].", body = [[ type ]]),
+        (status = 400, description = "The request is malformed.", body = Problem, content_type = "application/problem+json"),
+[% if auth %]
+        (status = 401, description = "A signed-in user is required.", body = Problem, content_type = "application/problem+json"),
+[% endif %]
+        (status = 409, description = "The request conflicts with other data.", body = Problem, content_type = "application/problem+json"),
+        (status = 422, description = "The request has invalid values.", body = Problem, content_type = "application/problem+json"),
+        (status = "default", description = "An unexpected error.", body = Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn create_[[ singular ]](
+    State(db): State<PgPool>,
+[% if owned %]
+    AuthUser(user): AuthUser,
+[% elif auth %]
+    AuthUser(_user): AuthUser,
+[% endif %]
+    ValidJson(input): ValidJson<[[ type ]]Input>,
+) -> ApiResult<(StatusCode, Json<[[ type ]]>)> {
+    let item = [[ singular ]]::create(&db, [% if owned %]user.id, [% endif %]input).await?;
+    Ok((StatusCode::CREATED, Json(item)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/[[ plural ]]/{id}",
+    operation_id = "get[[ type ]]",
+    summary = "Get [[ article ]] [[ human ]]",
+    tag = "[[ plural ]]",
+    params(("id" = i64, Path)),
+    responses(
+        (status = 200, description = "The [[ human ]].", body = [[ type ]]),
+        (status = 400, description = "The request is malformed.", body = Problem, content_type = "application/problem+json"),
+[% if auth %]
+        (status = 401, description = "A signed-in user is required.", body = Problem, content_type = "application/problem+json"),
+[% endif %]
+        (status = 404, description = "The [[ human ]] does not exist.", body = Problem, content_type = "application/problem+json"),
+        (status = "default", description = "An unexpected error.", body = Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn get_[[ singular ]](
+    State(db): State<PgPool>,
+[% if owned %]
+    AuthUser(user): AuthUser,
+[% elif auth %]
+    AuthUser(_user): AuthUser,
+[% endif %]
+    Path(id): Path<i64>,
+) -> ApiResult<Json<[[ type ]]>> {
+    Ok(Json([[ singular ]]::get(&db, [% if owned %]user.id, [% endif %]id).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/[[ plural ]]/{id}",
+    operation_id = "update[[ type ]]",
+    summary = "Replace [[ article ]] [[ human ]]",
+    tag = "[[ plural ]]",
+    params(("id" = i64, Path)),
+    request_body = [[ type ]]Input,
+    responses(
+        (status = 200, description = "The updated [[ human ]].", body = [[ type ]]),
+        (status = 400, description = "The request is malformed.", body = Problem, content_type = "application/problem+json"),
+[% if auth %]
+        (status = 401, description = "A signed-in user is required.", body = Problem, content_type = "application/problem+json"),
+[% endif %]
+        (status = 404, description = "The [[ human ]] does not exist.", body = Problem, content_type = "application/problem+json"),
+        (status = 409, description = "The request conflicts with other data.", body = Problem, content_type = "application/problem+json"),
+        (status = 422, description = "The request has invalid values.", body = Problem, content_type = "application/problem+json"),
+        (status = "default", description = "An unexpected error.", body = Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn update_[[ singular ]](
+    State(db): State<PgPool>,
+[% if owned %]
+    AuthUser(user): AuthUser,
+[% elif auth %]
+    AuthUser(_user): AuthUser,
+[% endif %]
+    Path(id): Path<i64>,
+    ValidJson(input): ValidJson<[[ type ]]Input>,
+) -> ApiResult<Json<[[ type ]]>> {
+    Ok(Json([[ singular ]]::update(&db, [% if owned %]user.id, [% endif %]id, input).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/[[ plural ]]/{id}",
+    operation_id = "delete[[ type ]]",
+    summary = "Delete a [[ human ]]",
+    tag = "[[ plural ]]",
+    params(("id" = i64, Path)),
+    responses(
+        (status = 204, description = "The [[ human ]] is deleted."),
+        (status = 400, description = "The request is malformed.", body = Problem, content_type = "application/problem+json"),
+[% if auth %]
+        (status = 401, description = "A signed-in user is required.", body = Problem, content_type = "application/problem+json"),
+[% endif %]
+        (status = 404, description = "The [[ human ]] does not exist.", body = Problem, content_type = "application/problem+json"),
+        (status = 409, description = "The request conflicts with other data.", body = Problem, content_type = "application/problem+json"),
+        (status = "default", description = "An unexpected error.", body = Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn delete_[[ singular ]](
+    State(db): State<PgPool>,
+[% if owned %]
+    AuthUser(user): AuthUser,
+[% elif auth %]
+    AuthUser(_user): AuthUser,
+[% endif %]
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    [[ singular ]]::delete(&db, [% if owned %]user.id, [% endif %]id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+[% if tests %]
+
+#[cfg(test)]
+#[path = "[[ plural ]]_tests.rs"]
+mod tests;
+[% endif %]

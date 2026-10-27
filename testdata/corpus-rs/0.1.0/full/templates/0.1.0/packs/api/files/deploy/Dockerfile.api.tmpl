@@ -1,0 +1,62 @@
+[% if ((get(data, "frontend_mode")) == "embed") %]# Build with the API context and the web context:
+# docker build -f deploy/Dockerfile.api --build-context web=web api
+FROM [[ image("node") ]] AS web-build[% if ((get(data, "package_manager")) == "bun") %]
+RUN npm install --global bun@[[ npm("bun") ]][% else %]
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable[% endif %]
+WORKDIR /web[% if ((get(data, "package_manager")) == "bun") %]
+COPY --from=web package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts[% else %]
+COPY --from=web package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts[% endif %]
+COPY --from=web . .
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.[% if ((get(data, "package_manager")) == "bun") %]
+RUN bunx --no-install svelte-kit sync && bun run build[% else %]
+RUN pnpm exec svelte-kit sync && pnpm build[% endif %]
+
+[% endif %]# A local kit patch uses the build context kit:
+# docker build -f deploy/Dockerfile.api --build-context kit=<kit dir> api
+FROM scratch AS kit
+
+FROM [[ image("rust") ]] AS chef
+ENV RUSTUP_TOOLCHAIN=[[ data.Stack.Rust.Toolchain ]]
+RUN apk add --no-cache musl-dev cmake make perl clang
+RUN cargo install cargo-chef --locked --version [[ data.Stack.CargoTools["cargo-chef"] ]]
+WORKDIR /src
+
+FROM chef AS planner
+COPY . .
+# Cargo reads path patches during recipe discovery. Remap the host path first.
+RUN --mount=type=bind,from=kit,target=/kit \
+    if [ -f /kit/Cargo.toml ]; then \
+      mkdir -p /opt/kit && cp -a /kit/. /opt/kit/ && \
+      sed -i 's|spinup-kit = { path = ".*" }|spinup-kit = { path = "/opt/kit" }|' Cargo.toml; \
+    fi
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS build
+COPY --from=planner /src/recipe.json recipe.json
+RUN --mount=type=bind,from=kit,target=/kit \
+    if [ -f /kit/Cargo.toml ]; then mkdir -p /opt/kit && cp -a /kit/. /opt/kit/; fi
+ENV SQLX_OFFLINE=true
+RUN cargo chef cook --release --locked --recipe-path recipe.json
+COPY . .
+RUN if [ -f /opt/kit/Cargo.toml ]; then \
+      sed -i 's|spinup-kit = { path = ".*" }|spinup-kit = { path = "/opt/kit" }|' Cargo.toml; \
+    fi
+[% if data.frontend_mode == "embed" %]
+# Embed only the assets from this web build.
+RUN rm -rf webdist
+COPY --from=web-build /web/build ./webdist
+[% endif %]
+ARG VERSION=dev
+ARG GIT_SHA=
+RUN SPINUP_APP_VERSION="${VERSION}" SPINUP_APP_GIT_SHA="${GIT_SHA}" \
+    SPINUP_APP_RUST="$(rustc --version)" cargo build --release --locked --bin api
+
+FROM [[ image("distroless-static-debian13") ]]
+ENV SPINUP_ENV=production
+COPY --from=build /src/target/release/api /api
+USER nonroot
+EXPOSE 8080
+ENTRYPOINT ["/api"]

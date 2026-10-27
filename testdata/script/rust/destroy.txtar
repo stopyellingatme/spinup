@@ -1,0 +1,58 @@
+# Rust twin of testdata/script/destroy.txtar (Go blob 67e8fd6ea54999077e0c7724905f262dc1df7c41).
+# spinup destroy on a Rust API: the handler, its tests, and the model go away.
+# The module lists lose the removed modules, and the migration pair stays.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+
+# Without a database the generators skip the post-steps. The .env file names a
+# database that does not exist here, so remove it.
+[!env:DATABASE_URL] rm .env
+exec spinup g resource todo title:string
+cp spinup.lock before.lock
+exec spinup destroy resource todo --dry-run
+stdout '^would remove api/src/handlers/todos\.rs$'
+stdout '^would remove api/src/handlers/todos_tests\.rs$'
+stdout '^would remove api/src/models/todo\.rs$'
+stdout '^would update api/src/handlers/mod\.rs$'
+stdout '^would update api/src/models/mod\.rs$'
+stdout '^would update api/src/routes_gen\.rs$'
+cmp spinup.lock before.lock
+exists api/src/handlers/todos.rs api/src/handlers/todos_tests.rs api/src/models/todo.rs
+grep 'pub mod todos;' api/src/handlers/mod.rs
+
+# Keep changed files. Preserve the migration and remove only matching files.
+cp $WORK/edited.rs api/src/handlers/todos.rs
+exec spinup destroy resource todo
+stdout 'keep api/src/handlers/todos.rs'
+stdout 'Try: delete it by hand, or keep it'
+stdout 'Next: spinup db new drop_todos'
+cmp api/src/handlers/todos.rs $WORK/edited.rs
+! exists api/src/handlers/todos_tests.rs
+! exists api/src/models/todo.rs
+exists api/migrations/00002_create_todos.up.sql api/migrations/00002_create_todos.down.sql
+grep 'pub mod todos;' api/src/handlers/mod.rs
+! grep 'todo' api/src/models/mod.rs
+! grep '"api/src/handlers/todos_tests.rs"' spinup.lock
+! grep '"api/src/models/todo.rs"' spinup.lock
+grep '"api/src/handlers/todos.rs"' spinup.lock
+grep '"api/migrations/00002_create_todos.up.sql"' spinup.lock
+grep '"api/migrations/00002_create_todos.down.sql"' spinup.lock
+
+# The post-steps rebuilt the app and emitted the bundle without the resource.
+[env:DATABASE_URL] exec spinup routes --json
+[env:DATABASE_URL] ! stdout 'openapi:'
+[env:DATABASE_URL] exec spinup build --tag v0.1.0
+[env:DATABASE_URL] exec $WORK/todo/api/bin/api version
+[env:DATABASE_URL] stdout '"version":"v0.1.0"'
+
+-- edited.rs --
+//! User edits must survive destruction.
+
+use kit::db::PgPool;
+use utoipa_axum::router::OpenApiRouter;
+
+/// Registers no routes.
+pub fn routes() -> OpenApiRouter<PgPool> {
+    OpenApiRouter::new()
+}

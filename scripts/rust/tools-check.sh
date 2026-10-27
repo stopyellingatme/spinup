@@ -48,6 +48,23 @@ exact cargo-nextest 0.9.146 cargo nextest --version
 exact cargo-llvm-cov 0.9.1 cargo llvm-cov --version
 minimum cargo-deny 0.20.2 cargo deny --version
 minimum sqlx-cli 0.9.0 sqlx --version
+# sqlx-cli needs the sqlx-toml feature: spinup db migrate passes --config for the kit
+# migrations table (ADR 0021 §6). Without it, --config fails.
+sqlx_try="Try: cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls,sqlx-toml --force"
+if have sqlx && sqlx migrate run --help 2>/dev/null | grep -q -- '--config'; then
+  echo "ok   sqlx-cli: migrate run --config"
+else
+  echo "FAIL sqlx-cli: migrate run has no --config (the sqlx-toml feature is missing)"; echo "$sqlx_try"; status=1
+fi
+crates2=${CARGO_INSTALL_ROOT:-$HOME/.cargo}/.crates2.json
+if [[ -f $crates2 ]] && python3 -I -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+ok = any(k.startswith("sqlx-cli ") and "sqlx-toml" in (v.get("features") or []) for k, v in d.get("installs", {}).items())
+sys.exit(0 if ok else 1)' "$crates2"; then
+  echo "ok   sqlx-cli: $crates2 records sqlx-toml"
+else
+  echo "FAIL sqlx-cli: $crates2 does not record the sqlx-toml feature"; echo "$sqlx_try"; status=1
+fi
 
 # The shared sections of the two stack files are in step (rust-plan.md decision 11).
 repo=$(cd "$(dirname "$0")/../.." && pwd)

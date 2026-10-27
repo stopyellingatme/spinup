@@ -1,6 +1,4 @@
-//! The web pack must match the Go golden tree, take every version from the stack versions,
-//! and keep the file classes that upgrades depend on (Go
-//! `internal/templates/golden_web_test.go`).
+//! The Rust web pack keeps stack pins and the file classes needed for upgrades.
 
 use crate::golden_deploy::{read, render};
 use anyhow::{Context, Result};
@@ -31,6 +29,19 @@ fn golden_web_pins() -> Result<()> {
         &["base", "api", "web"],
         serde_json::json!({"app_name": "todo", "module": "example.com/todo"}),
     )?;
+    for path in [
+        "web/vite.config.js",
+        "web/src/hooks.server.ts",
+        "web/src/env.ts",
+        "web/src/instrumentation.server.ts",
+        "web/src/lib/api/client.ts",
+        "web/src/routes/+page.svelte",
+    ] {
+        let data = read(&tree, path)?;
+        for absent in ["Go API", "Go spans", "sends /api to Go."] {
+            assert!(!data.contains(absent), "{path} includes {absent:?}");
+        }
+    }
     let package: Package = serde_json::from_str(&read(&tree, "web/package.json")?)
         .context("parse web/package.json")?;
     let mut errors = Vec::new();
@@ -118,5 +129,29 @@ fn golden_web_pack_classes() -> Result<()> {
         registry.is_some_and(|q| q.r#type == "string" && q.default == "1.7.0"),
         "shadcn_registry question = {registry:?}, want a string with default 1.7.0"
     );
+    Ok(())
+}
+
+/// The `frontend_mode` prompt names the API binary, not the Go binary, and the `api` and
+/// `web` packs declare the same question (the answers module rejects two definitions).
+#[test]
+fn frontend_mode_prompt_names_the_api_binary() -> Result<()> {
+    let embedded = spinup_packs::embed::embedded()?;
+    let mut prompts = Vec::new();
+    for name in ["api", "web"] {
+        let pack = spinup_packs::loader::load(&embedded, name)?;
+        let questions: Vec<_> = pack
+            .questions
+            .iter()
+            .filter(|q| q.key == "frontend_mode")
+            .collect();
+        assert_eq!(questions.len(), 1, "{name} declares frontend_mode once");
+        prompts.push(questions[0].prompt.clone());
+    }
+    assert_eq!(
+        prompts[0],
+        "Frontend mode (node: SvelteKit server; embed: a static app served by the API binary)"
+    );
+    assert_eq!(prompts[0], prompts[1]);
     Ok(())
 }

@@ -1,0 +1,24 @@
+# Managed by spinup: `spinup upgrade` keeps this file current. Put your own rules in
+# monitoring/alerts/custom.yml.
+#
+# The public URL alerts (profile full): the blackbox exporter probes PUBLIC_URL every minute.
+groups:
+  - name: public-url
+    rules:
+      - alert: PublicURLDown
+        expr: probe_success{job="blackbox"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} does not answer"
+          description: "The blackbox probe of {{ $labels.instance }} fails for 5 minutes."
+
+      - alert: CertificateExpiresSoon
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 14 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "The certificate of {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+          description: "Caddy renews certificates 30 days before they expire. Read the caddy logs with spinup server logs."

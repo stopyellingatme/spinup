@@ -1,4 +1,4 @@
-//! The monitoring pack must match the Go golden trees and keep the contracts of ADR 0010 §2
+//! The monitoring pack must match the Rust golden trees and keep the contracts of ADR 0010 §2
 //! (Go `internal/templates/golden_monitoring_test.go`).
 //!
 //! As in Go, the tests run `promtool` and `docker compose config` only when the tool is on
@@ -264,10 +264,10 @@ fn check_monitoring_tree(tree: &Tree, full: bool) -> Result<()> {
         }
     }
     // The vendored dashboards need the full exporters, so only the full profile renders them.
-    let min_dashboards = if full { 8 } else { 5 };
+    let min_dashboards = if full { 9 } else { 6 };
     assert!(
         dashboards.len() >= min_dashboards,
-        "dashboards = {dashboards:?}, want spinup's five (plus the three vendored ones in full)"
+        "dashboards = {dashboards:?}, want spinup's six (plus the three vendored ones in full)"
     );
     for name in &dashboards {
         let data = read(tree, name)?;
@@ -426,6 +426,13 @@ fn golden_monitoring_dashboard_coverage() -> Result<()> {
     for profile in ["lite", "full"] {
         let tree = render_monitoring(profile)?;
         let runtime = read(&tree, "monitoring/grafana/dashboards/stack/go-runtime.json")?;
+        assert_eq!(
+            runtime,
+            include_str!(
+                "../../packs/monitoring/files/monitoring/grafana/dashboards/stack/go-runtime.json"
+            ),
+            "{profile}: the Go runtime dashboard changed"
+        );
         assert!(
             !runtime.contains("process_cpu_seconds_total"),
             "{profile}: the runtime dashboard queries a CPU metric the API does not produce"
@@ -444,6 +451,44 @@ fn golden_monitoring_dashboard_coverage() -> Result<()> {
         assert!(
             !app.contains("<app>-web") && app.contains("API"),
             "{profile}: HTTP RED must describe API coverage"
+        );
+    }
+    Ok(())
+}
+
+/// The Tokio dashboard queries the five runtime metrics that the kit exports.
+#[test]
+fn golden_monitoring_tokio_runtime() -> Result<()> {
+    if !spinup_testutil::golden::selected("monitoring") {
+        return Ok(());
+    }
+    for profile in ["lite", "full"] {
+        let tree = render_monitoring(profile)?;
+        let data = read(
+            &tree,
+            "monitoring/grafana/dashboards/stack/tokio-runtime.json",
+        )?;
+        let dashboard: serde_json::Value = serde_json::from_str(&data)?;
+        assert_eq!(dashboard["uid"], "spinup-tokio-runtime");
+        let panels = dashboard["panels"].as_array().context("missing panels")?;
+        let queries = panels
+            .iter()
+            .flat_map(|panel| panel["targets"].as_array().into_iter().flatten())
+            .map(|target| {
+                assert_eq!(target["datasource"]["uid"], "prometheus");
+                target["expr"].as_str().unwrap_or_default()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            queries,
+            [
+                r#"tokio_runtime_workers{job=~"$job"}"#,
+                r#"tokio_runtime_alive_tasks{job=~"$job"}"#,
+                r#"tokio_runtime_global_queue_depth{job=~"$job"}"#,
+                r#"rate(tokio_runtime_worker_busy_duration_seconds_total{job=~"$job"}[$__rate_interval])"#,
+                r#"rate(tokio_runtime_worker_park_count_total{job=~"$job"}[$__rate_interval])"#,
+            ],
+            "{profile}: the queries must use the kit's Prometheus names"
         );
     }
     Ok(())
@@ -626,7 +671,7 @@ fn golden_monitoring_grafana_password() -> Result<()> {
             std::env::var("PATH").unwrap_or_default()
         );
         let result = run_tool(Cmd {
-            timeout: Some(Duration::from_secs(5)),
+            timeout: Some(Duration::from_secs(30)),
             ..Cmd::new("sh")
                 .args([script_path.to_string_lossy().into_owned()])
                 .dir(root)

@@ -1,0 +1,148 @@
+# Rust twin of testdata/script/gen_job.txtar (Go blob 75396112005d0b70e199f922c30d7eba6aebd677).
+# g job adds kit jobs to an app with the jobs module, and the app builds offline.
+# Jobs live in api/src/jobs/. The app binary runs them with "api worker" (ADR 0021 §3).
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --api-only --module example.com/todo --modules ci,jobs --no-git --non-interactive
+stdout 'from packs base, api, ci, jobs'
+cd todo
+exists api/src/jobs/mod.rs
+grep '^default = \[.*"jobs".*\]$' api/Cargo.toml
+grep '"worker",' api/src/main.rs
+grep 'crate::jobs::register\(worker, &pool\)\?;' api/src/main.rs
+! exists api/src/jobs/send_digest.rs
+
+# A dry run writes nothing.
+exec spinup g job send_digest --dry-run
+stdout '^create api/src/jobs/send_digest\.rs \(scaffold\)$'
+stdout '^update api/src/jobs/mod\.rs \(managed\)$'
+! exists api/src/jobs/send_digest.rs
+
+# The Go rule for a GOOS or GOARCH suffix in a file name does not apply to Rust.
+exec spinup g job sync_linux --dry-run
+stdout '^create api/src/jobs/sync_linux\.rs \(scaffold\)$'
+! exists api/src/jobs/sync_linux.rs
+
+exec spinup g job send_digest
+stdout '^Created 1, updated 1 files$'
+stdout '^Next: cd api && cargo test --locked jobs$'
+stdout '^Next: cd api && cargo run --locked -- worker$'
+exists api/src/jobs/send_digest.rs
+grep 'const KIND: &''static str = "send_digest";' api/src/jobs/send_digest.rs
+grep '^    send_digest::register\(worker, pool\)\?;$' api/src/jobs/mod.rs
+exec spinup check
+! stderr .
+
+# A second job rewrites the generator-owned mod.rs without --force, sorted.
+exec spinup g job cleanupSessions
+stdout '^Created 1, updated 1 files$'
+exists api/src/jobs/cleanup_sessions.rs
+cmp api/src/jobs/mod.rs ../want/mod.rs
+
+# Pascal names must stay unique.
+exec spinup g job send_2fa
+! exec spinup g job send2fa
+stderr 'Send2fa is already declared'
+stderr 'Try: use a different job name'
+! exists api/src/jobs/send2fa.rs
+
+# The same job again changes nothing. After an edit, it needs --force.
+exec spinup g job send_digest
+stdout '^Created 0, updated 0 files$'
+cp ../want/edited.rs api/src/jobs/send_digest.rs
+! exec spinup g job send_digest
+stderr 'api/src/jobs/send_digest.rs'
+stderr 'Try: pass --force'
+cmp api/src/jobs/send_digest.rs ../want/edited.rs
+
+# The app builds and passes clippy offline. Pack code uses runtime queries only.
+cd api
+exec cargo build --offline --locked
+exec cargo clippy --offline --locked --all-targets -- -D warnings
+cd ..
+
+# With a database: the kit queue tables migrate before the app migrations, in the same
+# migrate step. The app binary reports them, and the job tests pass.
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout '^Applied 1/migrate job queue '
+[env:DATABASE_URL] stdout '^Applied 1/migrate init '
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] ! stdout .
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^1/installed job queue$'
+[env:DATABASE_URL] stdout '^1/installed init$'
+[env:DATABASE_URL] cd api
+[env:DATABASE_URL] exec cargo run --offline --locked -q -- migrate status
+[env:DATABASE_URL] stdout '^applied  00001_job_queue$'
+[env:DATABASE_URL] ! stdout '^pending'
+[env:DATABASE_URL] ! exec cargo run --offline --locked -q -- no-such-command
+[env:DATABASE_URL] stderr '^cannot run command "no-such-command": unknown command\. Available commands: healthcheck, migrate, openapi, serve, version, worker\.$'
+[env:DATABASE_URL] exec cargo test --offline --locked
+[env:DATABASE_URL] stdout 'kind_and_json_are_stable \.\.\. ok'
+[env:DATABASE_URL] ! stdout 'FAILED'
+[env:DATABASE_URL] cd ..
+
+# An app without the jobs module refuses g job.
+cd ..
+exec spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g job send_digest
+stderr 'no jobs module'
+stderr 'Try: spinup module add jobs'
+! exists api/src/jobs
+
+-- want/edited.rs --
+//! The send_digest job.
+
+/// The arguments stored as JSON for this job kind.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SendDigestArgs {
+    /// The user that gets the digest.
+    pub user_id: i64,
+}
+
+impl kit::jobs::Args for SendDigestArgs {
+    const KIND: &'static str = "send_digest";
+}
+
+/// Registers the job handler. Keep the handler idempotent.
+pub fn register(worker: &mut kit::jobs::Worker, pool: &kit::db::PgPool) -> anyhow::Result<()> {
+    let pool = pool.clone();
+    worker.register(move |job: kit::jobs::Job<SendDigestArgs>| {
+        let pool = pool.clone();
+        async move { handle(job, &pool).await }
+    });
+    Ok(())
+}
+
+/// Handles one job. Return an error to retry it later.
+pub async fn handle(
+    job: kit::jobs::Job<SendDigestArgs>,
+    _pool: &kit::db::PgPool,
+) -> anyhow::Result<()> {
+    tracing::info!(job_id = job.id, attempt = job.attempt, "job send_digest");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kit::jobs::Args;
+
+    #[test]
+    fn kind_and_json_are_stable() {
+        assert_eq!(SendDigestArgs::KIND, "send_digest");
+        let encoded = serde_json::to_value(SendDigestArgs { user_id: 1 }).unwrap();
+        let _: SendDigestArgs = serde_json::from_value(encoded).unwrap();
+    }
+}
+-- want/mod.rs --
+//! The application jobs. spinup owns this file.
+pub mod cleanup_sessions;
+pub mod send_digest;
+
+/// Registers each application job in name order.
+pub fn register(worker: &mut kit::jobs::Worker, pool: &kit::db::PgPool) -> anyhow::Result<()> {
+    cleanup_sessions::register(worker, pool)?;
+    send_digest::register(worker, pool)?;
+    Ok(())
+}

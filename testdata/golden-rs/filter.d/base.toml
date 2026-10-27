@@ -1,0 +1,4 @@
+[golden."base"]
+packs = ["base"]
+answers = { app_name = "todo", module = "example.com/todo" }
+mode = "keep"

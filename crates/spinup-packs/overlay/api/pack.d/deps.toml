@@ -1,0 +1,11 @@
+# The Cargo files of the generated API (ADR 0021 §4). Main loop only.
+# make rs-pack-lock remakes Cargo.lock. Units never edit this fragment or its sources.
+[[files]]
+path = "api/Cargo.toml"
+source = "files/api/Cargo.toml.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/Cargo.lock"
+source = "files/api/Cargo.lock"
+class = "scaffold"

@@ -3,7 +3,7 @@ import { expect, type Page } from '@playwright/test';
 /** The password of every test user. */
 export const password = 'correct horse battery staple';
 
-/** The address of the Go API. In production a reverse proxy serves /api on the web origin. */
+/** The address of the API. In production a reverse proxy serves /api on the web origin. */
 export const apiURL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8080';
 
 let counter = 0;

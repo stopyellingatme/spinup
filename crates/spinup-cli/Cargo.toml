@@ -17,12 +17,17 @@ clap_complete = { workspace = true }
 linkme = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+spinup-appcmd = { workspace = true }
+spinup-build = { workspace = true }
 spinup-compat = { workspace = true }
+spinup-db = { workspace = true }
 spinup-doctor = { workspace = true }
 spinup-drift = { workspace = true }
 spinup-editors = { workspace = true }
 spinup-exec = { workspace = true }
 spinup-gen = { workspace = true }
+spinup-gen-app = { workspace = true }
+spinup-gen-web = { workspace = true }
 spinup-manifest = { workspace = true }
 spinup-merge = { workspace = true }
 spinup-migrate = { workspace = true }

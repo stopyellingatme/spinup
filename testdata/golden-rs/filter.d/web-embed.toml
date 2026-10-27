@@ -1,0 +1,6 @@
+[golden."web-embed"]
+packs = ["base", "api", "web", "deploy"]
+answers = { app_name = "todo", module = "example.com/todo", frontend_mode = "embed" }
+prefixes = ["web/", "deploy/", "api/webdist/"]
+paths = ["api/src/main.rs", "api/build.rs"]
+mode = "keep"

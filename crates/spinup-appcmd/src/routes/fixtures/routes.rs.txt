@@ -1,0 +1,11 @@
+fn routes() {
+    // .route("/ignored", get(handler))
+    let ignored = r#".route("/ignored", get(handler))"#;
+    Router::new().route(
+        "/custom",
+        axum::routing::get(handler).post(other),
+    )
+    .route(r#"/raw"#, any(handler))
+    .route(dynamic, get(handler));
+    /* nested /* .route("/ignored", get(handler)) */ comment */
+}

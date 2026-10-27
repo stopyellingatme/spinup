@@ -1,0 +1,11 @@
+[golden."monitoring/lite"]
+packs = ["base", "api", "web", "deploy", "monitoring"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,monitoring", monitoring_profile = "lite" }
+prefixes = ["monitoring/"]
+mode = "keep"
+
+[golden."monitoring/full"]
+packs = ["base", "api", "web", "deploy", "monitoring"]
+answers = { app_name = "todo", module = "example.com/todo", modules = "ci,deploy,monitoring", monitoring_profile = "full" }
+prefixes = ["monitoring/"]
+mode = "keep"

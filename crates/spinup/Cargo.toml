@@ -20,5 +20,7 @@ workspace = true
 spinup-cli = { workspace = true }
 spinup-doctor = { workspace = true }
 spinup-gen = { workspace = true }
+spinup-gen-app = { workspace = true }
+spinup-gen-web = { workspace = true }
 spinup-migrate = { workspace = true }
 spinup-upgrade = { workspace = true }

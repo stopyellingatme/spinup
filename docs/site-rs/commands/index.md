@@ -1,20 +1,50 @@
 # Command reference
 
+- [`spinup build`](build.md) — Build the application API
 - [`spinup cache`](cache.md) — Manage cached template versions
 - [`spinup cache clean`](cache-clean.md) — Remove downloaded template archives and signatures
 - [`spinup cache list`](cache-list.md) — List loadable template versions and their sources
 - [`spinup cache warm`](cache-warm.md) — Download and verify missing template versions
 - [`spinup check`](check.md) — Check application drift for CI
+- [`spinup db`](db.md) — Operate the application database
+- [`spinup db doctor`](db-doctor.md) — Check the PostgreSQL version and pending migrations
+- [`spinup db dump`](db-dump.md) — Dump the development database (default .spinup/dumps/app.dump)
+- [`spinup db lint`](db-lint.md) — Check migrations for unsafe deploy changes
+- [`spinup db migrate`](db-migrate.md) — Run the kit migrations, then the app migrations, with sqlx-cli
+- [`spinup db new`](db-new.md) — Create an empty reversible SQL migration
+- [`spinup db prepare`](db-prepare.md) — Migrate up, then refresh the SQLx query cache in api/.sqlx
+- [`spinup db psql`](db-psql.md) — Open psql on the development database
+- [`spinup db redo`](db-redo.md) — Roll back the last migration and apply it again
+- [`spinup db reset`](db-reset.md) — Recreate the development database and migrate up
+- [`spinup db restore`](db-restore.md) — Restore a dump into the development database
+- [`spinup db seed`](db-seed.md) — Run the seed files in the development database
+- [`spinup db status`](db-status.md) — List applied and pending migrations
+- [`spinup db to`](db-to.md) — Migrate up or down to a version
+- [`spinup destroy`](destroy.md) — Remove unchanged generated files
 - [`spinup diff`](diff.md) — Compare tracked files with their templates
 - [`spinup docs`](docs.md) — Print compatibility data and generate command references
 - [`spinup docs compat`](docs-compat.md) — Print compatible CLI, kit, template, and stack versions
 - [`spinup docs reference`](docs-reference.md) — Write a Markdown reference page for every command
 - [`spinup eject`](eject.md) — Take ownership of a managed file
 - [`spinup generate`](generate.md) — Generate application files
+- [`spinup generate alert`](generate-alert.md) — Add a custom Prometheus alert rule
+- [`spinup generate client`](generate-client.md) — Generate TypeScript types from OpenAPI
+- [`spinup generate component`](generate-component.md) — Add shadcn-svelte components to the web app (needs the network)
+- [`spinup generate dashboard`](generate-dashboard.md) — Add a custom Grafana dashboard
+- [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
+- [`spinup generate job`](generate-job.md) — Generate a background job and register it
+- [`spinup generate mailer`](generate-mailer.md) — Generate a typed mailer and email templates
+- [`spinup generate migration`](generate-migration.md) — Generate an empty SQL migration pair
+- [`spinup generate model`](generate-model.md) — Generate a table: migration, model types, and queries
+- [`spinup generate openapi`](generate-openapi.md) — Emit the API OpenAPI document
+- [`spinup generate page`](generate-page.md) — Generate a SvelteKit page in web/src/routes
+- [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, model, handlers, and tests
 - [`spinup module`](module.md) — List and enable built-in modules
 - [`spinup module add`](module-add.md) — Enable modules on a branch at the locked template version
 - [`spinup module list`](module-list.md) — List modules and their enabled state
 - [`spinup new`](new.md) — Create an application from template packs
 - [`spinup restore`](restore.md) — Restore a tracked file from its template
+- [`spinup routes`](routes.md) — List application HTTP routes
+- [`spinup test`](test.md) — Run application tests
 - [`spinup upgrade`](upgrade.md) — Upgrade app templates in a separate Git worktree
 - [`spinup version`](version.md) — Print the spinup version

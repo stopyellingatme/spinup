@@ -1,0 +1,44 @@
+# Rust twin of testdata/script/app_gate_web.txtar (Go blob 24f7bfd00fe24de647bc7bbf471d5c1d02fb5fab).
+# App gate: a generated web app installs offline, type-checks, builds, and serves health checks.
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+[!exec:curl] skip 'curl is required to poll the health endpoints'
+
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new gateweb --module example.com/gateweb --no-git --non-interactive
+cd gateweb/web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.js
+
+# The Node server answers without the Rust API: an unreachable API means no user, not an error.
+env PORT=38427
+env API_URL=http://127.0.0.1:38428
+exec node build &web&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38427/healthz
+stdout '^200$'
+grep '"status":\s*"ok"' health.json
+exec curl -sS -o home.html -w '%{http_code}' -H 'Cookie: session=gate' http://127.0.0.1:38427/
+stdout '^200$'
+grep 'Welcome to gateweb' home.html
+# Without the auth module the shell has no sign-in link (ADR 0015 §3), and it links to the API reference.
+! grep 'Sign in' home.html
+grep 'href="/api/docs"' home.html
+# adapter-node shuts down cleanly on SIGINT.
+kill -INT web
+wait web
+
+# The image builds from the pinned Node base. The build needs Docker and the npm registry.
+[!exec:docker] skip 'docker is required for the web image build'
+cd ..
+exec docker build -q -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=http://localhost:3000 -t spinup-gateweb:gate web
+exec docker image rm spinup-gateweb:gate
+
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"
