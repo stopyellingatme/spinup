@@ -1,60 +1,10 @@
 # Pinned stack versions for the Rust CLI, schema 2 (ADR 0020 §3). Main loop only.
 # Do not edit the lines above the marker line: scripts/rust/gen-stack.sh copies them from
-# internal/stackversions/stackversions.yaml (the Go file, schema 1). Schema 2 is additive in
-# R1: it keeps the Go sections, because the converted Go `api` pack reads them. The R2 gate
-# removes the Go sections.
+# internal/stackversions/stackversions.yaml (the Go file, schema 1), without the Go sections
+# (go, go_modules, go_tools). Schema 2 has no Go sections: the R2 gate removed them, and the
+# strict decode rejects them.
 schema: 2
 verified: "2026-10-13"
-
-go:
-  toolchain: go1.27.2
-  min: "1.26"          # generated apps declare `go 1.26.0`; CI tests 1.26 and 1.27
-  notes:
-    - "Go 1.27 enables encoding/json v2 by default (GOEXPERIMENT JSONv2=true). Keep the kit error-format golden tests."
-
-go_modules:
-  # CLI
-  github.com/spf13/cobra: v1.10.2
-  charm.land/huh/v2: v2.0.3               # NOT github.com/charmbracelet/huh v1 (needs Bubble Tea v1)
-  charm.land/bubbletea/v2: v2.1.0         # module path is charm.land, not github.com/charmbracelet
-  charm.land/bubbles/v2: v2.0.0
-  charm.land/lipgloss/v2: v2.0.1
-  github.com/pelletier/go-toml/v2: v2.4.3 # no comment round trip; use its unstable.Parser AST for edits
-  go.yaml.in/yaml/v3: v3.0.5              # maintained fork; gopkg.in/yaml.v3 is archived
-  github.com/rogpeppe/go-internal: v1.16.0  # testscript
-  github.com/klauspost/compress: v1.20.3  # zstd; released 2026-10-12, recheck before release
-  golang.org/x/tools: v0.52.0
-  golang.org/x/term: v0.47.0
-
-  # kit and generated API
-  github.com/stopyellingatme/spinup/kit: v0.1.0-alpha.418   # the kit tag that generated apps require (ADR 0018); bump after each kit tag push
-  github.com/oapi-codegen/oapi-codegen/v2: v2.8.0
-  github.com/oapi-codegen/runtime: v1.7.0       # the only runtime import of generated strict servers (no embedded spec, ADR 0007)
-  github.com/jackc/pgx/v5: v5.11.0        # above the CVE-2026-41889 fix (5.9.2); pin explicitly, pgxstore wants 5.5.4
-  github.com/pressly/goose/v3: v3.29.0
-  github.com/riverqueue/river: v0.49.0
-  github.com/riverqueue/river/riverdriver/riverpgxv5: v0.49.0   # keep equal to river
-  github.com/alexedwards/scs/v2: v2.9.0
-  github.com/alexedwards/scs/pgxstore: v0.0.0-20251002162104-209de6e426de   # no tags upstream
-  github.com/coreos/go-oidc/v3: v3.21.0
-  golang.org/x/oauth2: v0.37.0
-  github.com/wneessen/go-mail: v0.8.1
-  github.com/testcontainers/testcontainers-go: v0.44.0
-  github.com/testcontainers/testcontainers-go/modules/postgres: v0.44.0
-  go.opentelemetry.io/otel: v1.47.0       # also otel/sdk, otlptracehttp, otlpmetrichttp at v1.47.0
-  go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp: v0.23.0
-  go.opentelemetry.io/contrib/bridges/otelslog: v0.21.0
-  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp: v0.72.0
-  go.opentelemetry.io/contrib/instrumentation/runtime: v0.72.0
-  github.com/exaring/otelpgx: v0.13.0
-
-go_tools:   # generated apps install these through api/tools.mod (go tool -modfile=tools.mod)
-  github.com/sqlc-dev/sqlc/cmd/sqlc: v1.31.1
-  github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen: v2.8.0
-  github.com/pressly/goose/v3/cmd/goose: v3.29.0
-  github.com/air-verse/air: v1.67.4
-  github.com/bokwoon95/wgo: v0.7.2        # fallback watcher
-  golang.org/x/vuln/cmd/govulncheck: v1.9.0
 
 npm:
   bun: 1.4.2   # the packageManager pin of web apps created with --package-manager bun
