@@ -13,7 +13,7 @@ spinup new <name> [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--api-client` | `openapi-fetch` | Generated API client (openapi-fetch or heyapi) |
-| `--api-only` | `false` | create only the Go API |
+| `--api-only` | `false` | create only the API |
 | `--auth-oidc` | `false` | Enable OpenID Connect sign-in? |
 | `--ci-deploy-on-push` | `false` | Deploy the default environment on pushes to main |
 | `--confirm-env` | `` | type the protected environment name without a terminal |
