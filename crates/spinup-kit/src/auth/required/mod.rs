@@ -220,6 +220,12 @@ impl std::fmt::Debug for Auth {
     }
 }
 
+/// Reports whether the dummy hash task stopped because the runtime shut down. A cancel at
+/// shutdown is not an error. A panic is.
+fn dummy_failure_is_shutdown(e: &tokio::task::JoinError) -> bool {
+    e.is_cancelled()
+}
+
 fn cannot_start(what: String, try_: &str) -> AuthError {
     AuthError(format!("auth: cannot start: {what}\nTry: {try_}"))
 }
@@ -404,27 +410,43 @@ impl Auth {
 
     /// The hash that a login for an unknown email verifies, so the time does not reveal
     /// accounts. The first call waits for the background computation.
+    ///
+    /// A runtime shutdown cancels a computation that did not start. That cancel is not an
+    /// error: the call logs it at debug level, returns an empty hash, and keeps the cache
+    /// empty.
     pub async fn dummy_hash(&self) -> String {
         let params = self.0.params;
-        self.0
+        let hash = self
+            .0
             .dummy
-            .get_or_init(|| async move {
+            .get_or_try_init(|| async move {
                 // A random password that nobody knows.
                 let mut secret = [0u8; 32];
                 if aws_lc_rs::rand::fill(&mut secret).is_err() {
                     panic!("auth: the system random source failed");
                 }
                 let pw = hex::encode(secret);
-                tokio::task::spawn_blocking(move || password::hash_password(&params, &pw))
-                    .await
-                    .unwrap_or_else(|e| {
+                let result =
+                    tokio::task::spawn_blocking(move || password::hash_password(&params, &pw))
+                        .await;
+                match result {
+                    Ok(hash) => Ok(hash),
+                    Err(e) if dummy_failure_is_shutdown(&e) => Err(e),
+                    Err(e) => {
                         // An empty hash fails to parse: such logins answer 500.
                         tracing::error!(error = %e, "auth: cannot compute the dummy hash");
-                        String::new()
-                    })
+                        Ok(String::new())
+                    }
+                }
             })
-            .await
-            .clone()
+            .await;
+        match hash {
+            Ok(hash) => hash.clone(),
+            Err(e) => {
+                tracing::debug!(error = %e, "auth: the shutdown stopped the dummy hash");
+                String::new()
+            }
+        }
     }
 
     async fn cleanup_loop(self, interval: Duration, sweep: Duration) {
@@ -782,4 +804,22 @@ pub async fn require_user(req: Request, next: Next) -> Response {
 pub fn with_user<B>(mut req: axum::http::Request<B>, user: User) -> axum::http::Request<B> {
     req.extensions_mut().insert(user);
     req
+}
+
+#[cfg(test)]
+mod dummy_tests {
+    use super::dummy_failure_is_shutdown;
+
+    #[tokio::test]
+    async fn a_cancel_is_shutdown_and_a_panic_is_an_error() {
+        let pending = tokio::spawn(std::future::pending::<()>());
+        pending.abort();
+        let cancelled = pending.await.unwrap_err();
+        assert!(dummy_failure_is_shutdown(&cancelled), "{cancelled}");
+
+        let panicked = tokio::task::spawn_blocking(|| panic!("boom"))
+            .await
+            .unwrap_err();
+        assert!(!dummy_failure_is_shutdown(&panicked), "{panicked}");
+    }
 }

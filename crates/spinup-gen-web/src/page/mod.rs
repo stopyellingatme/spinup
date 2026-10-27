@@ -70,7 +70,7 @@ pub fn parse_route(route: &str) -> Result<Vec<String>> {
         .is_some_and(|s| s == "api")
     {
         bail!(
-            "route {route:?} is under /api, which goes to the Go API\nTry: choose another route, or add an API operation in api/openapi/"
+            "route {route:?} is under /api, which goes to the API\nTry: choose another route, or add an API operation in api/openapi/"
         );
     }
     Ok(segments)
@@ -173,7 +173,7 @@ fn server_ts(name: &str, auth: bool) -> String {
         ("", "", "")
     };
     format!(
-        "{imports}import type {{ PageServerLoad }} from './$types';\n\n// load runs on the server for each request of this page. To read from the Go API, use the\n// typed client with the fetch of the load function:\n//\n//     const {{ data }} = await api.GET('/api/...', {{ fetch, baseUrl: __PUBLIC_ORIGIN__ }});\nexport const load: PageServerLoad = ({args}) => {{\n{guard}\treturn {{ title: '{name}' }};\n}};\n"
+        "{imports}import type {{ PageServerLoad }} from './$types';\n\n// load runs on the server for each request of this page. To read from the API, use the\n// typed client with the fetch of the load function:\n//\n//     const {{ data }} = await api.GET('/api/...', {{ fetch, baseUrl: __PUBLIC_ORIGIN__ }});\nexport const load: PageServerLoad = ({args}) => {{\n{guard}\treturn {{ title: '{name}' }};\n}};\n"
     )
 }
 

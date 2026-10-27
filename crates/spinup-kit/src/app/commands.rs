@@ -64,12 +64,13 @@ impl App {
                     .map_err(|e| anyhow::anyhow!("version: {e}\nTry: check the output pipe"))
             }
             _ => {
-                let names: Vec<&str> = self.commands.keys().map(String::as_str).collect();
-                let commands = if names.is_empty() {
-                    "(none)".to_string()
-                } else {
-                    names.join(", ")
-                };
+                // The list holds the built-in commands too. `openapi` is answered by
+                // [`main`], so the app binary accepts it.
+                let mut names: Vec<&str> = self.commands.keys().map(String::as_str).collect();
+                names.extend(BUILT_IN);
+                names.sort_unstable();
+                names.dedup();
+                let commands = names.join(", ");
                 anyhow::bail!(
                     "cannot run command {name:?}: unknown command. Available commands: {commands}.\nTry: use a listed command, or omit the command to serve HTTP"
                 )
@@ -77,6 +78,9 @@ impl App {
         }
     }
 }
+
+/// The commands that every app binary has, in addition to the registered commands.
+const BUILT_IN: [&str; 4] = ["healthcheck", "openapi", "serve", "version"];
 
 /// The port of a listen address such as `:8080`, `0.0.0.0:8080`, or `[::]:8080`.
 fn healthcheck_port(addr: &str) -> anyhow::Result<u16> {

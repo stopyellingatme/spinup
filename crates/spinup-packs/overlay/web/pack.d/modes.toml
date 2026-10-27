@@ -1,0 +1,9 @@
+# The frontend_mode question with the Rust text (overlay/web/remove.txt drops the converted
+# question). The prompt must be equal to the prompt of overlay/api/pack.d/rust.toml.
+
+[[questions]]
+key = "frontend_mode"
+prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the API binary)"
+type = "enum"
+choices = ["node", "embed"]
+default = "node"

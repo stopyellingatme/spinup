@@ -91,8 +91,12 @@ pub fn redo(o: &mut Options<'_>, runner: &dyn Runner, cancel: &Cancellation) -> 
     stream(o, runner, cancel, what, &apply)
 }
 
+/// The output of `db to 0` when no app migration is applied.
+pub(crate) const NOTHING_TO_ROLL_BACK: &str = "Nothing to roll back: no app migration is applied\n";
+
 /// Migrate only the app to a version. Guard moves that can lose data.
-/// A dry run treats a target below the newest file as a rollback.
+/// A dry run treats a target below the newest file as a rollback. Version 0 with no
+/// applied app migration is a no-op that says so.
 pub fn to(
     o: &mut Options<'_>,
     runner: &dyn Runner,
@@ -128,6 +132,11 @@ pub fn to(
             .into());
     }
     guard_migration(o, &config, what, &format!("db to {version}"), down)?;
+    if target == 0 && !down {
+        // Version 0 means "roll back everything". With no app migration applied, SQLx has
+        // no version 0 to run to, so nothing moves.
+        return write_out(o, what, NOTHING_TO_ROLL_BACK);
+    }
     let cmd = app_command(&root, if down { "revert" } else { "run" })
         .args(["--target-version".into(), target.to_string()]);
     let cmd = database_cmd(o, &root, cmd, what)?;

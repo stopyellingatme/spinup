@@ -131,3 +131,27 @@ fn golden_web_pack_classes() -> Result<()> {
     );
     Ok(())
 }
+
+/// The `frontend_mode` prompt names the API binary, not the Go binary, and the `api` and
+/// `web` packs declare the same question (the answers module rejects two definitions).
+#[test]
+fn frontend_mode_prompt_names_the_api_binary() -> Result<()> {
+    let embedded = spinup_packs::embed::embedded()?;
+    let mut prompts = Vec::new();
+    for name in ["api", "web"] {
+        let pack = spinup_packs::loader::load(&embedded, name)?;
+        let questions: Vec<_> = pack
+            .questions
+            .iter()
+            .filter(|q| q.key == "frontend_mode")
+            .collect();
+        assert_eq!(questions.len(), 1, "{name} declares frontend_mode once");
+        prompts.push(questions[0].prompt.clone());
+    }
+    assert_eq!(
+        prompts[0],
+        "Frontend mode (node: SvelteKit server; embed: a static app served by the API binary)"
+    );
+    assert_eq!(prompts[0], prompts[1]);
+    Ok(())
+}

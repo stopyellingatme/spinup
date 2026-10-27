@@ -428,3 +428,152 @@ fn docker_errors_keep_go_hints_and_exit_codes() {
     assert!(parts.try_hint.ends_with(START_DB));
     fake.assert_done().unwrap();
 }
+
+#[test]
+fn to_zero_with_nothing_applied_is_a_no_op() {
+    let dir = project("");
+    let fake = Fake::new();
+    fake.expect("sqlx", ["migrate", "info"])
+        .returns("1/pending init\n2/pending next\n", "", 0);
+    let mut out = Vec::new();
+    {
+        let mut o = Options {
+            dir: dir.path().into(),
+            i_know: true,
+            out: Some(&mut out),
+            lookup: Some(&|_| None),
+            ..Options::default()
+        };
+        to(&mut o, &fake, &Cancellation::new(), "0").unwrap();
+        // Without --i-know it is still a no-op: nothing rolls back.
+        o.i_know = false;
+        fake.expect("sqlx", ["migrate", "info"])
+            .returns("1/pending init\n2/pending next\n", "", 0);
+        to(&mut o, &fake, &Cancellation::new(), "0").unwrap();
+    }
+    fake.assert_done().unwrap();
+    assert_eq!(
+        String::from_utf8(out).unwrap(),
+        "Nothing to roll back: no app migration is applied\n".repeat(2)
+    );
+
+    // A project with no migration file needs no info query.
+    let dir = project("");
+    for file in ["00001_init.up.sql", "00002_next.up.sql"] {
+        std::fs::remove_file(dir.path().join("api/migrations").join(file)).unwrap();
+    }
+    let mut out = Vec::new();
+    let mut o = Options {
+        dir: dir.path().into(),
+        out: Some(&mut out),
+        lookup: Some(&|_| None),
+        ..Options::default()
+    };
+    to(&mut o, &fake, &Cancellation::new(), "0").unwrap();
+    drop(o);
+    assert!(fake.calls().len() == 2, "{:?}", fake.calls());
+    assert_eq!(
+        String::from_utf8(out).unwrap(),
+        "Nothing to roll back: no app migration is applied\n"
+    );
+}
+
+/// A database of its own on the server of `DATABASE_URL`, dropped at the end.
+struct OwnDatabase {
+    admin: String,
+    name: String,
+    url: String,
+}
+
+impl OwnDatabase {
+    fn create(admin: &str, label: &str) -> Self {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let name = format!("spinup_db_{label}_{}_{nanos}", std::process::id());
+        let (base, query) = admin
+            .split_once('?')
+            .map_or((admin, String::new()), |(b, q)| (b, format!("?{q}")));
+        let (server, _) = base.rsplit_once('/').expect("DATABASE_URL has a path");
+        let url = format!("{server}/{name}{query}");
+        let db = Self {
+            admin: admin.into(),
+            name,
+            url,
+        };
+        run_psql(admin, &format!("CREATE DATABASE {}", db.name));
+        db
+    }
+}
+
+fn run_psql(url: &str, sql: &str) {
+    let cmd = Cmd::new("psql").args([url, "-q", "-v", "ON_ERROR_STOP=1", "-c", sql]);
+    spinup_exec::os_runner::OsRunner
+        .run(&cmd, &Cancellation::new(), Sinks::none())
+        .unwrap_or_else(|error| panic!("psql {sql:?}: {error}"));
+}
+
+impl Drop for OwnDatabase {
+    fn drop(&mut self) {
+        let sql = format!("DROP DATABASE IF EXISTS {} WITH (FORCE)", self.name);
+        let cmd = Cmd::new("psql").args([self.admin.as_str(), "-q", "-c", sql.as_str()]);
+        let _ = spinup_exec::os_runner::OsRunner.run(&cmd, &Cancellation::new(), Sinks::none());
+    }
+}
+
+#[test]
+fn pg_to_zero_with_nothing_applied_is_a_no_op() {
+    let Ok(admin) = std::env::var("DATABASE_URL") else {
+        return;
+    };
+    let db = OwnDatabase::create(&admin, "to_zero");
+    let dir = project("");
+    let migrations = dir.path().join("api/migrations");
+    for file in ["00001_init.up.sql", "00002_next.up.sql"] {
+        std::fs::remove_file(migrations.join(file)).unwrap();
+    }
+    for (file, sql) in [
+        (
+            "00001_init.up.sql",
+            "CREATE TABLE widgets (id int PRIMARY KEY);\n",
+        ),
+        ("00001_init.down.sql", "DROP TABLE widgets;\n"),
+    ] {
+        std::fs::write(migrations.join(file), sql).unwrap();
+    }
+    let url = db.url.clone();
+    let lookup = move |key: &str| (key == "DATABASE_URL").then(|| url.clone());
+    let runner = spinup_exec::os_runner::OsRunner;
+    let cancel = Cancellation::new();
+    let run = |version: &str| -> String {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let mut o = Options {
+            dir: dir.path().into(),
+            i_know: true,
+            out: Some(&mut out),
+            err_out: Some(&mut err),
+            lookup: Some(&lookup),
+            ..Options::default()
+        };
+        let result = to(&mut o, &runner, &cancel, version);
+        drop(o);
+        let err = String::from_utf8_lossy(&err).into_owned();
+        result.unwrap_or_else(|error| panic!("db to {version}: {error:#}\n{err}"));
+        String::from_utf8(out).unwrap()
+    };
+    // Nothing is applied: version 0 is a no-op that says so.
+    assert_eq!(
+        run("0"),
+        "Nothing to roll back: no app migration is applied\n"
+    );
+    // Apply, roll everything back, and ask again.
+    run("1");
+    run_psql(&db.url, "SELECT 1 FROM widgets");
+    run("0");
+    assert_eq!(
+        run("0"),
+        "Nothing to roll back: no app migration is applied\n"
+    );
+}

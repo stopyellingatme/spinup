@@ -17,6 +17,11 @@ stdout '^create api/src/jobs/send_digest\.rs \(scaffold\)$'
 stdout '^update api/src/jobs/mod\.rs \(managed\)$'
 ! exists api/src/jobs/send_digest.rs
 
+# The Go rule for a GOOS or GOARCH suffix in a file name does not apply to Rust.
+exec spinup g job sync_linux --dry-run
+stdout '^create api/src/jobs/sync_linux\.rs \(scaffold\)$'
+! exists api/src/jobs/sync_linux.rs
+
 exec spinup g job send_digest
 stdout '^Created 1, updated 1 files$'
 stdout '^Next: cd api && cargo test --locked jobs$'
@@ -70,7 +75,7 @@ cd ..
 [env:DATABASE_URL] stdout '^applied  00001_job_queue$'
 [env:DATABASE_URL] ! stdout '^pending'
 [env:DATABASE_URL] ! exec cargo run --offline --locked -q -- no-such-command
-[env:DATABASE_URL] stderr 'Available commands: migrate, worker\.'
+[env:DATABASE_URL] stderr '^cannot run command "no-such-command": unknown command\. Available commands: healthcheck, migrate, openapi, serve, version, worker\.$'
 [env:DATABASE_URL] exec cargo test --offline --locked
 [env:DATABASE_URL] stdout 'kind_and_json_are_stable \.\.\. ok'
 [env:DATABASE_URL] ! stdout 'FAILED'
