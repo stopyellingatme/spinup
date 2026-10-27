@@ -1,6 +1,7 @@
 //! The embedded `stackversions.yaml`, strict decode, and the sync check with the Go file.
 //!
 //! [`parse`] decodes and validates one stack versions file (Go `stackversions.Parse`).
+//! Schema 2 has no Go sections ([`GO_SECTIONS`]). A file with a Go section is an error.
 //! [`load`] parses the file that is compiled into the binary. [`embedded`] returns it once
 //! and panics when it is invalid (Go `MustLoad`): a test guards the file.
 
@@ -15,6 +16,10 @@ pub const EMBEDDED: &str = include_str!("../stackversions.yaml");
 /// (`scripts/rust/gen-stack.sh`).
 pub const MARKER: &str =
     "# ---- Rust sections (schema 2). The lines above are generated. Edit the lines below. ----";
+
+/// The schema 1 sections that schema 2 does not have. `scripts/rust/gen-stack.sh` removes
+/// them when it copies the Go file (rust-plan.md decision 11).
+pub const GO_SECTIONS: [&str; 3] = ["go", "go_modules", "go_tools"];
 
 /// A stack versions file that does not decode or is not valid.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -31,11 +36,18 @@ pub enum Error {
 
 /// Decodes and validates one stack versions file.
 ///
-/// The decode is strict: an unknown field is an error.
+/// The decode is strict: an unknown field is an error. A Go section of schema 1 is an
+/// error that names the section.
 pub fn parse(data: &[u8]) -> Result<Stack, Error> {
     // The generic decode rejects duplicate keys, as go-yaml does. The typed decode then
     // rejects unknown fields and reports the location.
-    yaml_serde::from_slice::<yaml_serde::Value>(data).map_err(|e| Error::Parse(e.to_string()))?;
+    let value = yaml_serde::from_slice::<yaml_serde::Value>(data)
+        .map_err(|e| Error::Parse(e.to_string()))?;
+    if let Some(section) = GO_SECTIONS.iter().find(|s| value.get(**s).is_some()) {
+        return Err(Error::Parse(format!(
+            "the Go section {section:?} is not part of schema 2 (the Rust stack has no go, go_modules, or go_tools sections)"
+        )));
+    }
     let stack: Stack = yaml_serde::from_slice(data).map_err(|e| Error::Parse(e.to_string()))?;
     stack.validate().map_err(Error::Invalid)?;
     Ok(stack)
@@ -120,7 +132,6 @@ mod tests {
             "postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
         );
         assert!(stack.npm_version("svelte").is_ok());
-        assert!(stack.go_module("github.com/spf13/cobra").is_ok());
         assert!(stack.crate_version("axum").is_ok());
         assert_eq!(
             stack
@@ -142,8 +153,33 @@ mod tests {
         }
     }
 
-    /// The lines above the marker are the Go file without its leading comment block, with
-    /// `schema: 2` (a port of `scripts/rust/gen-stack.sh`).
+    #[test]
+    fn parse_rejects_a_go_section() {
+        for section in GO_SECTIONS {
+            let data = format!(
+                "schema: 2\nverified: today\nrust: {{toolchain: '1.99.1', edition: '2024', min: '1.99'}}\n{section}: {{}}\n"
+            );
+            let err = parse(data.as_bytes()).unwrap_err();
+            assert!(matches!(err, Error::Parse(_)), "{section}: {err}");
+            let text = err.to_string();
+            assert!(
+                text.contains(&format!("the Go section {section:?}")),
+                "{text}"
+            );
+            assert!(text.contains("\nTry: "), "{text}");
+        }
+    }
+
+    #[test]
+    fn embedded_file_has_no_go_section() {
+        let rust: yaml_serde::Value = yaml_serde::from_str(EMBEDDED).expect("Rust file");
+        for section in GO_SECTIONS {
+            assert!(rust.get(section).is_none(), "the Rust file has {section}");
+        }
+    }
+
+    /// The lines above the marker are the Go file without its leading comment block and
+    /// without the Go sections, with `schema: 2` (a port of `scripts/rust/gen-stack.sh`).
     #[test]
     fn generated_part_matches_the_go_file() {
         let go = go_file();
@@ -157,11 +193,20 @@ mod tests {
         );
         let mut want = String::new();
         let mut started = false;
+        let mut skip = false;
         for line in go.lines() {
             if !started && (line.starts_with('#') || line.is_empty()) {
                 continue;
             }
             started = true;
+            // A top-level key starts a section. The Go sections end at the next one.
+            if !line.is_empty() && !line.starts_with([' ', '#']) {
+                let key = line.split(':').next().unwrap_or_default();
+                skip = GO_SECTIONS.contains(&key);
+            }
+            if skip {
+                continue;
+            }
             want.push_str(if line == "schema: 1" {
                 "schema: 2"
             } else {
@@ -181,7 +226,8 @@ mod tests {
         );
     }
 
-    /// The shared sections decode to the same values in both files.
+    /// The shared sections decode to the same values in both files. The Go sections are
+    /// not shared.
     #[test]
     fn shared_sections_decode_equal() {
         let go: yaml_serde::Value = yaml_serde::from_str(&go_file()).expect("Go file");
@@ -189,7 +235,7 @@ mod tests {
         let go_map = go.as_mapping().expect("Go mapping");
         for (key, value) in go_map {
             let name = key.as_str().expect("string key");
-            if name == "schema" {
+            if name == "schema" || GO_SECTIONS.contains(&name) {
                 continue;
             }
             assert_eq!(rust.get(name), Some(value), "section {name} differs");

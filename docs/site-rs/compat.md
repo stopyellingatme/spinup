@@ -5,7 +5,7 @@
 - Template versions: `0.0.0-dev`
 - Behavior versions: 1
 - PostgreSQL majors: 14, 15, 16, 17, 18
-- Go: go1.27.2 (generated apps require Go 1.26)
+- Rust: 1.99.1 (generated apps require Rust 1.99)
 - Node: 24-bookworm-slim
 - SvelteKit: 3.0.1
 

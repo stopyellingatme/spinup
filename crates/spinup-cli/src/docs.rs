@@ -41,8 +41,8 @@ pub struct Compatibility {
     pub behavior_versions: Vec<u32>,
     /// The supported PostgreSQL majors.
     pub postgresql_majors: Vec<u32>,
-    /// The Go toolchain and the Go minimum of generated apps.
-    pub go: String,
+    /// The Rust toolchain and the Rust minimum of generated apps.
+    pub rust: String,
     /// The Node image tag.
     pub node: String,
     /// The SvelteKit version.
@@ -74,9 +74,9 @@ impl Compatibility {
             ),
             behavior_versions: BEHAVIOR_VERSIONS.to_vec(),
             postgresql_majors: (PG_OLDEST_ALLOWED..=PG_NEWEST_ALLOWED).collect(),
-            go: format!(
-                "{} (generated apps require Go {})",
-                stack.go.toolchain, stack.go.min
+            rust: format!(
+                "{} (generated apps require Rust {})",
+                stack.rust.toolchain, stack.rust.min
             ),
             node: stack
                 .images
@@ -112,7 +112,7 @@ impl Compatibility {
             "- PostgreSQL majors: {}\n",
             int_list(&self.postgresql_majors)
         ));
-        out.push_str(&format!("- Go: {}\n", self.go));
+        out.push_str(&format!("- Rust: {}\n", self.rust));
         out.push_str(&format!("- Node: {}\n", self.node));
         out.push_str(&format!("- SvelteKit: {}\n\n", self.sveltekit));
         out.push_str("## Pinned images\n\n| Name | Image |\n| --- | --- |\n");
@@ -321,8 +321,8 @@ pub fn reference_pages(root: &Command) -> BTreeMap<String, Vec<u8>> {
 fn render_stack(matrix: &Compatibility) -> String {
     let mut out = String::from("# Pinned stack\n\n");
     out.push_str(&format!(
-        "The stack uses {} and SvelteKit {}.\n\n",
-        matrix.go, matrix.sveltekit
+        "The stack uses Rust {} and SvelteKit {}.\n\n",
+        matrix.rust, matrix.sveltekit
     ));
     out.push_str("## Container images\n\n| Name | Immutable reference |\n| --- | --- |\n");
     for image in &matrix.images {
