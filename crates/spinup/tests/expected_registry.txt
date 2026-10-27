@@ -1,5 +1,6 @@
 # The registered IDs of the spinup binary, one `<kind> <id>` line each, sorted.
 # Main loop only (ADR 0020 §5). The registry test ignores lines that start with `#`.
+command build
 command cache
 command check
 command db
@@ -11,6 +12,8 @@ command generate
 command module
 command new
 command restore
+command routes
+command test
 command upgrade
 command version
 doctor-check compose-security
