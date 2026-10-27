@@ -1,0 +1,59 @@
+# The API of app. spinup upgrade edits this file with toml_edit (ADR 0021 §4, §8).
+[workspace]
+# The empty table makes api/ its own workspace, also inside another Cargo tree.
+
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[features]
+default = ["telemetry", "apidocs", "devtools", "auth", "jobs", "mail"]
+auth = ["kit/auth"]
+oidc = ["auth", "kit/oidc"]
+jobs = ["kit/jobs"]
+mail = ["kit/mail"]
+telemetry = ["kit/telemetry"]
+apidocs = ["kit/apidocs"]
+devtools = ["kit/devtools"]
+embedweb = ["kit/embedweb"]
+
+[dependencies]
+anyhow = "1.0.104"
+axum = { version = "0.8.9", features = ["macros"] }
+kit = { package = "spinup-kit", version = "=0.1.0", default-features = false, features = ["db"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "migrate", "uuid", "time", "json"] }
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+utoipa = { version = "6.0.0", features = ["yaml", "uuid", "time", "axum_extras"] }
+utoipa-axum = "0.3.0"
+uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
+
+[dev-dependencies]
+kit = { package = "spinup-kit", version = "=0.1.0", default-features = false, features = ["db", "testkit"] }
+
+# ADR 0019 §4: the dev profile. Without it the dev loop fails the 5 s limit (R0.11).
+[profile.dev]
+debug = 0
+strip = "symbols"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
+# R0.12: the release profile of the image.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

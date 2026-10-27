@@ -1,0 +1,59 @@
+# The schema must equal the kit test migrations. Keep the web entries.
+[[files]]
+path = "api/migrations/00002_create_auth.up.sql"
+source = "files/api/migrations/00002_create_auth.up.sql"
+class = "seed"
+
+[[files]]
+path = "api/migrations/00002_create_auth.down.sql"
+source = "files/api/migrations/00002_create_auth.down.sql"
+class = "seed"
+
+[[files]]
+path = "api/migrations/00003_password_resets.up.sql"
+source = "files/api/migrations/00003_password_resets.up.sql"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/migrations/00003_password_resets.down.sql"
+source = "files/api/migrations/00003_password_resets.down.sql"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/migrations/00004_oidc_identities.up.sql"
+source = "files/api/migrations/00004_oidc_identities.up.sql"
+class = "seed"
+when = "auth_oidc"
+
+[[files]]
+path = "api/migrations/00004_oidc_identities.down.sql"
+source = "files/api/migrations/00004_oidc_identities.down.sql"
+class = "seed"
+when = "auth_oidc"
+
+[[files]]
+path = "api/src/reset.rs"
+source = "files/api/src/reset.rs"
+class = "managed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/templates/mail/password_reset.subject.tmpl"
+source = "files/api/templates/mail/password_reset.subject.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/templates/mail/password_reset.txt.tmpl"
+source = "files/api/templates/mail/password_reset.txt.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+
+[[files]]
+path = "api/templates/mail/password_reset.html.tmpl"
+source = "files/api/templates/mail/password_reset.html.tmpl"
+class = "seed"
+when = "modules contains 'mail'"
+

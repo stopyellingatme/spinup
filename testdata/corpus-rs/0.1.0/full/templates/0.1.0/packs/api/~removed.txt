@@ -1,0 +1,34 @@
+# Go sources of pack.toml entries (B1: the loader drops the entries that name them)
+files/api/cmd/api/main.go.tmpl
+files/api/internal/routes/routes.go.tmpl
+files/api/internal/routes/routes_gen.go.tmpl
+files/api/internal/routes/routes_test.go.tmpl
+files/api/db/migrations/embed.go.tmpl
+files/api/db/migrations/00001_init.sql
+files/api/openapi/paths/.gitkeep
+# air (Go live reload)
+pack.d/air.toml
+files/api/.air.toml.tmpl
+# Go module files (the main loop declares the Cargo files in its own overlay fragment)
+pack.d/deps.toml
+files/api/go.mod.tmpl
+files/api/go.sum
+files/api/tools.mod.tmpl
+files/api/tools.sum
+# Go embed (the overlay fragment declares the question again, with the Rust embed files)
+pack.d/embed.toml
+embed/embed.go.tmpl
+embed/stub.go.tmpl
+embed/gitignore
+# Spec-first OpenAPI and oapi-codegen (code-first utoipa replaces them)
+pack.d/openapi.toml
+files/api/openapi/openapi.yaml.tmpl
+files/api/openapi/embed.go.tmpl
+files/api/openapi/schemas/.gitkeep
+files/api/oapi-codegen.yaml.tmpl
+files/api/internal/gen/generate.go.tmpl
+# sqlc and the Go db/ layout
+pack.d/sqlc.toml
+files/api/sqlc.yaml.tmpl
+files/api/db/queries/.gitkeep
+files/api/db/seeds/.gitkeep

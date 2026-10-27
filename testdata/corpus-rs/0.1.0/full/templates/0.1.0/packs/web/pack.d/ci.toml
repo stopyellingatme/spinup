@@ -1,0 +1,6 @@
+# The web pack owns the workflow because web is selected independently of modules.
+[[files]]
+path = ".github/workflows/e2e.yml"
+source = "files/.github/workflows/e2e.yml.tmpl"
+class = "managed"
+when = "modules contains 'ci'"

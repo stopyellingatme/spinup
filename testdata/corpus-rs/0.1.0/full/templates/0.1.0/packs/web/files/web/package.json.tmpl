@@ -1,0 +1,58 @@
+{
+  "name": "[[ data.app_name ]]-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "[[ data.package_manager ]]@[[ npm(data.package_manager) ]]",
+  "engines": {
+    "node": ">=24"
+  },
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",[% if (data.api_client == "heyapi") %]
+    "gen:client": "openapi-ts --input ../api/openapi/bundle.gen.yaml --output src/lib/api/client"[% else %]
+    "gen:client": "openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts"[% endif %]
+  },
+  "dependencies": {
+    "@opentelemetry/api": "[[ npm("@opentelemetry/api") ]]",
+    "@opentelemetry/exporter-trace-otlp-http": "[[ npm("@opentelemetry/exporter-trace-otlp-http") ]]",
+    "@opentelemetry/instrumentation-undici": "[[ npm("@opentelemetry/instrumentation-undici") ]]",
+    "@opentelemetry/sdk-node": "[[ npm("@opentelemetry/sdk-node") ]]",
+    "import-in-the-middle": "[[ npm("import-in-the-middle") ]]",
+    "openapi-fetch": "[[ npm("openapi-fetch") ]]",
+    "sveltekit-superforms": "[[ npm("sveltekit-superforms") ]]",
+    "zod": "[[ npm("zod") ]]"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "[[ npm("@hey-api/openapi-ts") ]]",
+    "@internationalized/date": "[[ npm("@internationalized/date") ]]",
+    "@lucide/svelte": "[[ npm("@lucide/svelte") ]]",
+    "@playwright/test": "[[ npm("@playwright/test") ]]",
+    "@sveltejs/adapter-node": "[[ npm("@sveltejs/adapter-node") ]]",
+    "@sveltejs/adapter-static": "[[ npm("@sveltejs/adapter-static") ]]",
+    "@sveltejs/kit": "[[ npm("@sveltejs/kit") ]]",
+    "@sveltejs/vite-plugin-svelte": "[[ npm("@sveltejs/vite-plugin-svelte") ]]",
+    "@tailwindcss/vite": "[[ npm("@tailwindcss/vite") ]]",
+    "bits-ui": "[[ npm("bits-ui") ]]",
+    "clsx": "[[ npm("clsx") ]]",
+    "openapi-typescript": "[[ npm("openapi-typescript") ]]",
+    "svelte": "[[ npm("svelte") ]]",
+    "svelte-check": "[[ npm("svelte-check") ]]",
+    "svelte-sonner": "[[ npm("svelte-sonner") ]]",
+    "tailwind-merge": "[[ npm("tailwind-merge") ]]",
+    "tailwind-variants": "[[ npm("tailwind-variants") ]]",
+    "tailwindcss": "[[ npm("tailwindcss") ]]",
+    "tw-animate-css": "[[ npm("tw-animate-css") ]]",
+    "typescript": "[[ npm("typescript") ]]",
+    "vite": "[[ npm("vite") ]]",
+    "vitest": "[[ npm("vitest") ]]"
+  }
+}

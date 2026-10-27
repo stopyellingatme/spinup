@@ -1,0 +1,44 @@
+# Managed by spinup. Build context is web/:
+#   docker build -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=https://app.example.com web
+FROM [[ image("node") ]] AS build[% if ((get(data, "package_manager")) == "bun") %]
+RUN npm install --global bun@[[ npm("bun") ]][% else %]
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable[% endif %]
+WORKDIR /app[% if ((get(data, "package_manager")) == "bun") %]
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts[% else %]
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts[% endif %]
+COPY . .
+# adapter-node does not read ORIGIN at run time: the build bakes the public origin into
+# paths.origin, the CSRF check, and handleFetch.
+ARG PUBLIC_ORIGIN=http://localhost:3000
+ENV PUBLIC_ORIGIN=${PUBLIC_ORIGIN}
+# --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.[% if ((get(data, "package_manager")) == "bun") %]
+RUN bunx --no-install svelte-kit sync && bun run build \
+ && rm -rf node_modules && bun install --production --frozen-lockfile --ignore-scripts[% else %]
+RUN pnpm exec svelte-kit sync && pnpm build \
+ && rm -rf node_modules && pnpm install --prod --frozen-lockfile --ignore-scripts --offline[% endif %]
+
+FROM [[ image("node") ]]
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000 \
+    API_URL=http://api:8080 \
+    BODY_SIZE_LIMIT=1M \
+    SHUTDOWN_TIMEOUT=20 \
+    OTEL_TRACES_SAMPLER=parentbased_traceidratio \
+    OTEL_TRACES_SAMPLER_ARG=1.0
+# Tracing is off until OTEL_EXPORTER_OTLP_ENDPOINT is set (for example http://alloy:4318).
+# Lower OTEL_TRACES_SAMPLER_ARG (0 to 1) to keep a fraction of the new traces. A request that
+# arrives with a sampled traceparent stays sampled.
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+# --import runs the OpenTelemetry instrumentation before any application module loads.
+CMD ["node", "--import", "./build/server/instrumentation.server.js", "build"]

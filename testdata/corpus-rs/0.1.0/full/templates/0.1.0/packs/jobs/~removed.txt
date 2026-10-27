@@ -1,0 +1,4 @@
+# The app binary provides the worker command.
+files/api/cmd/worker/main.go.tmpl
+files/api/internal/jobs/deps.go.tmpl
+files/api/internal/jobs/register.go.tmpl

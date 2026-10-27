@@ -1,0 +1,27 @@
+[% set v_web = ((get(data, "shadcn_registry")) and (((get(data, "frontend_mode")) != "embed"))) %]# Deploy settings of the production environment. `spinup deploy --env production` reads this file.
+# The host, the SSH user, public_url, and the protected flag are in spinup.toml
+# under [env.production]. The secrets are in secrets/production.enc.yaml.
+
+# After the switch, spinup deploy requests each path on public_url and expects a 2xx answer.
+# It always checks /healthz and /version too.
+[% if get(data, "shadcn_registry") %]smoke_urls = ["/"][% else %]smoke_urls = [] # an API-only app has no page at /[% endif %]
+
+# The number of containers of each service in a color. During a switch, both colors run,
+# so the VM needs memory for two sets.
+[replicas]
+api = 2[% if v_web %]
+web = 2[% endif %]
+
+# The resource limits of each container. cpus is a fraction of the CPUs of the VM.
+# memory uses Docker units: 512m, 1g.
+[resources.api]
+cpus = "1.0"
+memory = "512m"[% if v_web %]
+
+[resources.web]
+cpus = "1.0"
+memory = "512m"[% endif %]
+
+[resources.postgres]
+cpus = "2.0"
+memory = "1g"

@@ -1,0 +1,94 @@
+# Rust API outputs. The Cargo files have their own main-loop fragment.
+[[questions]]
+key = "frontend_mode"
+prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the API binary)"
+type = "enum"
+choices = ["node", "embed"]
+default = "node"
+
+[[files]]
+path = "api/rust-toolchain.toml"
+source = "files/api/rust-toolchain.toml.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/.cargo/config.toml"
+source = "files/api/.cargo/config.toml"
+class = "managed"
+
+[[files]]
+path = "api/.dockerignore"
+source = "files/api/.dockerignore"
+class = "managed"
+
+[[files]]
+path = "api/src/main.rs"
+source = "files/api/src/main.rs.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/src/lib.rs"
+source = "files/api/src/lib.rs.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/src/routes.rs"
+source = "files/api/src/routes.rs"
+class = "scaffold"
+
+[[files]]
+path = "api/src/openapi.rs"
+source = "files/api/src/openapi.rs.tmpl"
+class = "managed"
+
+[[files]]
+path = "api/src/routes_gen.rs"
+source = "files/api/src/routes_gen.rs"
+class = "managed"
+
+[[files]]
+path = "api/src/handlers/mod.rs"
+source = "files/api/src/handlers/mod.rs"
+class = "managed"
+
+[[files]]
+path = "api/src/models/mod.rs"
+source = "files/api/src/models/mod.rs"
+class = "managed"
+
+[[files]]
+path = "api/migrations/00001_init.up.sql"
+source = "files/api/migrations/00001_init.up.sql"
+class = "seed"
+
+[[files]]
+path = "api/migrations/00001_init.down.sql"
+source = "files/api/migrations/00001_init.down.sql"
+class = "seed"
+
+[[files]]
+path = "api/seeds/.gitkeep"
+source = "files/api/seeds/.gitkeep"
+class = "seed"
+
+[[files]]
+path = "api/openapi/bundle.gen.yaml"
+source = "files/api/openapi/bundle.gen.yaml.tmpl"
+class = "seed"
+
+[[files]]
+path = "api/tests/it/main.rs"
+source = "files/api/tests/it/main.rs"
+class = "scaffold"
+
+[[files]]
+path = "api/build.rs"
+source = "files/api/build.rs"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "api/webdist/.gitignore"
+source = "files/api/webdist/.gitignore"
+class = "managed"
+when = "frontend_mode == 'embed'"
