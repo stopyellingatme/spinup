@@ -23,7 +23,7 @@ spinup module add [name...] [flags]
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |
-| `--frontend-mode` | `node` | Frontend mode (node: SvelteKit server; embed: a static app served by the Go binary) |
+| `--frontend-mode` | `node` | Frontend mode (node: SvelteKit server; embed: a static app served by the API binary) |
 | `--json` | `false` | write JSON output |
 | `--module` | `` | Repository path (github.com/<owner>/<repo>) |
 | `--monitoring-profile` | `lite` | Monitoring profile |

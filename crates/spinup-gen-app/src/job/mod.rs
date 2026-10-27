@@ -36,7 +36,8 @@ pub struct Name {
 }
 
 /// Parses snake, kebab, or camel case with the Go job naming rules.
-/// Rust keywords and generated file names are reserved.
+/// Rust keywords and generated file names are reserved. The Go file-name rule for a
+/// GOOS or GOARCH suffix does not apply: Rust has no build constraint in a file name.
 pub fn parse_name(value: &str) -> Result<Name> {
     item_name(value, "job")
 }
@@ -83,11 +84,6 @@ pub(crate) fn item_name(value: &str, kind: &str) -> Result<Name> {
         Some("the name is reserved")
     } else if snake.ends_with("_test") || snake.ends_with("_tests") || snake.ends_with("_gen") {
         Some("a name that ends in _test, _tests, or _gen is reserved")
-    } else if kind != "handler" && words.last().is_some_and(|last| {
-        "aix android darwin dragonfly freebsd hurd illumos ios js linux nacl netbsd openbsd plan9 solaris wasip1 windows zos 386 amd64 amd64p32 arm armbe arm64 arm64be loong64 mips mipsle mips64 mips64le mips64p32 mips64p32le ppc ppc64 ppc64le riscv riscv64 s390 s390x sparc sparc64 wasm"
-            .split_whitespace().any(|selector| selector == last)
-    }) {
-        Some("a name that ends in a GOOS or GOARCH value is reserved")
     } else {
         None
     };

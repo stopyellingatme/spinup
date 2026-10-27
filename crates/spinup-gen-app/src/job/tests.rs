@@ -51,14 +51,27 @@ fn names_keep_go_case_rules_and_reject_reserved_names() {
         "load_test",
         "routes_gen",
         "éclair",
-        "sync_linux",
-        "sync_arm64",
-        "sync_linux_arm64",
     ] {
         let error = super::parse_name(value).unwrap_err().to_string();
         assert!(error.contains("\nTry:"), "{error}");
     }
     assert!(super::parse_name(&"a".repeat(51)).is_err());
+}
+
+#[test]
+fn names_that_end_in_a_platform_word_are_valid() {
+    // The GOOS and GOARCH file-name rule of Go does not apply to Rust files.
+    let root = tempfile::tempdir().unwrap();
+    let output = generate(root.path(), &["sync_linux"]).unwrap();
+    assert!(output.plan.get("api/src/jobs/sync_linux.rs").is_some());
+    let modules = String::from_utf8(output.plan.get(super::REGISTER_FILE).unwrap().data).unwrap();
+    assert!(modules.contains("pub mod sync_linux;"), "{modules}");
+    for (value, pascal) in [
+        ("sync_arm64", "SyncArm64"),
+        ("sync_linux_arm64", "SyncLinuxArm64"),
+    ] {
+        assert_eq!(super::parse_name(value).unwrap().pascal, pascal);
+    }
 }
 
 fn fixture(root: &std::path::Path, names: &[&str]) {

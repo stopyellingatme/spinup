@@ -1,7 +1,7 @@
 # Rust API outputs. The Cargo files have their own main-loop fragment.
 [[questions]]
 key = "frontend_mode"
-prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the Go binary)"
+prompt = "Frontend mode (node: SvelteKit server; embed: a static app served by the API binary)"
 type = "enum"
 choices = ["node", "embed"]
 default = "node"

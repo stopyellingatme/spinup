@@ -19,12 +19,13 @@ grep '<title>About</title>' web/src/routes/about/+page.svelte
 ! exists web/src/routes/about/+page.server.ts
 exec spinup g page settings/profile --server
 grep 'return \{ title: ''Profile'' \};' web/src/routes/settings/profile/+page.server.ts
+grep '^// load runs on the server for each request of this page\. To read from the API, use the$' web/src/routes/settings/profile/+page.server.ts
 grep '"web/src/routes/settings/profile/\+page.svelte": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
 ! exec spinup g page Settings
 stderr 'invalid segment "Settings"'
 stderr 'Try: '
 ! exec spinup g page api/users
-stderr 'route "api/users" is under /api, which goes to the'
+stderr '^Error: generator "page" failed: route "api/users" is under /api, which goes to the API$'
 stderr 'Try: choose another route'
 
 # g component runs shadcn-svelte at the lock registry version. A dry run prints the command.

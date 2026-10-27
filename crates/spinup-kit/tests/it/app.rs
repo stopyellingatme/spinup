@@ -230,14 +230,17 @@ async fn app_commands() {
         .to_string();
     assert_eq!(
         err,
-        "cannot run command \"unknown\": unknown command. Available commands: migrate, zeta.\nTry: use a listed command, or omit the command to serve HTTP"
+        "cannot run command \"unknown\": unknown command. Available commands: healthcheck, migrate, openapi, serve, version, zeta.\nTry: use a listed command, or omit the command to serve HTTP"
     );
     let err = new_app()
         .run(vec!["unknown".into()], std::future::pending())
         .await
         .unwrap_err()
         .to_string();
-    assert!(err.contains("Available commands: (none)."), "{err}");
+    assert!(
+        err.contains("Available commands: healthcheck, openapi, serve, version."),
+        "{err}"
+    );
     assert!(err.contains("\nTry: "), "{err}");
 }
 
