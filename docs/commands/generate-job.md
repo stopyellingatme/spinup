@@ -6,7 +6,7 @@ The jobs run on [River](https://riverqueue.com) with the application database.
 
 The app must have the `jobs` module.
 Create the app with `--modules ci,jobs` to get it.
-A command to add a module to an existing app arrives in a later spinup version.
+In an existing app, run `spinup module add jobs` (see [module](module.md)).
 
 <!-- doctest: only go -->
 ```console
@@ -25,6 +25,26 @@ $ grep -h 'Kind\|jobs.Register(' api/internal/jobs/send_digest.go api/internal/j
 // Kind names the job kind in River. Do not change it after jobs exist.
 func (SendDigestArgs) Kind() string { return "send_digest" }
 	jobs.Register(w, SendDigest(d))
+```
+
+The Rust API gives these results:
+
+<!-- doctest: only rust -->
+```console
+$ spinup new todo --api-only --module example.com/todo --modules ci,jobs --no-git --non-interactive
+...
+$ cd todo
+$ spinup g job send_digest --dry-run
+update api/src/jobs/mod.rs (managed)
+create api/src/jobs/send_digest.rs (scaffold)
+$ spinup g job send_digest
+Created 1, updated 1 files
+Next: cd api && cargo test --locked jobs
+Next: cd api && cargo run --locked -- worker
+$ grep 'const KIND' api/src/jobs/send_digest.rs
+    const KIND: &'static str = "send_digest";
+$ grep 'send_digest::register' api/src/jobs/mod.rs
+    send_digest::register(worker, pool)?;
 ```
 
 The name can be in snake case, kebab case, or camel case.
@@ -132,6 +152,29 @@ Use `--json` for structured results.
 ## Rust API
 
 In a Rust API, `spinup g job <name>` writes the scaffold file `api/src/jobs/<name>.rs`.
+The file has the `<Name>Args` type with its `kit::jobs::Args` kind, the `register` function, the `handle` function, and a test.
 It also rewrites the managed module list `api/src/jobs/mod.rs`, with one sorted line for each job.
 The generator finds the existing jobs by their file names in `api/src/jobs/`.
 It does not parse the Rust code.
+Two job names with the same Pascal name fail, for example `send_2fa` and `send2fa`.
+
+The kit runs the jobs on its own queue tables in the application database.
+The kit migrations create these tables.
+`spinup db migrate up` applies the kit migrations first, and then the app migrations.
+`cd api && cargo run -- migrate status` shows both sets.
+
+Insert a job with the client of kit `jobs` in the API process:
+
+```rust
+let client = kit::jobs::Client::new(pool.clone());
+let opts = kit::jobs::InsertOpts { unique_by_args: true, ..Default::default() };
+let inserted = client.insert(&SendDigestArgs { user_id: 1 }, &opts).await?;
+```
+
+`insert_tx` inserts a job on the connection of a transaction.
+The application binary runs the worker with `api worker`:
+
+```sh
+spinup db migrate up
+cd api && cargo run --locked -- worker
+```

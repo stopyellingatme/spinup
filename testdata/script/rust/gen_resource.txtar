@@ -1,0 +1,123 @@
+# Rust twin of testdata/script/gen_resource.txtar (Go blob d663a312e509b69c936e22fdacb5c693b500952d).
+# g resource gives a CRUD API: axum handlers, sqlx models, and sqlx migration pairs. With a
+# database, the post-steps migrate, prepare the query cache, build, and emit the spec, and the
+# generated tests pass. Without one, the plan applies and the post-steps wait (ADR 0021 §7).
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+# The resolver also reads the DATABASE_URL line of .env (ADR 0021 §6). Hide the file, so that
+# only the database of the script applies.
+mv .env $WORK/todo.env
+
+# A dry run lists the plan and writes nothing.
+exec spinup g resource todo title:string done:bool --dry-run
+stdout '^create api/migrations/00002_create_todos\.up\.sql \(seed\)$'
+stdout '^create api/migrations/00002_create_todos\.down\.sql \(seed\)$'
+stdout '^create api/src/handlers/todos\.rs \(scaffold\)$'
+stdout '^create api/src/handlers/todos_tests\.rs \(scaffold\)$'
+stdout '^create api/src/models/todo\.rs \(scaffold\)$'
+stdout '^update api/src/handlers/mod\.rs \(managed\)$'
+stdout '^update api/src/routes_gen\.rs \(managed\)$'
+! stdout 'openapi/paths'
+! stdout 'sqlc'
+! exists api/migrations/00002_create_todos.up.sql
+! exists api/src/handlers/todos.rs
+
+# The first resource rewrites the untouched module lists without --force.
+exec spinup g resource todo title:string done:bool
+stdout '^Created 5, updated 3 files$'
+stdout '^Next: spinup db migrate up$'
+stdout '^Next: cd api && cargo nextest run$'
+[!env:DATABASE_URL] stdout '^Skipped post-steps: DATABASE_URL is not set \(migrate, sqlx-prepare, build, openapi-emit\)$'
+[!env:DATABASE_URL] stdout '^Next: spinup db prepare$'
+[!env:DATABASE_URL] stdout '^Next: spinup g openapi$'
+[env:DATABASE_URL] ! stdout 'Skipped post-steps'
+[env:DATABASE_URL] exists api/.sqlx
+[env:DATABASE_URL] grep '^  /api/todos/\{id\}:$' api/openapi/bundle.gen.yaml
+exists api/migrations/00002_create_todos.up.sql api/migrations/00002_create_todos.down.sql
+exists api/src/handlers/todos.rs api/src/handlers/todos_tests.rs api/src/models/todo.rs
+! exists api/openapi/paths
+! exists api/db
+! exists api/sqlc.yaml
+grep '^pub mod todos;$' api/src/handlers/mod.rs
+grep '^pub mod todo;$' api/src/models/mod.rs
+grep 'router = router\.merge\(handlers::todos::routes\(\)\);' api/src/routes_gen.rs
+grep '^DROP TABLE todos;$' api/migrations/00002_create_todos.down.sql
+grep '"api/src/routes_gen.rs"' spinup.lock
+grep '"template": "gen/resource"' spinup.lock
+
+# The same resource again needs --force.
+! exec spinup g resource todo title:string done:bool
+stderr 'the table todos already exists in api/migrations/00002_create_todos\.up\.sql'
+stderr 'Try: pass --force'
+
+# The other generators.
+exec spinup g model tag name:string
+stdout '^Created 3, updated 1 files$'
+exists api/migrations/00003_create_tags.up.sql api/migrations/00003_create_tags.down.sql api/src/models/tag.rs
+! exists api/src/handlers/tags.rs
+exec spinup g migration add_index
+stdout '^Next: edit api/migrations/00004_add_index\.up\.sql$'
+exists api/migrations/00004_add_index.up.sql
+grep 'reverses the up migration' api/migrations/00004_add_index.down.sql
+exec spinup g handler ping
+stdout '^Next: cd api && cargo test --locked ping$'
+exists api/src/handlers/ping.rs api/src/handlers/ping_tests.rs
+grep 'path = "/ping",' api/src/handlers/ping.rs
+grep 'router = router\.merge\(handlers::ping::routes\(\)\);' api/src/routes_gen.rs
+exec spinup db lint
+
+# Cover the single-field case and all required types through real handlers.
+exec spinup g resource author name:string
+exec spinup g resource post title:string details:text views:int total:bigint flag:bool score:float reqday:date reqat:time requid:uuid reqmeta:json reqprice:decimal 'status:enum:draft|published' author:ref:author note:string?
+grep 'author_id bigint NOT NULL REFERENCES authors' api/migrations/00006_create_posts.up.sql
+
+# The query macros read the cache of the sqlx-prepare post-step, so the build, the tests, and
+# the round trip run only with a database.
+[env:DATABASE_URL] cd api
+[env:DATABASE_URL] exec cargo build --offline --locked
+[env:DATABASE_URL] exec cargo clippy --offline --locked --all-targets -- -D warnings
+[env:DATABASE_URL] exec cargo test --offline --locked
+[env:DATABASE_URL] stdout 'handlers::todos::tests::pg_todos_crud \.\.\. ok'
+[env:DATABASE_URL] stdout 'handlers::posts::tests::pg_posts_crud \.\.\. ok'
+[env:DATABASE_URL] ! stdout 'FAILED'
+[env:DATABASE_URL] cd ..
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^2/installed create todos$'
+[env:DATABASE_URL] stdout '^6/installed create posts$'
+
+# Roll back so that the next run starts from an empty database. The down migrations drop the
+# tables.
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] stdout '^Applied 2/revert create todos '
+[env:DATABASE_URL] stdout '^Applied 1/revert init '
+
+# Reserved names protect the API reference for both spec consumers.
+cd $WORK/todo
+! exec spinup g resource doc title:string
+stderr 'Try: choose another name, for example document'
+! exec spinup g model openapi title:string
+stderr 'Try: choose another name, for example document'
+! exec spinup g resource global title:string --shared
+stderr 'Try: drop --shared'
+
+# Auth resources require a user and isolate each user's rows.
+cd $WORK
+exec spinup new owned --modules auth --module example.com/owned --no-git --non-interactive
+cd owned
+mv .env $WORK/owned.env
+exec spinup g resource note title:string --api-only
+exec spinup g resource bulletin title:string --shared --api-only
+exec spinup g resource entry title:string note:ref:note count:int total:bigint done:bool score:float price:decimal day:date at:time uid:uuid meta:json 'state:enum:draft|published' optional:string? --api-only
+grep 'user_id bigint NOT NULL REFERENCES users' api/migrations/00003_create_notes.up.sql
+! grep 'user_id' api/migrations/00004_create_bulletins.up.sql
+grep 'AuthUser\(user\): AuthUser' api/src/handlers/notes.rs
+grep 'AuthUser\(_user\): AuthUser' api/src/handlers/bulletins.rs
+! exists web/src/routes/notes
+[env:DATABASE_URL] cd api
+[env:DATABASE_URL] exec cargo build --offline --locked
+[env:DATABASE_URL] exec cargo clippy --offline --locked --all-targets -- -D warnings
+[env:DATABASE_URL] exec cargo test --offline --locked
+[env:DATABASE_URL] stdout 'handlers::notes::tests::pg_notes_crud \.\.\. ok'
+[env:DATABASE_URL] stdout 'handlers::entries::tests::pg_entries_crud \.\.\. ok'
+[env:DATABASE_URL] ! stdout 'FAILED'

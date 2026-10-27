@@ -1,0 +1,116 @@
+# Rust twin of testdata/script/gen_page.txtar (Go blob 5d1c78ae61bcda06c32c5499ed81cafb2ef1e43b).
+# g page and g component in a web app, then g resource with its SvelteKit pages: the pages
+# install offline, type-check against the regenerated client types, and build. An app with the
+# auth module gets guarded pages that also type-check and build.
+# The client post-step reads the spec of openapi-emit, which needs a build of the Rust API, so
+# the resource part needs a database (ADR 0021 §7).
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new demo --module example.com/demo --no-git --non-interactive
+cd demo
+# The resolver also reads the DATABASE_URL line of .env (ADR 0021 §6). Hide the file, so that
+# only the database of the script applies.
+mv .env $WORK/demo.env
+
+# g page writes a scaffold page. --server adds a load function.
+exec spinup g page about
+stdout '^Created 1, updated 0 files$'
+stdout '^Next: cd web && pnpm check$'
+grep '<title>About</title>' web/src/routes/about/+page.svelte
+! exists web/src/routes/about/+page.server.ts
+exec spinup g page settings/profile --server
+grep 'return \{ title: ''Profile'' \};' web/src/routes/settings/profile/+page.server.ts
+grep '"web/src/routes/settings/profile/\+page.svelte": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+! exec spinup g page Settings
+stderr 'invalid segment "Settings"'
+stderr 'Try: '
+! exec spinup g page api/users
+stderr 'route "api/users" is under /api, which goes to the'
+stderr 'Try: choose another route'
+
+# g component runs shadcn-svelte at the lock registry version. A dry run prints the command.
+exec spinup g component dialog --dry-run
+stdout '^run pnpm dlx shadcn-svelte@1\.7\.0 add dialog --yes --no-deps-install \(in web\)$'
+! exists web/src/lib/components/ui/dialog
+! grep 'components/ui/dialog/' spinup.lock
+
+# A resource dry run lists the Rust API files and the pages.
+exec spinup g resource todo title:string done:bool 'due:date?' --dry-run
+stdout '^create api/src/handlers/todos\.rs \(scaffold\)$'
+stdout '^create api/migrations/00002_create_todos\.up\.sql \(seed\)$'
+stdout '^create web/src/routes/todos/\+page\.svelte \(scaffold\)$'
+stdout '^create web/src/routes/todos/\[id\]/\+page\.server\.ts \(scaffold\)$'
+stdout '^create web/src/routes/todos/\[id\]/edit/\+page\.svelte \(scaffold\)$'
+stdout '^create web/src/routes/todos/new/\+page\.svelte \(scaffold\)$'
+stdout '^create web/src/routes/todos/schema\.ts \(scaffold\)$'
+stdout '^update web/src/lib/nav\.gen\.ts \(managed\)$'
+! stdout 'form\.ts'
+! exists web/src/routes/todos
+
+# Without a database, the plan applies, and the post-steps wait. The client step waits too,
+# because openapi-emit did not run.
+[!env:DATABASE_URL] exec spinup g resource todo title:string done:bool 'due:date?'
+[!env:DATABASE_URL] stdout '^Skipped post-steps: DATABASE_URL is not set \(migrate, sqlx-prepare, build, openapi-emit, client\)$'
+[!env:DATABASE_URL] stdout '^Created 15, updated 4 files$'
+[!env:DATABASE_URL] stdout '^Next: spinup g openapi$'
+[!env:DATABASE_URL] exists web/src/routes/todos/+page.svelte web/src/routes/todos/schema.ts
+[!env:DATABASE_URL] ! grep '/api/todos' web/src/lib/api/schema.d.ts
+[!env:DATABASE_URL] stop 'the client types, pnpm check, and pnpm build need DATABASE_URL'
+
+# The client post-step needs pnpm and the installed packages.
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+
+exec spinup g resource todo title:string done:bool 'due:date?'
+stdout '^Created 15, updated 4 files$'
+! stdout 'Skipped post-steps'
+exists web/src/routes/todos/+page.svelte web/src/routes/todos/+page.server.ts
+exists web/src/routes/todos/new/+page.svelte web/src/routes/todos/new/+page.server.ts
+exists web/src/routes/todos/[id]/+page.svelte web/src/routes/todos/[id]/+page.server.ts
+exists web/src/routes/todos/[id]/edit/+page.svelte web/src/routes/todos/[id]/edit/+page.server.ts
+exists web/src/routes/todos/schema.ts web/src/routes/todos/fields.svelte
+! exists web/src/routes/todos/form.ts
+! grep 'requireUser' web/src/routes/todos/+page.server.ts
+grep '^  /api/todos/\{id\}:$' api/openapi/bundle.gen.yaml
+grep '"/api/todos/\{id\}": \{' web/src/lib/api/schema.d.ts
+grep '"web/src/routes/todos/schema.ts": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+grep '\{ href: ''/todos'', label: ''Todos'' \}' web/src/lib/nav.gen.ts
+
+cd web
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+stdout '(?i)\b0 warnings\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.js
+
+# The next app uses the same database with other migration versions: roll this app back.
+cd $WORK/demo
+exec spinup db to 0 --i-know
+stdout '^Applied 2/revert create todos '
+
+# With the auth module, every load and action of the pages requires a signed-in user.
+cd $WORK
+exec spinup new authdemo --module example.com/authdemo --modules auth --no-git --non-interactive
+cd authdemo
+mv .env $WORK/authdemo.env
+exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+exec spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high'
+! stdout 'Skipped post-steps'
+grep 'import \{ requireUser \} from ''#lib/server/auth.js'';' web/src/routes/todos/+page.server.ts
+grep 'requireUser\(locals, url\);' web/src/routes/todos/[id]/edit/+page.server.ts
+exec spinup g page settings/profile --server
+grep 'requireUser\(locals, url\);' web/src/routes/settings/profile/+page.server.ts
+grep '<PageHeader title=\{data.title\} />' web/src/routes/settings/profile/+page.svelte
+cd web
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+stdout '(?i)\b0 warnings\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.js
+
+-- pnpm.sh --
+# Scripts get their own HOME, but pnpm keeps the package metadata for offline installs under
+# the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"

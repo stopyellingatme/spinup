@@ -1,0 +1,50 @@
+# Rust twin of testdata/script/gen_mailer.txtar (Go blob bbc707c2b366b5298c95a3f91cbc05ce45c1bbd2).
+# Typed mailers, minijinja templates, reset routes, and offline API builds.
+# Mail templates live in api/templates/mail/. With jobs, "api worker" delivers the mail.send job.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --module example.com/todo --modules ci,auth,mail --no-git --non-interactive
+cd todo
+exists api/src/mail/mod.rs api/src/mail/mailers.rs api/src/reset.rs
+exists api/migrations/00003_password_resets.up.sql api/migrations/00003_password_resets.down.sql
+exists web/src/routes/reset/+page.svelte web/src/routes/reset/[token]/+page.svelte
+! grep '^default = .*"jobs"' api/Cargo.toml
+exec spinup g mailer welcome name:string --dry-run
+stdout '^create api/src/mail/welcome\.rs \(managed\)$'
+stdout '^create api/templates/mail/welcome\.subject\.tmpl \(seed\)$'
+stdout '^update api/src/mail/mod\.rs \(managed\)$'
+! exists api/src/mail/welcome.rs
+exec spinup g mailer welcome name:string
+stdout '^Created 4, updated 1 files$'
+stdout '^Next: cd api && cargo test --locked mail$'
+grep 'pub name: String,' api/src/mail/welcome.rs
+grep 'pub async fn send_welcome\(&self, to: &str, data: &WelcomeData\)' api/src/mail/welcome.rs
+grep '^pub mod welcome;$' api/src/mail/mod.rs
+exists api/templates/mail/welcome.subject.tmpl api/templates/mail/welcome.txt.tmpl api/templates/mail/welcome.html.tmpl
+grep '\{\{ name \}\}' api/templates/mail/welcome.txt.tmpl
+exec spinup check
+exec spinup g mailer receipt sent_at:time 'due:date?' key:uuid count:int payload:json
+grep 'pub due: Option<time::Date>,' api/src/mail/receipt.rs
+cd api
+exec cargo build --offline --locked
+exec cargo clippy --offline --locked --all-targets -- -D warnings
+cd ../..
+
+# Jobs enable queued delivery: the mail.send job registers in the worker of "api worker".
+exec spinup new queued --module example.com/queued --modules ci,auth,mail,jobs --no-git --non-interactive
+cd queued
+exists api/src/mail/worker.rs api/src/jobs/mod.rs
+grep '^default = \[.*"jobs".*\]$' api/Cargo.toml
+grep '"worker",' api/src/main.rs
+grep 'mailers\.register_jobs\(worker\)\?;' api/src/main.rs
+exec spinup g mailer welcome name:string
+cd api
+exec cargo build --offline --locked
+exec cargo clippy --offline --locked --all-targets -- -D warnings
+cd ../..
+
+exec spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g mailer welcome
+stderr 'no mail module'
+stderr 'Try: spinup module add mail'
+! exists api/src/mail
