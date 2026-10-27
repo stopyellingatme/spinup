@@ -16,4 +16,11 @@ R2 gate item 4 measures the R0.11 handler-body loop again, with the real kit and
 
 ## Numbers
 
-The main loop adds the numbers at the R2 gate.
+R2 gate, 2026-10-27. Machine: Apple M1 Max, 10 cores, 64 GB. Rust 1.99.1. PostgreSQL on 127.0.0.1:55433. The run used `nice -n 10` and `CARGO_BUILD_JOBS=4`. No lane ran. Other sessions kept the 1-minute load near 3 to 4.
+
+| Series | Median | p90 | Build | Stop | Ready | Response |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 3484 ms | 3560 ms | 2736 ms | 4 ms | 681 ms | 22 ms |
+| 2 | 3419 ms | 3550 ms | 2713 ms | 5 ms | 663 ms | 22 ms |
+
+Both series pass the 5 s limit. The result equals the R0.11 number for the shipped dev profile (3381 ms). The build step is about 2.7 s, and the start of the new binary to the first `/healthz` answer is about 0.7 s.

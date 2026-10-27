@@ -202,3 +202,38 @@ R2.10 fills all six slots of `Phases`, not only the cargo work:
 - `g resource` needs Postgres for its post-steps. Without it, the user runs `spinup db prepare` and `spinup g openapi` later.
 - A new app builds only with `SPINUP_KIT_REPLACE` until the kit is on crates.io (R4).
 - The CLI needs `sqlx-cli` with `sqlx-toml` for every database command.
+
+## R2 results (added at the R2 gate, 2026-10-27)
+
+The R2 gate passed locally, except item 11 (the Windows proof needs a push of `rust`) and the open disk question below. The checks:
+- `make rs-build`, `rs-lint`, `rs-test` (1003 tests with Postgres, 87 of them `pg_` tests), `rs-deny`, `rs-digest`, `rs-golden` (56 trees), `rs-doctest`, and `rs-cover` (`spinup-manifest` 99, `spinup-merge` 85.4, `spinup-migrate` 94.9, `spinup-upgrade` 90.4 percent).
+- `make rs-script`: the 25 parity scripts pass with the Rust binary. `make rs-app-gate`: `app_gate_api` (full app, `g resource todo`, clippy, tests, migrate, run, and the spec equal to the reference app except `info`) and `app_gate_web`.
+- `make rs-app-check` for the seven sets (`full` with `RESOURCE=1`), `rs-ref-check`, `rs-kit-features`, `rs-pack-lock`, `rs-twin-check`, the `kit_manifest` test, `make oracle` with no diff, and `rs-convert-check`.
+- `make rs-e2e`: the web and trace e2e scripts with the Rust binary. The trace goes from the web app to the Rust API in one Tempo trace.
+- `make rs-devloop`: median 3484 ms and 3419 ms in two series of 10 handler-body edits (limit 5000 ms). See `docs/design/rust-spike/r2-devloop.md`.
+- `make rs-vuln` and the full Go gate (`make build lint test golden script doctest`).
+- Gate item 6: the Rust stack model and the template data have no Go sections, and every pack set renders with strict undefined.
+
+### Disk (gate item 5, open)
+`make rs-disk` counts the gate target, the run `CARGO_HOME`, and the seed target: 34.24 GB, under the 40 GB limit. The gate target is 26.7 GB (16.1 GB workspace `debug`, 7.1 GB app targets). During the run, two lane targets (8.7 to 14.8 GB `du` each, APFS clones of the 6.7 GB seed) existed next to the gate target. The logical `du` peak of all of them is above 40 GB. The volume never had less than 276 GB free. The user decides whether the limit counts logical `du` with clones, and whether lanes remove app targets after each merge.
+
+### Recorded deviations from Go
+- Kit core (R2.1): `ValidJson` rejects unknown JSON properties with the Go 400 text (the Go API ignored them). A wrong value type is 422 with the field. Kit routes answer 405 problems. The access log has a `route` field. The redactor works on flat span fields only. The Go server read, write, and idle timeouts are not ported (`axum::serve` has none). `version` prints the `/version` JSON.
+- Kit database (R2.2): no migration hooks (kit migrations replace the Go job hook). The URL form only (no keyword/value DSN). `migration_status` lists applied rows only.
+- Telemetry (R2.3): bad sampler, ratio, or header values fail with a `Try:` line (Go falls back). `host.name` comes from `HOSTNAME`. Log events go to the log export only. New metrics: `http.server.request.count` and the tokio runtime metrics.
+- Auth (R2.5): an own session layer replaces tower-sessions (Max-Age 604800, as Go). The dummy hash runs after the start. A user delete cascades to the sessions. Hash slots default to 40 percent of the CPUs.
+- Mail, reset, and OIDC (R2.7): `render` takes `mail::Templates`. `SmtpMailer` starts its pool at the first send. No file mailer. The ID token check has no expiry leeway.
+- Jobs (R2.8, R2.19): a worker takes one queue, so `mail.send` runs on the default queue with 10 attempts. New metric `kit.job.duration`. A stop timeout returns cancelled jobs to `retryable` at once.
+- Commands (R2.23, R2.24): `db prepare` replaces `sqlc`. `test` has no `--race`. `build` has no image flags until R3a. A kept Rust handler file stays in `handlers/mod.rs` and `routes_gen.rs`, so it must define `routes()`.
+- Generators (R2.25, G1): `g handler` prints no route line. A `--shared` auth resource still needs a signed-in user. The generated Rust tests need Postgres (`pg_<plural>_crud`). The Go GOOS/GOARCH name rule for jobs is removed.
+- Upgrade (R2.28): the pin-only deps rule applies only to an edited `api/Cargo.toml`. An unedited manifest takes the new render, as Go does with `go.mod`.
+- CLI (G2): `spinup docs compat --json` has a `rust` key in place of `go`. A Rust stack file with a Go section is an error.
+
+### Fixed at the gate
+- `spinup db to 0 --i-know` with no applied migration is a no-op (it failed). An app binary stop no longer logs the cancelled dummy-hash task as an error. The app binary lists every command in its unknown-command error. Generator and help texts say "API", not "Go API".
+- Stale tests and fixtures that the lane checks did not cover: the `spinup-newapp` generation test (Go `api` files), the destroy test (it read `DATABASE_URL` from the process), the Go docs site and the converter stack oracle (the two R2 images), and a 5 s timeout in the Grafana golden test (30 s).
+
+### Due later
+- Windows: `rust.yml` on Linux, macOS, and Windows with the kit (main-loop decision 3).
+- `--frontend-mode embed` image lines (R3a.7). The kit-compat workflow (R4.9).
+- The auth pack login and register pages still say "The Go API" in comments (converted Go pack text; R5 docs sweep).
