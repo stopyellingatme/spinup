@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Trace propagation test: one request makes one trace across the SvelteKit server and the Go API.
+# Trace propagation test: one request makes one trace across the SvelteKit server and the API.
 # It generates an app, starts grafana/otel-lgtm, starts the API and the built web app with
 # OpenTelemetry on, requests a page whose server load calls the API, and asks Tempo for the trace.
-# It passes when a Go span has its parent span in the web service. It prints the trace ID.
+# It passes when an API span has its parent span in the web service. It prints the trace ID.
 # Set E2E_ONLINE=1 to install packages from the network (CI). The default is the offline store.
 # Set E2E_KEEP=1 to keep the work directory.
-# Needs: DATABASE_URL (a database you own), Docker, Go, Node 24, pnpm, curl, and python3.
+# Set SPINUP_BIN to a built spinup binary (the Rust CLI) to use it instead of a Go build of
+# ./cmd/spinup. Set SPINUP_KIT_DIR to the kit directory for SPINUP_KIT_REPLACE. The default is
+# $repo/kit (the Go kit). When the app has a Rust API (api/Cargo.toml), "spinup build" builds it.
+# Needs: DATABASE_URL (a database you own), Docker, Go (without SPINUP_BIN) or Cargo (a Rust
+# API), Node 24, pnpm, curl, and python3.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,12 +28,27 @@ fi
 
 export GOTOOLCHAIN="${GOTOOLCHAIN:-local}"
 export PATH="$repo/scripts/bin:/opt/homebrew/opt/node@24/bin:$PATH"
+kit_dir="${SPINUP_KIT_DIR:-$repo/kit}"
+if [[ -n "${SPINUP_BIN:-}" && ! -x "$SPINUP_BIN" ]]; then
+  echo "run.sh: SPINUP_BIN ($SPINUP_BIN) is not an executable file." >&2
+  echo "  Try: build the CLI (make rs-build), or unset SPINUP_BIN to build the Go CLI" >&2
+  exit 1
+fi
+if [[ ! -d "$kit_dir" ]]; then
+  echo "run.sh: the kit directory $kit_dir does not exist." >&2
+  echo "  Try: set SPINUP_KIT_DIR to the kit directory, such as $repo/crates/spinup-kit" >&2
+  exit 1
+fi
+
+# The stack versions of the CLI under test.
+stack="internal/stackversions/stackversions.yaml"
+if [[ -n "${SPINUP_BIN:-}" ]]; then stack="crates/spinup-stack/stackversions.yaml"; fi
 
 # The pinned image, as the [[ image "otel-lgtm" ]] template function renders it.
 image="$(sed -nE 's/^ *otel-lgtm: *\{ *image: *([^,]+), *tag: *"([^"]+)", *digest: *"([^"]+)".*/\1:\2@\3/p' \
-  "$repo/internal/stackversions/stackversions.yaml")"
+  "$repo/$stack")"
 if [[ -z "$image" ]]; then
-  echo "run.sh: cannot find the otel-lgtm image in internal/stackversions/stackversions.yaml." >&2
+  echo "run.sh: cannot find the otel-lgtm image in $stack." >&2
   echo "  Try: check the images section of that file" >&2
   exit 1
 fi
@@ -89,15 +108,20 @@ docker run -d --name "$lgtm" -p 127.0.0.1::4318 "$image" >"$work/logs/lgtm-id.lo
 otlp_port="$(docker port "$lgtm" 4318/tcp | head -n1 | sed -E 's/.*:([0-9]+)$/\1/')"
 otlp="http://127.0.0.1:$otlp_port"
 
-echo "==> build the CLI"
-(cd "$repo" && go build -o "$work/spinup" ./cmd/spinup)
+if [[ -n "${SPINUP_BIN:-}" ]]; then
+  echo "==> use the CLI $SPINUP_BIN"
+  cp "$SPINUP_BIN" "$work/spinup"
+else
+  echo "==> build the CLI"
+  (cd "$repo" && go build -o "$work/spinup" ./cmd/spinup)
+fi
 
 echo "==> generate the app"
 cd "$work"
-SPINUP_KIT_REPLACE="$repo/kit" ./spinup new "$app" --module "example.com/$app" \
+SPINUP_KIT_REPLACE="$kit_dir" ./spinup new "$app" --module "example.com/$app" \
   --modules ci --no-git --non-interactive >"$work/logs/new.log" 2>&1
 cd "$app"
-# A page whose server load calls the Go API.
+# A page whose server load calls the API.
 cp -R "$here/app/." web/
 
 api_port="$(free_port)"
@@ -114,7 +138,16 @@ PUBLIC_ORIGIN=$origin
 ENV
 
 echo "==> build the API"
-(cd api && go build -o ../api.bin ./cmd/api)
+if [[ -f api/Cargo.toml ]]; then
+  # The default is the offline crate cache, as for pnpm.
+  if [[ -z "${E2E_ONLINE:-}" ]]; then export CARGO_NET_OFFLINE="${CARGO_NET_OFFLINE:-true}"; fi
+  # spinup build runs cargo build --release --locked and copies the binary to api/bin/api.
+  # The api/.cargo/config.toml of the app sets SQLX_OFFLINE, so the build needs no database.
+  "$work/spinup" build >"$work/logs/build.log" 2>&1
+  cp api/bin/api api.bin
+else
+  (cd api && go build -o ../api.bin ./cmd/api)
+fi
 
 echo "==> build the web app"
 cd web
