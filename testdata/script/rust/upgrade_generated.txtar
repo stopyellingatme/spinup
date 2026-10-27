@@ -1,0 +1,46 @@
+# Rust twin of testdata/script/upgrade_generated.txtar (Go blob 013c8613069bd17805646b583b3c81a6c3e99f2c).
+# An upgrade keeps generated files: the packs do not render them, and routes_gen.rs keeps the
+# generator's version (generator-owned, ADR 0007 §1). g resource runs the database post-steps
+# (migrate, sqlx-prepare, build, openapi-emit), so this script needs Postgres.
+[!env:DATABASE_URL] skip 'g resource needs DATABASE_URL'
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+exec spinup g resource todo title:string done:bool
+! stdout 'Skipped post-steps'
+exists api/.sqlx
+# git add -A also commits the query cache of the sqlx-prepare post-step.
+exec git add -A
+exec git commit -q -m 'add todos'
+exec git ls-files api/.sqlx
+stdout '^api/\.sqlx/query-[0-9a-f]+\.json$'
+exec spinup upgrade --yes --no-verify
+stdout 'git merge spinup/upgrade-0.0.1'
+exists .spinup/upgrade/0.0.1/api/migrations/00002_create_todos.up.sql
+exists .spinup/upgrade/0.0.1/api/migrations/00002_create_todos.down.sql
+exists .spinup/upgrade/0.0.1/api/src/handlers/todos.rs
+exists .spinup/upgrade/0.0.1/api/src/handlers/todos_tests.rs
+exists .spinup/upgrade/0.0.1/api/src/models/todo.rs
+exists .spinup/upgrade/0.0.1/api/.sqlx
+grep '^pub mod todos;$' .spinup/upgrade/0.0.1/api/src/handlers/mod.rs
+grep '^pub mod todo;$' .spinup/upgrade/0.0.1/api/src/models/mod.rs
+grep 'router = router\.merge\(handlers::todos::routes\(\)\);' .spinup/upgrade/0.0.1/api/src/routes_gen.rs
+cmp api/src/routes_gen.rs .spinup/upgrade/0.0.1/api/src/routes_gen.rs
+grep '"template": "gen/resource"' .spinup/upgrade/0.0.1/spinup.lock
+grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
+exists .spinup/upgrade/0.0.1/upgrade-note.txt
+exec git status --porcelain
+! stdout .
+# The committed query cache builds the upgraded app offline (SQLX_OFFLINE in .cargo/config.toml).
+cd .spinup/upgrade/0.0.1/api
+exec cargo build --offline --locked
+
+-- overlay/packs/base/files/upgrade-note.txt --
+A file that only the newer template version has.
+-- overlay/packs/base/pack.d/upgrade-note.toml --
+[[files]]
+path = "upgrade-note.txt"
+source = "files/upgrade-note.txt"
+class = "managed"

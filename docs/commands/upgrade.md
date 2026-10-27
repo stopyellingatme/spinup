@@ -3,10 +3,10 @@
 `spinup upgrade` applies template changes in a separate Git worktree.
 The main checkout keeps its files and branch.
 
-The Rust R1 CLI supports template upgrades, conflict recovery, codemods, and `--ui`.
+The Rust CLI supports template upgrades, conflict recovery, codemods, and `--ui`.
 It requires lock schema 3 and templates with the `minijinja` engine marker.
 It rejects Go locks and Go template archives.
-Cargo dependency changes and build verification begin in R2.
+It updates the Cargo dependencies of `api/` and verifies the app with Cargo.
 
 ```console
 $ spinup upgrade --plan --continue
@@ -38,6 +38,7 @@ The worktree uses `.spinup/upgrade/<target>`.
 The branch uses `spinup/upgrade-<target>`.
 Each step commits the template changes and the lock separately.
 The Go CLI creates a separate commit when `go fix` changes files.
+The Rust CLI has no fix step.
 
 If files conflict, the command exits with code 3 and lists the paths.
 Resolve the markers in the upgrade worktree.
@@ -64,10 +65,47 @@ The upgrade runs codemods before and after the template changes.
 Each codemod prints its ID and description.
 The lock records completed codemods to prevent repeated changes.
 
+### Rust dependency steps
+
+These dependency and verification steps apply to the Rust CLI.
+The Go CLI runs the steps in the next section.
+
+The upgrade does not merge `api/Cargo.toml` and `api/Cargo.lock` as text.
+If you did not edit `api/Cargo.toml`, the upgrade writes the new render.
+If you edited the file, the upgrade keeps your file and edits it with a TOML editor.
+The editor adds the new dependencies and features of the template.
+The `default` feature list follows the template and keeps the features that you added.
+The upgrade increases a dependency pin only when the target stack pins a higher version.
+The upgrade never decreases a pin.
+It also increases `rust-version` to the minimum Rust version of the stack.
+
+For each increased pin, the upgrade prints `Dependency <name>: <old> -> <pin>`.
+It then runs `cargo update -p <name>@<old> --precise <pin>` in `api/`.
+This moves the lock to the pin and does not update other crates.
+If only features or dependencies change, the upgrade runs `cargo metadata --format-version 1` once.
+With `--offline`, these Cargo commands also get `--offline`.
+
+If `SPINUP_KIT_REPLACE` is set, the upgrade writes the kit patch with that directory.
+The kit patch is the `spinup-kit` entry of `[patch.crates-io]` in `api/Cargo.toml`.
+If the variable is not set, the upgrade keeps the kit patch of the current `api/Cargo.toml`.
+If a relative patch path points outside the repository, the upgrade writes the absolute path and prints a warning.
+If the patch directory does not exist, the upgrade stops with a `Try:` line.
+`spinup module add` follows the same rules.
+
+If the app has `web/package.json`, the upgrade then refreshes the web lockfile, as the Go CLI does.
+
+Verification runs `cargo clippy --locked --all-targets -- -D warnings` and `cargo test --locked` in `api/`.
+The Cargo commands run without `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and `LLVM_PROFILE_FILE`.
+If the app has `web/package.json`, verification then runs the `check` and `build` scripts in `web/`.
+It then runs every local doctor check against the worktree.
+If the step has committed conflict markers, the upgrade skips verification and prints a line.
+The error lists all failures and includes the last codemod ID for a file when available.
+After repairs, run `spinup upgrade --continue --yes` to repeat verification.
+
 ### Go dependency steps
 
 These dependency and verification steps apply to the Go CLI.
-The Rust R1 CLI does not run them.
+The Rust CLI does not run them.
 
 If `SPINUP_KIT_REPLACE` is set, the upgrade restores the local kit replacement in `api/go.mod`.
 If the variable is not set, the upgrade keeps a local kit replace that the current `api/go.mod` has.

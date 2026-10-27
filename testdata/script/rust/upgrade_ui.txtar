@@ -65,8 +65,11 @@ stderr 'api/src/routes.rs'
 grep '"ui": true' .spinup/upgrade.json
 cp $WORK/resolved-routes.rs .spinup/upgrade/0.0.1/api/src/routes.rs
 exec spinup upgrade --continue --yes --no-verify
-! stdout 'Skipped go fix'
+! stdout 'go fix'
 ! stdout 'Registry 1.8.0 is available'
+# The cargo phases keep the kit patch and the lock of the app (ADR 0021 §8).
+grep '^spinup-kit = \{ path = "'$SPINUP_KIT_DIR'" \}$' .spinup/upgrade/0.0.1/api/Cargo.toml
+cmp api/Cargo.lock .spinup/upgrade/0.0.1/api/Cargo.lock
 grep 'upgraded-button' .spinup/upgrade/0.0.1/web/src/lib/components/ui/button/button.svelte
 grep '"shadcn_registry": "1.8.0"' .spinup/upgrade/0.0.1/spinup.lock
 ! exists .spinup/upgrade.json

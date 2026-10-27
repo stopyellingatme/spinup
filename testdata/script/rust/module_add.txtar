@@ -1,0 +1,124 @@
+# Rust twin of testdata/script/module_add.txtar (Go blob 4d57a5df28a29d940c38beefd3174110b628bcc3).
+# Keep this command test offline. Tool shims record the phase commands (ADR 0021 §8).
+# Package tests exercise the planner, Git worktrees, lock, conflicts, and recovery.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec chmod +x tools/cargo tools/pnpm
+env PATH=$WORK/tools:$PATH
+env MODULE_TOOL_LOG=$WORK/tool-calls.txt
+mkversion 0.0.1
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+
+exec spinup new demo --modules ci,deploy --module example.com/demo --non-interactive
+cd demo
+exec spinup module list
+stdout 'monitoring +off +deploy'
+exec spinup module list --json
+stdout '"name":"monitoring"'
+stdout '"enabled":false'
+
+# Unknown modules and invalid answers fail before a branch or state exists.
+! exec spinup module add bogus --yes --non-interactive
+stderr 'unknown module'
+stderr 'Try: spinup module list'
+! exists .spinup/upgrade.json
+! exec spinup module add monitoring --monitoring-profile invalid --yes --non-interactive
+stderr 'Try: supply a valid --monitoring-profile value'
+! exists .spinup/upgrade.json
+
+# A requirement below the stack pin. The dependency step raises it and moves the lock to the
+# pin with one precise update for each raised crate.
+exec sed 's/^anyhow = "1\.0\.104"$/anyhow = "1.0.100"/' api/Cargo.toml
+cp stdout api/Cargo.toml
+exec sed '/^name = "anyhow"$/{n;s/^version = "1\.0\.104"$/version = "1.0.100"/;}' api/Cargo.lock
+cp stdout api/Cargo.lock
+grep '^anyhow = "1.0.100"$' api/Cargo.toml
+grep '^version = "1.0.100"$' api/Cargo.lock
+exec git commit -q -am 'Lower the anyhow requirement'
+
+# The main checkout stays unchanged. A newer template version remains unused.
+exec spinup module add monitoring --monitoring-profile lite --yes --non-interactive
+stdout 'monitoring/compose.monitoring.yml'
+stdout '^Dependency anyhow: 1\.0\.100 -> 1\.0\.104$'
+stdout 'git merge spinup/module-monitoring'
+exists .spinup/upgrade/0.0.0-dev/monitoring/compose.monitoring.yml
+! exists monitoring/compose.monitoring.yml
+! exists .spinup/upgrade.json
+grep '^modules = .*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
+! grep '^modules = .*monitoring' spinup.toml
+grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep '"template_version": "0.0.0-dev"' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep 'monitoring/files/monitoring/compose.monitoring.yml.tmpl' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep '^anyhow = "1\.0\.104"$' .spinup/upgrade/0.0.0-dev/api/Cargo.toml
+grep '^spinup-kit = \{ path = ' .spinup/upgrade/0.0.0-dev/api/Cargo.toml
+exec git status --porcelain
+! stdout .
+exec git show spinup/module-monitoring:monitoring/compose.monitoring.yml
+stdout 'services:'
+exec git show spinup/module-monitoring:spinup.toml
+stdout '^modules = .*monitoring'
+# The cargo phases: the precise update, then verification with clippy and the tests.
+grep '^cargo update -p anyhow@1\.0\.100 --precise 1\.0\.104$' $MODULE_TOOL_LOG
+grep '^cargo clippy --locked --all-targets -- -D warnings$' $MODULE_TOOL_LOG
+grep '^cargo test --locked$' $MODULE_TOOL_LOG
+grep '^pnpm install --lockfile-only --prefer-offline --ignore-scripts$' $MODULE_TOOL_LOG
+grep '^pnpm check$' $MODULE_TOOL_LOG
+grep '^pnpm build$' $MODULE_TOOL_LOG
+! grep '^cargo update$' $MODULE_TOOL_LOG
+
+# Merge the reviewed result. Repeating an enabled module creates no new worktree.
+exec git merge spinup/module-monitoring
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add monitoring --yes --non-interactive
+stdout 'Modules are already enabled.'
+exec spinup module list
+stdout 'monitoring +on +deploy'
+
+# Requirements are added automatically. Web modules refuse an API-only app.
+cd $WORK
+exec spinup new apionly --api-only --modules ci --module example.com/apionly --non-interactive
+cd apionly
+! exec spinup module add auth --yes --non-interactive
+stderr 'API-only'
+stderr 'Try:'
+rm $MODULE_TOOL_LOG
+exec spinup module add monitoring --yes --non-interactive
+stdout 'Adding required modules: deploy'
+stdout 'git merge spinup/module-monitoring'
+! stdout '^Dependency '
+grep '^modules = .*deploy.*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
+# Pins at the stack need no update. An API-only app has no web phase.
+! grep '^cargo update' $MODULE_TOOL_LOG
+grep '^cargo clippy --locked --all-targets -- -D warnings$' $MODULE_TOOL_LOG
+grep '^cargo test --locked$' $MODULE_TOOL_LOG
+! grep '^pnpm ' $MODULE_TOOL_LOG
+
+# Embed mode refuses auth before creating a branch, worktree, or upgrade state.
+cd $WORK
+exec spinup new embedded --frontend-mode embed --modules ci --module example.com/embedded --non-interactive
+cd embedded
+cp spinup.lock $WORK/embed.lock
+cp spinup.toml $WORK/embed.toml
+! exec spinup module add auth --yes --non-interactive
+stderr 'cannot use auth in embed mode: its pages require SvelteKit form actions'
+stderr 'Try: use --frontend-mode node, or remove auth from --modules'
+! exists .spinup/upgrade.json .spinup/upgrade/0.0.0-dev
+exec git branch --list spinup/module-auth
+! stdout .
+exec git status --porcelain
+! stdout .
+cmp spinup.lock $WORK/embed.lock
+cmp spinup.toml $WORK/embed.toml
+
+-- tools/cargo --
+#!/bin/sh
+printf 'cargo %s\n' "$*" >> "$MODULE_TOOL_LOG"
+case "$*" in
+  '--version') printf '%s\n' 'cargo 1.99.1' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+printf 'pnpm %s\n' "$*" >> "$MODULE_TOOL_LOG"
+exit 0
