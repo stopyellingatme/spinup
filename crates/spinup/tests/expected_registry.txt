@@ -2,6 +2,8 @@
 # Main loop only (ADR 0020 §5). The registry test ignores lines that start with `#`.
 command cache
 command check
+command db
+command destroy
 command diff
 command docs
 command eject
