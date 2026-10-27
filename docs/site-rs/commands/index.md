@@ -1,5 +1,6 @@
 # Command reference
 
+- [`spinup build`](build.md) — Build the application API
 - [`spinup cache`](cache.md) — Manage cached template versions
 - [`spinup cache clean`](cache-clean.md) — Remove downloaded template archives and signatures
 - [`spinup cache list`](cache-list.md) — List loadable template versions and their sources
@@ -43,5 +44,7 @@
 - [`spinup module list`](module-list.md) — List modules and their enabled state
 - [`spinup new`](new.md) — Create an application from template packs
 - [`spinup restore`](restore.md) — Restore a tracked file from its template
+- [`spinup routes`](routes.md) — List application HTTP routes
+- [`spinup test`](test.md) — Run application tests
 - [`spinup upgrade`](upgrade.md) — Upgrade app templates in a separate Git worktree
 - [`spinup version`](version.md) — Print the spinup version
