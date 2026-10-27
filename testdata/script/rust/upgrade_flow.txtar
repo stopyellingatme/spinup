@@ -37,8 +37,13 @@ exec sh -c 'spinup upgrade --continue; test $? -eq 3'
 stderr 'api/src/routes.rs'
 cp $WORK/resolved-routes.rs .spinup/upgrade/0.0.1/api/src/routes.rs
 exec spinup upgrade --continue --yes --no-verify
-! stdout 'Skipped go fix'
+! stdout 'go fix'
 stdout 'git merge spinup/upgrade-0.0.1'
+# The cargo phases (ADR 0021 §8): the kit patch stays, and pins at the stack need no update.
+! stdout '^Dependency '
+grep '^spinup-kit = \{ path = "'$SPINUP_KIT_DIR'" \}$' .spinup/upgrade/0.0.1/api/Cargo.toml
+cmp api/Cargo.toml .spinup/upgrade/0.0.1/api/Cargo.toml
+cmp api/Cargo.lock .spinup/upgrade/0.0.1/api/Cargo.lock
 ! exists .spinup/upgrade.json
 grep '"template_version": "0.0.1"' .spinup/upgrade/0.0.1/spinup.lock
 exec git log spinup/upgrade-0.0.1 --format=%s
@@ -58,6 +63,8 @@ exec spinup upgrade --yes --no-verify
 stdout 'git merge spinup/upgrade-0.0.1'
 ! exists .spinup/upgrade.json
 exists .spinup/upgrade/0.0.1/upgrade-added.txt
+cmp api/Cargo.toml .spinup/upgrade/0.0.1/api/Cargo.toml
+cmp api/Cargo.lock .spinup/upgrade/0.0.1/api/Cargo.lock
 grep '^# Updated development compose file.' .spinup/upgrade/0.0.1/deploy/compose.dev.yml
 ! grep '^# Updated development compose file.' deploy/compose.dev.yml
 exec git status --porcelain
