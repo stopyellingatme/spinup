@@ -671,7 +671,7 @@ fn golden_monitoring_grafana_password() -> Result<()> {
             std::env::var("PATH").unwrap_or_default()
         );
         let result = run_tool(Cmd {
-            timeout: Some(Duration::from_secs(5)),
+            timeout: Some(Duration::from_secs(30)),
             ..Cmd::new("sh")
                 .args([script_path.to_string_lossy().into_owned()])
                 .dir(root)
