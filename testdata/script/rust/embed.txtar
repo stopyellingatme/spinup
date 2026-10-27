@@ -1,0 +1,85 @@
+# Rust twin of testdata/script/embed.txtar (Go blob a7d970a3703a74f971d4cc434af3750598e02d5f).
+# Embed mode builds offline and serves the static build through the kit app.
+# The web build goes to api/webdist/. The embedweb feature is in the default list (ADR 0021 §3).
+# The build --image lines of the Go script come back in R3a.7.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+# Bun apps use Bun in the embedded image and the upgrade workflow.
+exec spinup new embeddedbun --module example.com/embeddedbun --frontend-mode embed --package-manager bun --modules ci --no-git --non-interactive
+grep 'RUN npm install --global bun@[0-9]' embeddedbun/deploy/Dockerfile.api
+grep 'COPY --from=web package.json bun.lock ./' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bun install --frozen-lockfile --ignore-scripts' embeddedbun/deploy/Dockerfile.api
+grep 'RUN bunx --no-install svelte-kit sync && bun run build' embeddedbun/deploy/Dockerfile.api
+! grep 'pnpm|corepack' embeddedbun/deploy/Dockerfile.api
+grep 'npm install --global bun@[0-9]' embeddedbun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' embeddedbun/.github/workflows/upgrade-check.yml
+exec spinup new nodebun --module example.com/nodebun --package-manager bun --modules ci --no-git --non-interactive
+grep 'npm install --global bun@[0-9]' nodebun/.github/workflows/upgrade-check.yml
+! grep 'pnpm/action-setup' nodebun/.github/workflows/upgrade-check.yml
+exec spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
+cd embedded
+! exists deploy/Dockerfile.web web/src/hooks.server.ts web/src/routes/+layout.server.ts
+! grep 'WEB_IMAGE' deploy/compose.yml
+grep 'ssr = false' web/src/routes/+layout.ts
+# The embedweb feature comes from the default feature list, not from a build flag.
+grep '^default = \[.*"embedweb".*\]$' api/Cargo.toml
+grep '^embedweb = \["kit/embedweb"\]$' api/Cargo.toml
+exists api/build.rs
+exec spinup g page about
+! exec spinup g page settings --server
+stderr 'embed mode'
+stderr 'Try:'
+! exists web/src/routes/settings/+page.svelte
+! exec spinup g resource todo title:string --dry-run
+stderr 'embed mode'
+stderr 'Try:'
+! exists api/migrations/00002_create_todos.up.sql
+cd ..
+! exec spinup new invalid --module example.com/invalid --frontend-mode embed --modules auth --no-git --non-interactive
+stderr 'cannot use auth in embed mode'
+stderr 'Try:'
+! exists invalid
+cd embedded
+exec spinup build --dry-run
+stdout 'pnpm --dir web install --frozen-lockfile'
+stdout 'pnpm --dir web build'
+stdout 'Copy web/build to api/webdist'
+stdout 'cargo build --release --locked'
+! stdout '--features'
+cd web
+exec pnpm install --frozen-lockfile --offline --package-import-method=copy --store-dir $SPINUP_PNPM_STORE
+exec pnpm check
+stdout '(?i)\b0 errors\b'
+cd ..
+# Keep every package manager invocation offline, including spinup build.
+env npm_config_offline=true
+exec spinup build
+exists web/build/index.html api/webdist/index.html api/bin/api
+! exists web/build/index.js
+cd api
+# The live check runs the generated process over HTTP. It needs no database.
+[!exec:curl] skip 'curl is required for the live HTTP check'
+env DATABASE_URL=postgres://unused:unused@127.0.0.1:1/unused?sslmode=disable
+env SPINUP_ENV=production
+env PORT=38439
+exec ./bin/api &api&
+exec curl -sS --retry 15 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38439/healthz
+stdout '^200$'
+grep '"status":"ok"' health.json
+# The SvelteKit SPA shell starts the app with an inline script that imports the hashed start entry.
+exec curl -sS -D index.headers -o index.html -w '%{http_code}' http://127.0.0.1:38439/
+stdout '^200$'
+grep 'import\("/_app/immutable/entry/start\.' index.html
+grep '(?i)^cache-control: no-cache' index.headers
+exec curl -sS -o deep.html -w '%{http_code}' http://127.0.0.1:38439/deep/link
+stdout '^200$'
+cmp index.html deep.html
+exec sh $WORK/asset.sh
+grep '(?i)^cache-control: public, max-age=31536000, immutable' asset.headers
+kill -INT api
+wait api
+
+-- asset.sh --
+set -eu
+asset=$(find webdist/_app/immutable -type f -name '*.js' | head -n 1)
+path=${asset#webdist}
+curl -sS -D asset.headers -o /dev/null "http://127.0.0.1:38439$path"
