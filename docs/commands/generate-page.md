@@ -11,6 +11,9 @@ Run the generators from the application root.
 | `spinup g component <name>...` | Runs the shadcn-svelte CLI to add components |
 | `spinup g resource <name> <field:type>...` | Also writes the pages of the resource (see below) |
 
+The long forms are `spinup generate page` and `spinup generate component`.
+The page and component generators work the same for a Go API and a Rust API.
+
 ## Page
 
 ```console
@@ -36,7 +39,7 @@ Each segment is one of these:
 - A parameter, such as `[id]` or `[slug]`.
 - A group, such as `(marketing)`. A group does not change the URL.
 
-The generator refuses a route below `api`, because `/api` goes to the Go API.
+The generator refuses a route below `api`, because `/api` goes to the API.
 The page title comes from the last name segment.
 With `--server`, the generator also writes `+page.server.ts` with a `load` function.
 The page shows the title that `load` returns.
@@ -64,6 +67,7 @@ The lock does not record the component files, because they are tool output.
 In an app with the web pack, `spinup g resource` also writes the pages of the resource.
 Pass `--api-only` to skip them.
 
+<!-- doctest: only go -->
 ```console
 $ spinup g resource todo title:string done:bool 'due:date?' --dry-run
 create api/db/migrations/00002_create_todos.sql (seed)
@@ -75,6 +79,32 @@ create api/internal/handlers/validation.go (scaffold)
 update api/internal/routes/routes_gen.go (managed)
 create api/openapi/paths/todos.yaml (scaffold)
 create api/openapi/schemas/todo.yaml (scaffold)
+update web/src/lib/nav.gen.ts (managed)
+create web/src/routes/todos/+page.server.ts (scaffold)
+create web/src/routes/todos/+page.svelte (scaffold)
+create web/src/routes/todos/[id]/+page.server.ts (scaffold)
+create web/src/routes/todos/[id]/+page.svelte (scaffold)
+create web/src/routes/todos/[id]/edit/+page.server.ts (scaffold)
+create web/src/routes/todos/[id]/edit/+page.svelte (scaffold)
+create web/src/routes/todos/fields.svelte (scaffold)
+create web/src/routes/todos/new/+page.server.ts (scaffold)
+create web/src/routes/todos/new/+page.svelte (scaffold)
+create web/src/routes/todos/schema.ts (scaffold)
+```
+
+With a Rust API, the API files are the Rust files of [g resource](generate-resource.md), and the pages are the same:
+
+<!-- doctest: only rust -->
+```console
+$ spinup g resource todo title:string done:bool 'due:date?' --dry-run
+create api/migrations/00002_create_todos.down.sql (seed)
+create api/migrations/00002_create_todos.up.sql (seed)
+update api/src/handlers/mod.rs (managed)
+create api/src/handlers/todos.rs (scaffold)
+create api/src/handlers/todos_tests.rs (scaffold)
+update api/src/models/mod.rs (managed)
+create api/src/models/todo.rs (scaffold)
+update api/src/routes_gen.rs (managed)
 update web/src/lib/nav.gen.ts (managed)
 create web/src/routes/todos/+page.server.ts (scaffold)
 create web/src/routes/todos/+page.svelte (scaffold)
@@ -109,8 +139,9 @@ This managed file lists one link for each resource, and the sidebar of the app s
 It also sets `home`, the first page that a signed-in user sees.
 When the app has the `auth` module, each user sees only the items that the user owns.
 
-The pages call the Go API with the typed client in `web/src/lib/api/client.ts`.
+The pages call the API with the typed client in `web/src/lib/api/client.ts`.
 After the write, the `client` post-step regenerates `web/src/lib/api/schema.d.ts`, so the pages type-check.
+With a Rust API, the `client` post-step reads the bundle that `openapi-emit` writes, so it also needs a database URL.
 That post-step needs pnpm. If `web/node_modules` is missing, it runs `pnpm install` first.
 
 Each field type gets one input:

@@ -1,0 +1,139 @@
+# Rust twin of testdata/script/db_cmds.txtar (Go blob 6bf48006ddd113c8562dc37ad3922a3a47270c75).
+# The db group on a generated Rust app: migration names, guards, and the exact commands.
+# Migrations are sqlx pairs in api/migrations. The kit migrations run first (ADR 0021 §6).
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exists api/migrations/00001_init.up.sql api/migrations/00001_init.down.sql
+! exists api/sqlc.yaml
+
+# New migrations take the next number from the files on disk.
+exec spinup db new add_widgets
+stdout '^Created api/migrations/00002_add_widgets\.up\.sql$'
+stdout '^Created api/migrations/00002_add_widgets\.down\.sql$'
+exists api/migrations/00002_add_widgets.up.sql api/migrations/00002_add_widgets.down.sql
+exec spinup db new add_gadgets
+stdout '^Created api/migrations/00003_add_gadgets\.up\.sql$'
+! exec spinup db new add_widgets
+stderr 'already has the name add_widgets'
+stderr 'Try:'
+! exec spinup db new AddWidgets
+stderr 'not snake case'
+! exists api/migrations/00004_add_widgets.up.sql
+exec spinup db new add_parts --dry-run
+stdout '^Would create api/migrations/00004_add_parts\.up\.sql$'
+! exists api/migrations/00004_add_parts.up.sql
+
+# Commands that can lose data need --i-know.
+! exec spinup db redo
+stderr 'Try: spinup db redo --i-know'
+! exec spinup db to 1 --dry-run
+stderr 'Try: spinup db to 1 --i-know'
+! exec spinup db migrate down
+stderr 'Try: spinup db migrate down --i-know'
+
+# Dry runs print the exact commands. The kit paths are placeholders.
+exec spinup db status --dry-run
+cmp stdout ../want/status
+exec spinup db migrate --dry-run
+cmp stdout ../want/up
+exec spinup db migrate down --i-know --dry-run
+cmp stdout ../want/down
+exec spinup db redo --i-know --dry-run
+cmp stdout ../want/redo
+exec spinup db to 1 --i-know --dry-run
+cmp stdout ../want/to
+exec spinup db prepare --dry-run
+cmp stdout ../want/prepare
+exec spinup db psql --dry-run
+cmp stdout ../want/psql
+exec spinup db dump --dry-run
+cmp stdout ../want/dump
+! exists .spinup/dumps
+exec spinup db seed --dry-run
+stdout '^No seed files in api/seeds\.$'
+cp ../seed.sql api/seeds/01_widgets.sql
+exec spinup db seed --dry-run
+cmp stdout ../want/seed
+! exec spinup db reset --dry-run
+stderr 'Try: spinup db reset --yes'
+exec spinup db reset --dry-run --yes
+cmp stdout ../want/reset
+exec spinup db doctor --dry-run
+cmp stdout ../want/doctor
+
+# The migration lint reads the .up.sql files.
+exec spinup db lint
+! stdout .
+
+# The real migration commands run only with a database.
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout '^Applied 1/migrate init '
+[env:DATABASE_URL] stdout '^Applied 3/migrate add gadgets '
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^1/installed init$'
+[env:DATABASE_URL] stdout '^2/installed add widgets$'
+[env:DATABASE_URL] stdout '^3/installed add gadgets$'
+[env:DATABASE_URL] exec spinup db redo --i-know
+[env:DATABASE_URL] stdout '^Applied 3/revert add gadgets '
+[env:DATABASE_URL] stdout '^Applied 3/migrate add gadgets '
+[env:DATABASE_URL] exec spinup db to 1 --i-know
+[env:DATABASE_URL] stdout '^Applied 3/revert add gadgets '
+[env:DATABASE_URL] stdout '^Applied 2/revert add widgets '
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^1/installed init$'
+[env:DATABASE_URL] stdout '^2/pending add widgets$'
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+[env:DATABASE_URL] stdout '^Applied 1/revert init '
+
+# db prepare (Go db sqlc) migrates up, then refreshes the query cache in api/.sqlx.
+[env:DATABASE_URL] exec spinup db prepare
+[env:DATABASE_URL] stdout '^Applied 3/migrate add gadgets '
+[env:DATABASE_URL] exists api/.sqlx
+
+# Reset refuses a production environment, protected or not.
+exec sh -c 'cat ../production.toml >> spinup.toml'
+! exec spinup db reset --env production --yes
+stderr 'works only on the local development database'
+stderr 'Try:'
+! exec spinup db redo --i-know --dry-run
+stderr 'protected environment "production"'
+
+-- seed.sql --
+INSERT INTO widgets (name) VALUES ('first');
+-- production.toml --
+
+[env.production]
+host = "203.0.113.10"
+protected = true
+-- want/status --
+sqlx migrate info --source '<kit>/migrations' --config '<tmp>/kit-migrations.toml'
+sqlx migrate info --source migrations
+-- want/up --
+sqlx migrate run --source '<kit>/migrations' --config '<tmp>/kit-migrations.toml'
+sqlx migrate run --source migrations
+-- want/down --
+sqlx migrate revert --source migrations
+-- want/redo --
+sqlx migrate revert --source migrations
+sqlx migrate run --source migrations
+-- want/to --
+sqlx migrate revert --source migrations --target-version 1
+-- want/prepare --
+sqlx migrate run --source '<kit>/migrations' --config '<tmp>/kit-migrations.toml'
+sqlx migrate run --source migrations
+cargo sqlx prepare --workspace -- --all-targets
+-- want/psql --
+docker compose -f deploy/compose.dev.yml exec postgres psql -U app -d app
+-- want/dump --
+docker compose -f deploy/compose.dev.yml exec -T postgres pg_dump -U app -d app -Fc > .spinup/dumps/app.dump
+-- want/seed --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -v ON_ERROR_STOP=1 -f - < api/seeds/01_widgets.sql
+-- want/reset --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'
+sqlx migrate run --source '<kit>/migrations' --config '<tmp>/kit-migrations.toml'
+sqlx migrate run --source migrations
+-- want/doctor --
+docker compose -f deploy/compose.dev.yml exec -T postgres psql -U app -d app -At -c 'SELECT current_setting('"'"'server_version_num'"'"')'
+sqlx migrate info --source '<kit>/migrations' --config '<tmp>/kit-migrations.toml'
+sqlx migrate info --source migrations

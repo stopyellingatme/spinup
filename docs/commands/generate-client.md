@@ -26,6 +26,7 @@ After generation, run `cd web && pnpm check`.
 
 This example verifies the preview and the skip for an application without the web pack:
 
+<!-- doctest: only go -->
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 ...
@@ -35,6 +36,26 @@ $ test ! -e api/openapi/bundle.gen.yaml
 $ spinup g client
 no OpenAPI paths; oapi-codegen skipped
 Try: spinup g resource <name> <field:type>...
+client generation skipped: no web pack
+Created 0, updated 0 files
+Next: cd web && pnpm check
+$ test -s api/openapi/bundle.gen.yaml
+$ test ! -e web/src/lib/api/schema.d.ts
+```
+
+In a Rust API, the first post-step is `openapi-emit`.
+It builds the app and writes `api/openapi/bundle.gen.yaml` from the utoipa annotations.
+A new Rust app already has the bundle, because the bundle is a tracked `seed` file.
+If no database URL is set, the command skips both post-steps and prints `Next: spinup db prepare` and `Next: spinup g openapi`.
+
+<!-- doctest: only rust -->
+```console
+$ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+...
+$ cd todo
+$ spinup g client --dry-run
+$ spinup g client
+...
 client generation skipped: no web pack
 Created 0, updated 0 files
 Next: cd web && pnpm check
