@@ -28,6 +28,9 @@ pub struct Options<'a> {
     pub dry_run: bool,
     /// Receives file actions and migration suggestions. None discards output.
     pub out: Option<&'a Mutex<dyn Write + Send>>,
+    /// Overrides the database URL lookup. None reads the process environment and the
+    /// project files (`spinup_project::env`). `Some(None)` means that no URL is set.
+    pub database_url: Option<Option<String>>,
 }
 
 /// Safe file changes, retained paths, and empty directories.
@@ -213,7 +216,11 @@ fn post_steps(
     if lock.packs.iter().any(|p| p == "web") {
         steps.push(PostStep::Client);
     }
-    if spinup_project::env::database_url_from_process(&options.root)?.is_none() {
+    let database_url = match &options.database_url {
+        Some(url) => url.clone(),
+        None => spinup_project::env::database_url_from_process(&options.root)?,
+    };
+    if database_url.is_none() {
         output(
             options,
             &format!(

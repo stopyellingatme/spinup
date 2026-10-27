@@ -130,6 +130,7 @@ fn destruction_updates_the_lock_navigation_and_directories() {
     run(
         &Options {
             out: Some(&out),
+            database_url: Some(None),
             ..options(root.path())
         },
         &fake,

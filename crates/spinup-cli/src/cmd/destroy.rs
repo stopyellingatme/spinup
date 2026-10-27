@@ -47,6 +47,7 @@ fn run(app: &App, matches: &ArgMatches) -> Result<()> {
         name: text("name"),
         dry_run: app.flags.dry_run,
         out: Some(&channel),
+        database_url: None,
     };
     let mut out = Output::new(&app.ui);
     let result = std::thread::scope(|scope| {
