@@ -1,0 +1,81 @@
+# Rust twin of testdata/script/app_gate_api.txtar (Go blob f5a87528c3ef298fe260da9e6773c585e61630f2).
+# App gate: a full generated app (auth, jobs, mail) with the todo resource builds, passes
+# clippy and its tests, migrates, and serves health checks. The emitted spec equals the
+# committed bundle, and it equals the spec of the reference app except info (ADR 0021 §12).
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to poll the health endpoints'
+
+# The auth module needs the web app, so this gate does not use --api-only.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new gateapp --modules ci,auth,jobs,mail --module example.com/gateapp --no-git --non-interactive
+stdout 'from packs base, api, ci, jobs, mail, web, auth'
+cd gateapp
+
+# The real environment wins over .env, so DATABASE_URL points the app at the script database.
+# The kit migrations run first.
+exec spinup db migrate up
+stdout '^Applied 1/migrate init '
+stdout '^Applied 2/migrate create auth '
+
+# With a database, the post-steps migrate, prepare the query cache, build, emit the spec,
+# and write the web client.
+exec spinup g resource todo title:string done:bool 'due:date?'
+stdout '^Created [0-9]+, updated [0-9]+ files$'
+! stdout 'Skipped post-steps'
+exists api/.sqlx api/src/handlers/todos.rs api/src/models/todo.rs
+grep '^  /api/todos/\{id\}:$' api/openapi/bundle.gen.yaml
+
+# The Rust form of go vet and go test.
+cd api
+exec cargo clippy --offline --locked --all-targets -- -D warnings
+cd ..
+exec spinup test
+stderr 'PASS .* api handlers::todos::tests::pg_todos_crud'
+! stderr 'FAIL'
+
+exec spinup db migrate status
+stdout '^1/installed init$'
+stdout '^4/installed create todos$'
+! stdout 'pending'
+exec spinup db migrate up
+! stdout 'Applied'
+
+# Build, start the server, and check both endpoints.
+exec spinup build
+exists api/bin/api
+env PORT=38417
+cd api
+exec bin/api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38417/healthz
+stdout '^200$'
+grep '"status":\s*"ok"' health.json
+exec curl -sS -o ready.json -w '%{http_code}' http://127.0.0.1:38417/readyz
+stdout '^200$'
+grep '"db":\s*"ok"' ready.json
+# The todo rows belong to a user: a request without a session gets a problem answer.
+exec curl -sS -o todos.json -w '%{http_code}' http://127.0.0.1:38417/api/todos
+stdout '^401$'
+grep '"status":\s*401' todos.json
+kill server
+
+# The binary emits the committed spec.
+exec bin/api openapi
+cmp stdout openapi/bundle.gen.yaml
+
+# The spec equals the spec of the reference app, except the info object.
+exec sh $WORK/noinfo.sh openapi/bundle.gen.yaml
+cp stdout $WORK/app.yaml
+exec sh $WORK/noinfo.sh $SPINUP_REPO/testdata/reference/todo-rs/todo-api/openapi.gen.yaml
+cp stdout $WORK/reference.yaml
+cmp $WORK/app.yaml $WORK/reference.yaml
+cd ..
+
+# Roll back the last migration.
+exec spinup db migrate down --i-know
+stdout '^Applied 4/revert create todos '
+exec spinup db migrate status
+stdout '^4/pending create todos$'
+
+-- noinfo.sh --
+# Print the spec without the top-level info object.
+awk '/^info:/ { skip = 1; next } skip && /^[^ ]/ { skip = 0 } !skip' "$1"
