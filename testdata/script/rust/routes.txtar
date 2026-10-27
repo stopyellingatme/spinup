@@ -1,0 +1,53 @@
+# Rust twin of testdata/script/routes.txtar (Go blob db35613f9668896ce1ffdbfc98539fbed7545b18).
+# spinup routes reads the kit routes, api/openapi/bundle.gen.yaml, and literal routes in
+# api/src/routes.rs (ADR 0021 §7). It never builds the app.
+env SPINUP_KIT_REPLACE=$SPINUP_KIT_DIR
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup routes --json
+stdout '^\[\{"method":"GET","path":"/healthz","source":"kit"\},\{"method":"GET","path":"/readyz","source":"kit"\},\{"method":"GET","path":"/version","source":"kit"\}\]$'
+
+# The openapi-emit post-step rewrites the bundle. It runs only with a database.
+[env:DATABASE_URL] exec spinup g resource todo title:string
+[env:DATABASE_URL] exec spinup routes
+[env:DATABASE_URL] stdout '^METHOD +PATH +SOURCE$'
+[env:DATABASE_URL] stdout '^GET +/api/todos +openapi:listTodos$'
+[env:DATABASE_URL] stdout '^POST +/api/todos +openapi:createTodo$'
+[env:DATABASE_URL] stdout '^DELETE +/api/todos/\{id\} +openapi:deleteTodo$'
+[env:DATABASE_URL] stdout '^GET +/api/todos/\{id\} +openapi:getTodo$'
+[env:DATABASE_URL] stdout '^PUT +/api/todos/\{id\} +openapi:updateTodo$'
+[env:DATABASE_URL] exec spinup routes --json
+[env:DATABASE_URL] stdout '"source":"openapi:listTodos"'
+
+# Literal registrations in api/src/routes.rs also appear. Paths that are not literals do not.
+cp $WORK/routes.rs api/src/routes.rs
+exec spinup routes
+stdout '^METHOD +PATH +SOURCE$'
+stdout '^POST +/custom +routes.rs:12$'
+stdout '^GET +/custom +routes.rs:12$'
+stdout '^\* +/any +routes.rs:13$'
+stdout '^GET +/healthz +kit$'
+! stdout '/ignored'
+exec spinup routes --json
+stdout '\{"method":"POST","path":"/custom","source":"routes.rs:12"\}'
+
+-- routes.rs --
+//! The application routes.
+
+use axum::Router;
+use axum::routing::{any, get, post};
+use kit::db::PgPool;
+
+const IGNORED: &str = "/ignored";
+
+/// Registers the application routes.
+pub fn routes() -> Router<PgPool> {
+    Router::new()
+        .route("/custom", post(create).get(read))
+        .route("/any", any(read))
+        .route(IGNORED, get(read))
+}
+
+async fn create() {}
+
+async fn read() {}

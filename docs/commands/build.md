@@ -4,6 +4,7 @@
 The default binary is `api/bin/api`.
 The command embeds the version from `--tag`, or `dev` when the flag is absent.
 
+<!-- doctest: only go -->
 ```console
 $ spinup new todo --api-only --module github.com/acme/todo --no-git --non-interactive
 ...
@@ -22,7 +23,7 @@ go build -trimpath -ldflags '-X main.version=v0.1.0' -o bin/api ./cmd/api
 | --- | --- |
 | `--target <name>` | Select `api`, `web`, or `all`. The default is `api`. |
 | `--tag <version>` | Set the embedded version and image tag. The default is `dev`. |
-| `--image` | Build `<app>-api:<tag>` with `deploy/Dockerfile.api`. |
+| `--image` | Go API: build `<app>-api:<tag>` with `deploy/Dockerfile.api`. |
 | `--dir`, `-C <directory>` | Find the project root from this directory. |
 | `--dry-run` | Print the command without execution. |
 | `--env <name>` | Global flag. Local builds do not select an environment. |
@@ -43,12 +44,47 @@ If the directory does not exist, the build fails with a `Try:` line.
 Without a local kit replace, the build uses the published kit version.
 If project discovery fails, pass `--dir` with the application directory.
 
+## Rust API
+
+In a Rust API, `spinup build` runs `cargo build --release --locked` in `api/`.
+The command gives the version to the app through three environment variables.
+`SPINUP_APP_VERSION` is the `--tag` value, or `dev`.
+`SPINUP_APP_GIT_SHA` is empty for a local build.
+`SPINUP_APP_RUST` is the toolchain channel from `api/rust-toolchain.toml`.
+The app shows these values in `/version` and in `api version`.
+
+The command reads the binary path from the Cargo JSON messages.
+Then it copies the binary to `api/bin/api`.
+Thus a shared `CARGO_TARGET_DIR` also works.
+For an app with the embed frontend mode, the command first builds the web app and copies `web/build` to `api/webdist`.
+
+<!-- doctest: only rust -->
+```console
+$ spinup new todo --api-only --module github.com/acme/todo --no-git --non-interactive
+...
+$ cd todo
+$ spinup build --dry-run
+env SPINUP_APP_VERSION=dev SPINUP_APP_GIT_SHA= SPINUP_APP_RUST=1.99.1 cargo build --release --locked --message-format=json-render-diagnostics
+$ spinup build --target all --tag v0.1.0 --dry-run
+Building available targets: api
+env SPINUP_APP_VERSION=v0.1.0 SPINUP_APP_GIT_SHA= SPINUP_APP_RUST=1.99.1 cargo build --release --locked --message-format=json-render-diagnostics
+$ spinup build --target web
+Error: Cannot build the API: Cannot build the web frontend: the web pack is not available as a local target
+  Try: pass --target api
+[exit 1]
+```
+
+If the build fails because the SQLx query cache has no entry for a query, the error ends with `Try: spinup db prepare`.
+A missing `cargo` executable produces an error with installation guidance.
+The `--image` flags of a Rust API arrive in a later release.
+
 ## Images and push
 
 `--image` builds both deploy images with Docker buildx.
 The default platform is `linux/amd64`.
 Without `--push`, buildx loads local images and does not create provenance or an SBOM.
 
+<!-- doctest: only go -->
 ```console
 $ spinup build --image --tag v0.1.0 --platform linux/amd64 --dry-run
 ...
@@ -59,6 +95,7 @@ The module path supplies the GitHub owner for the default `ghcr.io` registry.
 Buildx creates provenance and an SBOM for pushed images.
 The command prints each image digest for the deployer.
 
+<!-- doctest: only go -->
 ```console
 $ spinup build --image --push --tag v0.1.0 --dry-run
 ...
