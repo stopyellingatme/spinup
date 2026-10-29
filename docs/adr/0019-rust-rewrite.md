@@ -42,7 +42,7 @@ Both hard no-go conditions pass:
 
 Condition (a) passes only with the dev profile in §4. Condition (b) passes only with the lane settings in §5.
 
-The swap limit counts the increase over the swap in use when the run starts. The user decided this on 2026-10-24, because other sessions already held 9.18 GB of swap. The disk limit and the load limit stay absolute.
+The swap limit counts the increase over the swap in use when the run starts. The user decided this on 2026-10-24, because other sessions already held 9.18 GB of swap. The load limit stays absolute. The disk limit counts the real drop in free space since the run start (decided 2026-10-29, ADR 0021 "R2 results").
 
 ### 3. The R0 choices
 
