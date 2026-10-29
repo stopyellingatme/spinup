@@ -70,6 +70,11 @@ fn check_workflows(tree: &Tree) -> Result<()> {
             workflows.push(path.to_owned());
         }
     }
+    // CI installs actionlint on Linux and macOS only (scripts/ci/install-tools.sh). The
+    // workflow files are the same on every system, so Windows checks only the steps.
+    if cfg!(windows) {
+        return Ok(());
+    }
     let output = run_tool(Cmd::new("actionlint").args(workflows).dir(root.path()))
         .map_err(|error| anyhow::anyhow!("actionlint: {}", tool_failure(&error)))?;
     assert!(output.stdout.is_empty() && output.stderr.is_empty());

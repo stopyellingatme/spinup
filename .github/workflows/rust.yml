@@ -105,6 +105,10 @@ jobs:
       # The generator tests compile generated apps offline (cargo --offline --locked).
       - name: Fetch the crates of the generated apps
         run: scripts/rust/app-fetch.sh
+      # golden_ci runs actionlint on the generated workflows (not on Windows).
+      - name: Install actionlint
+        if: runner.os != 'Windows'
+        run: scripts/ci/install-tools.sh actionlint
       # The pg_ tests of spinup-db run db to through sqlx-cli. Windows skips the pg_ tests.
       - name: Install sqlx-cli
         if: runner.os != 'Windows'
