@@ -80,7 +80,7 @@ fn up_and_status_run_kit_first_with_a_live_separate_config() {
         let calls = runner.fake.calls();
         assert_eq!(
             calls[1].args[3],
-            dir.path().join("kit/migrations").to_string_lossy()
+            dir.path().join("kit").join("migrations").to_string_lossy()
         );
         assert!(!Path::new(&calls[1].args[5]).exists());
         for cmd in &calls {

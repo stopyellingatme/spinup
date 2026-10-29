@@ -129,7 +129,7 @@ fn database_steps_use_the_shared_implementation() {
             assert_eq!(call.dir.as_deref(), Some(root.path().join("api").as_path()));
             assert!(!call.to_string().contains("fixture-secret"));
         }
-        assert!(calls[1].args[3].ends_with("kit/migrations"));
+        assert!(std::path::Path::new(&calls[1].args[3]).ends_with("kit/migrations"));
         assert!(calls[1].args.contains(&"--config".into()));
         if step == PostStep::SqlxPrepare {
             assert!(

@@ -307,7 +307,7 @@ fn cargo_apply_override_wins_and_rejects_missing_directory() {
         let doc = read(&s.worktree.join("api/Cargo.toml")).unwrap();
         assert_eq!(
             doc["patch"]["crates-io"]["spinup-kit"]["path"].as_str(),
-            kit.to_str()
+            Some(kit.to_string_lossy().replace('\\', "/").as_str())
         );
         assert!(doc["patch"]["crates-io"].get("other").is_some());
         let error = apply::apply(s, Some(kit.join("absent")))

@@ -90,15 +90,27 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/cargo-nextest*
+            ~/.cargo/bin/sqlx
+            ~/.cargo/bin/cargo-sqlx
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             target
-          key: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-
+          key: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ env.SQLX_CLI_VERSION }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/spinup-packs/overlay/api/files/api/Cargo.lock') }}
+          restore-keys: nextest-${{ runner.os }}-${{ env.NEXTEST_VERSION }}-${{ env.SQLX_CLI_VERSION }}-
       - name: Install cargo-nextest
         run: |
           if ! cargo nextest --version 2>/dev/null | grep -q "^cargo-nextest $NEXTEST_VERSION "; then
             cargo install --locked cargo-nextest --version "$NEXTEST_VERSION"
+          fi
+      # The generator tests compile generated apps offline (cargo --offline --locked).
+      - name: Fetch the crates of the generated apps
+        run: scripts/rust/app-fetch.sh
+      # The pg_ tests of spinup-db run db to through sqlx-cli. Windows skips the pg_ tests.
+      - name: Install sqlx-cli
+        if: runner.os != 'Windows'
+        run: |
+          if ! sqlx migrate run --help 2>/dev/null | grep -q -- --config; then
+            cargo install sqlx-cli --version "$SQLX_CLI_VERSION" --no-default-features --features postgres,rustls,sqlx-toml --force
           fi
       # The kit tests need PostgreSQL (tests named pg_, ADR 0021 §2). A services block does not
       # work in a matrix with macOS and Windows, so each system starts its own server.
@@ -191,8 +203,18 @@ jobs:
           echo "DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable" >> "$GITHUB_ENV"
       - name: The converted packs are current
         run: make rs-convert-check
+      - name: Fetch the crates of the generated apps
+        run: scripts/rust/app-fetch.sh
       - name: The parity scripts with the Rust binary
         run: make rs-script
+      # make rs-script prints only the result lines and the last 80 lines of the log.
+      - name: Keep the full script log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rs-script-log-${{ runner.os }}
+          path: target/rs-script.log
+          if-no-files-found: ignore
 
   # Line coverage (make rs-cover: a 70 percent floor for each of merge, manifest, migrate,
   # and upgrade).

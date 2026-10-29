@@ -170,18 +170,16 @@ rs-doctest: rs-pack-tree ## Rust: the Go doc tests with the Rust binary for the 
 rs-fetch: ## Rust: fetch every locked crate into CARGO_HOME (network; main loop only)
 	@CARGO_NET_OFFLINE=false $(CARGO) fetch --locked
 
+rs-app-fetch: ## Rust: fetch the crates of the api pack lock into CARGO_HOME (network; CI and main loop)
+	@scripts/rust/app-fetch.sh
+
 rs-vuln: ## Rust: cargo deny advisories (network for the advisory database; gate only)
 	@$(CARGO) deny check advisories
 
 rs-cover: ## Rust: line coverage with cargo llvm-cov, $(COVER_FLOOR) percent floor for each crate of COVER_CRATES
 	@$(CARGO) llvm-cov nextest --locked $(COVER_CRATES) -E 'not test(packs_digest)' \
 		--json --summary-only --output-path '$(RS_TARGET)/cover.json'
-	@jq -r --argjson floor $(COVER_FLOOR) --arg names '$(COVER_NAMES)' ' \
-		($$names | split(" ")) as $$n \
-		| [.data[0].files[] | {c: ((.filename | (try capture("/crates/(?<c>[^/]+)/src/").c catch "")) // ""), l: .summary.lines} \
-		   | select(.c as $$x | $$n | index($$x))] \
-		| group_by(.c)[] | (map(.l.covered) | add) as $$cov | (map(.l.count) | add) as $$all \
-		| "\(.[0].c) \($$cov * 1000 / $$all | floor / 10) \(if $$cov * 100 < $$floor * $$all then "FAIL" else "ok" end)"' \
+	@jq -r --argjson floor $(COVER_FLOOR) --arg names '$(COVER_NAMES)' -f scripts/rust/cover.jq \
 		'$(RS_TARGET)/cover.json' | tee '$(RS_TARGET)/cover.txt'
 	@if grep -q ' FAIL$$' '$(RS_TARGET)/cover.txt'; then echo "rs-cover: a crate is under $(COVER_FLOOR) percent"; \
 		echo "Try: add tests to the crate that the FAIL line names"; exit 1; fi
