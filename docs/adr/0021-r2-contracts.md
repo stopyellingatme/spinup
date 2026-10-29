@@ -205,7 +205,7 @@ R2.10 fills all six slots of `Phases`, not only the cargo work:
 
 ## R2 results (added at the R2 gate, 2026-10-27)
 
-The R2 gate passed locally, except item 11 (the Windows proof needs a push of `rust`) and the open disk question below. The checks:
+The R2 gate passed locally. Item 11 passed after the push: `rust.yml` was green on Linux, macOS, and Windows at 30f346d (run 40798532673), after the CI fixes a762f35 and 30f346d. The checks:
 - `make rs-build`, `rs-lint`, `rs-test` (1003 tests with Postgres, 87 of them `pg_` tests), `rs-deny`, `rs-digest`, `rs-golden` (56 trees), `rs-doctest`, and `rs-cover` (`spinup-manifest` 99, `spinup-merge` 85.4, `spinup-migrate` 94.9, `spinup-upgrade` 90.4 percent).
 - `make rs-script`: the 25 parity scripts pass with the Rust binary. `make rs-app-gate`: `app_gate_api` (full app, `g resource todo`, clippy, tests, migrate, run, and the spec equal to the reference app except `info`) and `app_gate_web`.
 - `make rs-app-check` for the seven sets (`full` with `RESOURCE=1`), `rs-ref-check`, `rs-kit-features`, `rs-pack-lock`, `rs-twin-check`, the `kit_manifest` test, `make oracle` with no diff, and `rs-convert-check`.
@@ -214,8 +214,10 @@ The R2 gate passed locally, except item 11 (the Windows proof needs a push of `r
 - `make rs-vuln` and the full Go gate (`make build lint test golden script doctest`).
 - Gate item 6: the Rust stack model and the template data have no Go sections, and every pack set renders with strict undefined.
 
-### Disk (gate item 5, open)
-`make rs-disk` counts the gate target, the run `CARGO_HOME`, and the seed target: 34.24 GB, under the 40 GB limit. The gate target is 26.7 GB (16.1 GB workspace `debug`, 7.1 GB app targets). During the run, two lane targets (8.7 to 14.8 GB `du` each, APFS clones of the 6.7 GB seed) existed next to the gate target. The logical `du` peak of all of them is above 40 GB. The volume never had less than 276 GB free. The user decides whether the limit counts logical `du` with clones, and whether lanes remove app targets after each merge.
+### Disk (gate item 5, decided 2026-10-29)
+`make rs-disk` counts the gate target, the run `CARGO_HOME`, and the seed target: 34.24 GB. The gate target is 26.7 GB (16.1 GB workspace `debug`, 7.1 GB app targets). During the run, two lane targets (8.7 to 14.8 GB `du` each, APFS clones of the 6.7 GB seed) existed next to the gate target. Their logical `du` peak is above 40 GB, because `du` counts each cloned block once for each clone. The volume never had less than 276 GB free.
+
+The user decided the reading on 2026-10-29: the 40 GB limit counts the real drop in free disk space since the run started, like the swap limit (ADR 0019). An APFS clone block counts once. The peak drop (free space at the run start minus free space now) must stay at or under 40 GB. R0.13 measured a 5.1 GB drop for two lanes plus the gate. R2 did not record its start value, so R2 has no drop number. From R3a, the pre-seed records the free space at the run start, and `make rs-disk` reports the drop next to the `du` numbers.
 
 ### Recorded deviations from Go
 - Kit core (R2.1): `ValidJson` rejects unknown JSON properties with the Go 400 text (the Go API ignored them). A wrong value type is 422 with the field. Kit routes answer 405 problems. The access log has a `route` field. The redactor works on flat span fields only. The Go server read, write, and idle timeouts are not ported (`axum::serve` has none). `version` prints the `/version` JSON.
