@@ -48,10 +48,16 @@ COPY --from=web-build /web/build ./internal/webdist/dist
 [[- end ]]
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build[[ if eq (index . "frontend_mode") "embed" ]] -tags embedweb[[ end ]] -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+[[- if has "jobs" .modules ]]
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/worker ./cmd/worker
+[[- end ]]
 
 FROM [[ image "distroless-static" ]]
 ENV SPINUP_ENV=production
 COPY --from=build /out/api /api
+[[- if has "jobs" .modules ]]
+COPY --from=build /out/worker /worker
+[[- end ]]
 USER nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

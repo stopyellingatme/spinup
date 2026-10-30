@@ -37,7 +37,7 @@ staging.toml
 
 | File | Class | Purpose |
 | --- | --- | --- |
-| `deploy/compose.yml` | managed | The color project: `api`, `web`, and the one-shot `migrate`. |
+| `deploy/compose.yml` | managed | The color project: `api`, `web`, `worker` when jobs are enabled, and the one-shot `migrate`. |
 | `deploy/compose.override.yml` | seed | Your own services. `compose.yml` includes this file. |
 | `deploy/compose.edge.yml` | managed | The base project: `caddy` and `postgres`. |
 | `deploy/Caddyfile` | managed | The site, the security headers, compression, and the routes. |
@@ -54,7 +54,7 @@ staging.toml
 The deploy uses blue/green Compose projects (`docs/adr/0003-deploy-strategy.md`).
 Each release runs as the Compose project `<app>-blue` or `<app>-green`.
 
-- `compose.yml` holds the services that change with each release: `api`, `web`, and `migrate`.
+- `compose.yml` holds the services that change with each release: `api`, `web`, `worker`, and `migrate`.
   Its project name is `<app>-${SPINUP_COLOR}`.
 - `compose.edge.yml` holds the services that do not change color: `caddy` and `postgres`.
   Its project name is `<app>`. A color switch never restarts it.
@@ -78,6 +78,7 @@ Each release runs as the Compose project `<app>-blue` or `<app>-green`.
 | `DEPLOY_UID`, `DEPLOY_GID` | both | The IDs of the deploy user on the VM (default `1000`) |
 | `API_REPLICAS`, `API_CPUS`, `API_MEMORY` | `compose.yml` | From the environment file |
 | `WEB_REPLICAS`, `WEB_CPUS`, `WEB_MEMORY` | `compose.yml` | From the environment file |
+| `WORKER_REPLICAS` | `compose.yml` | The jobs worker replica count. The default is `1`. |
 | `POSTGRES_CPUS`, `POSTGRES_MEMORY` | `compose.edge.yml` | From the environment file |
 
 The migrations run before the new color starts:
@@ -86,6 +87,13 @@ The migrations run before the new color starts:
 ```console
 $ docker compose -p todo-green -f compose.yml --profile migrate run --rm migrate
 ```
+
+## Jobs worker
+
+When the `jobs` module is enabled, each color starts a `worker` service from the API image.
+The worker runs `/worker`, joins the `app` and `db` networks, and restarts after database failures.
+Set `WORKER_REPLICAS` to change its replica count.
+The worker has no health check because it has no HTTP endpoint.
 
 ## Caddy and the switch
 
