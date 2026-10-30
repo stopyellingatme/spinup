@@ -12,6 +12,9 @@ A `s-1vcpu-2gb` droplet costs a few cents for the short run.
 If a step fails, the droplet can stay on the account and keep costing money.
 The script then prints the destroy command. Run it.
 
+If the app declares sidecar services, two colors run during a color switch.
+Use the size `s-2vcpu-4gb` for such an app.
+
 ## Prerequisites
 
 - A DigitalOcean account that holds no other droplets, firewalls, or tags.
@@ -19,6 +22,9 @@ The script then prints the destroy command. Run it.
 - A stored sign-in with a refresh token. Run `spinup deploy digital-ocean login` first.
 - A spinup project with the deploy pack and a clean git tree.
   An app that `spinup new` made is enough.
+- For the full test, use an app with the `jobs` module, one `rust` service, and one `python` service.
+  Add the services with `spinup g service <name> --lang rust|python`.
+  Without services, the service step does nothing.
 - The tools `jq`, `curl`, `openssl`, `ssh`, `docker`, `sops`, and `age-keygen`.
 - A terminal. The script reads the answers from `/dev/tty`. Without a terminal, set `SPINUP_DO_LIVE_YES=1` to answer yes. Set it only after a person approved the cost.
 - `--yes` in the provision flags and `SPINUP_DO_DEPLOY_ARGS=--yes`, because the provision and deploy runs have no terminal.
@@ -38,6 +44,7 @@ The script prints the plan and asks for `yes` before it creates anything.
 It asks again before it destroys the environment.
 Set `SPINUP_BIN` to test a spinup binary that is not in `PATH`.
 Set `SPINUP_DO_DEPLOY_ARGS` for extra flags of the deploy runs.
+Set `SPINUP_DO_VERIFY_CMD` for your own check after the service step (see step 7 below).
 
 ## What the script checks
 
@@ -49,7 +56,19 @@ Set `SPINUP_DO_DEPLOY_ARGS` for extra flags of the deploy runs.
    The script never prints a token value.
 5. A plain `spinup deploy` works with an empty `SPINUP_CREDENTIALS_DIR` and no `DIGITALOCEAN_*` variable.
 6. `curl` reaches the public URL, and the certificate is valid.
-7. `spinup deploy digital-ocean destroy --confirm-env <env> --i-know` deletes the environment.
-8. The account holds no droplet, firewall, or tag. Only the SSH key stays.
+7. The services and the hook. The script connects to the droplet over `ssh` with the host, the user, and the pinned host key of `spinup.toml`.
+   The private key is the `--ssh-key` public key without `.pub`. The default is `~/.ssh/id_ed25519`.
+   If `spinup.toml` declares `[[services]]`, the live color must pass these checks for each service:
+   - Each service container runs and is healthy, and the old color runs no such container.
+   - `GET <health>` answers through the `caddy` container. The services are not public.
+   - The `api` container, and the `worker` container, have `SERVICE_<NAME>_URL`.
+
+   If the app has the `jobs` module, the `worker` container must run in the live color only.
+   It must not restart during a wait of 10 seconds.
+   If `SPINUP_DO_VERIFY_CMD` is set, the script runs it with `bash -c`.
+   The script exports `SPINUP_DO_HOST` (the droplet IP) and `SPINUP_DO_SSH_KEY` (the private key file).
+   If the command fails, the script stops and prints the destroy command.
+8. `spinup deploy digital-ocean destroy --confirm-env <env> --i-know` deletes the environment.
+9. The account holds no droplet, firewall, or tag. Only the SSH key stays.
 
 The script lists the names of the droplets, firewalls, tags, and SSH keys that it finds, and it prints no other data.

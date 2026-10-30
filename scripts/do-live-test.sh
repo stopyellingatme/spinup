@@ -18,6 +18,9 @@
 #         SPINUP_DO_DEPLOY_ARGS        extra flags for the deploy runs (word split)
 #         SPINUP_DO_API                the API base (default https://api.digitalocean.com)
 #         SPINUP_DO_WAIT_SECONDS       the wait for each long step (default 600)
+#         SPINUP_DO_VERIFY_CMD         an optional command (run with bash -c) after the service checks.
+#                                      The script exports SPINUP_DO_HOST (the droplet IP) and
+#                                      SPINUP_DO_SSH_KEY (the private key file). A failure stops the script.
 #         SPINUP_DO_LIVE_YES=1         answer yes to the create and destroy questions (no terminal
 #                                      needed). Set it only after a person approved the cost.
 # The script never prints a token value.
@@ -198,14 +201,143 @@ echo "curl verified the certificate of $host."
 openssl s_client -connect "$host:443" -servername "$host" </dev/null 2>/dev/null |
   openssl x509 -noout -issuer -enddate
 
-# --- 7. destroy --------------------------------------------------------------------------------------
-step "7. Destroy"
+# --- 7. services on the droplet and the optional hook ----------------------------------------------
+step "7. Services on the droplet"
+# env_value <key> prints the value of a string key in the [env.<name>] table of spinup.toml.
+env_value() {
+  awk -v tbl="[env.$env_name]" -v key="$1" '
+    /^\[/ { in_tbl = ($0 == tbl) }
+    in_tbl && $1 == key { gsub(/["\047]/, "", $3); print $3; exit }' "$app_dir/spinup.toml"
+}
+droplet_ip=$(env_value host)
+droplet_user=$(env_value user)
+droplet_user=${droplet_user:-deploy}
+[[ -n "$droplet_ip" ]] || die "spinup.toml has no host in the [env.$env_name] table" \
+  "read the output above, then run: ${destroy_cmd[*]}"
+
+# The private key is the public key of --ssh-key without the .pub suffix (default ~/.ssh/id_ed25519).
+ssh_pub="$HOME/.ssh/id_ed25519.pub"
+prev=
+for flag in ${provision_flags[@]+"${provision_flags[@]}"}; do
+  case "$prev" in --ssh-key) ssh_pub=$flag ;; esac
+  case "$flag" in --ssh-key=*) ssh_pub=${flag#--ssh-key=} ;; esac
+  prev=$flag
+done
+ssh_pub=${ssh_pub/#\~/$HOME}
+ssh_key=${ssh_pub%.pub}
+
+# Services are declared as [[services]] tables. Each line holds: name port health.
+service_lines=$(awk '
+  /^\[\[services\]\]/ { if (n != "") print n, p, h; n = p = h = ""; ins = 1; next }
+  /^\[/ { if (ins && n != "") print n, p, h; n = p = h = ""; ins = 0 }
+  ins && $1 == "name" { gsub(/["\047]/, "", $3); n = $3 }
+  ins && $1 == "port" { p = $3 }
+  ins && $1 == "health" { gsub(/["\047]/, "", $3); h = $3 }
+  END { if (ins && n != "") print n, p, h }' "$app_dir/spinup.toml")
+has_jobs=0
+if [[ -f "$app_dir/api/cmd/worker/main.go" ]]; then has_jobs=1; fi
+
+# Pin the host key of spinup.toml in a known_hosts file, as spinup does. Without a pin, accept the
+# key of the first connection.
+known_hosts="$work/known_hosts"
+: >"$known_hosts"
+awk -v tbl="[env.$env_name]" '/^\[/ { in_tbl = ($0 == tbl) } in_tbl { print }' "$app_dir/spinup.toml" |
+  grep -oE 'ssh-ed25519 [A-Za-z0-9+/=]+' | sed 's/^/* /' >"$known_hosts" || true
+host_check=yes
+if [[ ! -s "$known_hosts" ]]; then host_check=accept-new; fi
+droplet_ssh() {
+  ssh -i "$ssh_key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 \
+    -o UserKnownHostsFile="$known_hosts" -o GlobalKnownHostsFile=/dev/null -o CheckHostIP=no \
+    -o StrictHostKeyChecking="$host_check" "$droplet_user@$droplet_ip" "$@"
+}
+
+if [[ -n "$service_lines" || "$has_jobs" -eq 1 ]]; then
+  [[ -f "$ssh_key" ]] || die "the private key $ssh_key does not exist" \
+    "pass --ssh-key <public key> in the provision flags, then run: ${destroy_cmd[*]}"
+  specs=()
+  while read -r svc_name svc_port svc_health; do
+    [[ -n "$svc_name" ]] || continue
+    specs+=("$svc_name:${svc_port:-8080}:${svc_health:-/healthz}")
+  done <<<"$service_lines"
+  echo "Services: ${specs[*]:-none}. Jobs worker: $has_jobs."
+  # The remote script runs on the droplet. The services are not public, so Caddy calls them.
+  droplet_ssh bash -s -- "$has_jobs" ${specs[@]+"${specs[@]}"} <<'REMOTE' || die "the service checks on the droplet failed" \
+    "read the output above, then run: ${destroy_cmd[*]}"
+set -eu
+has_jobs=$1
+shift
+bad() { echo "service check failed: $*" >&2; exit 1; }
+project=$(docker ps --filter label=com.docker.compose.service=api --format '{{.Label "com.docker.compose.project"}}' | sort -u)
+[ "$(printf '%s\n' "$project" | grep -c .)" -eq 1 ] || bad "not exactly one color runs an api container: $project"
+color=${project##*-}
+caddy=$(docker ps --filter label=com.docker.compose.service=caddy --format '{{.Names}}' | head -n 1)
+[ -n "$caddy" ] || bad "no caddy container runs"
+api_c=$(docker ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=api --format '{{.Names}}' | head -n 1)
+[ -n "$api_c" ] || bad "no api container runs in $project"
+env_of() { docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1"; }
+# running <container> fails when the container is not running, restarts, or is not healthy.
+running() {
+  state=$(docker inspect -f '{{.State.Status}} {{.State.Restarting}} {{.RestartCount}}' "$1")
+  [ "$state" = "running false 0" ] || bad "$1 state is '$state'"
+  health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1")
+  [ -z "$health" ] || [ "$health" = healthy ] || bad "$1 is $health"
+}
+for spec in "$@"; do
+  name=${spec%%:*}
+  rest=${spec#*:}
+  port=${rest%%:*}
+  health=${rest#*:}
+  upper=$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')
+  projects=$(docker ps --filter "label=com.docker.compose.service=$name" --format '{{.Label "com.docker.compose.project"}}' | sort -u)
+  [ "$projects" = "$project" ] || bad "$name runs in '$projects', not only in the live color $project"
+  containers=$(docker ps --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$name" --format '{{.Names}}')
+  [ -n "$containers" ] || bad "no $name container runs in $project"
+  for c in $containers; do
+    running "$c"
+    echo "$c runs and is healthy"
+  done
+  body=$(docker exec "$caddy" wget -q -T 10 -O - "http://$name-$color:$port$health") || bad "GET $health on $name-$color:$port through $caddy failed"
+  echo "GET $health through $caddy answers: $(printf '%s' "$body" | head -c 80)"
+  url=$(env_of "$api_c" | sed -n "s/^SERVICE_${upper}_URL=//p")
+  [ "$url" = "http://$name-$color:$port" ] || bad "$api_c has SERVICE_${upper}_URL='${url:-unset}', want http://$name-$color:$port"
+  echo "$api_c has SERVICE_${upper}_URL=$url"
+  if [ "$has_jobs" = 1 ]; then
+    worker_c=$(docker ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=worker --format '{{.Names}}' | head -n 1)
+    wurl=$(env_of "$worker_c" | sed -n "s/^SERVICE_${upper}_URL=//p")
+    [ "$wurl" = "$url" ] || bad "$worker_c has SERVICE_${upper}_URL='${wurl:-unset}', want $url"
+  fi
+done
+if [ "$has_jobs" = 1 ]; then
+  workers=$(docker ps --filter label=com.docker.compose.service=worker --format '{{.Label "com.docker.compose.project"}}' | sort -u)
+  [ "$workers" = "$project" ] || bad "the worker runs in '$workers', not only in the live color $project"
+  worker_c=$(docker ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=worker --format '{{.Names}}' | head -n 1)
+  [ -n "$worker_c" ] || bad "no worker container runs in $project"
+  running "$worker_c"
+  started=$(docker inspect -f '{{.State.StartedAt}}' "$worker_c")
+  sleep 10
+  running "$worker_c"
+  [ "$started" = "$(docker inspect -f '{{.State.StartedAt}}' "$worker_c")" ] || bad "$worker_c restarted during the wait"
+  echo "$worker_c runs and does not restart"
+fi
+REMOTE
+else
+  echo "The app declares no [[services]] and has no jobs module. Skipped the service checks."
+fi
+
+if [[ -n "${SPINUP_DO_VERIFY_CMD:-}" ]]; then
+  echo "Running SPINUP_DO_VERIFY_CMD with SPINUP_DO_HOST=$droplet_ip"
+  SPINUP_DO_HOST="$droplet_ip" SPINUP_DO_SSH_KEY="$ssh_key" bash -c "$SPINUP_DO_VERIFY_CMD" ||
+    die "SPINUP_DO_VERIFY_CMD failed" "read the output above, then run: ${destroy_cmd[*]}"
+fi
+
+# --- 8. destroy --------------------------------------------------------------------------------------
+step "8. Destroy"
 ask "The next step deletes the droplet, the firewall, and the database of the environment $env_name."
 "${destroy_cmd[@]}"
 destroyed=1
 
-# --- 8. what is left ---------------------------------------------------------------------------------
-step "8. Resources left on the account (names only)"
+# --- 9. what is left ---------------------------------------------------------------------------------
+step "9. Resources left on the account (names only)"
 rm -f "$work/header"
 left=0
 for item in "droplets|/v2/droplets|.droplets[].name" "firewalls|/v2/firewalls|.firewalls[].name" \

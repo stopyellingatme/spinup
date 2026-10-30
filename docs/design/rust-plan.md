@@ -1,6 +1,8 @@
 # spinup in Rust: the rewrite plan (`docs/design/rust-plan.md`)
 
-Status: stopped after R2 (2026-10-30, ADR 0022). Earlier: accepted (2026-10-24). R0 decides go or no-go. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it. Where this document and `plan.md` disagree about Rust work, this document wins.
+> **Historical. Do not follow this plan.** The rewrite stopped after R2 on 2026-10-30 (ADR 0022). Go stays the language of the CLI, the kit, the plugin SDK, and the generated API. The ADRs 0019, 0020, and 0021 that this document cites exist only on the branch `rust`.
+
+Earlier status: accepted (2026-10-24). R0 decides go or no-go. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it.
 
 ## Context
 
@@ -705,7 +707,7 @@ The main loop adds `rust.yml` in the R1 pre-seed. Each workflow has one disposit
 
 ## 7. ADR changes
 
-New ADRs supersede the named sections. The old ADR text stays. Each old section gets a one-line note: "Superseded by ADR 00NN".
+The ADRs 0019, 0020, and 0021 are on the branch `rust`. They are not on `main`. New ADRs supersede the named sections. The old ADR text stays. Each old section gets a one-line note: "Superseded by ADR 00NN".
 
 | New ADR | Written at | Supersedes (old ADR and section) |
 |---|---|---|
