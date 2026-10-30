@@ -15,7 +15,7 @@ func TestDevHelp(t *testing.T) {
 	if code != 0 {
 		t.Fatal(errOut)
 	}
-	for _, flag := range []string{"--no-web", "--no-infra", "--lgtm", "--port", "--api-port", "--watch", "--down"} {
+	for _, flag := range []string{"--no-web", "--no-infra", "--lgtm", "--port", "--api-port", "--watch", "--down", "--no-services", "--no-worker"} {
 		if !strings.Contains(out, flag) {
 			t.Errorf("missing flag %s", flag)
 		}

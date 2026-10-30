@@ -26,7 +26,9 @@ func newDev(app *App) *cobra.Command {
 	}}
 	flags := command.Flags()
 	flags.BoolVar(&options.NoWeb, "no-web", false, "skip the Vite dev server")
-	flags.BoolVar(&options.NoInfra, "no-infra", false, "skip Docker infrastructure")
+	flags.BoolVar(&options.NoInfra, "no-infra", false, "skip Docker infrastructure and the sidecar services")
+	flags.BoolVar(&options.NoServices, "no-services", false, "skip the sidecar services in spinup.toml")
+	flags.BoolVar(&options.NoWorker, "no-worker", false, "skip the jobs worker")
 	flags.BoolVar(&options.LGTM, "lgtm", false, "start Grafana LGTM monitoring")
 	flags.IntVar(&options.Port, "port", 5173, "preferred web port")
 	flags.IntVar(&options.APIPort, "api-port", 8080, "preferred API port")

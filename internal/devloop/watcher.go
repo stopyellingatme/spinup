@@ -28,6 +28,9 @@ type Watcher struct {
 	Interval, Debounce time.Duration
 	// Dispatch overrides registry dispatch for tests or embedded callers.
 	Dispatch func(context.Context, []gen.PostStep) error
+	// ServiceOpenAPI lists the OpenAPI files of the sidecar services, relative to Root
+	// with forward slashes. A change to one of them runs gen.PostServiceClients.
+	ServiceOpenAPI []string
 }
 
 type stamp struct {
@@ -52,7 +55,7 @@ func (w Watcher) Run(ctx context.Context) error {
 	if dispatch == nil {
 		dispatch = w.dispatch
 	}
-	previous, err := snapshot(w.Root)
+	previous, err := snapshot(w.Root, w.ServiceOpenAPI)
 	if err != nil {
 		return err
 	}
@@ -67,12 +70,12 @@ func (w Watcher) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			current, err := snapshot(w.Root)
+			current, err := snapshot(w.Root, w.ServiceOpenAPI)
 			if err != nil {
 				_, _ = fmt.Fprintf(out, "watch: %v\n", err)
 				continue
 			}
-			changed := changes(previous, current)
+			changed := changes(previous, current, w.ServiceOpenAPI)
 			previous = current
 			if len(changed) == 0 {
 				continue
@@ -102,8 +105,20 @@ func (w Watcher) dispatch(ctx context.Context, steps []gen.PostStep) error {
 	return err
 }
 
-func snapshot(root string) (map[string]stamp, error) {
+// snapshot records the watched generator inputs. extra holds more files, relative to
+// root with forward slashes. A missing extra file is not an error.
+func snapshot(root string, extra []string) (map[string]stamp, error) {
 	result := make(map[string]stamp)
+	for _, relative := range extra {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(relative)))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("scan dev inputs: %w\nTry: check the service source permissions", err)
+		}
+		result[relative] = stamp{size: info.Size(), mtime: info.ModTime()}
+	}
 	for _, directory := range []string{"api/db/queries", "api/openapi"} {
 		err := filepath.WalkDir(filepath.Join(root, filepath.FromSlash(directory)), func(path string, entry fs.DirEntry, err error) error {
 			if os.IsNotExist(err) {
@@ -143,12 +158,17 @@ func watched(path string) bool {
 	}
 	return strings.HasPrefix(path, "api/openapi/") && strings.HasSuffix(path, ".yaml") && filepath.Base(path) != "bundle.gen.yaml"
 }
-func changes(before, after map[string]stamp) []gen.PostStep {
-	sql, openapi := false, false
+
+// changes maps the changed inputs to post-steps. A path in extra is a service OpenAPI file.
+func changes(before, after map[string]stamp, extra []string) []gen.PostStep {
+	sql, openapi, serviceClients := false, false, false
 	changed := func(path string) {
-		if strings.HasSuffix(path, ".sql") {
+		switch {
+		case slices.Contains(extra, path):
+			serviceClients = true
+		case strings.HasSuffix(path, ".sql"):
 			sql = true
-		} else {
+		default:
 			openapi = true
 		}
 	}
@@ -171,6 +191,9 @@ func changes(before, after map[string]stamp) []gen.PostStep {
 	}
 	if openapi {
 		steps = append(steps, gen.PostClient)
+	}
+	if serviceClients {
+		steps = append(steps, gen.PostServiceClients)
 	}
 	return steps
 }

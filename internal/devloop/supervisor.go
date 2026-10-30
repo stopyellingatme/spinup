@@ -23,6 +23,9 @@ type Process struct {
 	Ready func(ctx context.Context) error
 	// Restart enables retries when a process exits.
 	Restart bool
+	// Reload stops and starts the process again at once, with no backoff, each time it
+	// receives a value. A nil channel never reloads.
+	Reload <-chan struct{}
 }
 
 // Supervisor streams process logs and owns process groups until all children stop.
@@ -160,6 +163,7 @@ func supervise(ctx context.Context, starter Starter, p Process, index int, log *
 				return ctx.Err()
 			}
 		}
+		reloaded := false
 		if !dead {
 			if !announced {
 				ready <- struct{}{}
@@ -170,6 +174,9 @@ func supervise(ctx context.Context, starter Starter, p Process, index int, log *
 				stopChild(child, exited)
 			case runErr = <-exited:
 				dead = true
+			case <-p.Reload:
+				stopChild(child, exited)
+				reloaded = true
 			}
 		}
 		if dead {
@@ -180,6 +187,11 @@ func supervise(ctx context.Context, starter Starter, p Process, index int, log *
 		stderr.flush()
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		if reloaded {
+			log.line(p.Name, index, "restarting after a Go change")
+			delay = backoff
+			continue
 		}
 		if runErr == nil {
 			runErr = errors.New("process exited unexpectedly")
