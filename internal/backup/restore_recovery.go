@@ -4,25 +4,52 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/stopyellingatme/spinup/internal/deploy"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
+func restoreServices(s *Session, rel deploy.Release) []string {
+	result := []string{"api"}
+	if hasWeb(s.Config) {
+		result = append(result, "web")
+	}
+	if modules.Enabled(s.Config, "jobs") {
+		result = append(result, "worker")
+	}
+	for _, service := range rel.Services {
+		result = append(result, service.Name)
+	}
+	return result
+}
+
+func restoreServiceText(s *Session, rel deploy.Release) string {
+	if modules.Enabled(s.Config, "jobs") || len(rel.Services) > 0 {
+		return "the app services"
+	}
+	return "api and web"
+}
+
 func liveCompose(s *Session, rel deploy.Release, args ...string) []string {
 	dir := "/opt/" + s.App + "/releases/" + rel.Release
-	services := []string{"api"}
-	if hasWeb(s.Config) {
-		services = append(services, "web")
+	files := deploy.ColorComposeFiles(rel.Services)
+	for i := range files {
+		files[i] = dir + "/" + files[i]
 	}
-	return deploy.ComposeArgv(s.App+"-"+rel.Color, dir, []string{dir + "/compose.yml"}, append(args, services...)...)
+	return deploy.ComposeArgv(s.App+"-"+rel.Color, dir, files, append(args, restoreServices(s, rel)...)...)
 }
 
 func restoreRecovery(ctx context.Context, s *Session, rel deploy.Release, state *restoreRemote, starting bool, cause error) error {
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 	progress := s.Progress
+	serviceText := restoreServiceText(s, rel)
+	if strings.HasPrefix(serviceText, "the ") {
+		serviceText = "The " + strings.TrimPrefix(serviceText, "the ")
+	}
 	postgres := baseCompose(s.App, "start", "--wait", "postgres")
 	live := liveCompose(s, rel, "up", "-d", "--no-deps", "--wait")
 	if !state.touched {
@@ -40,7 +67,7 @@ func restoreRecovery(ctx context.Context, s *Session, rel deploy.Release, state 
 		}
 		status := "postgres restarted. The live color failed to start. Its state is unconfirmed"
 		if pgErr != nil {
-			status = "postgres failed to restart. Its state is unconfirmed. api and web were not restarted"
+			status = "postgres failed to restart. Its state is unconfirmed. " + serviceText + " were not restarted"
 		}
 		return fmt.Errorf("%w\nThe database was not changed. %s.\nTry: run these commands on the VM, in order:\n%s\n%s", cause, status, shellCommand(postgres), shellCommand(live))
 	}
@@ -50,9 +77,9 @@ func restoreRecovery(ctx context.Context, s *Session, rel deploy.Release, state 
 	if starting {
 		_, stopErr = s.Remote.Run(cleanup, remote.Cmd{Argv: liveCompose(s, rel, "stop"), Stdout: progress, Stderr: progress})
 	}
-	status := "api and web are STOPPED"
+	status := serviceText + " are STOPPED"
 	if stopErr != nil {
-		status = "api and web stop failed. Their state is unconfirmed"
+		status = serviceText + " stop failed. Their state is unconfirmed"
 	}
 	return fmt.Errorf("%w\n%s. postgres: %s. The database may have changed.\nTry: inspect the database before running these commands on the VM, in order:\n%s\n%s", errors.Join(cause, stopErr), status, state.postgres, shellCommand(postgres), shellCommand(live))
 }

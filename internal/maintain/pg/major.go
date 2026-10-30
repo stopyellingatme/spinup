@@ -48,8 +48,8 @@ func (u *upgrade) major(ctx context.Context) error {
 	if err = u.saveRecovery(ctx, oldVolume); err != nil {
 		return err
 	}
-	fmt.Fprintln(u.o.Out, "Stop api and web of both colors. The app is down.")
-	if _, err = u.run(ctx, "sh", "-ec", stopColorsScript(u.cfg.App.Name)); err != nil {
+	fmt.Fprintln(u.o.Out, "Stop "+u.serviceText()+" of both colors. The app is down.")
+	if _, err = u.run(ctx, "sh", "-ec", stopColorsScript(u.cfg.App.Name, u.appServices()...)); err != nil {
 		return err
 	}
 	fmt.Fprintln(u.o.Out, "Take a full backup with pgdump")
@@ -155,7 +155,7 @@ func (u *upgrade) finish(ctx context.Context) error {
 		return err
 	}
 	fmt.Fprintln(u.o.Out, "Start the live color")
-	if _, err = u.run(ctx, u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.services()...)...)...); err != nil {
+	if _, err = u.run(ctx, u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.appServices()...)...)...); err != nil {
 		return err
 	}
 	fmt.Fprintln(u.o.Out, "Run the deploy smoke checks")

@@ -117,7 +117,7 @@ func (s *Session) Base(args ...string) []string { return s.u.base(args...) }
 
 // StopColors stops both app colors using the shared maintenance operation.
 func (s *Session) StopColors(ctx context.Context) error {
-	_, err := s.u.run(ctx, "sh", "-ec", stopColorsScript(s.u.cfg.App.Name))
+	_, err := s.u.run(ctx, "sh", "-ec", stopColorsScript(s.u.cfg.App.Name, s.u.appServices()...))
 	return err
 }
 

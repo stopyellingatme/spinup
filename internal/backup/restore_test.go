@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -90,10 +91,14 @@ func expectRestoreLock(vm *remote.Fake) {
 
 func TestRestoreInPlace(t *testing.T) {
 	t.Parallel()
-	for _, fail := range []bool{false, true} {
+	for _, tc := range []struct{ fail, extras bool }{{}, {fail: true}, {extras: true}, {fail: true, extras: true}} {
+		fail := tc.fail
 		name := "success"
 		if fail {
 			name = "failure prints recovery command"
+		}
+		if tc.extras {
+			name += " with worker and sidecar"
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -104,12 +109,30 @@ func TestRestoreInPlace(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "deploy/environments/staging.toml"), []byte("smoke_urls = [\"/ready\"]\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
+			appServices := []string{"api"}
+			files := []string{"/opt/todo/releases/" + liveRelease + "/compose.yml"}
+			if tc.extras {
+				path := filepath.Join(dir, "spinup.toml")
+				config, readErr := os.ReadFile(path)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				config = []byte(strings.Replace(string(config), `"deploy", "backups"`, `"deploy", "backups", "jobs"`, 1))
+				if writeErr := os.WriteFile(path, config, 0600); writeErr != nil {
+					t.Fatal(writeErr)
+				}
+				appServices = append(appServices, "worker", "ocr")
+				files = append(files, "/opt/todo/releases/"+liveRelease+"/compose.services.yml")
+			}
 			vm := &remote.Fake{}
 			expectRestoreLock(vm)
 			vm.ExpectUpload(RemoteConfigPath("todo"))
 			// The latest target is selected before the safety backup exists.
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			rel := deploy.Release{Release: liveRelease, Color: deploy.Blue, GitSHA: "abcdef1234567890"}
+			if tc.extras {
+				rel.Services = []deploy.ReleaseService{{Name: "ocr", Port: 8080, Health: "/healthz"}}
+			}
 			data, err := json.Marshal(rel)
 			if err != nil {
 				t.Fatal(err)
@@ -119,8 +142,12 @@ func TestRestoreInPlace(t *testing.T) {
 			vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return("", "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0) // Re-check before stopping.
+			stopServices := appServices
+			if !tc.extras {
+				stopServices = []string{"api", "web"}
+			}
 			for _, color := range []string{deploy.Blue, deploy.Green} {
-				for _, service := range []string{"api", "web"} {
+				for _, service := range stopServices {
 					vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color, "--filter", "label=com.docker.compose.service="+service).Return(color+"-"+service, "", 0)
 					vm.Expect("docker", "stop", color+"-"+service).Return("", "", 0)
 				}
@@ -135,7 +162,7 @@ func TestRestoreInPlace(t *testing.T) {
 				vm.Expect(baseCompose("todo", "start", "--wait", "postgres")...).Return("", "", 0)
 				dir := "/opt/todo/releases/" + liveRelease
 				vm.Expect(deploy.ComposeArgv("todo-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")...).Return("", "", 0)
-				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait", "api")...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-blue", dir, files, append([]string{"up", "-d", "--no-deps", "--wait"}, appServices...)...)...).Return("", "", 0)
 			}
 			vm.Expect("sh", "-c").Return("", "", 0) // Release the lock, also after failure.
 			var out, errOut strings.Builder
@@ -153,6 +180,18 @@ func TestRestoreInPlace(t *testing.T) {
 				t.Fatalf("restore: %v, smoke: %v", err, paths)
 			}
 			vm.AssertDone(t)
+			if !fail {
+				want := deploy.ComposeArgv("todo-blue", "/opt/todo/releases/"+liveRelease, files, append([]string{"up", "-d", "--no-deps", "--wait"}, appServices...)...)
+				found := false
+				for _, call := range vm.Calls() {
+					if slices.Equal(call.Argv, want) {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("missing exact argv: %v", want)
+				}
+			}
 			joined := ""
 			for _, call := range vm.Calls() {
 				joined += strings.Join(call.Argv, " ") + "\n"

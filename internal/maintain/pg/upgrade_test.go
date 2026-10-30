@@ -143,21 +143,31 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		current version
+		extras  bool
 		want    string
-	}{{"upgrade", version{17, 10}, "now runs 17.11"}, {"equal", version{17, 11}, "already matches"}, {"newer", version{17, 12}, "Refusing a downgrade"}} {
+	}{{"upgrade", version{17, 10}, false, "now runs 17.11"}, {"upgrade extras", version{17, 10}, true, "now runs 17.11"}, {"equal", version{17, 11}, false, "already matches"}, {"newer", version{17, 12}, false, "Refusing a downgrade"}} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			u, f, out := fixture(t, false)
 			u.current = tt.current
-			if tt.name == "upgrade" {
+			if tt.extras {
+				enableExtraServices(t, u)
+			}
+			if strings.HasPrefix(tt.name, "upgrade") {
 				expectBackup(f)
 				expectRecovery(u, f)
 				expectUpdate(u, f)
 				f.Expect(u.base("build", "postgres")...)
+				if tt.extras {
+					f.Expect("sh", "-ec", stopColorsScript("demo", "api", "worker", "ocr"))
+				}
 				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "postgres")...)
 				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--wait", "--wait-timeout", "120", "postgres")...)
 				f.Expect(u.base("ps", "-q", "postgres")...).Return("new-pg\n", "", 0)
 				f.Expect("docker", "exec", "-i", "new-pg").Return("17.11 (Debian)\n", "", 0)
+				if tt.extras {
+					f.Expect(expectedAppStart(u, true)...)
+				}
 			}
 			err := u.minor(context.Background())
 			text := out.String()
@@ -171,7 +181,10 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.AssertDone(t)
-			if tt.name == "upgrade" {
+			if strings.HasPrefix(tt.name, "upgrade") {
+				if tt.extras {
+					assertExtraServiceCommands(t, u, f)
+				}
 				assertRecovery(t, u, f)
 				assertCompose(t, u, f, false)
 			}
@@ -180,7 +193,7 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 }
 func expectMajorUntilVerify(u *upgrade, f *remote.Fake, restored string) {
 	expectRecovery(u, f)
-	f.Expect("sh", "-ec", stopColorsScript("demo"))
+	f.Expect("sh", "-ec", stopColorsScript("demo", u.appServices()...))
 	expectBackup(f)
 	f.Expect("docker", "exec", "-i", "old-pg").Return(counts, "", 0)
 	f.Expect("sh", "-ec").Return("demo_pgdata_18", "", 0)
@@ -193,12 +206,13 @@ func expectMajorUntilVerify(u *upgrade, f *remote.Fake, restored string) {
 func TestMajorOrderAndMismatch(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		name, backend                   string
-		mismatch, stanzaFail, noBackups bool
+		name, backend                           string
+		mismatch, stanzaFail, noBackups, extras bool
 	}{
 		{name: "pgbackrest", backend: "pgbackrest"},
 		{name: "default backend"},
 		{name: "pgdump", backend: "pgdump"},
+		{name: "worker and sidecar", backend: "pgdump", extras: true},
 		{name: "no backups module", noBackups: true},
 		{name: "stanza failure", stanzaFail: true},
 		{name: "counts mismatch", mismatch: true},
@@ -206,6 +220,9 @@ func TestMajorOrderAndMismatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			u, f, out := fixture(t, true)
+			if tt.extras {
+				enableExtraServices(t, u)
+			}
 			// Major upgrades must dump even when the configured backend is pgBackRest.
 			u.cfg.Backups.Backend = tt.backend
 			if tt.noBackups {
@@ -235,7 +252,7 @@ func TestMajorOrderAndMismatch(t *testing.T) {
 				}
 				if !tt.stanzaFail {
 					f.Expect(u.color("--profile", "migrate", "run", "--rm", "-T", "migrate")...)
-					f.Expect(u.color("up", "-d", "--no-deps", "--wait", "api")...)
+					f.Expect(expectedAppStart(u, tt.extras)...)
 					u.d.HTTPGet = func(_ context.Context, url string) (int, []byte, error) {
 						urls = append(urls, url)
 						return 200, []byte(`{"version":"abcdef123456"}`), nil
@@ -283,6 +300,9 @@ func TestMajorOrderAndMismatch(t *testing.T) {
 				}
 			}
 			assertRecovery(t, u, f)
+			if tt.extras {
+				assertExtraServiceCommands(t, u, f)
+			}
 			f.AssertDone(t)
 			if !tt.mismatch && u.usesPGBackRest() {
 				for _, upload := range f.Uploads() {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,11 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		if !o.NoSafetyBackup {
 			steps = append(steps, "Take a safety backup")
 		}
-		steps = append(steps, "Re-check the restore target", "Stop api and web of both colors")
+		stopText := "Stop api and web of both colors"
+		if len(s.Config.Services) > 0 || slices.Contains(s.Config.Modules, "jobs") {
+			stopText = "Stop the app services of both colors"
+		}
+		steps = append(steps, "Re-check the restore target", stopText)
 		if s.Config.Backups.Backend == "pgdump" {
 			steps = append(steps, "Restore into a staging database while postgres runs", "Rename the databases and retain the old database", "Print the dropdb command for the old database")
 		} else {
@@ -172,9 +177,14 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 			err = restoreRecovery(ctx, s, rel, state, starting, err)
 		}
 	}()
-	fmt.Fprintln(out, "Stopping api and web of both colors")
+	fmt.Fprintln(out, "Stopping "+restoreServiceText(s, rel)+" of both colors")
+	stopServices := restoreServices(s, rel)
+	// Preserve the legacy discovery of an optional web container.
+	if len(stopServices) == 1 {
+		stopServices = append(stopServices, "web")
+	}
 	for _, color := range []string{deploy.Blue, deploy.Green} {
-		for _, service := range []string{"api", "web"} {
+		for _, service := range stopServices {
 			result, runErr := s.Remote.Run(ctx, remote.Cmd{Argv: []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + s.App + "-" + color, "--filter", "label=com.docker.compose.service=" + service}})
 			if runErr != nil {
 				return restoreFailure("find "+color+" "+service, runErr)
@@ -202,11 +212,7 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		return restoreFailure("migrate the restored database", err)
 	}
 	fmt.Fprintln(out, "Starting the live color")
-	services := []string{"api"}
-	if hasWeb(s.Config) {
-		services = append(services, "web")
-	}
-	args = deploy.ComposeArgv(s.App+"-"+rel.Color, dir, []string{dir + "/compose.yml"}, append([]string{"up", "-d", "--no-deps", "--wait"}, services...)...)
+	args = liveCompose(s, rel, "up", "-d", "--no-deps", "--wait")
 	starting = true
 	if _, err = s.Remote.Run(ctx, remote.Cmd{Argv: args, Stdout: errOut, Stderr: errOut}); err != nil {
 		return restoreFailure("start the live color", err)
