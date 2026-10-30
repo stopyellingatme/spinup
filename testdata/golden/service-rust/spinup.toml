@@ -1,0 +1,17 @@
+# Preserve this comment and spacing.
+behavior_version = 1
+
+[app]
+name = "todo"
+module = "example.com/todo"
+
+[custom]
+value = 'keep me'
+
+[[services]]
+name = "ocr"
+port = 8080
+dev_port = 8101
+health = "/healthz"
+openapi = "openapi.yaml"
+healthcheck = ["/service", "healthcheck"]

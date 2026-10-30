@@ -1,0 +1,56 @@
+# Services use fixed lockfiles and append declarations without external tools.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+cp spinup.toml original.toml
+
+# Preview does not change the application.
+exec spinup g service ocr --lang rust --dry-run
+stdout 'create services/ocr/src/main.rs \(scaffold\)'
+stdout 'update spinup.toml \(scaffold\)'
+! exists services/ocr
+cmp spinup.toml original.toml
+
+exec spinup g service ocr --lang rust
+stdout 'Next: spinup g client'
+stdout 'Next: spinup dev'
+exists services/ocr/Cargo.toml services/ocr/Cargo.lock services/ocr/src/main.rs
+exists services/ocr/Dockerfile services/ocr/.dockerignore services/ocr/openapi.yaml services/ocr/README.md
+cmp services/ocr/Cargo.toml $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.toml
+cmp services/ocr/Cargo.lock $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.lock
+grep '^\[\[services\]\]$' spinup.toml
+grep '^name = "ocr"$' spinup.toml
+grep '^port = 8080$' spinup.toml
+grep '^dev_port = 8101$' spinup.toml
+grep '^health = "/healthz"$' spinup.toml
+grep '^openapi = "openapi.yaml"$' spinup.toml
+grep '^healthcheck = \["/service", "healthcheck"\]$' spinup.toml
+
+# Refuse a second run, including with --force.
+cp spinup.toml after.toml
+! exec spinup g service ocr --lang rust
+stderr 'already exists'
+stderr 'Try:'
+! exec spinup g service ocr --lang python --force
+stderr 'already exists'
+cmp spinup.toml after.toml
+! exec spinup g service api --lang rust
+stderr 'reserved'
+stderr 'Try:'
+! exec spinup g service other
+stderr '--lang is required'
+stderr 'Try:'
+! exists services/api services/other
+
+# Python uses the next host port and can omit the OpenAPI contract.
+exec spinup g service classify --lang python --port 9000 --no-openapi
+exists services/classify/service/main.py services/classify/service/healthcheck.py services/classify/service/__init__.py
+exists services/classify/tests/test_main.py services/classify/Dockerfile services/classify/README.md
+! exists services/classify/openapi.yaml
+cmp services/classify/pyproject.toml $SPINUP_REPO/internal/gen/service/templates/python/pyproject.toml
+cmp services/classify/uv.lock $SPINUP_REPO/internal/gen/service/templates/python/uv.lock
+grep '^port = 9000$' spinup.toml
+grep '^dev_port = 8102$' spinup.toml
+grep '^healthcheck = \["/app/.venv/bin/python", "-m", "service.healthcheck"\]$' spinup.toml
+stdout 'Next: spinup dev'
+! stdout 'Next: spinup g client'
