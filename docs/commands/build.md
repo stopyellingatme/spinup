@@ -22,7 +22,7 @@ go build -trimpath -ldflags '-X main.version=v0.1.0' -o bin/api ./cmd/api
 | --- | --- |
 | `--target <name>` | Select `api`, `web`, or `all`. The default is `api`. |
 | `--tag <version>` | Set the embedded version and image tag. The default is `dev`. |
-| `--image` | Build `<app>-api:<tag>` with `deploy/Dockerfile.api`. |
+| `--image` | Build application container images. |
 | `--dir`, `-C <directory>` | Find the project root from this directory. |
 | `--dry-run` | Print the command without execution. |
 | `--env <name>` | Global flag. Local builds do not select an environment. |
@@ -45,7 +45,10 @@ If project discovery fails, pass `--dir` with the application directory.
 
 ## Images and push
 
-`--image` builds both deploy images with Docker buildx.
+`--image` builds the API, web, and declared service images with Docker buildx.
+The default order is API, web, then services in `spinup.toml` order.
+Use `--target` to select image names. Repeat the flag or separate names with commas.
+Each service uses `services/<name>/Dockerfile` and `services/<name>` as its build context.
 The default platform is `linux/amd64`.
 Without `--push`, buildx loads local images and does not create provenance or an SBOM.
 

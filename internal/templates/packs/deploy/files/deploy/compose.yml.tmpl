@@ -13,7 +13,7 @@
 #   WEB_IMAGE       [[ .app_name ]]-web:<release-id>[[ end ]]
 #   PUBLIC_ORIGIN   public_url of the environment in spinup.toml
 #   DEPLOY_UID, DEPLOY_GID   the deploy user on the VM, which owns /opt/[[ .app_name ]]/secrets
-#   API_REPLICAS, API_CPUS, API_MEMORY[[ if $web ]], WEB_REPLICAS, WEB_CPUS, WEB_MEMORY[[ end ]]
+#   API_REPLICAS, API_CPUS, API_MEMORY[[ if $web ]], WEB_REPLICAS, WEB_CPUS, WEB_MEMORY[[ end ]][[ if has "jobs" .modules ]], WORKER_REPLICAS[[ end ]]
 #                   from deploy/environments/<env>.toml
 name: [[ .app_name ]]-${SPINUP_COLOR:?spinup deploy sets SPINUP_COLOR to blue or green}
 
@@ -69,6 +69,37 @@ services:
     stop_grace_period: 20s
     restart: unless-stopped
     logging: *logging
+[[- if has "jobs" .modules ]]
+
+  worker:
+    image: ${API_IMAGE:?spinup deploy sets API_IMAGE} # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    entrypoint: ["/worker"]
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      SPINUP_ENV: production
+      SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
+      DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+[[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_SERVICE_NAME: [[ .app_name ]]-worker
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=${SPINUP_COLOR}
+[[- end ]]
+    volumes:
+      - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
+    networks:
+      app: {}
+      db: {}
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+    restart: unless-stopped
+    logging: *logging
+[[- end ]]
 [[- if $web ]]
 
   web:

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,11 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		if !o.NoSafetyBackup {
 			steps = append(steps, "Take a safety backup")
 		}
-		steps = append(steps, "Re-check the restore target", "Stop api and web of both colors")
+		stopText := "Stop api and web of both colors"
+		if len(s.Config.Services) > 0 || slices.Contains(s.Config.Modules, "jobs") {
+			stopText = "Stop the app services of both colors"
+		}
+		steps = append(steps, "Re-check the restore target", stopText)
 		if s.Config.Backups.Backend == "pgdump" {
 			steps = append(steps, "Restore into a staging database while postgres runs", "Rename the databases and retain the old database", "Print the dropdb command for the old database")
 		} else {
@@ -172,18 +177,18 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 			err = restoreRecovery(ctx, s, rel, state, starting, err)
 		}
 	}()
-	fmt.Fprintln(out, "Stopping api and web of both colors")
+	fmt.Fprintln(out, "Stopping "+restoreServiceText(s, rel)+" of both colors")
+	// Select the containers by color project only. The worker and every sidecar of
+	// any deployed release stop, whatever the local spinup.toml declares.
 	for _, color := range []string{deploy.Blue, deploy.Green} {
-		for _, service := range []string{"api", "web"} {
-			result, runErr := s.Remote.Run(ctx, remote.Cmd{Argv: []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + s.App + "-" + color, "--filter", "label=com.docker.compose.service=" + service}})
-			if runErr != nil {
-				return restoreFailure("find "+color+" "+service, runErr)
-			}
-			if ids := strings.Fields(string(result.Stdout)); len(ids) > 0 {
-				stopping = true
-				if _, runErr = s.Remote.Run(ctx, remote.Cmd{Argv: append([]string{"docker", "stop"}, ids...)}); runErr != nil {
-					return restoreFailure("stop "+color+" "+service, runErr)
-				}
+		result, runErr := s.Remote.Run(ctx, remote.Cmd{Argv: []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + s.App + "-" + color}})
+		if runErr != nil {
+			return restoreFailure("find the "+color+" containers", runErr)
+		}
+		if ids := strings.Fields(string(result.Stdout)); len(ids) > 0 {
+			stopping = true
+			if _, runErr = s.Remote.Run(ctx, remote.Cmd{Argv: append([]string{"docker", "stop"}, ids...)}); runErr != nil {
+				return restoreFailure("stop the "+color+" containers", runErr)
 			}
 		}
 	}
@@ -197,16 +202,12 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 	}
 	dir := "/opt/" + s.App + "/releases/" + rel.Release
 	fmt.Fprintln(out, "Running migrate with the live release")
-	args := deploy.ComposeArgv(s.App+"-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")
+	args := deploy.ComposeArgv(s.App+"-migrate", dir, releaseFiles(dir, rel), "--profile", "migrate", "run", "--rm", "-T", "migrate")
 	if _, err = s.Remote.Run(ctx, remote.Cmd{Argv: args, Stdout: errOut, Stderr: errOut}); err != nil {
 		return restoreFailure("migrate the restored database", err)
 	}
 	fmt.Fprintln(out, "Starting the live color")
-	services := []string{"api"}
-	if hasWeb(s.Config) {
-		services = append(services, "web")
-	}
-	args = deploy.ComposeArgv(s.App+"-"+rel.Color, dir, []string{dir + "/compose.yml"}, append([]string{"up", "-d", "--no-deps", "--wait"}, services...)...)
+	args = liveCompose(s, rel, "up", "-d", "--no-deps", "--wait")
 	starting = true
 	if _, err = s.Remote.Run(ctx, remote.Cmd{Argv: args, Stdout: errOut, Stderr: errOut}); err != nil {
 		return restoreFailure("start the live color", err)

@@ -93,7 +93,7 @@ func TestWatcherDeletionAndFilters(t *testing.T) {
 	for _, path := range []string{"api/db/queries/todos.sql", "api/db/queries/nested/ignored.sql", "api/openapi/schemas/todo.yaml", "api/openapi/bundle.gen.yaml", "api/openapi/readme.md"} {
 		writeInput(t, root, path, "input")
 	}
-	before, err := snapshot(root)
+	before, err := snapshot(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,11 +103,11 @@ func TestWatcherDeletionAndFilters(t *testing.T) {
 	if err := os.Remove(filepath.Join(root, "api/db/queries/todos.sql")); err != nil {
 		t.Fatal(err)
 	}
-	after, err := snapshot(root)
+	after, err := snapshot(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := changes(before, after); !reflect.DeepEqual(got, []gen.PostStep{gen.PostSQLC}) {
+	if got := changes(before, after, nil); !reflect.DeepEqual(got, []gen.PostStep{gen.PostSQLC}) {
 		t.Fatal(got)
 	}
 }

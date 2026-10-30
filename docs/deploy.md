@@ -37,8 +37,9 @@ staging.toml
 
 | File | Class | Purpose |
 | --- | --- | --- |
-| `deploy/compose.yml` | managed | The color project: `api`, `web`, and the one-shot `migrate`. |
+| `deploy/compose.yml` | managed | The color project: `api`, `web`, `worker` when jobs are enabled, and the one-shot `migrate`. |
 | `deploy/compose.override.yml` | seed | Your own services. `compose.yml` includes this file. |
+| `compose.services.yml` | generated | The sidecar services. `spinup deploy` writes it into each release from `spinup.toml`. It is not a template file. See [Sidecar services](services.md). |
 | `deploy/compose.edge.yml` | managed | The base project: `caddy` and `postgres`. |
 | `deploy/Caddyfile` | managed | The site, the security headers, compression, and the routes. |
 | `deploy/Caddyfile.d/` | seed | Your own site directives in `*.caddy` files. |
@@ -54,7 +55,7 @@ staging.toml
 The deploy uses blue/green Compose projects (`docs/adr/0003-deploy-strategy.md`).
 Each release runs as the Compose project `<app>-blue` or `<app>-green`.
 
-- `compose.yml` holds the services that change with each release: `api`, `web`, and `migrate`.
+- `compose.yml` holds the services that change with each release: `api`, `web`, `worker`, and `migrate`.
   Its project name is `<app>-${SPINUP_COLOR}`.
 - `compose.edge.yml` holds the services that do not change color: `caddy` and `postgres`.
   Its project name is `<app>`. A color switch never restarts it.
@@ -78,6 +79,7 @@ Each release runs as the Compose project `<app>-blue` or `<app>-green`.
 | `DEPLOY_UID`, `DEPLOY_GID` | both | The IDs of the deploy user on the VM (default `1000`) |
 | `API_REPLICAS`, `API_CPUS`, `API_MEMORY` | `compose.yml` | From the environment file |
 | `WEB_REPLICAS`, `WEB_CPUS`, `WEB_MEMORY` | `compose.yml` | From the environment file |
+| `WORKER_REPLICAS` | `compose.yml` | From `[replicas] worker` in the environment file (default `1`) |
 | `POSTGRES_CPUS`, `POSTGRES_MEMORY` | `compose.edge.yml` | From the environment file |
 
 The migrations run before the new color starts:
@@ -86,6 +88,13 @@ The migrations run before the new color starts:
 ```console
 $ docker compose -p todo-green -f compose.yml --profile migrate run --rm migrate
 ```
+
+## Jobs worker
+
+When the `jobs` module is enabled, each color starts a `worker` service from the API image.
+The worker runs `/worker`, joins the `app` and `db` networks, and restarts after database failures.
+Set `worker` under `[replicas]` in `deploy/environments/<env>.toml` to change its replica count.
+The worker has no health check because it has no HTTP endpoint.
 
 ## Caddy and the switch
 
@@ -302,7 +311,7 @@ It includes `conf.d/` for your own settings. The backups pack sets its archive s
 
 - `smoke_urls`: the paths that the deploy requests after the switch. It always checks `/healthz` and `/version` too.
 - `[replicas]`: the number of containers of each service in a color.
-- `[resources.<service>]`: `cpus` and `memory` limits for `api`, `web`, and `postgres`.
+- `[resources.<service>]`: `cpus` and `memory` limits for `api`, `web`, and `postgres`, and for each sidecar service. A service with no entry has no limit. See [Sidecar services](services.md).
 
 During a switch, both colors run. The VM needs memory for two sets of `api` and `web`.
 

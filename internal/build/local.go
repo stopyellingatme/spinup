@@ -24,6 +24,7 @@ type Options struct {
 	Dir, Target, Tag        string
 	Platform, Registry, Env string
 	Image, Push, DryRun     bool
+	ImageTargets            []string
 	Out, ErrOut             io.Writer
 }
 
@@ -150,7 +151,8 @@ func Images(ctx context.Context, o Options, runner run.Runner) ([]Image, error) 
 	}
 	return BuildImages(ctx, runner, ImageOptions{
 		Root: root, App: config.App.Name, Tag: o.Tag, Platform: o.Platform,
-		Push: o.Push, Registry: o.Registry, PublicOrigin: publicOrigin,
+		Push: o.Push, Registry: o.Registry, PublicOrigin: publicOrigin, Targets: o.ImageTargets,
+		Services: config.Services,
 	})
 }
 

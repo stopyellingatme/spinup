@@ -1,0 +1,72 @@
+# Written by spinup deploy from spinup.toml. Do not edit: spinup writes this file again for each release.
+# The color project uses it as a second -f file after compose.yml, which defines the networks.
+
+services:
+  ocr:
+    image: todo-ocr:r1 # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      PORT: "8080"
+      BANNER: "cost $$5"
+      MODEL: "small"
+      OCR_LICENSE_KEY_FILE: "/run/secrets/OCR_LICENSE_KEY"
+      OCR_SALT_FILE: "/run/secrets/OCR_SALT"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy:4318"
+      OTEL_SERVICE_NAME: "todo-ocr"
+      OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=${SPINUP_COLOR}"
+    volumes:
+      - type: bind
+        source: /opt/todo/secrets/OCR_LICENSE_KEY
+        target: /run/secrets/OCR_LICENSE_KEY
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/todo/secrets/OCR_SALT
+        target: /run/secrets/OCR_SALT
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      app:
+        aliases:
+          - ocr-${SPINUP_COLOR}
+      db: {}
+    healthcheck:
+      test: ["CMD", "/service", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2g
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
+    stop_grace_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  api:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
+  worker:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
+  migrate:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"

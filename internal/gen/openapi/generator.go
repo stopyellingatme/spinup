@@ -23,7 +23,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate OpenAPI: expected no positional arguments\nTry: spinup g openapi")
 	}
-	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI}, Next: []string{"cd api && go build ./..."}}, nil
+	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI, gen.PostServiceClients}, Next: []string{"cd api && go build ./..."}}, nil
 }
 
 func postStep(ctx context.Context, root string, _ []string, runner exec.Runner) error {

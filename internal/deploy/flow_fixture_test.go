@@ -27,6 +27,7 @@ const (
 	testRelDir  = "/opt/todo/releases/" + testRelease
 	digestAPI   = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 	digestWeb   = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	digestOCR   = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
 )
 
 var testNow = time.Date(2026, 10, 15, 8, 0, 0, 0, time.UTC)
@@ -60,6 +61,7 @@ type fx struct {
 	t         *testing.T
 	root      string
 	web       bool
+	svc       bool // the app declares the sidecar service ocr (see withService)
 	transport string
 	exec      *runexec.Fake
 	vm        *remote.Fake
@@ -138,10 +140,10 @@ func newFx(t *testing.T, web bool, transport string) *fx {
 			x.built = append(x.built, o)
 			var out []build.Image
 			for _, target := range o.Targets {
-				img := build.Image{Name: "todo-" + target, Ref: "todo-" + target + ":" + o.Tag}
+				img := build.Image{Name: target, Ref: "todo-" + target + ":" + o.Tag}
 				if o.Push {
 					img.Ref = "ghcr.io/acme/" + img.Ref
-					img.Digest = map[string]string{"api": digestAPI, "web": digestWeb}[target]
+					img.Digest = map[string]string{"api": digestAPI, "web": digestWeb, "ocr": digestOCR}[target]
 				}
 				out = append(out, img)
 			}
@@ -201,10 +203,11 @@ func (x *fx) expectLock() {
 }
 
 // expectBegin scripts the journal start of a new release: read, rotate, preflight, build.
-func (x *fx) expectBegin(previous string) {
+// The previous journal is empty.
+func (x *fx) expectBegin() {
 	x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/releases.json").Return("", "", 0)
 	x.vm.Expect("sh", "-c", releaseExistsScript, "spinup-release-exists", testRelDir).Return("", "", 0)
-	x.vm.Expect("sh", "-c").Return(previous, "", 0)
+	x.vm.Expect("sh", "-c").Return("", "", 0)
 	x.ok("sh", "-c", rotateJournalScript, "spinup-journal", testRoot+"/deploy.state")
 	x.journal(2)
 }
@@ -234,6 +237,9 @@ func (x *fx) expectUploadRelease(live string) {
 }
 
 func (x *fx) releasePaths() []string {
+	if x.svc {
+		return []string{".env", "Caddyfile", "Dockerfile.postgres", "compose.edge.yml", "compose.override.yml", ServicesComposeFile, "compose.yml", "postgres/postgresql.conf"}
+	}
 	return []string{".env", "Caddyfile", "Dockerfile.postgres", "compose.edge.yml", "compose.override.yml", "compose.yml", "postgres/postgresql.conf"}
 }
 
@@ -255,11 +261,20 @@ func (x *fx) expectEdge(live, caddy string) {
 }
 
 func (x *fx) expectMigrate() {
-	x.ok(ComposeArgv("todo-migrate", testRelDir, []string{testRelDir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")...)
+	// migrate runs with the files of the release, so it gets SERVICE_<NAME>_URL.
+	files := []string{testRelDir + "/compose.yml"}
+	if x.svc {
+		files = append(files, testRelDir+"/"+ServicesComposeFile)
+	}
+	x.ok(ComposeArgv("todo-migrate", testRelDir, files, "--profile", "migrate", "run", "--rm", "-T", "migrate")...)
 }
 
 func (x *fx) colorArgv(color string, args ...string) []string {
-	return ComposeArgv("todo-"+color, testRelDir, []string{testRelDir + "/compose.yml"}, args...)
+	files := []string{testRelDir + "/compose.yml"}
+	if x.svc {
+		files = append(files, testRelDir+"/"+ServicesComposeFile)
+	}
+	return ComposeArgv("todo-"+color, testRelDir, files, args...)
 }
 
 func psArgv(project, service string) []string {
@@ -288,6 +303,12 @@ func (x *fx) expectReady(color string) {
 		x.vm.Expect(psArgv("todo-"+color, "web")...).Return("nweb1\n", "", 0)
 		x.vm.Expect(inspectArgv("nweb1")...).Return("10.0.1.3\n", "", 0)
 		x.ok(wgetReady("10.0.1.3", 3000, "/healthz")...)
+	}
+	if x.svc {
+		x.vm.Expect(psArgv("todo-"+color, "ocr")...).Return("nocr1\nnocr2\n", "", 0)
+		x.vm.Expect(inspectArgv("nocr1", "nocr2")...).Return("10.0.1.5\n10.0.1.6\n", "", 0)
+		x.ok(wgetReady("10.0.1.5", 9000, "/health/ready")...)
+		x.ok(wgetReady("10.0.1.6", 9000, "/health/ready")...)
 	}
 }
 

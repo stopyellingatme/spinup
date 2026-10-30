@@ -16,7 +16,7 @@ spinup build [flags]
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |
-| `--image` | `false` | build the API container image |
+| `--image` | `false` | build application container images |
 | `--json` | `false` | write JSON output |
 | `--no-color` | `false` | turn off color |
 | `--non-interactive` | `false` | never prompt |
@@ -25,6 +25,6 @@ spinup build [flags]
 | `--push` | `false` | push images with provenance and an SBOM |
 | `--registry` | `` | container registry (default ghcr.io) |
 | `--tag` | `` | version tag (default dev) |
-| `--target` | `api` | target to build: api, web, or all |
+| `--target` | `[]` | image target to build; repeat or separate names with commas |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |

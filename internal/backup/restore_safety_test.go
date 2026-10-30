@@ -141,19 +141,14 @@ func TestRestoreFailureRecovery(t *testing.T) {
 			expectLiveRelease(vm)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			safe := stage == "stop app" || stage == "stop postgres"
-			for i, color := range []string{deploy.Blue, deploy.Green} {
-				for _, service := range []string{"api", "web"} {
-					vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color, "--filter", "label=com.docker.compose.service="+service).Return(color+"-"+service, "", 0)
-					e := vm.Expect("docker", "stop", color+"-"+service)
-					if stage == "stop app" {
-						e.Return("", "stop app failed", 1)
-						break
-					}
-					e.Return("", "", 0)
-				}
-				if stage == "stop app" && i == 0 {
+			for _, color := range []string{deploy.Blue, deploy.Green} {
+				vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color).Return(color+"-api\n", "", 0)
+				e := vm.Expect("docker", "stop", color+"-api")
+				if stage == "stop app" {
+					e.Return("", "stop app failed", 1)
 					break
 				}
+				e.Return("", "", 0)
 			}
 			if stage != "stop app" {
 				vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
@@ -175,7 +170,7 @@ func TestRestoreFailureRecovery(t *testing.T) {
 							e.Return("", "migrate failed", 1)
 						} else {
 							e.Return("", "", 0)
-							e = vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait", "api")...)
+							e = vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait")...)
 							if stage == "start" {
 								e.Return("", "start failed", 1)
 							} else {
@@ -190,9 +185,9 @@ func TestRestoreFailureRecovery(t *testing.T) {
 				if stage != "stop postgres" {
 					vm.Expect(baseCompose("todo", "start", "--wait", "postgres")...).Return("", "", 0)
 				}
-				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait", "api")...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait")...).Return("", "", 0)
 			} else if stage == "start" || stage == "smoke" {
-				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "stop", "api")...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "stop")...).Return("", "", 0)
 			}
 			vm.Expect("sh", "-c").Return("", "", 0)
 			err := Restore(context.Background(), RestoreOptions{Options: Options{Dir: restoreProject(t), Env: "staging", Remote: vm}, Into: "in-place", IKnow: true, NoSafetyBackup: true,

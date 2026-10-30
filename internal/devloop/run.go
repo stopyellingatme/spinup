@@ -20,7 +20,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/quick" // Register development prerequisites.
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
+	"github.com/stopyellingatme/spinup/internal/services"
 	"github.com/stopyellingatme/spinup/internal/stackversions"
 	"github.com/stopyellingatme/spinup/internal/webtool"
 )
@@ -31,8 +33,12 @@ type Options struct {
 	Dir string
 	// NoWeb skips Vite and the web prerequisites.
 	NoWeb bool
-	// NoInfra skips Docker startup and shutdown.
+	// NoInfra skips Docker startup and shutdown. It also skips the sidecar services.
 	NoInfra bool
+	// NoServices skips the sidecar services that spinup.toml declares.
+	NoServices bool
+	// NoWorker skips the jobs worker when the jobs module is on.
+	NoWorker bool
 	// LGTM enables the pinned local monitoring container.
 	LGTM bool
 	// Down stops infrastructure owned by this run on exit.
@@ -49,6 +55,9 @@ type Options struct {
 	Starter Starter
 	// PortAllocator overrides local TCP probing for embedded callers.
 	PortAllocator func(int) (int, error)
+
+	// watchInterval and watchDebounce override the watcher timing in tests.
+	watchInterval, watchDebounce time.Duration
 }
 
 // Endpoint records one local development port.
@@ -90,9 +99,18 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 		return err
 	}
 	behavior := 1
-	if cfg, err := project.Load(root); err == nil {
+	var cfg *project.Config
+	if loaded, err := project.Load(root); err == nil {
+		cfg = loaded
 		behavior = cfg.EffectiveBehaviorVersion()
 	}
+	var declared []services.Service
+	appName := ""
+	if cfg != nil {
+		declared, appName = cfg.Services, cfg.App.Name
+	}
+	runServices := len(declared) > 0 && !o.NoServices && !o.NoInfra
+	runWorker := modules.Enabled(cfg, "jobs") && !o.NoWorker
 	lock, err := manifest.Load(filepath.Join(root, project.LockFile))
 	if err != nil {
 		return err
@@ -114,7 +132,11 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 		base := []string{"compose", "-f", "deploy/compose.dev.yml", "--project-directory", root, "--env-file", filepath.Join(root, ".env")}
 		running = publishedPorts(ctx, runner, base, root)
 	}
-	ports, err := allocate(o, hasWeb, running)
+	reserved := make([]int, 0, len(declared))
+	for _, s := range declared {
+		reserved = append(reserved, s.DevPort)
+	}
+	ports, err := allocate(o, hasWeb, running, reserved)
 	if err != nil {
 		return err
 	}
@@ -124,6 +146,14 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	compose, err := composeArgs(root, o, ports)
 	if err != nil {
 		return err
+	}
+	up := []string{"up", "-d", "--wait"}
+	if runServices {
+		if err := writeServicesCompose(root, appName, declared, o.LGTM); err != nil {
+			return err
+		}
+		compose = withServices(compose)
+		up = []string{"up", "--build", "-d", "--wait"}
 	}
 	if !o.NoInfra {
 		if o.Down {
@@ -135,7 +165,7 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 				}
 			}()
 		}
-		if err := runCommand(ctx, runner, exec.Cmd{Name: "docker", Args: append(slices.Clone(compose), "up", "-d", "--wait"), Dir: root, Stdout: o.Out, Stderr: o.Out}); err != nil {
+		if err := runCommand(ctx, runner, exec.Cmd{Name: "docker", Args: append(slices.Clone(compose), up...), Dir: root, Stdout: o.Out, Stderr: o.Out}); err != nil {
 			return err
 		}
 	}
@@ -145,6 +175,9 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	if o.LGTM {
 		apiEnv = append(apiEnv, "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318")
 	}
+	// The API and the worker reach each declared service on its dev port, also when this
+	// run does not start the services, so a service that runs elsewhere still works.
+	apiEnv = append(apiEnv, serviceEnv(declared)...)
 	if err := runCommand(ctx, runner, exec.Cmd{Name: "go", Args: []string{"run", "./cmd/api", "migrate", "up"}, Dir: filepath.Join(root, "api"), Env: apiEnv, Stdout: o.Out, Stderr: o.Out}); err != nil {
 		return err
 	}
@@ -153,6 +186,11 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 		apiArgs = []string{"tool", "-modfile=tools.mod", "wgo", "run", "./cmd/api"}
 	}
 	processes := []Process{{Name: "api", Dir: filepath.Join(root, "api"), Cmd: exec.Cmd{Name: "go", Args: apiArgs, Env: apiEnv}, Restart: true}}
+	var reload chan struct{}
+	if runWorker {
+		reload = make(chan struct{}, 1)
+		processes = append(processes, Process{Name: "worker", Dir: filepath.Join(root, "api"), Cmd: exec.Cmd{Name: "go", Args: []string{"run", "./cmd/worker"}, Env: slices.Clone(apiEnv)}, Restart: true, Reload: reload})
+	}
 	if hasWeb {
 		tool := webtool.FromLock(lock)
 		cmd := tool.InWeb(root, tool.Run("dev", "--port", strconv.Itoa(ports.Web.Port), "--strictPort"))
@@ -162,8 +200,13 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	watchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	watchDone := make(chan error, 1)
+	if reload != nil {
+		// Air rebuilds the API after a Go change. The worker runs with go run, so the
+		// dev command starts it again after the same change.
+		go (goWatcher{Root: root, Reload: reload, Out: o.Out, Interval: o.watchInterval, Debounce: o.watchDebounce}).Run(watchCtx)
+	}
 	go func() {
-		err := (Watcher{Root: root, Runner: runner, Out: o.Out}).Run(watchCtx)
+		err := (Watcher{Root: root, Runner: runner, Out: o.Out, ServiceOpenAPI: serviceOpenAPI(declared), Interval: o.watchInterval, Debounce: o.watchDebounce}).Run(watchCtx)
 		watchDone <- err
 		if err != nil {
 			cancel()
@@ -236,7 +279,8 @@ func prerequisites(ctx context.Context, root string, o Options, web bool, runner
 
 // allocate picks the local ports. running holds the host ports that the app's own running
 // Compose services already publish (see publishedPorts); those are reused without a probe.
-func allocate(o Options, web bool, running map[string]int) (Ports, error) {
+// reserved holds the dev ports of the sidecar services. The API and web ports never take them.
+func allocate(o Options, web bool, running map[string]int, reserved []int) (Ports, error) {
 	api, front := o.APIPort, o.Port
 	if api == 0 {
 		api = 8080
@@ -269,6 +313,9 @@ func allocate(o Options, web bool, running map[string]int) (Ports, error) {
 		free = FreePort
 	}
 	used := map[int]bool{}
+	for _, port := range reserved {
+		used[port] = true
+	}
 	held := map[*Endpoint]int{&ports.Mailpit: running["mailpit:8025"], &ports.Grafana: running["otel-lgtm:3000"]}
 	for _, endpoint := range endpoints {
 		if port := held[endpoint]; port > 0 && !used[port] {
@@ -341,6 +388,16 @@ func composeArgs(root string, o Options, ports Ports) ([]string, error) {
 		args = append(args, "-f", ".spinup/compose.lgtm.yml")
 	}
 	return append(args, "--project-directory", root, "--env-file", filepath.Join(root, ".env")), nil
+}
+
+// withServices adds the services Compose file after the other -f files, before
+// --project-directory.
+func withServices(args []string) []string {
+	index := slices.Index(args, "--project-directory")
+	if index < 0 {
+		index = len(args)
+	}
+	return slices.Concat(args[:index], []string{"-f", servicesFile}, args[index:])
 }
 func runCommand(ctx context.Context, r exec.Runner, c exec.Cmd) error {
 	result, err := r.Run(ctx, c)

@@ -1,0 +1,22 @@
+"""Exit with zero when the HTTP service is ready."""
+
+import os
+import sys
+import urllib.error
+import urllib.request
+
+
+def main() -> int:
+    """Test the local health route."""
+    try:
+        port = int(os.environ.get("PORT", "8080"))
+        if not 1 <= port <= 65535:
+            return 1
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=3) as response:
+            return 0 if response.status == 200 else 1
+    except (OSError, ValueError, urllib.error.URLError):
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

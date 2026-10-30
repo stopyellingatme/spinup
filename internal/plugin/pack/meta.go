@@ -16,6 +16,7 @@ import (
 )
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
+var serviceTemplateNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,29}$`)
 var versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 var argPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
@@ -108,7 +109,33 @@ func validate(t tree, cliVersion string) (plugin.Meta, error) {
 			}
 		}
 	}
+	if err := validateServiceTemplates(t.fs(), meta); err != nil {
+		return meta, err
+	}
 	return meta, nil
+}
+
+func validateServiceTemplates(fsys fs.FS, meta plugin.Meta) error {
+	names := map[string]bool{}
+	for _, serviceTemplate := range meta.ServiceTemplates {
+		if !serviceTemplateNamePattern.MatchString(serviceTemplate.Name) || names[serviceTemplate.Name] {
+			return problem("validate service template", fmt.Errorf("plugin %q has an invalid or duplicate service template name %q", meta.Name, serviceTemplate.Name))
+		}
+		names[serviceTemplate.Name] = true
+		clean, err := vfs.CleanPath(serviceTemplate.Dir)
+		if err != nil || clean != serviceTemplate.Dir {
+			return problem("validate service template", fmt.Errorf("plugin %q has an unsafe service template dir %q", meta.Name, serviceTemplate.Dir))
+		}
+		namespace := strings.Split(clean, "/")[0]
+		if namespace == "@gen" || namespace == "@exec" {
+			return problem("validate service template", fmt.Errorf("plugin %q service template dir %q uses the reserved %s namespace", meta.Name, clean, namespace))
+		}
+		info, err := fs.Stat(fsys, clean)
+		if err != nil || !info.IsDir() {
+			return problem("validate service template", fmt.Errorf("plugin %q service template dir %q is missing or not a directory", meta.Name, clean))
+		}
+	}
+	return nil
 }
 
 // CheckOutputPath validates a portable plugin output path or renamed_from path.

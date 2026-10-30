@@ -5,6 +5,4 @@
 // templates/rust/Cargo.toml, templates/rust/Cargo.lock, templates/python/pyproject.toml, and
 // templates/python/uv.lock. Their versions equal the crates and python_packages pins in
 // stackversions.yaml.
-//
-// Stub from the services pre-seed. Unit S2 replaces this file.
 package service

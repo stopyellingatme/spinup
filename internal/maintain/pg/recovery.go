@@ -96,7 +96,7 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	script.WriteString(shell("docker", "tag", u.live.Image, u.live.Config.Image) + "\n")
 	script.WriteString(shell(u.base("up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...) + "\n")
 	if u.o.Major {
-		script.WriteString(shell(u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.services()...)...)...) + "\n")
+		script.WriteString(shell(u.color("up", "-d", "--no-deps", "--wait")...) + "\n")
 	}
 	if u.rollbackRefusal != "" {
 		script.Reset()
@@ -180,13 +180,15 @@ func (u *upgrade) volume() string {
 	}
 	return ""
 }
+
+// stopColorsScript stops every container of both color projects. It selects the
+// containers by project, not by service name, so the worker and every sidecar of
+// any deployed release stop, whatever the local spinup.toml declares.
 func stopColorsScript(app string) string {
 	var b strings.Builder
 	for _, color := range []string{"blue", "green"} {
-		for _, service := range []string{"api", "web"} {
-			b.WriteString("ids=$(" + shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project="+app+"-"+color, "--filter", "label=com.docker.compose.service="+service) + ")\n")
-			b.WriteString("if [ -n \"$ids\" ]; then docker stop $ids; fi\n")
-		}
+		b.WriteString("ids=$(" + shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project="+app+"-"+color) + ")\n")
+		b.WriteString("if [ -n \"$ids\" ]; then docker stop $ids; fi\n")
 	}
 	return b.String()
 }

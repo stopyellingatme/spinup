@@ -93,7 +93,7 @@ func TestFlowHeartbeatDuringLongStep(t *testing.T) {
 			x.expectLocalGit()
 			x.expectConnect()
 			x.expectLock()
-			x.expectBegin("")
+			x.expectBegin()
 			x.journal(1)
 			x.expectReadCurrent("")
 			if !lost {

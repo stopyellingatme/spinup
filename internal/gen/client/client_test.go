@@ -27,7 +27,7 @@ func TestGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Plan.Files) != 0 || !reflect.DeepEqual(out.PostSteps, []gen.PostStep{gen.PostOpenAPI, gen.PostClient}) || !reflect.DeepEqual(out.Next, []string{"cd web && pnpm check"}) {
+	if len(out.Plan.Files) != 0 || !reflect.DeepEqual(out.PostSteps, []gen.PostStep{gen.PostOpenAPI, gen.PostClient, gen.PostServiceClients}) || !reflect.DeepEqual(out.Next, []string{"cd web && pnpm check"}) {
 		t.Fatalf("output = %+v", out)
 	}
 	if _, err := g.Run(context.Background(), gen.Input{Args: []string{"unexpected"}}); err == nil || !strings.Contains(err.Error(), "Try:") {

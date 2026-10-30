@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1
+FROM {{ .RustImage }} AS build
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --locked && cp target/release/service /service
+
+FROM {{ .DistrolessImage }}
+COPY --from=build /service /service
+USER nonroot
+ENV PORT={{ .Port }}
+EXPOSE {{ .Port }}
+ENTRYPOINT ["/service"]

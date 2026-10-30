@@ -47,8 +47,8 @@ The standard worker registers mail delivery and consumes the `default` and `mail
 Each queue permits ten concurrent jobs.
 When the standard worker runs, it also delivers queued mail.
 
-The current `spinup dev` command and deployment templates do not start this worker.
-Start it alongside `spinup dev`, or configure it as a separate service for deployment:
+`spinup dev` and the deployment templates start this worker when the `jobs` module is enabled.
+For manual operation, start it after the migrations:
 
 ```sh
 cd api

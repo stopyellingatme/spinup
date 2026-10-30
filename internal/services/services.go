@@ -9,6 +9,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"go/token"
 	"regexp"
 	"slices"
 	"strconv"
@@ -58,13 +59,18 @@ var (
 	varPattern  = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 )
 
-// ValidName reports whether name is a valid, unreserved service name.
+// ValidName reports whether name is a valid, unreserved service name. A Go keyword
+// is not valid, because the name is the package name of the generated Go client.
 func ValidName(name string) error {
 	if !namePattern.MatchString(name) {
 		return fmt.Errorf("service name %q must match %s. Try: use lower-case letters and digits, such as ocr", name, namePattern)
 	}
 	if slices.Contains(Reserved, name) {
 		return fmt.Errorf("service name %q is reserved for spinup. Try: choose another name, such as %ssvc", name, name)
+	}
+	// The name is the Go package name of the generated client (api/internal/services/<name>).
+	if token.IsKeyword(name) {
+		return fmt.Errorf("service name %q is a Go keyword, and the Go client uses the name as its package name. Try: choose another name, such as %ssvc", name, name)
 	}
 	return nil
 }

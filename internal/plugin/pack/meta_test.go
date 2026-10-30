@@ -2,6 +2,7 @@ package pack
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,49 @@ func TestMetadataValidation(t *testing.T) {
 			}
 			if tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)) {
 				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestServiceTemplateValidation(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, metadata, prepare, want string
+	}{
+		{"valid", "[[service_templates]]\nname = 'go-http'\ndescription = 'HTTP service'\ndir = 'services/go-http'\n", "services/go-http/main.go", ""},
+		{"bad name", "[[service_templates]]\nname = 'Go'\ndir = 'services/go'\n", "services/go/main.go", "service template"},
+		{"duplicate", "[[service_templates]]\nname = 'go'\ndir = 'services/go'\n\n[[service_templates]]\nname = 'go'\ndir = 'services/other'\n", "services/go/main.go", "duplicate"},
+		{"unclean dir", "[[service_templates]]\nname = 'go'\ndir = 'services/../go'\n", "services/go/main.go", "dir"},
+		{"missing dir", "[[service_templates]]\nname = 'go'\ndir = 'services/go'\n", "", "missing or not a directory"},
+		{"file dir", "[[service_templates]]\nname = 'go'\ndir = 'services/go'\n", "services/go", "missing or not a directory"},
+		{"reserved dir", "[[service_templates]]\nname = 'go'\ndir = '@gen/go'\n", "@gen/go/main.go", "reserved"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := fixture(t)
+			if tc.prepare != "" {
+				path := root + "/" + tc.prepare
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("template\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(root+"/plugin.toml", []byte("name = 'example'\nversion = '1.0.0'\napi = 1\nspinup = '>=0.0.0'\n"+tc.metadata), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			tr, err := readTree(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = validate(tr, "1.2.3")
+			if tc.want == "" && err != nil {
+				t.Fatal(err)
+			}
+			if tc.want != "" && (err == nil || !strings.Contains(err.Error(), "example") || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "Try:")) {
+				t.Fatalf("error = %v, want plugin name, %q, and Try:", err, tc.want)
 			}
 		})
 	}

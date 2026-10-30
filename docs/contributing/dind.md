@@ -39,8 +39,11 @@ Then it tests the commands:
 | 4 | `deploy` of a good release, then `rollback` | `/version` reports the first release again. `releases list` marks it as current. |
 | 5 | `deploy` while another process holds the lock | The deploy exits 5 and names the owner. `deploy unlock --force` removes the lock. |
 | 6 | `deploy` after `secrets set` of a new name | Each secret file has mode 0600 and the owner `deploy`. The value is not in a release file. |
+| 7 | `deploy` with a sidecar service, a second `deploy`, then `rollback` | The service answers through Caddy. The second release switches colors and changes the service environment. Rollback restores the service of the first release. `release.json` records the image. |
 
-Step 7 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
+Step 7 builds a small Go service from `testdata/dind/fixtures/service/` on the pinned images. It declares the secret `ECHO_TOKEN`.
+
+Step 8 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
 
 1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.
 2. The suite adds a `Host 127.0.0.1` block to the `ssh_config`, with the port of the VM and the operator key. The droplet address is `127.0.0.1`, and the new environment has no port.
