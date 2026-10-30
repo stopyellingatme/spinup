@@ -1,6 +1,7 @@
 # Check local health
 
-`spinup doctor` reports the git version, lock validity, missing managed files, and kit compatibility.
+`spinup doctor` reports the git version, lock validity, missing managed files, kit compatibility, and sidecar service problems.
+The services check validates `[[services]]`, service files, generated Go clients, and secret names.
 Use `--quick` to run only the fast checks: the git version and the dev environment (Go, Node, pnpm, Docker, ports, and `.env`). `spinup dev` runs the same set first.
 Use `--json` for a JSON array of results.
 Checks that require a project skip outside a project.
