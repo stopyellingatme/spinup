@@ -53,4 +53,9 @@ import (
 	// M10
 	_ "github.com/stopyellingatme/spinup/internal/backup/walg"
 	_ "github.com/stopyellingatme/spinup/internal/plugin/rpc"
+
+	// Sidecar services (ADR 0022)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/services"
+	_ "github.com/stopyellingatme/spinup/internal/gen/service"
+	_ "github.com/stopyellingatme/spinup/internal/gen/serviceclient"
 )

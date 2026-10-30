@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/stopyellingatme/spinup/internal/services"
 )
 
 const (
@@ -94,7 +96,9 @@ type Config struct {
 	Envs       map[string]Env `toml:"env"`
 	Plugins    []Plugin       `toml:"plugins"`
 	DefaultEnv string         `toml:"default_env"`
-	Extra      map[string]any `toml:"-"`
+	// Services are the sidecar services of the app (ADR 0022).
+	Services []services.Service `toml:"services"`
+	Extra    map[string]any     `toml:"-"`
 }
 
 // FindRoot finds the nearest parent directory containing spinup.toml.
@@ -146,7 +150,7 @@ func Parse(data []byte) (*Config, error) {
 	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse %s extra keys: %w", ConfigFile, err)
 	}
-	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env"} {
+	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services"} {
 		delete(raw, key)
 	}
 	config.Extra = raw
@@ -197,6 +201,9 @@ func (c *Config) Validate() error {
 		if _, ok := c.Envs[c.DefaultEnv]; !ok {
 			problems = append(problems, fmt.Errorf("default environment %q does not exist", c.DefaultEnv))
 		}
+	}
+	if err := services.Validate(c.Services, nil); err != nil {
+		problems = append(problems, err)
 	}
 	return errors.Join(problems...)
 }

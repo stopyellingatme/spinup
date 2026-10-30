@@ -76,6 +76,9 @@ type Stack struct {
 	Images    map[string]Image  `yaml:"images"`
 	Binaries  map[string]Binary `yaml:"binaries"`
 	Actions   map[string]Action `yaml:"actions"`
+	// Crates and PythonPackages pin the sidecar service templates (ADR 0022).
+	Crates         map[string]string `yaml:"crates"`
+	PythonPackages map[string]string `yaml:"python_packages"`
 	// DigitalOcean holds the droplet defaults of `spinup deploy digital-ocean` (ADR 0017).
 	DigitalOcean DigitalOcean `yaml:"digitalocean"`
 }
