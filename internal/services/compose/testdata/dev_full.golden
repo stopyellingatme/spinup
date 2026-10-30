@@ -15,4 +15,4 @@ services:
       OCR_LICENSE_KEY: "${OCR_LICENSE_KEY:-}"
       OCR_SALT: "${OCR_SALT:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-lgtm:4318"
-      OTEL_SERVICE_NAME: "ocr"
+      OTEL_SERVICE_NAME: "todo-ocr"

@@ -93,7 +93,7 @@ func TestDevGolden(t *testing.T) {
 		name string
 		in   DevInput
 	}{
-		{"dev_full", DevInput{Services: []services.Service{fullService()}, LGTM: true}},
+		{"dev_full", DevInput{App: "todo", Services: []services.Service{fullService()}, LGTM: true}},
 		{"dev_two", DevInput{Services: []services.Service{minimalService("ocr", 8080, 8101), minimalService("tts", 9000, 8102)}}},
 	}
 	for _, tt := range tests {

@@ -44,6 +44,9 @@ type DeployInput struct {
 
 // DevInput is the input of Dev.
 type DevInput struct {
+	// App is the app name. It forms the OpenTelemetry service name. Empty means the bare
+	// service name.
+	App string
 	// Services are the declared services, in declaration order.
 	Services []services.Service
 	// LGTM sends the OpenTelemetry data of each service to the otel-lgtm container.
@@ -223,7 +226,7 @@ func Dev(in DevInput) ([]byte, error) {
 		if in.LGTM {
 			extras = append(extras,
 				[2]string{"OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-lgtm:4318"},
-				[2]string{"OTEL_SERVICE_NAME", s.Name})
+				[2]string{"OTEL_SERVICE_NAME", devOTelName(in.App, s.Name)})
 		}
 		env, err := environmentDev(s, extras)
 		if err != nil {
@@ -345,4 +348,12 @@ func flow(items ...*yaml.Node) *yaml.Node {
 	n := seq(items...)
 	n.Style = yaml.FlowStyle
 	return n
+}
+
+// devOTelName returns the OpenTelemetry service name of a service in spinup dev.
+func devOTelName(app, name string) string {
+	if app == "" {
+		return name
+	}
+	return services.OTelName(app, name)
 }
