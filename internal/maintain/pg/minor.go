@@ -37,6 +37,12 @@ func (u *upgrade) minor(ctx context.Context) error {
 	if _, err = u.run(ctx, u.base("build", "postgres")...); err != nil {
 		return err
 	}
+	if u.hasExtraServices() {
+		fmt.Fprintln(u.o.Out, "Stop the app services of both colors. The app is down.")
+		if _, err = u.run(ctx, "sh", "-ec", stopColorsScript(u.cfg.App.Name, u.appServices()...)); err != nil {
+			return err
+		}
+	}
 	fmt.Fprintln(u.o.Out, "Recreate only postgres (restart downtime)")
 	if _, err = u.run(ctx, u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "postgres")...); err != nil {
 		return err
@@ -64,6 +70,16 @@ func (u *upgrade) minor(ctx context.Context) error {
 	if got != pinned {
 		return failure("check new version", fmt.Errorf("running %d.%d, expected %d.%d", got.major, got.minor, pinned.major, pinned.minor))
 	}
-	fmt.Fprintf(u.o.Out, "PostgreSQL now runs %d.%d. Downtime was the restart only.\n", got.major, got.minor)
+	if u.hasExtraServices() {
+		fmt.Fprintln(u.o.Out, "Start the live color")
+		if _, err = u.run(ctx, u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.appServices()...)...)...); err != nil {
+			return err
+		}
+	}
+	if u.hasExtraServices() {
+		fmt.Fprintf(u.o.Out, "PostgreSQL now runs %d.%d. The app services have restarted.\n", got.major, got.minor)
+	} else {
+		fmt.Fprintf(u.o.Out, "PostgreSQL now runs %d.%d. Downtime was the restart only.\n", got.major, got.minor)
+	}
 	return nil
 }

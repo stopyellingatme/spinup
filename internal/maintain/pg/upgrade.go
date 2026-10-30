@@ -216,7 +216,11 @@ func (u *upgrade) base(args ...string) []string {
 	return deploy.ComposeArgv(u.cfg.App.Name, u.dir, u.files, args...)
 }
 func (u *upgrade) color(args ...string) []string {
-	return deploy.ComposeArgv(u.cfg.App.Name+"-"+u.rel.Color, u.dir, []string{u.dir + "/compose.yml"}, args...)
+	files := deploy.ColorComposeFiles(u.rel.Services)
+	for i := range files {
+		files[i] = u.dir + "/" + files[i]
+	}
+	return deploy.ComposeArgv(u.cfg.App.Name+"-"+u.rel.Color, u.dir, files, args...)
 }
 func (u *upgrade) services() []string {
 	lock, err := manifest.Load(filepath.Join(u.root, "spinup.lock"))
@@ -225,6 +229,30 @@ func (u *upgrade) services() []string {
 	}
 	return []string{"api"}
 }
+
+// appServices includes every process that must stop before a database change.
+func (u *upgrade) appServices() []string {
+	result := u.services()
+	if modules.Enabled(u.cfg, "jobs") {
+		result = append(result, "worker")
+	}
+	for _, service := range u.rel.Services {
+		result = append(result, service.Name)
+	}
+	return result
+}
+
+func (u *upgrade) hasExtraServices() bool {
+	return modules.Enabled(u.cfg, "jobs") || len(u.rel.Services) > 0
+}
+
+func (u *upgrade) serviceText() string {
+	if u.hasExtraServices() || len(u.cfg.Services) > 0 {
+		return "the app services"
+	}
+	return "api and web"
+}
+
 func (u *upgrade) operationDir() string {
 	if u.o.Major {
 		return "/opt/" + u.cfg.App.Name + "/pg-upgrade"
@@ -237,9 +265,16 @@ func (u *upgrade) plan() {
 	case u.o.Cleanup:
 		steps = append(steps, "Check the completed upgrade and the active volume", "Check the repository lock answer and external volume mapping", "Remove the retained old volume with confirmation")
 	case u.o.Major:
-		steps = append(steps, "Save the old image, Compose files, and recovery command", "Stop api and web of both colors (the app is down)", "Take a full backup with pgdump", "Start the target pinned image on a new volume", "Restore the dump and run ANALYZE", "Compare goose_db_version and every user table row count", "Stop the old postgres and swap the Compose image and volume", "Upgrade the pgBackRest stanza when the backups module uses pgbackrest", "Run migrate", "Start the live color", "Run the deploy smoke checks", "Retain the old volume until --cleanup")
+		steps = append(steps, "Save the old image, Compose files, and recovery command", "Stop "+u.serviceText()+" of both colors (the app is down)", "Take a full backup with pgdump", "Start the target pinned image on a new volume", "Restore the dump and run ANALYZE", "Compare goose_db_version and every user table row count", "Stop the old postgres and swap the Compose image and volume", "Upgrade the pgBackRest stanza when the backups module uses pgbackrest", "Run migrate", "Start the live color", "Run the deploy smoke checks", "Retain the old volume until --cleanup")
 	default:
-		steps = append(steps, "Exit successfully if the pinned version is already running", "Take a backup with the configured backend", "Save the old image and recovery command", "Build postgres from the release Dockerfile.postgres", "Recreate only postgres (restart downtime)", "Wait for health and print SHOW server_version")
+		steps = append(steps, "Exit successfully if the pinned version is already running", "Take a backup with the configured backend", "Save the old image and recovery command", "Build postgres from the release Dockerfile.postgres")
+		if u.hasExtraServices() || len(u.cfg.Services) > 0 {
+			steps = append(steps, "Stop the app services of both colors (the app is down)")
+		}
+		steps = append(steps, "Recreate only postgres (restart downtime)", "Wait for health and print SHOW server_version")
+		if u.hasExtraServices() || len(u.cfg.Services) > 0 {
+			steps = append(steps, "Start the live color")
+		}
 	}
 	for _, step := range steps {
 		fmt.Fprintln(u.o.Out, "Plan: "+step)
