@@ -25,8 +25,10 @@ func TestFindings(t *testing.T) {
 		{name: "missing Dockerfile", config: serviceConfig("ocr", "", ""), status: doctor.Fail, want: "services/ocr/Dockerfile", wantTry: "add a Dockerfile"},
 		{name: "missing OpenAPI", config: serviceConfig("ocr", "openapi.yaml", ""), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n"}, status: doctor.Fail, want: "services/ocr/openapi.yaml", wantTry: "add the OpenAPI file"},
 		{name: "missing client", config: serviceConfig("ocr", "openapi.yaml", ""), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "services/ocr/openapi.yaml": "openapi: 3.0.0\n"}, status: doctor.Warn, want: "generated Go client is missing", wantTry: "spinup g client"},
-		{name: "missing secret", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "secrets/prod.enc.yaml": "sops: {}\nOTHER: ENC[value]\n"}, status: doctor.Warn, want: "OCR_LICENSE_KEY", wantTry: "add OCR_LICENSE_KEY"},
-		{name: "secret exists across files", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "secrets/prod.enc.yaml": "sops: {}\nOCR_LICENSE_KEY: ENC[never print this]\n"}, status: doctor.OK, want: "declared sidecar services"},
+		{name: "missing secret", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY") + envTables("prod"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "secrets/prod.enc.yaml": "sops: {}\nOTHER: ENC[value]\n"}, status: doctor.Warn, want: "secrets/prod.enc.yaml for environment prod", wantTry: "add OCR_LICENSE_KEY to secrets/prod.enc.yaml"},
+		{name: "secret exists in the environment file", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY") + envTables("prod"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "secrets/prod.enc.yaml": "sops: {}\nOCR_LICENSE_KEY: ENC[never print this]\n"}, status: doctor.OK, want: "declared sidecar services"},
+		{name: "secret only in another environment file", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY") + envTables("prod", "staging"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n", "secrets/prod.enc.yaml": "sops: {}\nOCR_LICENSE_KEY: ENC[never print this]\n", "secrets/staging.enc.yaml": "sops: {}\nOTHER: ENC[value]\n"}, status: doctor.Warn, want: "secrets/staging.enc.yaml for environment staging", wantTry: "add OCR_LICENSE_KEY to secrets/staging.enc.yaml"},
+		{name: "environment without a secrets file", config: serviceConfig("ocr", "", "OCR_LICENSE_KEY") + envTables("prod"), files: map[string]string{"services/ocr/Dockerfile": "FROM scratch\n"}, status: doctor.Warn, want: "environment prod", wantTry: "add OCR_LICENSE_KEY to secrets/prod.enc.yaml"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -85,4 +87,12 @@ func writeFile(t *testing.T, root, name, data string) {
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func envTables(names ...string) string {
+	var out string
+	for _, name := range names {
+		out += "\n[env." + name + "]\nhost='" + name + ".example.com'\nuser='deploy'\n"
+	}
+	return out
 }

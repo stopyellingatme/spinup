@@ -53,12 +53,20 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 			}
 		}
 	}
-	missingSecrets, err := checkSecrets(c.Root, config.Services)
-	if err != nil {
-		findings = append(findings, finding{doctor.Fail, "cannot inspect encrypted secret keys: " + err.Error(), "check the secrets/*.enc.yaml files"})
+	envNames := make([]string, 0, len(config.Envs))
+	for name := range config.Envs {
+		envNames = append(envNames, name)
 	}
-	for _, name := range missingSecrets {
-		findings = append(findings, finding{doctor.Warn, "secret " + name + " is not declared in any secrets/*.enc.yaml file", "add " + name + " to an encrypted secrets file"})
+	sort.Strings(envNames)
+	for _, env := range envNames {
+		missingSecrets, err := checkSecrets(c.Root, env, config.Services)
+		if err != nil {
+			findings = append(findings, finding{doctor.Fail, "cannot inspect encrypted secret keys for environment " + env + ": " + err.Error(), "check secrets/" + env + ".enc.yaml"})
+			continue
+		}
+		for _, name := range missingSecrets {
+			findings = append(findings, finding{doctor.Warn, "secret " + name + " is not declared in secrets/" + env + ".enc.yaml for environment " + env, "add " + name + " to secrets/" + env + ".enc.yaml"})
+		}
 	}
 	if len(findings) == 0 {
 		return doctor.Result{Status: doctor.OK, Message: "declared sidecar services are present"}
@@ -91,7 +99,9 @@ func exists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func checkSecrets(root string, services []servicecontract.Service) ([]string, error) {
+// checkSecrets returns the declared secrets that secrets/<env>.enc.yaml does not name.
+// A missing file for the environment means that every declared secret is missing.
+func checkSecrets(root, env string, services []servicecontract.Service) ([]string, error) {
 	required := map[string]bool{}
 	for _, svc := range services {
 		for _, name := range svc.Secrets {
@@ -101,27 +111,23 @@ func checkSecrets(root string, services []servicecontract.Service) ([]string, er
 	if len(required) == 0 {
 		return nil, nil
 	}
-	files, err := filepath.Glob(filepath.Join(root, "secrets", "*.enc.yaml"))
-	if err != nil {
-		return nil, err
+	file := filepath.Join(root, "secrets", env+".enc.yaml")
+	data, err := os.ReadFile(file)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read %s: %w", filepath.Base(file), err)
 	}
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", filepath.Base(file), err)
-		}
+	if err == nil {
 		var document yaml.Node
 		if err := yaml.Unmarshal(data, &document); err != nil {
 			return nil, fmt.Errorf("parse %s: invalid YAML", filepath.Base(file))
 		}
-		if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
-			continue
-		}
-		mapping := document.Content[0]
-		for i := 0; i+1 < len(mapping.Content); i += 2 {
-			key := mapping.Content[i]
-			if key.Kind == yaml.ScalarNode {
-				delete(required, key.Value)
+		if len(document.Content) > 0 && document.Content[0].Kind == yaml.MappingNode {
+			mapping := document.Content[0]
+			for i := 0; i+1 < len(mapping.Content); i += 2 {
+				key := mapping.Content[i]
+				if key.Kind == yaml.ScalarNode {
+					delete(required, key.Value)
+				}
 			}
 		}
 	}
