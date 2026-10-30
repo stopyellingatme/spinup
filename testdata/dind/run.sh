@@ -413,7 +413,15 @@ expect_version "$rel1"
 
 # ---------------------------------------------------------------------------------------------
 step "3. a release whose /readyz fails must not go live"
-git -C "$work/$app" apply "$here/fixtures/broken-readyz.patch"
+# Add a readiness check that always fails, after the db check. An anchored insert, not a patch,
+# so the edit does not depend on which modules change the lines around it.
+main_go="$work/$app/api/cmd/api/main.go"
+awk '{ print }
+/app\.WithReadiness\("db", pool\.Ping\),/ {
+  print "\t\t// The dind suite overlay: readiness always fails, so the deploy must keep the old color."
+  print "\t\tapp.WithReadiness(\"dind-broken\", func(context.Context) error { return fmt.Errorf(\"broken by the dind overlay\") }),"
+}' "$main_go" >"$main_go.tmp" && mv "$main_go.tmp" "$main_go"
+grep -q dind-broken "$main_go" || fail "could not add the failing readiness check" "check the WithReadiness line in $main_go"
 commit "dind: break readiness"
 broken="$(new_release)"
 if sp deploy-broken deploy --env staging --skip-build --tag "$broken" --yes --health-timeout 20s; then
@@ -431,7 +439,7 @@ echo "    only $projects runs an api container"
 
 # ---------------------------------------------------------------------------------------------
 step "4. deploy a good second release, then roll back to the first"
-git -C "$work/$app" apply -R "$here/fixtures/broken-readyz.patch"
+git -C "$work/$app" checkout HEAD~1 -- api/cmd/api/main.go
 commit "dind: repair readiness"
 rel2="$(new_release)"
 sp deploy-2 deploy --env staging --skip-build --tag "$rel2" --yes ||

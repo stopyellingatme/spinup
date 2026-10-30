@@ -60,7 +60,7 @@ The `systemctl` shim of the VM sends a HUP to `sshd` and waits until `sshd` serv
 
 The step needs `ssh-keyscan` and the `go` toolchain, in addition to the tools of the other steps. The trap stops the fake, because the script keeps its process ID in `pids`.
 
-`testdata/dind/fixtures/broken-readyz.patch` makes the release of step 3.
+Step 3 makes its release with an `awk` insert in `api/cmd/api/main.go`, after the `db` readiness check. The suite does not use a patch file, because the modules change the lines around that check.
 It adds a readiness check that always fails. `/healthz` still answers, so only the readiness check of the deploy stops the release.
 
 ## Run the suite
