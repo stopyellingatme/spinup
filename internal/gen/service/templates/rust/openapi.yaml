@@ -31,7 +31,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SumResponse'
+                $ref: '#/components/schemas/SumResult'
 components:
   schemas:
     SumRequest:
@@ -43,7 +43,7 @@ components:
           items:
             type: number
             format: double
-    SumResponse:
+    SumResult:
       type: object
       required: [sum]
       properties:
