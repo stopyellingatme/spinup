@@ -43,6 +43,8 @@ Then it tests the commands:
 
 Step 7 builds a small Go service from `testdata/dind/fixtures/service/` on the pinned images. It declares the secret `ECHO_TOKEN`.
 
+The app of the suite has the jobs module. After each deploy and rollback of step 7, the suite checks the jobs worker. Only the live color runs the worker. The worker has `SERVICE_ECHO_URL` and runs the image of the release. The worker does not restart during a short wait. The worker follows the color switch and the rollback.
+
 Step 8 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
 
 1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.
@@ -58,7 +60,7 @@ The `systemctl` shim of the VM sends a HUP to `sshd` and waits until `sshd` serv
 
 The step needs `ssh-keyscan` and the `go` toolchain, in addition to the tools of the other steps. The trap stops the fake, because the script keeps its process ID in `pids`.
 
-`testdata/dind/fixtures/broken-readyz.patch` makes the release of step 3.
+Step 3 makes its release with an `awk` insert in `api/cmd/api/main.go`, after the `db` readiness check. The suite does not use a patch file, because the modules change the lines around that check.
 It adds a readiness check that always fails. `/healthz` still answers, so only the readiness check of the deploy stops the release.
 
 ## Run the suite

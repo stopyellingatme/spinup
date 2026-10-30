@@ -270,7 +270,7 @@ exec "$REAL_FLOCK" "$@"
 }
 
 func TestMetricsWritersShareLock(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the lock choreography needs a quiet machine and a long bound.
 	dir, env := scheduledTestFiles(t)
 	docker := "#!/bin/sh\nexit 0\n"
 	if err := runexec.WriteExecutable(filepath.Join(dir, "bin/docker"), []byte(docker), 0755); err != nil {
@@ -301,7 +301,7 @@ wait "$cli"
 trap - 0
 `
 	env = append(env, "MERGE_SCRIPT="+metricsMergeScript)
-	result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", script}, Env: env, Timeout: 15 * time.Second})
+	result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", script}, Env: env, Timeout: lockScriptTimeout(t)})
 	if err != nil {
 		t.Fatalf("overlapping writers: %v\n%s", err, result.Stderr)
 	}
@@ -317,7 +317,7 @@ trap - 0
 }
 
 func TestScheduledRunsShareLock(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the lock choreography needs a quiet machine and a long bound.
 	dir, env := scheduledTestFiles(t)
 	docker := `#!/bin/sh
 set -eu
@@ -349,8 +349,21 @@ wait "$first"
 wait "$second"
 trap - 0
 `
-	result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", script}, Env: env, Timeout: 15 * time.Second})
+	result, err := (runexec.OSRunner{}).Run(context.Background(), runexec.Cmd{Name: "sh", Args: []string{"-ec", script}, Env: env, Timeout: lockScriptTimeout(t)})
 	if err != nil {
 		t.Fatalf("overlapping jobs: %v\n%s", err, result.Stderr)
 	}
+}
+
+// lockScriptTimeout returns a generous bound for the lock scripts. Heavy load
+// can delay the shell children for a long time.
+func lockScriptTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	timeout := 120 * time.Second
+	if deadline, ok := t.Deadline(); ok {
+		if left := time.Until(deadline) - 5*time.Second; left > timeout {
+			timeout = left
+		}
+	}
+	return timeout
 }

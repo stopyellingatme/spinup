@@ -12,6 +12,8 @@
 #   7. a sidecar service (ADR 0022): the service runs in the live color, the API reaches it through
 #      SERVICE_ECHO_URL, it sees only its own secret, a second deploy switches colors, and rollback
 #      restores the previous release with its service
+#      The app also has the jobs module. The worker runs in the live color only, has SERVICE_ECHO_URL,
+#      does not restart, and follows the color switch and the rollback.
 #   8. deploy digital-ocean against the dofake binary, with the VM as the droplet: a provision run
 #      with host key rotation, a second run that creates nothing and deploys a new release, and destroy
 #
@@ -156,7 +158,14 @@ new_release() {
   (cd "$work/$app/api" && CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" GOWORK=off GOFLAGS=-mod=mod \
     "$GO" build -trimpath -ldflags "-s -w -X main.version=$rel" -o "$work/img/api" ./cmd/api) \
     >"$logs/build-$sha.log" 2>&1 || { show_log "build-$sha"; fail "go build of release $rel failed"; }
+  (cd "$work/$app/api" && CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" GOWORK=off GOFLAGS=-mod=mod \
+    "$GO" build -trimpath -ldflags "-s -w -X main.version=$rel" -o "$work/img/worker" ./cmd/worker) \
+    >>"$logs/build-$sha.log" 2>&1 || { show_log "build-$sha"; fail "go build of the worker of release $rel failed"; }
   cp "$here/fixtures/Dockerfile.api" "$work/img/Dockerfile"
+  if [[ -f "$work/img/worker" ]]; then
+    # The jobs module: the release image also holds the worker binary, as in deploy/Dockerfile.api.
+    printf 'COPY worker /worker\n' >>"$work/img/Dockerfile"
+  fi
   echo "$app-api:$rel" >>"$work/images"
   if [[ -n "$web" ]]; then
     echo "$app-web:$rel" >>"$work/images"
@@ -240,6 +249,41 @@ check_service() {
   echo "    $svc sees only /run/secrets/ECHO_TOKEN"
 }
 
+# check_worker <release> checks the jobs worker of the live color (check_service sets live_color
+# first). Exactly one color runs the worker. The worker runs the image of the release and has
+# SERVICE_ECHO_URL. It does not restart: RestartCount is 0, and StartedAt does not change.
+check_worker() {
+  local rel=$1 project projects worker_c image url state started1 started2 restarts
+  project="$(live_projects)"
+  projects="$(vm_docker ps --filter label=com.docker.compose.service=worker \
+    --format '{{.Label "com.docker.compose.project"}}' | sort -u)"
+  [[ "$projects" == "$project" ]] ||
+    fail "the worker does not run in the live color $live_color only" "worker projects: ${projects//$'\n'/ }" "api projects: ${project//$'\n'/ }"
+  worker_c="$(vm_docker ps --filter "label=com.docker.compose.project=$project" \
+    --filter label=com.docker.compose.service=worker --format '{{.Names}}')"
+  [[ "$(printf '%s\n' "$worker_c" | grep -c .)" -eq 1 ]] ||
+    fail "the live color $live_color does not run exactly one worker container" "containers: ${worker_c//$'\n'/ }"
+  image="$(vm_docker inspect -f '{{.Config.Image}}' "$worker_c")"
+  [[ "$image" == "$app-api:$rel" ]] || fail "the worker container runs the wrong image" "want: $app-api:$rel" "got:  $image"
+  url="$(vm_docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$worker_c" | sed -n 's/^SERVICE_ECHO_URL=//p')"
+  [[ "$url" == "http://$svc-$live_color:$svc_port" ]] ||
+    fail "the worker container has the wrong SERVICE_ECHO_URL" "want: http://$svc-$live_color:$svc_port" "got:  ${url:-unset}"
+  started1="$(vm_docker inspect -f '{{.State.StartedAt}}' "$worker_c")"
+  sleep 8
+  state="$(vm_docker inspect -f '{{.State.Status}} {{.State.Restarting}}' "$worker_c")"
+  restarts="$(vm_docker inspect -f '{{.RestartCount}}' "$worker_c")"
+  started2="$(vm_docker inspect -f '{{.State.StartedAt}}' "$worker_c")"
+  [[ "$state" == "running false" ]] || {
+    vm_docker logs --tail 20 "$worker_c" >&2 || true
+    fail "the worker container is not running" "state: $state"
+  }
+  [[ "$restarts" == 0 && "$started1" == "$started2" ]] || {
+    vm_docker logs --tail 20 "$worker_c" >&2 || true
+    fail "the worker container restarts" "RestartCount: $restarts" "StartedAt: $started1 then $started2"
+  }
+  echo "    $worker_c runs $rel in $live_color with SERVICE_ECHO_URL=$url and does not restart"
+}
+
 # ---------------------------------------------------------------------------------------------
 step "build the CLI"
 (cd "$repo" && "$GO" build -o "$work/spinup" ./cmd/spinup)
@@ -297,7 +341,7 @@ export SPINUP_KEYS_DIR="$work/keys"
 shape=(--api-only)
 if [[ -n "$web" ]]; then shape=(); fi
 (cd "$work" && SPINUP_KIT_REPLACE="$repo/kit" ./spinup new "$app" ${shape[@]+"${shape[@]}"} --module example.com/dindapp \
-  --modules ci,deploy,secrets --no-git --non-interactive) >"$logs/new.log" 2>&1 ||
+  --modules ci,deploy,secrets,jobs --no-git --non-interactive) >"$logs/new.log" 2>&1 ||
   { show_log new; fail "spinup new failed"; }
 cat >>"$work/$app/spinup.toml" <<EOF
 
@@ -369,7 +413,15 @@ expect_version "$rel1"
 
 # ---------------------------------------------------------------------------------------------
 step "3. a release whose /readyz fails must not go live"
-git -C "$work/$app" apply "$here/fixtures/broken-readyz.patch"
+# Add a readiness check that always fails, after the db check. An anchored insert, not a patch,
+# so the edit does not depend on which modules change the lines around it.
+main_go="$work/$app/api/cmd/api/main.go"
+awk '{ print }
+/app\.WithReadiness\("db", pool\.Ping\),/ {
+  print "\t\t// The dind suite overlay: readiness always fails, so the deploy must keep the old color."
+  print "\t\tapp.WithReadiness(\"dind-broken\", func(context.Context) error { return fmt.Errorf(\"broken by the dind overlay\") }),"
+}' "$main_go" >"$main_go.tmp" && mv "$main_go.tmp" "$main_go"
+grep -q dind-broken "$main_go" || fail "could not add the failing readiness check" "check the WithReadiness line in $main_go"
 commit "dind: break readiness"
 broken="$(new_release)"
 if sp deploy-broken deploy --env staging --skip-build --tag "$broken" --yes --health-timeout 20s; then
@@ -387,7 +439,7 @@ echo "    only $projects runs an api container"
 
 # ---------------------------------------------------------------------------------------------
 step "4. deploy a good second release, then roll back to the first"
-git -C "$work/$app" apply -R "$here/fixtures/broken-readyz.patch"
+git -C "$work/$app" checkout HEAD~1 -- api/cmd/api/main.go
 commit "dind: repair readiness"
 rel2="$(new_release)"
 sp deploy-2 deploy --env staging --skip-build --tag "$rel2" --yes ||
@@ -513,6 +565,7 @@ sp deploy-svc-1 deploy --env staging --skip-build --tag "$rel4" --yes ||
   { show_log deploy-svc-1 60; fail "the first deploy with a service failed"; }
 expect_version "$rel4"
 check_service "$rel4" one
+check_worker "$rel4"
 svc_color1="$live_color"
 release_services="$(docker exec "$vm" cat "/opt/$app/releases/$rel4/release.json")" ||
   fail "cannot read release.json of $rel4"
@@ -531,6 +584,7 @@ sp deploy-svc-2 deploy --env staging --skip-build --tag "$rel5" --yes ||
   { show_log deploy-svc-2 60; fail "the second deploy with a service failed"; }
 expect_version "$rel5"
 check_service "$rel5" two
+check_worker "$rel5"
 [[ "$live_color" != "$svc_color1" ]] || fail "the second deploy did not switch colors" "color: $live_color"
 echo "    the second deploy switched from $svc_color1 to $live_color"
 
@@ -538,6 +592,7 @@ echo "    the second deploy switched from $svc_color1 to $live_color"
 sp svc-rollback rollback --env staging --yes || { show_log svc-rollback 60; fail "rollback with a service failed"; }
 expect_version "$rel4"
 check_service "$rel4" one
+check_worker "$rel4"
 [[ "$live_color" == "$svc_color1" ]] || fail "rollback did not return to the color $svc_color1" "color: $live_color"
 echo "    rollback restored $rel4 and its service in $live_color"
 
@@ -626,6 +681,7 @@ sp do-up-2 "${do_args[@]}" --skip-build --tag "$rel6" || { show_log do-up-2 60; 
 if [[ "$(droplet_count)" != 1 ]]; then fail "the second run changed the number of droplets"; fi
 expect_version "$rel6"
 check_service "$rel6" two
+check_worker "$rel6"
 [[ "$(pinned_keys)" == "$vm_key" ]] || fail "the second run changed the pinned host key" "pinned: $(pinned_keys)"
 echo "    the second run created nothing and deployed $rel6"
 
