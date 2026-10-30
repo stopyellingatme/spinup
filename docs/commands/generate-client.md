@@ -7,6 +7,7 @@ It takes no positional arguments.
 The generator returns an empty plan.
 Its post-steps first bundle OpenAPI and generate Go types.
 Then the client post-step generates `web/src/lib/api/schema.d.ts`.
+The service client post-step generates a Go client for each declared service with an `openapi` value.
 Commit this file with the OpenAPI bundle.
 The lock does not track changes to this tool output.
 
@@ -19,6 +20,18 @@ pnpm --dir web exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib
 If `web/node_modules` is missing, the post-step first runs `pnpm --dir web install --frozen-lockfile`.
 If the web pack or the bundle is absent, it prints a skip reason on stderr.
 If pnpm is unavailable, it reports an error with a `Try:` instruction.
+
+For each service with `openapi = "openapi.yaml"`, the service step writes these files:
+
+| Path | Purpose |
+| --- | --- |
+| `api/internal/services/<name>/oapi-codegen.yaml` | The managed oapi-codegen configuration. |
+| `api/internal/services/<name>/client.gen.go` | The generated typed client and models. |
+| `api/internal/services/<name>/<name>.go` | The scaffold for `Config` and `New`. |
+
+The scaffold reads `SERVICE_<NAME>_URL` and adds OpenTelemetry transport tracing.
+The generator does not replace an existing scaffold.
+If an OpenAPI file is missing, the command fails with a `Try:` instruction.
 
 Use `--dry-run` or `--diff` to preview without writing files or running tools.
 Use `--json` for structured results.

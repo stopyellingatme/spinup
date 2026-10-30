@@ -47,7 +47,7 @@ func orderedSteps(requested []gen.PostStep) []gen.PostStep {
 		seen[step] = true
 	}
 	ordered := make([]gen.PostStep, 0, len(seen))
-	for _, step := range []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostClient, gen.PostGofmt} {
+	for _, step := range []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostClient, gen.PostServiceClients, gen.PostGofmt} {
 		if seen[step] {
 			ordered = append(ordered, step)
 			delete(seen, step)
@@ -104,6 +104,9 @@ func gofmtArgs(files []string) []string {
 }
 
 func retryStep(step gen.PostStep, files []string) string {
+	if step == gen.PostServiceClients {
+		return "run spinup g client from the application root by hand"
+	}
 	command := "spinup g openapi"
 	switch step {
 	case gen.PostSQLC:
