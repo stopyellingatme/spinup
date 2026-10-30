@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+FROM {{ .PythonImage }}
+COPY --from={{ .UVImage }} /uv /bin/uv
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONDONTWRITEBYTECODE=1
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev
+COPY service ./service
+RUN groupadd --gid 10001 service && useradd --uid 10001 --gid service --no-create-home service
+USER service
+ENV PORT={{ .Port }}
+EXPOSE {{ .Port }}
+CMD ["/app/.venv/bin/uvicorn", "service.main:app", "--host", "0.0.0.0", "--port", "{{ .Port }}"]
