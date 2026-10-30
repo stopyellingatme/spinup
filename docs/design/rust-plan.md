@@ -1,6 +1,6 @@
 # spinup in Rust: the rewrite plan (`docs/design/rust-plan.md`)
 
-Status: accepted (2026-10-24). R0 decides go or no-go. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it. Where this document and `plan.md` disagree about Rust work, this document wins.
+Status: stopped after R2 (2026-10-30, ADR 0022). Earlier: accepted (2026-10-24). R0 decides go or no-go. Date: 2026-10-24. Read `plan.md` and `architecture.md` first. This document extends `plan.md`. It does not replace it. Where this document and `plan.md` disagree about Rust work, this document wins.
 
 ## Context
 
