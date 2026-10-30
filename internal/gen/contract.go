@@ -14,13 +14,15 @@ import (
 // PostStep is a tool run after a generator's files are written (ADR 0007 §2).
 type PostStep string
 
-// The post-steps, run in the order openapi, sqlc, client, gofmt when requested.
+// The post-steps, run in the order openapi, sqlc, client, service-clients, gofmt when requested.
 const (
 	PostOpenAPI PostStep = "openapi"
 	PostSQLC    PostStep = "sqlc"
 	PostGofmt   PostStep = "gofmt"
 	// PostClient regenerates web/src/lib/api/schema.d.ts from the OpenAPI bundle (M4, ADR 0008).
 	PostClient PostStep = "client"
+	// PostServiceClients regenerates the Go clients of the sidecar services (ADR 0022).
+	PostServiceClients PostStep = "service-clients"
 )
 
 // Input is what a generator reads. Generators never write to disk.

@@ -26,6 +26,17 @@ type Meta struct {
 	Spinup      string          `toml:"spinup"`
 	Description string          `toml:"description"`
 	Generators  []GeneratorSpec `toml:"generators"`
+	// ServiceTemplates are templates for `spinup generate service --lang <plugin>/<name>` (ADR 0022).
+	ServiceTemplates []ServiceTemplate `toml:"service_templates"`
+}
+
+// ServiceTemplate is a service template of a plugin. Dir is a directory in the plugin.
+// Its files are rendered with text/template and the data Name, App, and Port. A .tmpl
+// file is rendered and loses the suffix. Other files are copied.
+type ServiceTemplate struct {
+	Name        string `toml:"name"`
+	Description string `toml:"description"`
+	Dir         string `toml:"dir"`
 }
 
 // GeneratorSpec is a declarative generator of a plugin.

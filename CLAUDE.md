@@ -12,13 +12,9 @@ Read these before you change anything:
 - `docs/design/architecture.md`: the full design (command tree, layouts, lock format, upgrade algorithm).
 - `docs/adr/`: decisions made after the design.
 
-## Rust rewrite (in progress)
+## Rust rewrite (stopped)
 
-The CLI, the kit, the plugin SDK, and the generated API move to Rust. The plan is `docs/design/rust-plan.md`. It overrides `plan.md` for Rust work. The epic is the GitHub issue labeled `epic` and `rust-rewrite`.
-- R0 is a spike with a go/no-go report. Spike code stays in `spikes-rs/r0-NN-<name>/`, each with its own workspace.
-- R0 spike lanes are offline too. The main loop pre-seeds each spike workspace with its candidate crates and runs `cargo fetch --locked`. A lane builds with `CARGO_NET_OFFLINE=true` and `--locked`. If it needs one more crate, it reports `blocked: <crate>`.
-- Rust 1.99.1 (edition 2024) is pinned in `rust-toolchain.toml`. Lanes set `RUSTUP_TOOLCHAIN=1.99.1` and never install a toolchain.
-- After the R0 gate (tag `go-freeze-r0`), Go gets bug fixes only. Each fix adds a txtar or golden case. Only the units R1.0a, R1.0b, R3.0a, and R3.0b may refactor Go.
+The Rust rewrite stopped after R2 (ADR `docs/adr/0022-go-and-sidecar-services.md`). Go stays the language of the CLI, the kit, the plugin SDK, and the generated API. The Go freeze is over. The branches `rust` and `bench` stay as a reference. Do not delete them.
 
 ## Corrections to architecture.md (Step 0 verification, 2026-10-13)
 
@@ -44,6 +40,7 @@ The CLI, the kit, the plugin SDK, and the generated API move to Rust. The plan i
 - The auth rate limit contract (endpoints, classes, client addresses, trusted proxies, the 429 answer) is in `docs/adr/0016-auth-rate-limit.md`.
 - The DigitalOcean deploy contract (commands, the browser sign-in and token store, the API client, resources and tags, host key pins, provisioning steps, sslip.io, secret generation) is in `docs/adr/0017-digitalocean-deploy.md`.
 - The changes from the first live DigitalOcean test (the public repository and the kit pin, the local kit build context, the kit replace on upgrade, `--confirm-env`, the fake API rules, the live test script) are in `docs/adr/0018-live-test-learnings.md`.
+- The sidecar services contract (`[[services]]` in `spinup.toml`, `services/<name>/`, the generated Compose files, build and deploy, the Go client, the service templates, plugin service templates, the jobs worker in dev and deploy) is in `docs/adr/0022-go-and-sidecar-services.md`. The contract package `internal/services` is a shared file (main loop only).
 
 ## Commands
 
@@ -104,6 +101,7 @@ Only the main loop writes these files. A unit never edits them:
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
 - the M7 contract files `internal/backup/registry.go` and `internal/maintain/window.go` (see `docs/adr/0011-m7-contracts.md`)
 - the M9 contract file `internal/plugin/contract.go` (see `docs/adr/0013-m9-contracts.md`)
+- the services contract file `internal/services/services.go`, and the service template lockfiles `internal/gen/service/templates/rust/Cargo.toml`, `Cargo.lock`, `templates/python/pyproject.toml`, and `uv.lock` (see `docs/adr/0022-go-and-sidecar-services.md`)
 - the web pack fragments `pack.d/deps.toml`, `pack.d/modes.toml`, and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/bun.lock`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.
