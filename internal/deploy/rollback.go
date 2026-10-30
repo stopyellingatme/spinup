@@ -160,7 +160,8 @@ func Rollback(ctx context.Context, o RollbackOptions, d Deps) (err error) {
 	}
 	web := slices.ContainsFunc(snap.Images, func(i Image) bool { return i.Service == "web" })
 	if err := step("switch", func() error {
-		switchErr := Switch(ctx, vm, SwitchOptions{App: app, ReleaseDir: dir, Color: color, Services: DefaultServices(web), HealthTimeout: o.HealthTimeout, Out: o.Out, Now: d.Now, Sleep: d.Sleep})
+		// The record of the target release gives its sidecar services and its Compose files.
+		switchErr := Switch(ctx, vm, SwitchOptions{App: app, ReleaseDir: dir, Color: color, Services: ColorServices(web, snap.Services), ComposeFiles: ColorComposeFiles(snap.Services), HealthTimeout: o.HealthTimeout, Out: o.Out, Now: d.Now, Sleep: d.Sleep})
 		if switchErr != nil {
 			cleanup := context.WithoutCancel(ctx)
 			upstream, readErr := ReadUpstream(cleanup, vm, app)

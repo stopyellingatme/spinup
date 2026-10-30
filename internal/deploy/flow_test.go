@@ -34,7 +34,7 @@ func TestFlowSSHFirstDeploy(t *testing.T) {
 	x.expectLocalGit()
 	x.expectConnect()
 	x.expectLock()
-	x.expectBegin("")
+	x.expectBegin()
 	// hooks
 	x.journal(1)
 	x.expectReadCurrent("")
@@ -150,7 +150,7 @@ func TestFlowRegistrySecondDeploy(t *testing.T) {
 	x.expectLocalGit()
 	x.expectConnect()
 	x.expectLock()
-	x.expectBegin("")
+	x.expectBegin()
 	x.journal(1)
 	x.expectReadCurrent(string(current))
 	x.journal(1)

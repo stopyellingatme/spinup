@@ -23,7 +23,7 @@ const (
 
 // Image is the deploy image of one service.
 type Image struct {
-	// Service is api or web.
+	// Service is api, web, or the name of a sidecar service of spinup.toml.
 	Service string `json:"service"`
 	// Tag is the tagged reference that the build created, for example app-api:<release-id>.
 	Tag string `json:"tag"`
