@@ -89,6 +89,7 @@ It can set `health` and an exec-form `healthcheck`.
 Without this file, the generated service has no health check command.
 The CLI records rendered files as plugin generator files in `spinup.lock`.
 
+<!-- doctest: skip -->
 ```console
 $ spinup plugin add path:./plugins/service-example --trust
 ...

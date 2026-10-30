@@ -27,7 +27,7 @@ See [Generate a service](commands/generate-service.md) for all flags.
 
 ```console
 $ spinup g service --help | head -1
-Add a Rust or Python sidecar service
+Add a sidecar service
 $ spinup g service --help | grep -c -- '--lang string'
 1
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
