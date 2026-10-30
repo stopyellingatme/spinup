@@ -323,6 +323,10 @@ Note: `packs/` means `internal/templates/packs/`.
 | U8 | Resource pages: superforms, read and edit views, row menu, inline toggle, pagination, dialogs, toasts, guards | `T ./internal/gen/resource/ -run Page`, `S gen_page`, `G gen-resource`; gate: app-gate † | `internal/gen/resource/pages*.go`, `internal/gen/page/`, `testdata/script/gen_page.txtar`, `testdata/golden/gen-resource/web/` | U3, U6, U7 |
 | U9 | E2E and docs for the new flow | `playwright test --list`; gate: `make e2e` † | `testdata/e2e/web/`, the web pack e2e template, `docs/commands/{generate-page,destroy}.md` | U4, U8 |
 
+#### Services — sidecar services (added 2026-10-30, epic #35, contracts in ADR 0022)
+
+The Rust rewrite (`docs/design/rust-plan.md`) stopped after R2. Go stays. The run S0 to S13 added sidecar services: `[[services]]` in `spinup.toml`, `services/<name>/` in any language, `spinup g service --lang rust|python|<plugin>/<tpl>`, `spinup g client`, build, deploy, rollback, dev, and the doctor check. The jobs worker now runs in dev and deploy. The status is done. The units and their checks are in the orchestrate run `20261030-130014`.
+
 ## Verification
 
 - **Per unit:** the orchestrate Phase 5 runs the unit's Check column, plus `make build lint`. Lanes do not self-certify.
@@ -334,4 +338,5 @@ Note: `packs/` means `internal/templates/packs/`.
   4. Kill a container, and see the alert in Grafana.
   5. `spinup backup verify` passes.
   6. Build the CLI at v+1 and run `spinup upgrade` on `demo` with local edits. Expect only the planned conflicts, then a green verify.
+  7. `spinup g service rs --lang rust`, `spinup g service py --lang python`, and `spinup g client` in `demo`. Then deploy, check that each service is healthy and that the API reaches it, and roll back. `make dind` does this with a Go service. `SPINUP_APP_GATE=1 make script RUN=app_gate_services` builds and runs the Rust and Python images. `scripts/do-live-test.sh` checks the services on a real droplet.
 - **Corpus:** from v0.3, freeze the output of each release in `testdata/corpus/`. Nightly runs upgrade every supported corpus to `main`.
