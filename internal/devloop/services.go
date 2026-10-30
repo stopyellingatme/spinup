@@ -25,12 +25,6 @@ func writeServicesCompose(root, app string, list []services.Service, lgtm bool) 
 	if err != nil {
 		return fmt.Errorf("render dev services: %w\nTry: correct [[services]] in spinup.toml", err)
 	}
-	// compose.Dev writes build contexts relative to deploy/. The dev command passes
-	// --project-directory <root>, and Compose then resolves every relative path against
-	// the root. So the contexts must start at the root.
-	data = []byte(strings.ReplaceAll(string(data), "context: ../"+services.Dir+"/", "context: "+services.Dir+"/"))
-	data = []byte(strings.Replace(string(data), "# The paths are relative to deploy/, the directory of the first -f file.",
-		"# The paths are relative to the app root, the Compose project directory.", 1))
 	return writeDevFile(root, "compose.services.yml", data)
 }
 

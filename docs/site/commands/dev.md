@@ -21,8 +21,10 @@ spinup dev [flags]
 | `--json` | `false` | write JSON output |
 | `--lgtm` | `false` | start Grafana LGTM monitoring |
 | `--no-color` | `false` | turn off color |
-| `--no-infra` | `false` | skip Docker infrastructure |
+| `--no-infra` | `false` | skip Docker infrastructure and the sidecar services |
+| `--no-services` | `false` | skip the sidecar services in spinup.toml |
 | `--no-web` | `false` | skip the Vite dev server |
+| `--no-worker` | `false` | skip the jobs worker |
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--port` | `5173` | preferred web port |

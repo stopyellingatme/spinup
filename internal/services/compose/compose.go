@@ -57,7 +57,7 @@ const (
 	deployHeader = "Written by spinup deploy from spinup.toml. Do not edit: spinup writes this file again for each release.\n" +
 		"The color project uses it as a second -f file after compose.yml, which defines the networks."
 	devHeader = "Written by spinup dev from spinup.toml. Do not edit: spinup writes this file again each time it starts.\n" +
-		"The paths are relative to deploy/, the directory of the first -f file."
+		"The paths are relative to the app root, the Compose project directory of spinup dev."
 	unpinnedReason = "# spinup:allow unpinned-image spinup deploy sets the release tag, never latest"
 )
 
@@ -208,8 +208,8 @@ func deployExtras(in DeployInput, s services.Service) [][2]string {
 }
 
 // Dev renders .spinup/compose.services.yml for spinup dev. With no services it returns
-// nil bytes and no error. The build paths are relative to deploy/, the directory of the
-// first -f file.
+// nil bytes and no error. The build paths are relative to the app root, because spinup dev
+// passes --project-directory <root>.
 func Dev(in DevInput) ([]byte, error) {
 	if len(in.Services) == 0 {
 		return nil, nil
@@ -233,7 +233,7 @@ func Dev(in DevInput) ([]byte, error) {
 			return nil, err
 		}
 		build := newMap()
-		build.add("context", plain("../"+services.ContextDir(s.Name)))
+		build.add("context", plain(services.ContextDir(s.Name)))
 		build.add("dockerfile", plain("Dockerfile"))
 		m := newMap()
 		m.add("build", build.node)

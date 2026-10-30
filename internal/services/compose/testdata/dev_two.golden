@@ -1,10 +1,10 @@
 # Written by spinup dev from spinup.toml. Do not edit: spinup writes this file again each time it starts.
-# The paths are relative to deploy/, the directory of the first -f file.
+# The paths are relative to the app root, the Compose project directory of spinup dev.
 
 services:
   ocr:
     build:
-      context: ../services/ocr
+      context: services/ocr
       dockerfile: Dockerfile
     ports:
       - "127.0.0.1:8101:8080"
@@ -12,7 +12,7 @@ services:
       PORT: "8080"
   tts:
     build:
-      context: ../services/tts
+      context: services/tts
       dockerfile: Dockerfile
     ports:
       - "127.0.0.1:8102:9000"
