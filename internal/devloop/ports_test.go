@@ -71,7 +71,7 @@ func TestAllocateUniquePorts(t *testing.T) {
 			return 32000, nil
 		}
 		return preferred, nil
-	}}, true, nil)
+	}}, true, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestNoInfraOmitsMailpit(t *testing.T) {
 	t.Parallel()
 	ports, err := allocate(Options{NoInfra: true, PortAllocator: func(port int) (int, error) {
 		return port, nil
-	}}, false, nil)
+	}}, false, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestAllocateReusesPortsOfRunningServices(t *testing.T) {
 		return preferred, nil
 	}
 	running := map[string]int{"mailpit:8025": 8025, "otel-lgtm:3000": 3001}
-	ports, err := allocate(Options{LGTM: true, PortAllocator: probe}, true, running)
+	ports, err := allocate(Options{LGTM: true, PortAllocator: probe}, true, running, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
