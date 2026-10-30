@@ -8,15 +8,17 @@ import (
 	"strings"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/services"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
-// ImageOptions configures API and web image builds.
+// ImageOptions configures application image builds.
 type ImageOptions struct {
 	Root, App, Tag, Platform string
 	Push                     bool
 	Registry                 string
 	Targets                  []string
+	Services                 []services.Service
 	PublicOrigin             string
 }
 
@@ -47,6 +49,9 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 		if _, err := os.Stat(filepath.Join(o.Root, "deploy", "Dockerfile.web")); err == nil && !embed {
 			o.Targets = append(o.Targets, "web")
 		}
+		for _, service := range o.Services {
+			o.Targets = append(o.Targets, service.Name)
+		}
 	}
 	kitDir := ""
 	if o.hasTarget("api") {
@@ -71,10 +76,14 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 
 	images := make([]Image, 0, len(o.Targets))
 	for _, target := range o.Targets {
-		if target != "api" && target != "web" {
-			return nil, &ui.Error{What: "Cannot build images", Why: "unknown image target " + target, Try: "pass api or web as an image target"}
+		service, ok := serviceTarget(o.Services, target)
+		if target != "api" && target != "web" && !ok {
+			return nil, &ui.Error{What: "Cannot build images", Why: "unknown image target " + target, Try: "pass one of: " + strings.Join(imageTargets(o.Services), ", ")}
 		}
 		name := o.App + "-" + target
+		if ok {
+			name = services.ImageName(o.App, service.Name)
+		}
 		ref := name + ":" + o.Tag
 		if o.Push {
 			ref = strings.TrimSuffix(o.Registry, "/") + "/" + owner + "/" + ref
@@ -83,14 +92,18 @@ func BuildImages(ctx context.Context, r run.Runner, o ImageOptions) ([]Image, er
 		if err != nil {
 			return nil, err
 		}
-		images = append(images, Image{Name: name, Ref: ref, Digest: digest})
+		images = append(images, Image{Name: target, Ref: ref, Digest: digest})
 	}
 	return images, nil
 }
 
 func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref string, embed bool, kitDir string) (string, error) {
-	args := []string{"buildx", "build", "--platform", o.Platform, "-f", "deploy/Dockerfile." + target, "-t", ref, "--build-arg"}
-	if target == "api" {
+	dockerfile, contextDir := "deploy/Dockerfile."+target, target
+	if service, ok := serviceTarget(o.Services, target); ok {
+		dockerfile, contextDir = services.Dockerfile(service.Name), services.ContextDir(service.Name)
+	}
+	args := []string{"buildx", "build", "--platform", o.Platform, "-f", dockerfile, "-t", ref, "--build-arg"}
+	if target != "web" {
 		args = append(args, "VERSION="+o.Tag)
 	} else {
 		args = append(args, "PUBLIC_ORIGIN="+o.PublicOrigin)
@@ -103,7 +116,7 @@ func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref s
 		args = append(args, "--build-context", "kit="+kitDir)
 	}
 	if !o.Push {
-		args = append(args, "--load", target)
+		args = append(args, "--load", contextDir)
 		if _, err := r.Run(ctx, run.Cmd{Name: "docker", Args: args, Dir: o.Root}); err != nil {
 			return "", imageError(err)
 		}
@@ -121,7 +134,7 @@ func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref s
 	}
 	defer os.Remove(metadataPath)
 
-	args = append(args, "--provenance=mode=max", "--sbom=true", "--metadata-file", metadataPath, "--push", target)
+	args = append(args, "--provenance=mode=max", "--sbom=true", "--metadata-file", metadataPath, "--push", contextDir)
 	if _, err := r.Run(ctx, run.Cmd{Name: "docker", Args: args, Dir: o.Root}); err != nil {
 		return "", imageError(err)
 	}
@@ -130,6 +143,24 @@ func buildImage(ctx context.Context, r run.Runner, o ImageOptions, target, ref s
 		return "", err
 	}
 	return digest, nil
+}
+
+func serviceTarget(list []services.Service, name string) (services.Service, bool) {
+	for _, service := range list {
+		if service.Name == name {
+			return service, true
+		}
+	}
+	return services.Service{}, false
+}
+
+func imageTargets(list []services.Service) []string {
+	targets := make([]string, 0, len(list)+2)
+	targets = append(targets, "api", "web")
+	for _, service := range list {
+		targets = append(targets, service.Name)
+	}
+	return targets
 }
 
 func (o ImageOptions) hasTarget(name string) bool {

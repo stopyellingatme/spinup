@@ -3,12 +3,15 @@ package build
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
+	"github.com/stopyellingatme/spinup/internal/services"
+	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
 func TestBuildImages(t *testing.T) {
@@ -101,8 +104,60 @@ func TestBuildImagesAPIOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Name != "todo-api" || len(images.calls) != 1 {
+	if len(got) != 1 || got[0].Name != "api" || len(images.calls) != 1 {
 		t.Fatalf("an app without deploy/Dockerfile.web builds only the API image: %+v, %d calls", got, len(images.calls))
+	}
+}
+
+func TestBuildImagesService(t *testing.T) {
+	t.Parallel()
+	service := services.Service{Name: "ocr"}
+	for _, tc := range []struct {
+		name string
+		push bool
+		want []string
+		ref  string
+	}{
+		{
+			name: "load",
+			want: []string{"buildx", "build", "--platform", "linux/amd64", "-f", "services/ocr/Dockerfile", "-t", "todo-ocr:v1", "--build-arg", "VERSION=v1", "--load", "services/ocr"},
+			ref:  "todo-ocr:v1",
+		},
+		{
+			name: "push",
+			push: true,
+			want: []string{"buildx", "build", "--platform", "linux/amd64", "-f", "services/ocr/Dockerfile", "-t", "ghcr.io/acme/todo-ocr:v1", "--build-arg", "VERSION=v1", "--provenance=mode=max", "--sbom=true"},
+			ref:  "ghcr.io/acme/todo-ocr:v1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := imageProject(t, "module github.com/acme/todo/api\n")
+			runner := &metadataRunner{digest: "sha256:ocr"}
+			images, err := BuildImages(t.Context(), runner, ImageOptions{Root: root, App: "todo", Tag: "v1", Push: tc.push, Targets: []string{"ocr"}, Services: []services.Service{service}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(images) != 1 || images[0].Name != "ocr" || images[0].Ref != tc.ref {
+				t.Fatalf("images = %#v", images)
+			}
+			if !reflect.DeepEqual(runner.calls[0].Args[:len(tc.want)], tc.want) {
+				t.Fatalf("args = %#v", runner.calls[0].Args)
+			}
+			if tc.push && runner.calls[0].Args[len(runner.calls[0].Args)-1] != "services/ocr" {
+				t.Fatalf("args = %#v", runner.calls[0].Args)
+			}
+		})
+	}
+}
+
+func TestBuildImagesUnknownTarget(t *testing.T) {
+	t.Parallel()
+	root := imageProject(t, "module github.com/acme/todo/api\n")
+	_, err := BuildImages(t.Context(), &metadataRunner{}, ImageOptions{Root: root, App: "todo", Targets: []string{"missing"}, Services: []services.Service{{Name: "ocr"}}})
+	var userErr *ui.Error
+	if !errors.As(err, &userErr) || userErr.Try != "pass one of: api, web, ocr" {
+		t.Fatalf("error = %v", err)
 	}
 }
 
