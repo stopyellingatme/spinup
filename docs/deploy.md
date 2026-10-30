@@ -79,7 +79,7 @@ Each release runs as the Compose project `<app>-blue` or `<app>-green`.
 | `DEPLOY_UID`, `DEPLOY_GID` | both | The IDs of the deploy user on the VM (default `1000`) |
 | `API_REPLICAS`, `API_CPUS`, `API_MEMORY` | `compose.yml` | From the environment file |
 | `WEB_REPLICAS`, `WEB_CPUS`, `WEB_MEMORY` | `compose.yml` | From the environment file |
-| `WORKER_REPLICAS` | `compose.yml` | The jobs worker replica count. The default is `1`. |
+| `WORKER_REPLICAS` | `compose.yml` | From `[replicas] worker` in the environment file (default `1`) |
 | `POSTGRES_CPUS`, `POSTGRES_MEMORY` | `compose.edge.yml` | From the environment file |
 
 The migrations run before the new color starts:
@@ -93,7 +93,7 @@ $ docker compose -p todo-green -f compose.yml --profile migrate run --rm migrate
 
 When the `jobs` module is enabled, each color starts a `worker` service from the API image.
 The worker runs `/worker`, joins the `app` and `db` networks, and restarts after database failures.
-Set `WORKER_REPLICAS` to change its replica count.
+Set `worker` under `[replicas]` in `deploy/environments/<env>.toml` to change its replica count.
 The worker has no health check because it has no HTTP endpoint.
 
 ## Caddy and the switch
