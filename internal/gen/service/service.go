@@ -29,20 +29,20 @@ var templates embed.FS
 
 func init() {
 	registry.Register(gen.Generator{
-		Name: "service", Short: "Add a Rust or Python sidecar service",
-		Usage: "<name> --lang rust|python [--port 8080] [--dev-port N] [--no-openapi]",
+		Name: "service", Short: "Add a sidecar service",
+		Usage: "<name> --lang rust|python|<plugin>/<template> [--port 8080] [--dev-port N] [--no-openapi]",
 		Flags: flags, Run: plan,
 	})
 }
 
 func flags(fs *pflag.FlagSet) {
-	fs.String("lang", "", "service language: rust or python (required)")
+	fs.String("lang", "", "service language or plugin template (required)")
 	fs.Int("port", 8080, "container port")
 	fs.Int("dev-port", 0, "host port (default: first unused port from 8101)")
 	fs.Bool("no-openapi", false, "omit the OpenAPI file and Go client")
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 1 {
 		return nil, fmt.Errorf("cannot generate service: expected one name\nTry: spinup g service ocr --lang rust")
 	}
@@ -54,7 +54,8 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		return nil, fmt.Errorf("cannot generate service: --lang is required\nTry: spinup g service %s --lang rust", name)
 	}
 	lang, _ := in.Flags.GetString("lang")
-	if lang != "rust" && lang != "python" {
+	pluginName, templateName, pluginTemplate := strings.Cut(lang, "/")
+	if lang != "rust" && lang != "python" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
 		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust or python, got %q\nTry: spinup g service %s --lang rust", lang, name)
 	}
 	dir := services.ContextDir(name)
@@ -75,6 +76,9 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		if existing.Name == name {
 			return nil, fmt.Errorf("cannot generate service %q: spinup.toml already declares the name\nTry: choose another service name", name)
 		}
+	}
+	if pluginTemplate {
+		return planPlugin(ctx, in, src, config, name, pluginName, templateName)
 	}
 	port, _ := in.Flags.GetInt("port")
 	devPort, _ := in.Flags.GetInt("dev-port")
@@ -195,13 +199,15 @@ func appendTable(src []byte, svc services.Service) []byte {
 	if svc.OpenAPI != "" {
 		fmt.Fprintf(&buf, "openapi = %q\n", svc.OpenAPI)
 	}
-	buf.WriteString("healthcheck = [")
-	for i, arg := range svc.Healthcheck {
-		if i > 0 {
-			buf.WriteString(", ")
+	if len(svc.Healthcheck) > 0 {
+		buf.WriteString("healthcheck = [")
+		for i, arg := range svc.Healthcheck {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			fmt.Fprintf(&buf, "%q", arg)
 		}
-		fmt.Fprintf(&buf, "%q", arg)
+		buf.WriteString("]\n")
 	}
-	buf.WriteString("]\n")
 	return buf.Bytes()
 }

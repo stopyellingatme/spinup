@@ -74,6 +74,29 @@ The pack templates use the core delimiters `[[` and `]]`.
 The CLI rejects unsafe output paths and duplicate generator names.
 Generated Go files receive the standard Go format.
 
+## Service templates
+
+A tier-1 plugin can supply a sidecar service template.
+Add and trust the plugin before you use its template.
+Run `spinup g service ocr --lang plugin-name/template-name`.
+The CLI renders the template into `services/ocr/`.
+It renders `.tmpl` files with `Name`, `App`, and `Port` data.
+It copies other files without change.
+
+The template can contain `service.toml`.
+This file is not copied into the service directory.
+It can set `health` and an exec-form `healthcheck`.
+Without this file, the generated service has no health check command.
+The CLI records rendered files as plugin generator files in `spinup.lock`.
+
+```console
+$ spinup plugin add path:./plugins/service-example --trust
+...
+$ spinup g service ocr --lang service-example/go-http
+create services/ocr/Dockerfile (scaffold)
+...
+```
+
 Plugin questions must declare a default, including an explicit empty default when appropriate.
 The CLI rejects questions without defaults during add, update, and verify.
 Upgrade stores completed answers in the next lock.
