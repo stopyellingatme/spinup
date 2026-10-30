@@ -9,7 +9,10 @@
 #   4. a good second release, then rollback to the first release
 #   5. lock contention: a held lock makes a deploy exit 5, then deploy unlock --force
 #   6. a deploy with a new secret: the secret file on the VM has mode 0600
-#   7. deploy digital-ocean against the dofake binary, with the VM as the droplet: a provision run
+#   7. a sidecar service (ADR 0022): the service runs in the live color, the API reaches it through
+#      SERVICE_ECHO_URL, it sees only its own secret, a second deploy switches colors, and rollback
+#      restores the previous release with its service
+#   8. deploy digital-ocean against the dofake binary, with the VM as the droplet: a provision run
 #      with host key rotation, a second run that creates nothing and deploys a new release, and destroy
 #
 # Every container, volume, and image that it creates has a name that starts with
@@ -30,6 +33,10 @@ GO="${GO:-go}"
 
 app=spinup-dind-app
 web="${DIND_WEB:-}"
+# The sidecar service of step 7. Before step 7, the app declares no service.
+svc="echo"
+svc_port=8090
+svc_on=""
 run_id="$$"
 vm="spinup-dind-vm-$run_id"
 vm_image="spinup-dind-vm:$run_id"
@@ -155,12 +162,83 @@ new_release() {
     echo "$app-web:$rel" >>"$work/images"
     docker tag "$app-web:dind-base" "$app-web:$rel"
   fi
+  if [[ -n "$svc_on" ]]; then
+    # The service source does not change between releases, so each release tags one image.
+    echo "$app-$svc:$rel" >>"$work/images"
+    docker tag "$app-$svc:dind-base" "$app-$svc:$rel"
+  fi
   docker build -q --build-arg BASE="$base" -t "$app-api:$rel" "$work/img" >>"$logs/build-$sha.log" 2>&1 ||
     { show_log "build-$sha"; fail "docker build of release $rel failed"; }
   printf '%s\n' "$rel"
 }
 
 commit() { git -C "$work/$app" add -A && git -C "$work/$app" commit -q -m "$1"; }
+
+# pin <name> prints the image ref image:tag@digest of a pin in stackversions.yaml.
+pin() {
+  local name=$1 image tag digest
+  image="$(sed -nE "s/^[[:space:]]*$name:.*image:[[:space:]]*([^,[:space:]]+),.*/\1/p" "$versions")"
+  tag="$(sed -nE "s/^[[:space:]]*$name:.*tag:[[:space:]]*\"([^\"]+)\".*/\1/p" "$versions")"
+  digest="$(sed -nE "s/^[[:space:]]*$name:.*digest:[[:space:]]*\"([^\"]+)\".*/\1/p" "$versions")"
+  if [[ -z "$image" || -z "$tag" || -z "$digest" ]]; then
+    fail "cannot read the $name pin from $versions"
+  fi
+  printf '%s:%s@%s\n' "$image" "$tag" "$digest"
+}
+
+# vm_docker <arguments...> runs the docker CLI on the VM.
+vm_docker() { docker exec "$vm" docker "$@"; }
+
+# check_service <release> <greeting> checks the sidecar service of the live color, and sets
+# live_color. Exactly one color runs api and the service. The service runs the image of the
+# release, is healthy, and reports the greeting of spinup.toml. The API has SERVICE_ECHO_URL and
+# reaches the service through it. The service sees only its own secret in /run/secrets.
+check_service() {
+  local rel=$1 greeting=$2 project svc_c api_c projects image health info url names
+  project="$(live_projects)"
+  if [[ "$(printf '%s\n' "$project" | grep -c .)" -ne 1 ]]; then
+    fail "more than one color runs an api container" "api projects: ${project//$'\n'/ }"
+  fi
+  live_color="${project##*-}"
+  projects="$(vm_docker ps --filter "label=com.docker.compose.service=$svc" \
+    --format '{{.Label "com.docker.compose.project"}}' | sort -u)"
+  [[ "$projects" == "$project" ]] ||
+    fail "the $svc service does not run in the live color $live_color only" "$svc projects: ${projects//$'\n'/ }"
+  svc_c="$(vm_docker ps --filter "label=com.docker.compose.project=$project" \
+    --filter "label=com.docker.compose.service=$svc" --format '{{.Names}}')"
+  [[ "$(printf '%s\n' "$svc_c" | grep -c .)" -eq 1 ]] ||
+    fail "the live color $live_color does not run exactly one $svc container" "containers: ${svc_c//$'\n'/ }"
+  image="$(vm_docker inspect -f '{{.Config.Image}}' "$svc_c")"
+  [[ "$image" == "$app-$svc:$rel" ]] || fail "the $svc container runs the wrong image" "want: $app-$svc:$rel" "got:  $image"
+  health="$(vm_docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$svc_c")"
+  [[ "$health" == healthy ]] || fail "the $svc container is not healthy" "health: ${health:-none}"
+  vm_docker exec "$svc_c" /service healthcheck ||
+    fail "the healthcheck command of the image fails in $svc_c"
+  info="$(vm_docker exec "$svc_c" /service get "http://127.0.0.1:$svc_port/info")" ||
+    fail "the $svc service does not answer /info"
+  [[ "$info" == *"\"greeting\":\"$greeting\""* ]] ||
+    fail "the $svc service reports the wrong greeting" "want: $greeting" "got:  $info"
+  echo "    $svc runs $rel in $live_color, healthy, greeting $greeting"
+
+  api_c="$(vm_docker ps --filter "label=com.docker.compose.project=$project" \
+    --filter label=com.docker.compose.service=api --format '{{.Names}}' | head -n 1)"
+  url="$(vm_docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$api_c" | sed -n 's/^SERVICE_ECHO_URL=//p')"
+  [[ "$url" == "http://$svc-$live_color:$svc_port" ]] ||
+    fail "the api container has the wrong SERVICE_ECHO_URL" "want: http://$svc-$live_color:$svc_port" "got:  ${url:-unset}"
+  # The API image is distroless and has no HTTP client. A container in the network namespace
+  # of the API container calls the URL, so the request takes the network path of the API.
+  info="$(vm_docker run --rm --network "container:$api_c" "$app-$svc:$rel" get "$url/healthz")" ||
+    fail "the api container cannot reach $url"
+  [[ "$info" == ok ]] || fail "$url/healthz answers the wrong body" "got: $info"
+  echo "    $api_c has SERVICE_ECHO_URL=$url and reaches it"
+
+  names="$(vm_docker exec "$svc_c" /service ls /run/secrets)" || fail "cannot list /run/secrets in $svc_c"
+  [[ "$names" == ECHO_TOKEN ]] ||
+    fail "the $svc service must see only its own secret in /run/secrets" "got: ${names//$'\n'/ }"
+  [[ "$(vm_docker exec "$svc_c" /service cat /run/secrets/ECHO_TOKEN)" == "$echo_token" ]] ||
+    fail "the $svc service cannot read the value of ECHO_TOKEN"
+  echo "    $svc sees only /run/secrets/ECHO_TOKEN"
+}
 
 # ---------------------------------------------------------------------------------------------
 step "build the CLI"
@@ -169,13 +247,7 @@ step "build the CLI"
 step "build the VM image"
 ssh-keygen -q -t ed25519 -N '' -C spinup-dind -f "$work/id_ed25519"
 versions="$repo/internal/stackversions/stackversions.yaml"
-dind_image="$(sed -nE 's/^[[:space:]]*docker-dind:.*image:[[:space:]]*([^,[:space:]]+),.*/\1/p' "$versions")"
-dind_tag="$(sed -nE 's/^[[:space:]]*docker-dind:.*tag:[[:space:]]*"([^"]+)".*/\1/p' "$versions")"
-dind_digest="$(sed -nE 's/^[[:space:]]*docker-dind:.*digest:[[:space:]]*"([^"]+)".*/\1/p' "$versions")"
-if [[ -z "$dind_image" || -z "$dind_tag" || -z "$dind_digest" ]]; then
-  fail "cannot read the docker-dind pin from $versions"
-fi
-dind_ref="$dind_image:$dind_tag@$dind_digest"
+dind_ref="$(pin docker-dind)"
 mkdir -p "$work/vm"
 sed "s#\[\[ image \"docker-dind\" \]\]#$dind_ref#" "$here/vm/Dockerfile" >"$work/vm/Dockerfile"
 cp "$here/vm/sshd_config" "$here/vm/entrypoint.sh" "$here/vm/cloud-init" "$here/vm/systemctl" "$work/vm/"
@@ -405,7 +477,72 @@ fi
 echo "    secrets push wrote the new value with mode 0600"
 
 # ---------------------------------------------------------------------------------------------
-step "7. spinup deploy digital-ocean on the VM as a droplet"
+step "7. a sidecar service: deploy, switch colors, and roll back"
+# The service is a small Go server on the pinned golang and distroless-static images. Like the
+# API, its image is built on the host, and deploy --skip-build finds it by the release ID.
+svc_dir="$work/$app/services/$svc"
+mkdir -p "$svc_dir"
+cp "$here/fixtures/service/main.go" "$svc_dir/main.go"
+golang_ref="$(pin golang)"
+static_ref="$(pin distroless-static)"
+sed -e "s#\[\[ image \"golang\" \]\]#$golang_ref#" -e "s#\[\[ image \"distroless-static\" \]\]#$static_ref#" \
+  "$here/fixtures/service/Dockerfile" >"$svc_dir/Dockerfile"
+cat >>"$work/$app/spinup.toml" <<EOF
+
+[[services]]
+name = "$svc"
+port = $svc_port
+dev_port = 8101
+health = "/healthz"
+healthcheck = ["/service", "healthcheck"]
+secrets = ["ECHO_TOKEN"]
+env = { GREETING = "one" }
+EOF
+echo_token="dind-echo-$run_id"
+printf '%s' "$echo_token" >"$work/value"
+sp secrets-echo secrets set --env staging ECHO_TOKEN <"$work/value" || { show_log secrets-echo; fail "secrets set failed"; }
+rm -f "$work/value"
+echo "$app-$svc:dind-base" >>"$work/images"
+docker build -q -t "$app-$svc:dind-base" "$svc_dir" >"$logs/service-build.log" 2>&1 ||
+  { show_log service-build; fail "the $svc service image did not build"; }
+commit "dind: add the $svc service"
+svc_on=1
+
+rel4="$(new_release)"
+sp deploy-svc-1 deploy --env staging --skip-build --tag "$rel4" --yes ||
+  { show_log deploy-svc-1 60; fail "the first deploy with a service failed"; }
+expect_version "$rel4"
+check_service "$rel4" one
+svc_color1="$live_color"
+release_services="$(docker exec "$vm" cat "/opt/$app/releases/$rel4/release.json")" ||
+  fail "cannot read release.json of $rel4"
+[[ "$release_services" == *"\"$app-$svc:$rel4\""* ]] ||
+  fail "release.json of $rel4 does not record the $svc image"
+docker exec "$vm" test -s "/opt/$app/releases/$rel4/compose.services.yml" ||
+  fail "the release directory of $rel4 has no compose.services.yml"
+
+# A second release changes the environment of the service and switches colors.
+sed 's/^env = { GREETING = "one" }$/env = { GREETING = "two" }/' "$work/$app/spinup.toml" >"$work/spinup.toml.new"
+mv "$work/spinup.toml.new" "$work/$app/spinup.toml"
+grep -q 'GREETING = "two"' "$work/$app/spinup.toml" || fail "cannot change the greeting in spinup.toml"
+commit "dind: change the $svc greeting"
+rel5="$(new_release)"
+sp deploy-svc-2 deploy --env staging --skip-build --tag "$rel5" --yes ||
+  { show_log deploy-svc-2 60; fail "the second deploy with a service failed"; }
+expect_version "$rel5"
+check_service "$rel5" two
+[[ "$live_color" != "$svc_color1" ]] || fail "the second deploy did not switch colors" "color: $live_color"
+echo "    the second deploy switched from $svc_color1 to $live_color"
+
+# Rollback restores the previous release with the service and the environment of that release.
+sp svc-rollback rollback --env staging --yes || { show_log svc-rollback 60; fail "rollback with a service failed"; }
+expect_version "$rel4"
+check_service "$rel4" one
+[[ "$live_color" == "$svc_color1" ]] || fail "rollback did not return to the color $svc_color1" "color: $live_color"
+echo "    rollback restored $rel4 and its service in $live_color"
+
+# ---------------------------------------------------------------------------------------------
+step "8. spinup deploy digital-ocean on the VM as a droplet"
 # The dofake binary serves the DigitalOcean API. On a droplet create it extracts the user data
 # and runs on-create.sh, which installs the injected host key and the rotation script on the VM,
 # as cloud-init does. The command must rotate the key, deploy, and do nothing on a second run.
@@ -454,6 +591,8 @@ printf '%s' "postgres://app:$db_password@postgres:5432/app?sslmode=disable" >"$w
 sp do-secrets-db secrets set --env "do" DATABASE_URL <"$work/value" || { show_log do-secrets-db; fail "secrets set failed"; }
 printf '%s' "$db_password" >"$work/value"
 sp do-secrets-pg secrets set --env "do" POSTGRES_PASSWORD <"$work/value" || { show_log do-secrets-pg; fail "secrets set failed"; }
+printf '%s' "$echo_token" >"$work/value"
+sp do-secrets-echo secrets set --env "do" ECHO_TOKEN <"$work/value" || { show_log do-secrets-echo; fail "secrets set failed"; }
 rm -f "$work/value"
 commit "dind: add the do environment"
 
@@ -482,12 +621,13 @@ served="$(ssh-keyscan -t ed25519 -p "$ssh_port" 127.0.0.1 2>/dev/null | grep -v 
 echo "    host key rotated and pinned: ${vm_key:0:40}..."
 
 # The second run finds the droplet by its tag, creates nothing, and deploys a new release.
-rel4="$(new_release)"
-sp do-up-2 "${do_args[@]}" --skip-build --tag "$rel4" || { show_log do-up-2 60; fail "the second spinup deploy digital-ocean failed"; }
+rel6="$(new_release)"
+sp do-up-2 "${do_args[@]}" --skip-build --tag "$rel6" || { show_log do-up-2 60; fail "the second spinup deploy digital-ocean failed"; }
 if [[ "$(droplet_count)" != 1 ]]; then fail "the second run changed the number of droplets"; fi
-expect_version "$rel4"
+expect_version "$rel6"
+check_service "$rel6" two
 [[ "$(pinned_keys)" == "$vm_key" ]] || fail "the second run changed the pinned host key" "pinned: $(pinned_keys)"
-echo "    the second run created nothing and deployed $rel4"
+echo "    the second run created nothing and deployed $rel6"
 
 # destroy deletes the droplet from the fake. The VM stays.
 CI=1 sp do-destroy deploy digital-ocean destroy --env "do" --i-know --yes ||
@@ -496,4 +636,4 @@ if [[ "$(droplet_count)" != 0 ]]; then fail "destroy left the droplet in the fak
 echo "    destroy removed the droplet"
 unset SPINUP_DO_API_BASE SPINUP_DO_OAUTH_BASE DIGITALOCEAN_ACCESS_TOKEN SPINUP_CREDENTIALS_DIR
 
-printf '\nrun.sh: PASS (releases %s, %s, %s, %s)\n' "$rel1" "$rel2" "$rel3" "$rel4"
+printf '\nrun.sh: PASS (releases %s, %s, %s, %s, %s, %s)\n' "$rel1" "$rel2" "$rel3" "$rel4" "$rel5" "$rel6"
