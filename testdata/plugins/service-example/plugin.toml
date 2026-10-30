@@ -1,0 +1,10 @@
+name = "service-example"
+version = "1.0.0"
+api = 1
+spinup = ">=0.0.0"
+description = "A plugin service template for tests."
+
+[[service_templates]]
+name = "go-http"
+description = "A small Go HTTP service."
+dir = "services/go-http"

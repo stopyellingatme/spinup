@@ -1,0 +1,27 @@
+# Plugin service templates render trusted data without running plugin code.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup plugin add path:$SPINUP_REPO/testdata/plugins/service-example --trust
+
+exec spinup g service ocr --lang service-example/go-http
+exists services/ocr/Dockerfile services/ocr/main.go services/ocr/openapi.yaml
+! exists services/ocr/service.toml
+grep '^EXPOSE 8080$' services/ocr/Dockerfile
+grep 'ocr belongs to todo' services/ocr/main.go
+grep '^name = "ocr"$' spinup.toml
+grep '^port = 8080$' spinup.toml
+grep '^dev_port = 8101$' spinup.toml
+grep '^health = "/ready"$' spinup.toml
+grep '^healthcheck = \["/service", "healthcheck"\]$' spinup.toml
+grep 'plugin/service-example/@gen/service/go-http' spinup.lock
+
+! exec spinup g service other --lang service-example/missing
+stderr 'available templates: service-example/go-http'
+stderr 'Try:'
+
+rm .spinup/plugins.allow
+! exec spinup g service denied --lang service-example/go-http
+stderr 'allowlist'
+stderr 'Try:'
+! exists services/denied
