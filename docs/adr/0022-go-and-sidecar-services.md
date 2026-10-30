@@ -124,14 +124,15 @@ Rules (`internal/services`, the contract package):
 
 **The jobs worker.** Dev and deploy start the worker when the jobs module is on:
 - `deploy/Dockerfile.api` also builds `/worker`. `compose.yml` gets a `worker` service with the API image, the `db` and `app` networks, and the API hardening.
-- The worker gets a `healthcheck` subcommand that checks the database.
+- The worker has no Compose health check. It has no HTTP port, and `cmd/worker/main.go` is a scaffold file, so a new subcommand would not reach apps that upgrade.
+  `up --wait` waits until the worker runs. The worker stops with an error when it cannot reach the database, and Compose restarts it.
 - `spinup dev` supervises `go run ./cmd/worker` next to the API.
 - A job hands work to a service through the service client in `jobs.Deps`. `docs/services.md` shows the pattern.
 
 **The doctor check.** The doctor check `services` reports these problems:
 - a declared service with no `services/<name>/Dockerfile`
 - a missing `openapi` file
-- a client that is older than its `openapi` file
+- a service with an `openapi` file and no generated client
 - a secret that `secrets/<env>.enc.yaml` does not name
 
 **Out of scope for this version:** public routes through Caddy, OTel tracing inside the templates, more template languages, and per-service CI jobs. Each one is a later issue.
