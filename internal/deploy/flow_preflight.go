@@ -13,6 +13,7 @@ import (
 
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/project"
+	"github.com/stopyellingatme/spinup/internal/services"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
@@ -47,6 +48,9 @@ type local struct {
 	sha        string
 	secrets    map[string]string
 	web        bool
+	sidecars   []services.Service // the [[services]] of spinup.toml (ADR 0022 §2)
+	jobs       bool               // the jobs module is on: compose.services.yml also feeds the worker
+	otel       bool               // the monitoring module is on with a profile other than none
 	files      []releaseFile
 	monitoring monitoringStack
 	migrations []migration
@@ -86,7 +90,10 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	if env.Host == "" {
 		return nil, preflightError(fmt.Sprintf("environment %q has no host", env.Name), "set host in [env."+env.Name+"] of spinup.toml")
 	}
-	l := &local{root: root, app: config.App.Name, env: env, behavior: config.EffectiveBehaviorVersion()}
+	l := &local{root: root, app: config.App.Name, env: env, behavior: config.EffectiveBehaviorVersion(), sidecars: config.Services}
+	l.jobs = slices.Contains(config.Modules, "jobs")
+	// The same rule as the OTel block of the api service in deploy/compose.yml.
+	l.otel = slices.Contains(config.Modules, "monitoring") && config.Monitoring.Profile != "none"
 	if l.origin, l.site, err = publicOrigin(env.PublicURL, env.Host); err != nil {
 		return nil, preflightError(stripTry(err.Error()), "set public_url in [env."+env.Name+"] of spinup.toml")
 	}
@@ -165,15 +172,37 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	return l, nil
 }
 
-// services returns the color services of the app.
-func (l *local) services() []string {
-	if l.web {
-		return []string{"api", "web"}
+// targets returns the image targets of the release: api, web when present, then the
+// sidecar services of spinup.toml. It is the order of the build and of release.json.
+func (l *local) targets() []string {
+	all := ColorServices(l.web, sidecarSpecs(l.sidecars))
+	out := make([]string, len(all))
+	for i, s := range all {
+		out[i] = s.Name
 	}
-	return []string{"api"}
+	return out
+}
+
+// sidecar reports whether name is a sidecar service of spinup.toml.
+func (l *local) sidecar(name string) bool {
+	return slices.ContainsFunc(l.sidecars, func(s services.Service) bool { return s.Name == name })
+}
+
+// sidecarSpecs returns the release records of the declared services, without image refs.
+func sidecarSpecs(list []services.Service) []ReleaseService {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]ReleaseService, len(list))
+	for i, s := range list {
+		out[i] = ReleaseService{Name: s.Name, Port: s.Port, Health: s.Health}
+	}
+	return out
 }
 
 // envPairs returns the variables of the release .env file in a fixed order.
+// Only api and web read them. compose.services.yml holds the literal values of the
+// sidecar services, because rollback changes only SPINUP_COLOR in .env.
 func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]string {
 	ref := func(service string) string {
 		for _, img := range images {
@@ -193,19 +222,10 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 		}
 		return r
 	}
-	replicas := func(service string) string {
-		n := l.envFile.Replicas[service]
-		if n < 1 {
-			n = 1
-		}
-		return fmt.Sprint(n)
-	}
-	pairs := [][2]string{
-		{"SPINUP_COLOR", color},
-		{"API_IMAGE", ref("api")},
-	}
-	if l.web {
-		pairs = append(pairs, [2]string{"WEB_IMAGE", ref("web")})
+	builtin := ColorServices(l.web, nil)
+	pairs := [][2]string{{"SPINUP_COLOR", color}}
+	for _, s := range builtin {
+		pairs = append(pairs, [2]string{strings.ToUpper(s.Name) + "_IMAGE", ref(s.Name)})
 	}
 	pairs = append(pairs,
 		[2]string{"PUBLIC_ORIGIN", l.origin},
@@ -214,14 +234,10 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 		[2]string{"DEPLOY_UID", uid},
 		[2]string{"DEPLOY_GID", gid},
 	)
-	services := []string{"api"}
-	if l.web {
-		services = append(services, "web")
-	}
-	for _, s := range services {
-		up := strings.ToUpper(s)
-		lim := limit(s)
-		pairs = append(pairs, [2]string{up + "_REPLICAS", replicas(s)}, [2]string{up + "_CPUS", lim.CPUs}, [2]string{up + "_MEMORY", lim.Memory})
+	for _, s := range builtin {
+		up := strings.ToUpper(s.Name)
+		lim := limit(s.Name)
+		pairs = append(pairs, [2]string{up + "_REPLICAS", strconv.Itoa(l.replicas(s.Name))}, [2]string{up + "_CPUS", lim.CPUs}, [2]string{up + "_MEMORY", lim.Memory})
 	}
 	pg := l.envFile.Resources["postgres"]
 	if pg.CPUs == "" {
@@ -231,6 +247,12 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 		pg.Memory = "1g"
 	}
 	return append(pairs, [2]string{"POSTGRES_CPUS", pg.CPUs}, [2]string{"POSTGRES_MEMORY", pg.Memory})
+}
+
+// replicas returns the replica count of a service in deploy/environments/<env>.toml.
+// A missing or smaller value gives 1.
+func (l *local) replicas(service string) int {
+	return max(l.envFile.Replicas[service], 1)
 }
 
 // sameSHA reports whether a release ID belongs to the commit.

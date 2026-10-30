@@ -101,6 +101,9 @@ type SwitchOptions struct {
 	App string
 	// ReleaseDir is the release directory on the VM. It holds compose.yml and .env.
 	ReleaseDir string
+	// ComposeFiles are the Compose files of the color project, relative to ReleaseDir.
+	// Empty means compose.yml alone. See ColorComposeFiles.
+	ComposeFiles []string
 	// Color is the color that the switch makes live.
 	Color string
 	// Services are the color services with their readiness checks.
@@ -128,13 +131,31 @@ type Service struct {
 	Path string
 }
 
-// DefaultServices returns the color services of the deploy pack. The web service exists only in a full app.
-func DefaultServices(web bool) []Service {
+// ServicesComposeFile is the Compose file of the sidecar services in a release directory
+// (ADR 0022 §2). Deploy writes it from spinup.toml. It is never a file of deploy/.
+const ServicesComposeFile = "compose.services.yml"
+
+// ColorServices returns the color services of a release, in a fixed order: api, web when
+// the app has it, then the sidecar services with their health paths (ADR 0022 §2).
+// Build, transport, the release .env file, and the readiness checks all use this list.
+func ColorServices(web bool, sidecars []ReleaseService) []Service {
 	services := []Service{{Name: "api", Port: 8080, Path: "/readyz"}}
 	if web {
 		services = append(services, Service{Name: "web", Port: 3000, Path: "/healthz"})
 	}
+	for _, s := range sidecars {
+		services = append(services, Service{Name: s.Name, Port: s.Port, Path: s.Health})
+	}
 	return services
+}
+
+// ColorComposeFiles returns the Compose files of the color project of a release:
+// compose.yml, and compose.services.yml when the release has sidecar services.
+func ColorComposeFiles(sidecars []ReleaseService) []string {
+	if len(sidecars) == 0 {
+		return []string{"compose.yml"}
+	}
+	return []string{"compose.yml", ServicesComposeFile}
 }
 
 // HealthError reports a new color that did not become healthy. The old color stays live.
@@ -179,6 +200,11 @@ func Switch(ctx context.Context, r remote.Runner, o SwitchOptions) error {
 	if !strings.HasPrefix(o.ReleaseDir, root+"/releases/") {
 		return fmt.Errorf("switch: release directory %q is outside %s/releases\nTry: pass a release directory of this app", o.ReleaseDir, root)
 	}
+	for _, f := range o.ComposeFiles {
+		if f == "" || strings.ContainsAny(f, "/\\") || strings.HasPrefix(f, ".") {
+			return fmt.Errorf("switch: Compose file %q is not a file name in the release directory\nTry: pass names such as compose.yml", f)
+		}
+	}
 	s := &switcher{r: r, o: o, root: root}
 	s.defaults()
 	return s.run(ctx)
@@ -204,7 +230,10 @@ func (s *switcher) defaults() {
 		s.o.Sleep = sleepContext
 	}
 	if len(s.o.Services) == 0 {
-		s.o.Services = DefaultServices(false)
+		s.o.Services = ColorServices(false, nil)
+	}
+	if len(s.o.ComposeFiles) == 0 {
+		s.o.ComposeFiles = ColorComposeFiles(nil)
 	}
 }
 
@@ -290,7 +319,11 @@ func seconds(d time.Duration) int {
 
 // compose returns a docker compose argv for a color project of the release.
 func (s *switcher) compose(project string, args ...string) []string {
-	return ComposeArgv(project, s.o.ReleaseDir, []string{s.o.ReleaseDir + "/compose.yml"}, args...)
+	files := make([]string, len(s.o.ComposeFiles))
+	for i, f := range s.o.ComposeFiles {
+		files[i] = s.o.ReleaseDir + "/" + f
+	}
+	return ComposeArgv(project, s.o.ReleaseDir, files, args...)
 }
 
 // ComposeArgv returns a docker compose argv with the release .env file and absolute

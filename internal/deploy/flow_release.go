@@ -58,10 +58,25 @@ type Release struct {
 	User             string            `json:"user"`
 	CreatedAt        time.Time         `json:"created_at"`
 	Secrets          map[string]string `json:"secrets"`
+	// Services are the sidecar services of the release (ADR 0022 §2). Rollback reads them
+	// for its readiness checks and its Compose files. A release without services omits them.
+	Services []ReleaseService `json:"services,omitempty"`
 	// MigrationsSafe and PreDeployBackupTime come from the pre-deploy backup hook. Rollback
 	// uses them for its point-in-time restore guidance (--with-db-plan).
 	MigrationsSafe      *bool     `json:"migrations_safe,omitempty"`
 	PreDeployBackupTime time.Time `json:"pre_deploy_backup_time,omitzero"`
+}
+
+// ReleaseService is the record of one sidecar service in release.json.
+type ReleaseService struct {
+	// Name is the service name of spinup.toml, such as ocr.
+	Name string `json:"name"`
+	// Port is the container port of the service.
+	Port int `json:"port"`
+	// Health is the HTTP path that answers 200 when a replica is ready.
+	Health string `json:"health"`
+	// Image is the image ref that Compose runs on the VM.
+	Image string `json:"image"`
 }
 
 // ReleaseEntry is one entry of releases.json, the release history (newest first).
@@ -158,7 +173,8 @@ type releaseFile struct {
 }
 
 // excludedDeployFiles are files of deploy/ that the VM never needs.
-var excludedDeployFiles = []string{"compose.dev.yml", "Dockerfile.api", "Dockerfile.web"}
+// compose.services.yml is not a file of deploy/: deploy writes it from spinup.toml.
+var excludedDeployFiles = []string{"compose.dev.yml", "Dockerfile.api", "Dockerfile.web", ServicesComposeFile}
 
 // deployFiles reads deploy/ for the release directory, without environments/, cloud-init/,
 // local build files, and .gitkeep files. The order is sorted.
@@ -218,6 +234,7 @@ func deployFiles(root string) ([]releaseFile, error) {
 
 // edgeComposeFiles returns the Compose files of the base project: compose.edge.yml and
 // other compose.*.yml files that a pack adds (for example compose.backups.yml).
+// compose.services.yml belongs to the color project, never to the base project.
 func edgeComposeFiles(files []releaseFile) []string {
 	out := []string{"compose.edge.yml"}
 	for _, f := range files {
@@ -225,7 +242,7 @@ func edgeComposeFiles(files []releaseFile) []string {
 			continue
 		}
 		switch f.Path {
-		case "compose.yml", "compose.edge.yml", "compose.override.yml", "compose.dev.yml":
+		case "compose.yml", "compose.edge.yml", "compose.override.yml", "compose.dev.yml", ServicesComposeFile:
 			continue
 		}
 		out = append(out, f.Path)

@@ -19,6 +19,8 @@ import (
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/remote"
 	"github.com/stopyellingatme/spinup/internal/secrets"
+	"github.com/stopyellingatme/spinup/internal/services"
+	"github.com/stopyellingatme/spinup/internal/services/compose"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
 
@@ -59,6 +61,10 @@ type flow struct {
 	images   []Image
 	color    string
 	uid, gid string
+	// recorded holds the services of release.json when a resume starts after the upload.
+	// The switch then follows the release on the VM, not the current spinup.toml.
+	recorded    []ReleaseService
+	hasRecorded bool
 }
 
 func (f *flow) root() string       { return "/opt/" + f.l.app }
@@ -216,21 +222,21 @@ func (f *flow) prepare(ctx context.Context) error {
 		return nil
 	}
 	fmt.Fprintf(f.out, "Building release %s\n", f.release)
+	targets := f.l.targets()
 	built, err := f.d.Build(ctx, f.d.Exec, build.ImageOptions{
 		Root: f.l.root, App: f.l.app, Tag: f.release, Platform: f.o.Platform,
-		Push: f.l.env.Transport == TransportRegistry, Targets: f.l.services(), PublicOrigin: f.l.origin,
+		Push: f.l.env.Transport == TransportRegistry, Targets: targets, Services: f.l.sidecars, PublicOrigin: f.l.origin,
 	})
 	if err != nil {
 		return err
 	}
-	for i, img := range built {
-		if i >= len(f.l.services()) {
-			break
+	// The build names each image by its target. Map by name, never by index.
+	for _, target := range targets {
+		i := slices.IndexFunc(built, func(img build.Image) bool { return img.Name == target })
+		if i < 0 || built[i].Ref == "" {
+			return &ui.Error{What: "Cannot build images", Why: "the build returned no image for " + target, Try: "run spinup build --image --target " + target + " and check the output"}
 		}
-		f.images = append(f.images, Image{Service: f.l.services()[i], Tag: img.Ref, Digest: img.Digest})
-	}
-	if len(f.images) != len(f.l.services()) {
-		return &ui.Error{What: "Cannot build images", Why: "the build returned the wrong number of images", Try: "run spinup build --image and check the output"}
+		f.images = append(f.images, Image{Service: target, Tag: built[i].Ref, Digest: built[i].Digest})
 	}
 	return nil
 }
@@ -267,8 +273,12 @@ func (f *flow) existingImages() ([]Image, error) {
 		prefix = "ghcr.io/" + owner + "/"
 	}
 	var out []Image
-	for _, s := range f.l.services() {
-		out = append(out, Image{Service: s, Tag: prefix + f.l.app + "-" + s + ":" + f.release})
+	for _, s := range f.l.targets() {
+		name := f.l.app + "-" + s
+		if f.l.sidecar(s) {
+			name = services.ImageName(f.l.app, s)
+		}
+		out = append(out, Image{Service: s, Tag: prefix + name + ":" + f.release})
 	}
 	return out, nil
 }
@@ -443,6 +453,7 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 			return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "release.json of the release is missing on the VM", Try: "run spinup deploy without --resume"}
 		}
 		f.color, f.images = rel.Color, rel.Images
+		f.recorded, f.hasRecorded = rel.Services, true
 	}
 	if len(f.images) == 0 {
 		return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "the journal has no images of the release", Try: "run spinup deploy without --resume"}
@@ -498,7 +509,7 @@ func (f *flow) releaseSnapshot() Release {
 	r := Release{
 		Release: f.release, App: f.l.app, Env: f.l.env.Name, GitSHA: f.l.sha, Color: f.color, Transport: transport,
 		Images: f.images, MigrationVersion: migrationVersion(f.l.migrations), User: f.d.User(),
-		CreatedAt: releaseTime(f.release), Secrets: SecretHashes(f.l.secrets),
+		CreatedAt: releaseTime(f.release), Secrets: SecretHashes(f.l.secrets), Services: f.releaseServices(),
 	}
 	if v, ok := f.hookResults[ResultMigrationsSafe]; ok {
 		safe := v == "true"
@@ -512,6 +523,53 @@ func (f *flow) releaseSnapshot() Release {
 	return r
 }
 
+// releaseServices returns the sidecar services of the release with their image refs:
+// the record of release.json on a resume after the upload, or else spinup.toml.
+func (f *flow) releaseServices() []ReleaseService {
+	if f.hasRecorded {
+		return f.recorded
+	}
+	out := sidecarSpecs(f.l.sidecars)
+	for i := range out {
+		out[i].Image = f.imageRef(out[i].Name)
+	}
+	return out
+}
+
+// imageRef returns the deploy ref of the image of a service, or "".
+func (f *flow) imageRef(service string) string {
+	for _, img := range f.images {
+		if img.Service == service {
+			return img.Ref
+		}
+	}
+	return ""
+}
+
+// servicesCompose renders compose.services.yml (ADR 0022 §2). It returns nil when the
+// app has no sidecar services.
+func (f *flow) servicesCompose() ([]byte, error) {
+	if len(f.l.sidecars) == 0 {
+		return nil, nil
+	}
+	in := compose.DeployInput{
+		App: f.l.app, Services: f.l.sidecars, Images: map[string]string{},
+		Monitoring: f.l.otel, Worker: f.l.jobs,
+		Replicas: map[string]int{}, Resources: map[string]compose.Resources{},
+	}
+	for _, s := range f.l.sidecars {
+		if ref := f.imageRef(s.Name); ref != "" {
+			in.Images[s.Name] = ref
+		}
+		in.Replicas[s.Name] = f.l.replicas(s.Name)
+		if r, ok := f.l.envFile.Resources[s.Name]; ok {
+			in.Resources[s.Name] = compose.Resources{CPUs: r.CPUs, Memory: r.Memory}
+		}
+	}
+	// The renderer errors end with a Try line.
+	return compose.Deploy(in)
+}
+
 // releaseFiles returns the files of the release directory, without release.json.
 func (f *flow) releaseFiles() ([]releaseFile, error) {
 	env, err := dotEnv(f.l.envPairs(f.color, f.images, f.uid, f.gid))
@@ -519,6 +577,13 @@ func (f *flow) releaseFiles() ([]releaseFile, error) {
 		return nil, err
 	}
 	files := append(slices.Clone(f.l.files), releaseFile{Path: ".env", Data: env, Mode: 0644})
+	sidecars, err := f.servicesCompose()
+	if err != nil {
+		return nil, err
+	}
+	if sidecars != nil {
+		files = append(files, releaseFile{Path: ServicesComposeFile, Data: sidecars, Mode: 0644})
+	}
 	slices.SortFunc(files, func(a, b releaseFile) int { return strings.Compare(a.Path, b.Path) })
 	return files, nil
 }
@@ -669,8 +734,10 @@ func (f *flow) migrate(ctx context.Context) (string, error) {
 
 // doSwitch makes the new color live (step 8, ADR 0003).
 func (f *flow) doSwitch(ctx context.Context) (string, error) {
+	sidecars := f.releaseServices()
 	err := Switch(ctx, f.vm, SwitchOptions{
-		App: f.l.app, ReleaseDir: f.releaseDir(), Color: f.color, Services: DefaultServices(f.l.web),
+		App: f.l.app, ReleaseDir: f.releaseDir(), Color: f.color,
+		Services: ColorServices(f.l.web, sidecars), ComposeFiles: ColorComposeFiles(sidecars),
 		HealthTimeout: f.o.HealthTimeout, NoAutoRollback: f.o.NoAutoRollback, Redact: f.redact,
 		Out: f.out, Now: f.d.Now, Sleep: f.d.Sleep,
 		Reconnect: func(ctx context.Context) (remote.Runner, error) {
