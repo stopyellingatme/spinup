@@ -149,10 +149,8 @@ func TestPgdumpRestoreFailureRecovery(t *testing.T) {
 			vm.Expect("cat", "/opt/todo/current/release.json").Return(`{"release":"`+releaseID+`","color":"blue","git_sha":"abcdef1234567890"}`, "", 0)
 			dumpListing(vm)
 			for _, color := range []string{"blue", "green"} {
-				for _, service := range []string{"api", "web"} {
-					vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color, "--filter", "label=com.docker.compose.service="+service).Return(color+"-"+service, "", 0)
-					vm.Expect("docker", "stop", color+"-"+service).Return("", "", 0)
-				}
+				vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color).Return(color+"-api\n", "", 0)
+				vm.Expect("docker", "stop", color+"-api").Return("", "", 0)
 			}
 			dumpListing(vm)
 			vm.Expect("docker", "compose").Return("app\n", "", 0)
@@ -170,7 +168,7 @@ func TestPgdumpRestoreFailureRecovery(t *testing.T) {
 				dir := "/opt/todo/current"
 				vm.Expect(deploy.ComposeArgv("todo", dir, []string{dir + "/compose.edge.yml", dir + "/compose.backups.yml"}, "start", "--wait", "postgres")...).Return("", "", 0)
 				dir = "/opt/todo/releases/" + releaseID
-				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait", "api")...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-blue", dir, []string{dir + "/compose.yml"}, "up", "-d", "--no-deps", "--wait")...).Return("", "", 0)
 			}
 			vm.Expect("sh", "-c").Return("", "", 0) // Unlock.
 			err := backup.Restore(context.Background(), backup.RestoreOptions{Options: backup.Options{Dir: dumpProject(t), Env: "staging", Remote: vm}, Into: "in-place", IKnow: true, NoSafetyBackup: true, Target: backup.Target{Label: dumpLabel}})

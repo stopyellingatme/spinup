@@ -81,3 +81,46 @@ func TestPluginTemplateWithoutConfigOmitsHealthcheck(t *testing.T) {
 		t.Fatalf("table contains healthcheck: %s", table)
 	}
 }
+
+// TestRenderPluginTemplatesKeepsExecutableBit keeps mode 0755 for a source file with an
+// execute bit, copied or rendered. Other files get 0644 (issue #37, review 6).
+func TestRenderPluginTemplatesKeepsExecutableBit(t *testing.T) {
+	t.Parallel()
+	loaded := plugin.Loaded{
+		Meta: plugin.Meta{Name: "service-example"},
+		FS: fstest.MapFS{
+			"t/entrypoint.sh":  {Data: []byte("#!/bin/sh\nexec /service\n"), Mode: 0o755},
+			"t/run.sh.tmpl":    {Data: []byte("#!/bin/sh\necho {{.Name}}\n"), Mode: 0o700},
+			"t/group.sh":       {Data: []byte("#!/bin/sh\n"), Mode: 0o654},
+			"t/Dockerfile":     {Data: []byte("FROM scratch\n"), Mode: 0o644},
+			"t/config.yaml":    {Data: []byte("a: 1\n"), Mode: 0o600},
+			"t/main.go.tmpl":   {Data: []byte("package main\n"), Mode: 0o664},
+			"t/README.md.tmpl": {Data: []byte("# {{.Name}}\n")},
+		},
+	}
+	svc := services.Service{Name: "ocr", Port: 9090, DevPort: 8101, Health: "/healthz"}
+	plan, err := renderPluginTemplates(loaded, plugin.ServiceTemplate{Name: "t", Dir: "t"}, svc, templateData{Name: "ocr", App: "todo", Port: 9090})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		path string
+		want fs.FileMode
+	}{
+		{"services/ocr/entrypoint.sh", 0o755},
+		{"services/ocr/run.sh", 0o755},
+		{"services/ocr/group.sh", 0o755},
+		{"services/ocr/Dockerfile", 0o644},
+		{"services/ocr/config.yaml", 0o644},
+		{"services/ocr/main.go", 0o644},
+		{"services/ocr/README.md", 0o644},
+	} {
+		file, ok := plan.Get(tc.path)
+		if !ok {
+			t.Fatalf("missing %s", tc.path)
+		}
+		if file.Mode != tc.want {
+			t.Errorf("%s: mode = %v, want %v", tc.path, file.Mode, tc.want)
+		}
+	}
+}

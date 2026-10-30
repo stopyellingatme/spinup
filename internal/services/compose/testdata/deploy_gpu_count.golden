@@ -34,3 +34,6 @@ services:
   api:
     environment:
       SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
+  migrate:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"

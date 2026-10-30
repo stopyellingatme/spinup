@@ -158,16 +158,10 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 				expectRecovery(u, f)
 				expectUpdate(u, f)
 				f.Expect(u.base("build", "postgres")...)
-				if tt.extras {
-					f.Expect("sh", "-ec", stopColorsScript("demo", "api", "worker", "ocr"))
-				}
 				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--force-recreate", "postgres")...)
 				f.Expect(u.base("up", "-d", "--no-deps", "--no-build", "--wait", "--wait-timeout", "120", "postgres")...)
 				f.Expect(u.base("ps", "-q", "postgres")...).Return("new-pg\n", "", 0)
 				f.Expect("docker", "exec", "-i", "new-pg").Return("17.11 (Debian)\n", "", 0)
-				if tt.extras {
-					f.Expect(expectedAppStart(u, true)...)
-				}
 			}
 			err := u.minor(context.Background())
 			text := out.String()
@@ -183,7 +177,12 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 			f.AssertDone(t)
 			if strings.HasPrefix(tt.name, "upgrade") {
 				if tt.extras {
-					assertExtraServiceCommands(t, u, f)
+					// A minor upgrade only restarts postgres. It never stops the colors.
+					for _, call := range f.Calls() {
+						if len(call.Argv) > 0 && call.Argv[0] == "sh" && slices.Contains(call.Argv, stopColorsScript("demo")) {
+							t.Fatal("a minor upgrade stopped the colors")
+						}
+					}
 				}
 				assertRecovery(t, u, f)
 				assertCompose(t, u, f, false)
@@ -193,7 +192,7 @@ func TestMinorOrderAndNoOp(t *testing.T) {
 }
 func expectMajorUntilVerify(u *upgrade, f *remote.Fake, restored string) {
 	expectRecovery(u, f)
-	f.Expect("sh", "-ec", stopColorsScript("demo", u.appServices()...))
+	f.Expect("sh", "-ec", stopColorsScript("demo"))
 	expectBackup(f)
 	f.Expect("docker", "exec", "-i", "old-pg").Return(counts, "", 0)
 	f.Expect("sh", "-ec").Return("demo_pgdata_18", "", 0)

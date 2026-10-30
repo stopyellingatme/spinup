@@ -725,7 +725,13 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 func (f *flow) migrate(ctx context.Context) (string, error) {
 	dir := f.releaseDir()
 	fmt.Fprintln(f.out, "Running the migrations")
-	argv := ComposeArgv(f.l.app+"-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")
+	// The files of the release: compose.services.yml gives migrate the SERVICE_<NAME>_URL
+	// variables, because the API binary can load the client configuration at startup.
+	files := ColorComposeFiles(f.releaseServices())
+	for i := range files {
+		files[i] = dir + "/" + files[i]
+	}
+	argv := ComposeArgv(f.l.app+"-migrate", dir, files, "--profile", "migrate", "run", "--rm", "-T", "migrate")
 	if _, err := f.cmd(ctx, true, argv...); err != nil {
 		return "", fmt.Errorf("the migrations failed, and the old release is still live: %w", brief(err))
 	}

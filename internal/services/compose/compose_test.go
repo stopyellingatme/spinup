@@ -196,3 +196,39 @@ func TestComposeSecurityLint(t *testing.T) {
 		}
 	}
 }
+
+// TestDeployReviewFixes covers the fixes of the integration review (issue #37):
+// the URL variables of migrate, the long syntax of the secret mounts, and the
+// escaped $ in the health check command.
+func TestDeployReviewFixes(t *testing.T) {
+	t.Parallel()
+	svc := minimalService("ocr", 8080, 8101)
+	svc.Secrets = []string{"OCR_LICENSE_KEY"}
+	svc.Healthcheck = []string{"sh", "-c", `test -n "$TOKEN" && wget -q -O- http://127.0.0.1:8080/healthz`}
+	got, err := Deploy(DeployInput{App: "todo", Services: []services.Service{svc}, Images: map[string]string{"ocr": "todo-ocr:r1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(got)
+	tests := []struct {
+		name, want string
+	}{
+		{"migrate gets the URL", "\n  migrate:\n    environment:\n      SERVICE_OCR_URL: \"http://ocr-${SPINUP_COLOR}:8080\"\n"},
+		{"secret long syntax", "    volumes:\n" +
+			"      - type: bind\n" +
+			"        source: /opt/todo/secrets/OCR_LICENSE_KEY\n" +
+			"        target: /run/secrets/OCR_LICENSE_KEY\n" +
+			"        read_only: true\n" +
+			"        bind:\n" +
+			"          create_host_path: false\n"},
+		{"healthcheck escapes $", `"test -n \"$$TOKEN\" && wget`},
+	}
+	for _, tt := range tests {
+		if !strings.Contains(s, tt.want) {
+			t.Errorf("%s: missing %q in\n%s", tt.name, tt.want, s)
+		}
+	}
+	if strings.Contains(s, `"$TOKEN`) || strings.Contains(s, ":/run/secrets/") {
+		t.Errorf("unescaped $ or short secret syntax in\n%s", s)
+	}
+}

@@ -163,6 +163,15 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 			return nil, preflightError("the secret "+name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name)
 		}
 	}
+	// A service mounts each of its secrets as one file. A missing file fails the start of
+	// the color, so check the names before anything changes on the VM.
+	for _, s := range l.sidecars {
+		for _, name := range s.Secrets {
+			if _, ok := l.secrets[name]; !ok {
+				return nil, preflightError("the secret "+name+" of service "+s.Name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name+", or remove it from secrets of the service in spinup.toml")
+			}
+		}
+	}
 
 	if confirm {
 		if err := project.ConfirmProtected(env, "deploy", o.Confirm); err != nil {
@@ -201,7 +210,7 @@ func sidecarSpecs(list []services.Service) []ReleaseService {
 }
 
 // envPairs returns the variables of the release .env file in a fixed order.
-// Only api and web read them. compose.services.yml holds the literal values of the
+// Only api, web, and the worker (WORKER_REPLICAS, with the jobs module) read them. compose.services.yml holds the literal values of the
 // sidecar services, because rollback changes only SPINUP_COLOR in .env.
 func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]string {
 	ref := func(service string) string {
@@ -238,6 +247,10 @@ func (l *local) envPairs(color string, images []Image, uid, gid string) [][2]str
 		up := strings.ToUpper(s.Name)
 		lim := limit(s.Name)
 		pairs = append(pairs, [2]string{up + "_REPLICAS", strconv.Itoa(l.replicas(s.Name))}, [2]string{up + "_CPUS", lim.CPUs}, [2]string{up + "_MEMORY", lim.Memory})
+	}
+	if l.jobs {
+		// compose.yml reads ${WORKER_REPLICAS:-1} for the worker service.
+		pairs = append(pairs, [2]string{"WORKER_REPLICAS", strconv.Itoa(l.replicas("worker"))})
 	}
 	pg := l.envFile.Resources["postgres"]
 	if pg.CPUs == "" {

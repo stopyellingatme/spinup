@@ -141,6 +141,15 @@ func renderPluginTemplates(loaded plugin.Loaded, spec plugin.ServiceTemplate, sv
 		if err != nil {
 			return err
 		}
+		// Keep the executable bit, so that a script such as entrypoint.sh still runs.
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		mode := fs.FileMode(0o644)
+		if info.Mode().Perm()&0o111 != 0 {
+			mode = 0o755
+		}
 		if strings.HasSuffix(rel, ".tmpl") {
 			tmpl, err := template.New(source).Option("missingkey=error").Parse(string(content))
 			if err != nil {
@@ -157,7 +166,7 @@ func renderPluginTemplates(loaded plugin.Loaded, spec plugin.ServiceTemplate, sv
 				return err
 			}
 		}
-		return result.Add(vfs.File{Path: output, Data: manifest.Normalize(content), Mode: 0o644, Class: string(manifest.Scaffold), Template: "plugin/" + loaded.Meta.Name + "/@gen/service/" + spec.Name})
+		return result.Add(vfs.File{Path: output, Data: manifest.Normalize(content), Mode: mode, Class: string(manifest.Scaffold), Template: "plugin/" + loaded.Meta.Name + "/@gen/service/" + spec.Name})
 	})
 	if err != nil {
 		return vfs.Plan{}, fmt.Errorf("render plugin service template %q: %w\nTry: repair the plugin service template", loaded.Meta.Name+"/"+spec.Name, err)

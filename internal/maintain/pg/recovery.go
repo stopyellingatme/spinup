@@ -78,8 +78,8 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	script.WriteString(shell("mkdir", lock) + "\n")
 	script.WriteString("trap " + remote.Quote(shell("rm", "-rf", "--", lock)) + " EXIT\n")
 	script.WriteString("printf '{\"owner\":\"pg-recovery\",\"pid\":%s,\"host\":\"recovery\",\"acquired\":\"%s\",\"ttl_seconds\":86400,\"release\":\"pg-recovery\"}\\n' \"$$\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > " + remote.Quote(lock+"/owner.json") + "\n")
-	if u.o.Major || u.hasExtraServices() {
-		script.WriteString(stopColorsScript(u.cfg.App.Name, u.appServices()...) + "\n")
+	if u.o.Major {
+		script.WriteString(stopColorsScript(u.cfg.App.Name) + "\n")
 	}
 	script.WriteString(shell(u.base("stop", "postgres")...) + "\n")
 	files := append(append([]string{}, u.files...), u.dir+"/Dockerfile.postgres", u.dir+"/.env")
@@ -95,8 +95,8 @@ func (u *upgrade) saveRecovery(ctx context.Context, oldVolume string) error {
 	}
 	script.WriteString(shell("docker", "tag", u.live.Image, u.live.Config.Image) + "\n")
 	script.WriteString(shell(u.base("up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", "--wait", "--wait-timeout", "120", "postgres")...) + "\n")
-	if u.o.Major || u.hasExtraServices() {
-		script.WriteString(shell(u.color(append([]string{"up", "-d", "--no-deps", "--wait"}, u.appServices()...)...)...) + "\n")
+	if u.o.Major {
+		script.WriteString(shell(u.color("up", "-d", "--no-deps", "--wait")...) + "\n")
 	}
 	if u.rollbackRefusal != "" {
 		script.Reset()
@@ -180,17 +180,15 @@ func (u *upgrade) volume() string {
 	}
 	return ""
 }
-func stopColorsScript(app string, services ...string) string {
-	// Preserve the legacy discovery of an optional web container.
-	if len(services) == 1 {
-		services = append(services, "web")
-	}
+
+// stopColorsScript stops every container of both color projects. It selects the
+// containers by project, not by service name, so the worker and every sidecar of
+// any deployed release stop, whatever the local spinup.toml declares.
+func stopColorsScript(app string) string {
 	var b strings.Builder
 	for _, color := range []string{"blue", "green"} {
-		for _, service := range services {
-			b.WriteString("ids=$(" + shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project="+app+"-"+color, "--filter", "label=com.docker.compose.service="+service) + ")\n")
-			b.WriteString("if [ -n \"$ids\" ]; then docker stop $ids; fi\n")
-		}
+		b.WriteString("ids=$(" + shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project="+app+"-"+color) + ")\n")
+		b.WriteString("if [ -n \"$ids\" ]; then docker stop $ids; fi\n")
 	}
 	return b.String()
 }

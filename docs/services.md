@@ -56,7 +56,7 @@ The directory `services/<name>/` is the Docker build context.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | yes | The service name. It matches `^[a-z][a-z0-9]{0,19}$` and is not a reserved name. |
+| `name` | yes | The service name. It matches `^[a-z][a-z0-9]{0,19}$`. It is not a reserved name and not a Go keyword. |
 | `port` | yes | The container port. |
 | `dev_port` | yes | The host port in `spinup dev`. It is unique for each service. |
 | `health` | yes | An HTTP path that answers 200 when the service is ready. |
@@ -67,6 +67,7 @@ The directory `services/<name>/` is the Docker build context.
 | `db` | no | If `true`, the service joins the `db` network. |
 | `gpus` | no | An empty value (none), `all`, or a count such as `1`. |
 
+A Go keyword such as `type` or `go` is not a valid name, because the name is the package name of the Go client.
 The reserved names are `api`, `web`, `migrate`, `worker`, `caddy`, `postgres`, `alloy`, `mailpit`, `grafana`, `loki`, `tempo`, `mimir`, `pyroscope`, `backup`, `backups`, `edge`, and `monitoring`.
 If a field is wrong, `spinup` fails with an error and a `Try:` line.
 Run `spinup doctor` to check the declaration, the files, the generated client, and the secret names.
@@ -159,6 +160,8 @@ The service never sees the other secrets of the app.
 
 Set the value with `spinup secrets set --env <env> <NAME>`.
 The doctor reports a name that `secrets/<env>.enc.yaml` does not hold.
+If a named secret is missing, `spinup deploy` stops in the preflight, before it changes the VM.
+Compose does not create a missing secret file. The start of the color fails instead.
 
 ## Monitoring
 
@@ -187,6 +190,9 @@ cpus = "1.5"
 memory = "1g"
 ```
 
+With the jobs module on, `worker` in `[replicas]` sets the replica count of the jobs worker.
+The default is 1. A value below 1 gives 1.
+
 During a switch, both colors run. The VM needs memory for two sets of each service.
 
 Set `gpus = "all"` or a count in the declaration to reserve a GPU.
@@ -213,7 +219,9 @@ If a check fails, the old color stays live.
 
 `release.json` records the name, the port, the health path, and the image of each service.
 `spinup rollback` reads this record, so it restores the services of that release.
-`spinup backup restore` and `spinup maintenance pg upgrade` stop and start the worker and the services together with `api` and `web`.
+`spinup backup restore` and `spinup maintenance pg upgrade` stop and start the whole color projects.
+The worker and the services of the deployed release stop and start together with `api` and `web`, whatever the local `spinup.toml` declares.
+The migrate step gets the `SERVICE_<NAME>_URL` variables in deploy and in restore.
 See [Deploy](deploy.md).
 
 Each service gets the hardening of the API.
@@ -228,6 +236,7 @@ Run `spinup g service <name> --lang <plugin>/<template>` to use one.
 spinup renders the directory with `text/template`.
 The data are `Name`, `App`, and `Port`.
 A `.tmpl` file is rendered and loses the suffix. Other files are copied.
+A file with an execute bit, such as `entrypoint.sh`, gets mode 0755. Other files get mode 0644.
 
 A template directory can have a `service.toml` file with `healthcheck` and `health`.
 spinup uses these values in the new `[[services]]` table.
