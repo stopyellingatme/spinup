@@ -244,7 +244,7 @@ dind_ref="$(pin docker-dind)"
 seaweed_ref="$(pin seaweedfs)"
 mkdir -p "$work/vm"
 sed "s#\[\[ image \"docker-dind\" \]\]#$dind_ref#" "$dind/vm/Dockerfile" >"$work/vm/Dockerfile"
-cp "$dind/vm/sshd_config" "$dind/vm/entrypoint.sh" "$work/vm/"
+cp "$dind/vm/sshd_config" "$dind/vm/entrypoint.sh" "$dind/vm/cloud-init" "$dind/vm/systemctl" "$work/vm/"
 chmod 0755 "$work/vm/entrypoint.sh"
 echo "    VM FROM $dind_ref"
 docker build -t "$vm_image" --build-arg DEPLOY_PUBKEY="$(cat "$work/id_ed25519.pub")" "$work/vm" \

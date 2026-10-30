@@ -67,6 +67,12 @@ The directory `services/<name>/` is the Docker build context.
 | `db` | no | If `true`, the service joins the `db` network. |
 | `gpus` | no | An empty value (none), `all`, or a count such as `1`. |
 
+The `rust` and `python` templates have a healthcheck command in the image.
+The Rust command is `/service healthcheck`, and the Python command is `/app/.venv/bin/python -m service.healthcheck`.
+Both commands request `/healthz` on `127.0.0.1` and ignore the `health` field.
+If you change `health` in `spinup.toml`, change the healthcheck code of the template in the same way.
+The Rust code is in `src/main.rs`, and the Python code is in `service/healthcheck.py`.
+
 A Go keyword such as `type` or `go` is not a valid name, because the name is the package name of the Go client.
 The reserved names are `api`, `web`, `migrate`, `worker`, `caddy`, `postgres`, `alloy`, `mailpit`, `grafana`, `loki`, `tempo`, `mimir`, `pyroscope`, `backup`, `backups`, `edge`, and `monitoring`.
 If a field is wrong, `spinup` fails with an error and a `Try:` line.
@@ -204,6 +210,9 @@ spinup does not install them.
 `spinup dev` writes `.spinup/compose.services.yml`, builds each service, and publishes it on `127.0.0.1:<dev_port>`.
 Use `--no-services` to skip the services and run one yourself on its dev port.
 The API, the worker, and the migrate step get the `SERVICE_<NAME>_URL` variables also with `--no-services`.
+If a service has `db = true`, `spinup dev` does not set `DATABASE_URL` for it.
+The service must read the database address from the `env` table of its declaration, or from its own dev environment.
+`spinup dev` sets only `PORT`, the `env` pairs, the secrets, and the OpenTelemetry variables.
 When `openapi.yaml` changes, `spinup dev` generates the Go client again.
 See [dev](commands/dev.md).
 
