@@ -1,0 +1,18 @@
+# Written by spinup dev from spinup.toml. Do not edit: spinup writes this file again each time it starts.
+# The paths are relative to deploy/, the directory of the first -f file.
+
+services:
+  ocr:
+    build:
+      context: ../services/ocr
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8101:8080"
+    environment:
+      PORT: "8080"
+      BANNER: "cost $$5"
+      MODEL: "small"
+      OCR_LICENSE_KEY: "${OCR_LICENSE_KEY:-}"
+      OCR_SALT: "${OCR_SALT:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-lgtm:4318"
+      OTEL_SERVICE_NAME: "ocr"

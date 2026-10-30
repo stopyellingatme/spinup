@@ -1,0 +1,30 @@
+# Written by spinup deploy from spinup.toml. Do not edit: spinup writes this file again for each release.
+# The color project uses it as a second -f file after compose.yml, which defines the networks.
+
+services:
+  ocr:
+    image: todo-ocr:r1 # spinup:allow unpinned-image spinup deploy sets the release tag, never latest
+    user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      PORT: "8080"
+    networks:
+      app:
+        aliases:
+          - ocr-${SPINUP_COLOR}
+    deploy:
+      replicas: 1
+    stop_grace_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  api:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
