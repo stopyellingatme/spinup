@@ -12,20 +12,8 @@ import (
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
-func restoreServices(s *Session, rel deploy.Release) []string {
-	result := []string{"api"}
-	if hasWeb(s.Config) {
-		result = append(result, "web")
-	}
-	if modules.Enabled(s.Config, "jobs") {
-		result = append(result, "worker")
-	}
-	for _, service := range rel.Services {
-		result = append(result, service.Name)
-	}
-	return result
-}
-
+// restoreServiceText names what a stop of both color projects stops. It only
+// changes the printed text: the stop always acts on the whole color projects.
 func restoreServiceText(s *Session, rel deploy.Release) string {
 	if modules.Enabled(s.Config, "jobs") || len(rel.Services) > 0 {
 		return "the app services"
@@ -33,13 +21,20 @@ func restoreServiceText(s *Session, rel deploy.Release) string {
 	return "api and web"
 }
 
-func liveCompose(s *Session, rel deploy.Release, args ...string) []string {
-	dir := "/opt/" + s.App + "/releases/" + rel.Release
+// releaseFiles returns the Compose files of the release in dir, as absolute paths.
+func releaseFiles(dir string, rel deploy.Release) []string {
 	files := deploy.ColorComposeFiles(rel.Services)
 	for i := range files {
 		files[i] = dir + "/" + files[i]
 	}
-	return deploy.ComposeArgv(s.App+"-"+rel.Color, dir, files, append(args, restoreServices(s, rel)...)...)
+	return files
+}
+
+// liveCompose runs a Compose command on the whole live color project, with no
+// service names, so that it acts on every app service of the release.
+func liveCompose(s *Session, rel deploy.Release, args ...string) []string {
+	dir := "/opt/" + s.App + "/releases/" + rel.Release
+	return deploy.ComposeArgv(s.App+"-"+rel.Color, dir, releaseFiles(dir, rel), args...)
 }
 
 func restoreRecovery(ctx context.Context, s *Session, rel deploy.Release, state *restoreRemote, starting bool, cause error) error {

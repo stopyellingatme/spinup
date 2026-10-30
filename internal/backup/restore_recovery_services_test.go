@@ -27,19 +27,17 @@ func TestRestoreRecoveryServices(t *testing.T) {
 			t.Parallel()
 			vm := &remote.Fake{}
 			cfg := &project.Config{Modules: []string{"jobs"}}
-			names := []string{"api"}
 			if tc.web {
 				cfg.Modules = append(cfg.Modules, "web")
-				names = append(names, "web")
 			}
-			names = append(names, "worker", "ocr")
 			// Use the release record even when the local declaration has no services.
 			rel := deploy.Release{Release: liveRelease, Color: deploy.Blue, Services: []deploy.ReleaseService{{Name: "ocr", Port: 8080, Health: "/healthz"}}}
 			s := &Session{Env: Env{App: "todo", Config: cfg, Remote: vm}}
 			dir := "/opt/todo/releases/" + liveRelease
 			files := []string{dir + "/compose.yml", dir + "/compose.services.yml"}
-			start := deploy.ComposeArgv("todo-blue", dir, files, append([]string{"up", "-d", "--no-deps", "--wait"}, names...)...)
-			stop := deploy.ComposeArgv("todo-blue", dir, files, append([]string{"stop"}, names...)...)
+			// The commands act on the whole color project, with no service names.
+			start := deploy.ComposeArgv("todo-blue", dir, files, "up", "-d", "--no-deps", "--wait")
+			stop := deploy.ComposeArgv("todo-blue", dir, files, "stop")
 			if !tc.touched {
 				expectation := vm.Expect(start...)
 				if tc.startFails {

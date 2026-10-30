@@ -109,19 +109,11 @@ func TestRestoreInPlace(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "deploy/environments/staging.toml"), []byte("smoke_urls = [\"/ready\"]\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			appServices := []string{"api"}
 			files := []string{"/opt/todo/releases/" + liveRelease + "/compose.yml"}
 			if tc.extras {
-				path := filepath.Join(dir, "spinup.toml")
-				config, readErr := os.ReadFile(path)
-				if readErr != nil {
-					t.Fatal(readErr)
-				}
-				config = []byte(strings.Replace(string(config), `"deploy", "backups"`, `"deploy", "backups", "jobs"`, 1))
-				if writeErr := os.WriteFile(path, config, 0600); writeErr != nil {
-					t.Fatal(writeErr)
-				}
-				appServices = append(appServices, "worker", "ocr")
+				// The deployed release has a sidecar, and the local spinup.toml has neither
+				// the jobs module nor the service. The stop and the start act on the whole
+				// color projects, so the release decides what runs.
 				files = append(files, "/opt/todo/releases/"+liveRelease+"/compose.services.yml")
 			}
 			vm := &remote.Fake{}
@@ -142,15 +134,9 @@ func TestRestoreInPlace(t *testing.T) {
 			vm.Expect(Command("todo", "--type=full", "--no-expire-auto", "backup")...).Return("", "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0) // Re-check before stopping.
-			stopServices := appServices
-			if !tc.extras {
-				stopServices = []string{"api", "web"}
-			}
 			for _, color := range []string{deploy.Blue, deploy.Green} {
-				for _, service := range stopServices {
-					vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color, "--filter", "label=com.docker.compose.service="+service).Return(color+"-"+service, "", 0)
-					vm.Expect("docker", "stop", color+"-"+service).Return("", "", 0)
-				}
+				vm.Expect("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=todo-"+color).Return(color+"-api\n"+color+"-worker\n"+color+"-ocr\n", "", 0)
+				vm.Expect("docker", "stop", color+"-api", color+"-worker", color+"-ocr").Return("", "", 0)
 			}
 			vm.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
 			vm.Expect(baseCompose("todo", "stop", "postgres")...).Return("", "", 0)
@@ -161,8 +147,8 @@ func TestRestoreInPlace(t *testing.T) {
 				restore.Return("", "", 0)
 				vm.Expect(baseCompose("todo", "start", "--wait", "postgres")...).Return("", "", 0)
 				dir := "/opt/todo/releases/" + liveRelease
-				vm.Expect(deploy.ComposeArgv("todo-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")...).Return("", "", 0)
-				vm.Expect(deploy.ComposeArgv("todo-blue", dir, files, append([]string{"up", "-d", "--no-deps", "--wait"}, appServices...)...)...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-migrate", dir, files, "--profile", "migrate", "run", "--rm", "-T", "migrate")...).Return("", "", 0)
+				vm.Expect(deploy.ComposeArgv("todo-blue", dir, files, "up", "-d", "--no-deps", "--wait")...).Return("", "", 0)
 			}
 			vm.Expect("sh", "-c").Return("", "", 0) // Release the lock, also after failure.
 			var out, errOut strings.Builder
@@ -181,15 +167,20 @@ func TestRestoreInPlace(t *testing.T) {
 			}
 			vm.AssertDone(t)
 			if !fail {
-				want := deploy.ComposeArgv("todo-blue", "/opt/todo/releases/"+liveRelease, files, append([]string{"up", "-d", "--no-deps", "--wait"}, appServices...)...)
-				found := false
-				for _, call := range vm.Calls() {
-					if slices.Equal(call.Argv, want) {
-						found = true
+				dir := "/opt/todo/releases/" + liveRelease
+				for _, want := range [][]string{
+					deploy.ComposeArgv("todo-blue", dir, files, "up", "-d", "--no-deps", "--wait"),
+					deploy.ComposeArgv("todo-migrate", dir, files, "--profile", "migrate", "run", "--rm", "-T", "migrate"),
+				} {
+					found := false
+					for _, call := range vm.Calls() {
+						if slices.Equal(call.Argv, want) {
+							found = true
+						}
 					}
-				}
-				if !found {
-					t.Fatalf("missing exact argv: %v", want)
+					if !found {
+						t.Fatalf("missing exact argv: %v", want)
+					}
 				}
 			}
 			joined := ""

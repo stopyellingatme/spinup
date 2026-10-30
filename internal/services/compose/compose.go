@@ -34,7 +34,8 @@ type DeployInput struct {
 	Images map[string]string
 	// Monitoring adds the OpenTelemetry variables to each service.
 	Monitoring bool
-	// Worker adds SERVICE_<NAME>_URL to the worker service, as well as to the api service.
+	// Worker adds SERVICE_<NAME>_URL to the worker service, as well as to the api and
+	// migrate services.
 	Worker bool
 	// Replicas maps a service name to its replica count. A missing name means 1.
 	Replicas map[string]int
@@ -79,7 +80,8 @@ func Deploy(in DeployInput) ([]byte, error) {
 		}
 		svcs.add(s.Name, node)
 	}
-	for _, name := range []string{"api", "worker"} {
+	// migrate runs the API binary, which can load the client configuration at startup.
+	for _, name := range []string{"api", "worker", "migrate"} {
 		if name == "worker" && !in.Worker {
 			continue
 		}
@@ -119,9 +121,19 @@ func deployService(in DeployInput, s services.Service) (*yaml.Node, error) {
 	m.add("tmpfs", seq(plain("/tmp")))
 	m.add("environment", env)
 	if len(s.Secrets) > 0 {
+		// The long syntax with create_host_path: false makes Compose fail on a missing
+		// secret file. The short syntax creates a directory in its place.
 		var mounts []*yaml.Node
 		for _, name := range s.Secrets {
-			mounts = append(mounts, plain(fmt.Sprintf("/opt/%s/secrets/%s:/run/secrets/%s:ro", in.App, name, name)))
+			bind := newMap()
+			bind.add("create_host_path", boolean(false))
+			mount := newMap()
+			mount.add("type", plain("bind"))
+			mount.add("source", plain(fmt.Sprintf("/opt/%s/secrets/%s", in.App, name)))
+			mount.add("target", plain("/run/secrets/"+name))
+			mount.add("read_only", boolean(true))
+			mount.add("bind", bind.node)
+			mounts = append(mounts, mount.node)
 		}
 		m.add("volumes", seq(mounts...))
 	}
@@ -134,7 +146,8 @@ func deployService(in DeployInput, s services.Service) (*yaml.Node, error) {
 	if len(s.Healthcheck) > 0 {
 		test := []*yaml.Node{quoted("CMD")}
 		for _, arg := range s.Healthcheck {
-			test = append(test, quoted(arg))
+			// Compose reads $ as an interpolation. The command sees a literal $ only as $$.
+			test = append(test, quoted(escapeDollar(arg)))
 		}
 		hc := newMap()
 		hc.add("test", flow(test...))
@@ -275,7 +288,7 @@ func buildEnv(s services.Service, files, extras [][2]string) (*yaml.Node, error)
 		}
 		seen[k] = true
 		// Compose reads $ in a value as an interpolation. A literal value needs $$.
-		env.add(k, quoted(strings.ReplaceAll(s.Env[k], "$", "$$")))
+		env.add(k, quoted(escapeDollar(s.Env[k])))
 	}
 	for _, pair := range slices.Concat(files, extras) {
 		if seen[pair[0]] {
@@ -286,6 +299,9 @@ func buildEnv(s services.Service, files, extras [][2]string) (*yaml.Node, error)
 	}
 	return env.node, nil
 }
+
+// escapeDollar writes each $ as $$, so that Compose passes a literal $ to the container.
+func escapeDollar(v string) string { return strings.ReplaceAll(v, "$", "$$") }
 
 func encode(header string, root *yaml.Node) ([]byte, error) {
 	doc := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}}

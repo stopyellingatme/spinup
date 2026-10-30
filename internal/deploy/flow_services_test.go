@@ -48,7 +48,7 @@ func withService(t *testing.T, x *fx, jobs bool) {
 	writeTree(t, x.root, map[string]string{
 		"spinup.toml":                      toml,
 		"services/ocr/Dockerfile":          "FROM scratch\n",
-		"deploy/environments/staging.toml": "smoke_urls = [\"/\"]\n[replicas]\napi = 2\nocr = 2\n[resources.api]\ncpus = \"0.5\"\nmemory = \"256m\"\n[resources.ocr]\nmemory = \"1g\"\n",
+		"deploy/environments/staging.toml": "smoke_urls = [\"/\"]\n[replicas]\napi = 2\nocr = 2\nworker = 3\n[resources.api]\ncpus = \"0.5\"\nmemory = \"256m\"\n[resources.ocr]\nmemory = \"1g\"\n",
 	})
 	x.svc = true
 }
@@ -169,7 +169,7 @@ func TestFlowServicesSSHFirstDeploy(t *testing.T) {
 	if got != string(want) {
 		t.Fatalf("compose.services.yml =\n%s\nwant\n%s", got, want)
 	}
-	for _, s := range []string{"image: " + ocr, "replicas: 2", "memory: 1g", "\n  worker:\n", "SERVICE_OCR_URL", "/opt/todo/secrets/API_TOKEN:/run/secrets/API_TOKEN:ro"} {
+	for _, s := range []string{"image: " + ocr, "replicas: 2", "memory: 1g", "\n  worker:\n", "SERVICE_OCR_URL", "source: /opt/todo/secrets/API_TOKEN\n", "create_host_path: false", "\n  migrate:\n"} {
 		if !strings.Contains(got, s) {
 			t.Errorf("compose.services.yml misses %q", s)
 		}
@@ -177,9 +177,10 @@ func TestFlowServicesSSHFirstDeploy(t *testing.T) {
 	if strings.Contains(got, "OTEL_") {
 		t.Errorf("compose.services.yml has OTel variables without the monitoring module:\n%s", got)
 	}
-	// The .env file of api and web does not change.
-	if env := string(x.upload(testRelDir + "/.env")); env != noServiceEnv {
-		t.Fatalf(".env =\n%s\nwant\n%s", env, noServiceEnv)
+	// The .env file of api and web does not change. The jobs module adds WORKER_REPLICAS.
+	wantEnv := strings.Replace(noServiceEnv, "POSTGRES_CPUS=", "WORKER_REPLICAS=3\nPOSTGRES_CPUS=", 1)
+	if env := string(x.upload(testRelDir + "/.env")); env != wantEnv {
+		t.Fatalf(".env =\n%s\nwant\n%s", env, wantEnv)
 	}
 	rel := x.release()
 	if !reflect.DeepEqual(rel.Services, []ReleaseService{ocrRecord}) {

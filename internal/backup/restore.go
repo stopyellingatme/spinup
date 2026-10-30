@@ -178,22 +178,17 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		}
 	}()
 	fmt.Fprintln(out, "Stopping "+restoreServiceText(s, rel)+" of both colors")
-	stopServices := restoreServices(s, rel)
-	// Preserve the legacy discovery of an optional web container.
-	if len(stopServices) == 1 {
-		stopServices = append(stopServices, "web")
-	}
+	// Select the containers by color project only. The worker and every sidecar of
+	// any deployed release stop, whatever the local spinup.toml declares.
 	for _, color := range []string{deploy.Blue, deploy.Green} {
-		for _, service := range stopServices {
-			result, runErr := s.Remote.Run(ctx, remote.Cmd{Argv: []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + s.App + "-" + color, "--filter", "label=com.docker.compose.service=" + service}})
-			if runErr != nil {
-				return restoreFailure("find "+color+" "+service, runErr)
-			}
-			if ids := strings.Fields(string(result.Stdout)); len(ids) > 0 {
-				stopping = true
-				if _, runErr = s.Remote.Run(ctx, remote.Cmd{Argv: append([]string{"docker", "stop"}, ids...)}); runErr != nil {
-					return restoreFailure("stop "+color+" "+service, runErr)
-				}
+		result, runErr := s.Remote.Run(ctx, remote.Cmd{Argv: []string{"docker", "ps", "-q", "--filter", "label=com.docker.compose.project=" + s.App + "-" + color}})
+		if runErr != nil {
+			return restoreFailure("find the "+color+" containers", runErr)
+		}
+		if ids := strings.Fields(string(result.Stdout)); len(ids) > 0 {
+			stopping = true
+			if _, runErr = s.Remote.Run(ctx, remote.Cmd{Argv: append([]string{"docker", "stop"}, ids...)}); runErr != nil {
+				return restoreFailure("stop the "+color+" containers", runErr)
 			}
 		}
 	}
@@ -207,7 +202,7 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 	}
 	dir := "/opt/" + s.App + "/releases/" + rel.Release
 	fmt.Fprintln(out, "Running migrate with the live release")
-	args := deploy.ComposeArgv(s.App+"-migrate", dir, []string{dir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")
+	args := deploy.ComposeArgv(s.App+"-migrate", dir, releaseFiles(dir, rel), "--profile", "migrate", "run", "--rm", "-T", "migrate")
 	if _, err = s.Remote.Run(ctx, remote.Cmd{Argv: args, Stdout: errOut, Stderr: errOut}); err != nil {
 		return restoreFailure("migrate the restored database", err)
 	}

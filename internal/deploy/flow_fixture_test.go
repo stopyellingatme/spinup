@@ -261,7 +261,12 @@ func (x *fx) expectEdge(live, caddy string) {
 }
 
 func (x *fx) expectMigrate() {
-	x.ok(ComposeArgv("todo-migrate", testRelDir, []string{testRelDir + "/compose.yml"}, "--profile", "migrate", "run", "--rm", "-T", "migrate")...)
+	// migrate runs with the files of the release, so it gets SERVICE_<NAME>_URL.
+	files := []string{testRelDir + "/compose.yml"}
+	if x.svc {
+		files = append(files, testRelDir+"/"+ServicesComposeFile)
+	}
+	x.ok(ComposeArgv("todo-migrate", testRelDir, files, "--profile", "migrate", "run", "--rm", "-T", "migrate")...)
 }
 
 func (x *fx) colorArgv(color string, args ...string) []string {

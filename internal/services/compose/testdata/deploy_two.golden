@@ -65,3 +65,7 @@ services:
     environment:
       SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
       SERVICE_TTS_URL: "http://tts-${SPINUP_COLOR}:9000"
+  migrate:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
+      SERVICE_TTS_URL: "http://tts-${SPINUP_COLOR}:9000"

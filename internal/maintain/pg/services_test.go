@@ -1,13 +1,11 @@
 package pg
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stopyellingatme/spinup/internal/deploy"
-	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
@@ -34,6 +32,27 @@ func TestColorUsesReleaseFiles(t *testing.T) {
 	}
 }
 
+// TestStopColorsScriptStopsWholeProjects checks that the stop selects the
+// containers by color project only. A worker or a sidecar of the deployed
+// release stops even when the local spinup.toml does not declare it.
+func TestStopColorsScriptStopsWholeProjects(t *testing.T) {
+	t.Parallel()
+	script := stopColorsScript("demo")
+	want := ""
+	for _, color := range []string{"blue", "green"} {
+		want += "ids=$(" + shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=demo-"+color) + ")\n"
+		want += "if [ -n \"$ids\" ]; then docker stop $ids; fi\n"
+	}
+	if script != want {
+		t.Fatalf("script =\n%s\nwant\n%s", script, want)
+	}
+	if strings.Contains(script, "com.docker.compose.service=") {
+		t.Fatalf("the stop names services: %s", script)
+	}
+}
+
+// enableExtraServices gives the deployed release a sidecar and the local config
+// the jobs module. The flows must not depend on either for their service lists.
 func enableExtraServices(t *testing.T, u *upgrade) {
 	t.Helper()
 	u.cfg.Modules = append(u.cfg.Modules, "jobs")
@@ -41,14 +60,14 @@ func enableExtraServices(t *testing.T, u *upgrade) {
 	u.rel.Services = []deploy.ReleaseService{{Name: "ocr", Port: 8080, Health: "/healthz"}}
 }
 
+// expectedAppStart is the start of the live color: the whole project, with no
+// service names, and the Compose files of the release.
 func expectedAppStart(u *upgrade, extras bool) []string {
 	files := []string{u.dir + "/compose.yml"}
-	args := []string{"up", "-d", "--no-deps", "--wait", "api"}
 	if extras {
 		files = append(files, u.dir+"/compose.services.yml")
-		args = append(args, "worker", "ocr")
 	}
-	return deploy.ComposeArgv("demo-blue", u.dir, files, args...)
+	return deploy.ComposeArgv("demo-blue", u.dir, files, "up", "-d", "--no-deps", "--wait")
 }
 
 func assertExtraServiceCommands(t *testing.T, u *upgrade, f *remote.Fake) {
@@ -68,50 +87,11 @@ func assertExtraServiceCommands(t *testing.T, u *upgrade, f *remote.Fake) {
 			if !strings.Contains(string(upload.Data), shell(want...)+"\n") {
 				t.Fatalf("recovery lacks exact start argv: %s", upload.Data)
 			}
-			for _, color := range []string{"blue", "green"} {
-				for _, service := range []string{"api", "worker", "ocr"} {
-					query := shell("docker", "ps", "-q", "--filter", "label=com.docker.compose.project=demo-"+color, "--filter", "label=com.docker.compose.service="+service)
-					if !strings.Contains(string(upload.Data), query) {
-						t.Fatalf("recovery lacks %s", query)
-					}
-				}
+			if !strings.Contains(string(upload.Data), stopColorsScript("demo")) {
+				t.Fatalf("recovery lacks the stop of both color projects: %s", upload.Data)
 			}
 			return
 		}
 	}
 	t.Fatal("missing rollback script")
-}
-
-func TestAppServicesKeepsWebSmokeSelection(t *testing.T) {
-	t.Parallel()
-	for _, web := range []bool{false, true} {
-		name := "api only"
-		if web {
-			name = "web"
-		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			u, _, _ := fixture(t, true)
-			enableExtraServices(t, u)
-			lock := manifest.New()
-			lock.Packs = []string{"base", "api"}
-			if web {
-				lock.Packs = append(lock.Packs, "web")
-			}
-			if err := lock.Save(filepath.Join(u.root, "spinup.lock")); err != nil {
-				t.Fatal(err)
-			}
-			want := []string{"api"}
-			if web {
-				want = append(want, "web")
-			}
-			if got := u.services(); !slices.Equal(got, want) {
-				t.Fatalf("smoke services = %v", got)
-			}
-			want = append(want, "worker", "ocr")
-			if got := u.appServices(); !slices.Equal(got, want) {
-				t.Fatalf("app services = %v, want %v", got, want)
-			}
-		})
-	}
 }

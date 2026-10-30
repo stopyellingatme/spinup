@@ -20,8 +20,18 @@ services:
       OTEL_SERVICE_NAME: "todo-ocr"
       OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=${SPINUP_COLOR}"
     volumes:
-      - /opt/todo/secrets/OCR_LICENSE_KEY:/run/secrets/OCR_LICENSE_KEY:ro
-      - /opt/todo/secrets/OCR_SALT:/run/secrets/OCR_SALT:ro
+      - type: bind
+        source: /opt/todo/secrets/OCR_LICENSE_KEY
+        target: /run/secrets/OCR_LICENSE_KEY
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/todo/secrets/OCR_SALT
+        target: /run/secrets/OCR_SALT
+        read_only: true
+        bind:
+          create_host_path: false
     networks:
       app:
         aliases:
@@ -55,5 +65,8 @@ services:
     environment:
       SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
   worker:
+    environment:
+      SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
+  migrate:
     environment:
       SERVICE_OCR_URL: "http://ocr-${SPINUP_COLOR}:8080"
