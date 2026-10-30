@@ -14,6 +14,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/gen/run"
+	_ "github.com/stopyellingatme/spinup/internal/gen/serviceclient"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 )
 
@@ -35,7 +36,7 @@ func TestGeneratorPlan(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(out.Plan.Files) != 0 || !reflect.DeepEqual(out.PostSteps, []gen.PostStep{gen.PostOpenAPI}) || out.Next[0] != "cd api && go build ./..." || len(out.Next) > 2 {
+			if len(out.Plan.Files) != 0 || !reflect.DeepEqual(out.PostSteps, []gen.PostStep{gen.PostOpenAPI, gen.PostServiceClients}) || out.Next[0] != "cd api && go build ./..." || len(out.Next) > 2 {
 				t.Fatalf("plan: %+v", out)
 			}
 			if len(out.Next) != 1 {
@@ -68,6 +69,7 @@ func TestPostStep(t *testing.T) {
 			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
 				t.Fatal(err)
 			}
+			put(t, root, "spinup.toml", "[app]\nname = \"todo\"\nmodule = \"example.com/todo\"\n")
 			put(t, root, "api/openapi/openapi.yaml", rootSpec)
 			if tc.paths {
 				put(t, root, "api/openapi/paths/todos.yaml", "/api/todos: {}")

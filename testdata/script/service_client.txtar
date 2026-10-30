@@ -1,0 +1,35 @@
+# Generate a typed service client in an API-only application.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+mkdir services
+mkdir services/ocr
+cp ../ocr-openapi.yaml services/ocr/openapi.yaml
+exec sh -c 'cat ../services.toml >> spinup.toml'
+exec spinup g client
+exists api/internal/services/ocr/oapi-codegen.yaml api/internal/services/ocr/client.gen.go api/internal/services/ocr/ocr.go
+grep 'SERVICE_OCR_URL' api/internal/services/ocr/ocr.go
+cd api
+exec go build ./...
+
+-- ocr-openapi.yaml --
+openapi: 3.0.3
+info:
+  title: OCR
+  version: 1.0.0
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      responses:
+        '200':
+          description: OK
+
+-- services.toml --
+
+[[services]]
+name = "ocr"
+port = 8080
+dev_port = 8101
+health = "/healthz"
+openapi = "openapi.yaml"

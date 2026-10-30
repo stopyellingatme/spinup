@@ -25,7 +25,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate client: expected no positional arguments\nTry: spinup g client")
 	}
-	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI, gen.PostClient}, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
+	return &gen.Output{PostSteps: []gen.PostStep{gen.PostOpenAPI, gen.PostClient, gen.PostServiceClients}, Next: []string{"cd web && " + webtool.FromLock(in.Lock).Run("check").String()}}, nil
 }
 
 func postStep(ctx context.Context, root string, _ []string, r exec.Runner) error {
