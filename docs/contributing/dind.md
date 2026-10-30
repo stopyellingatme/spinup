@@ -43,6 +43,8 @@ Then it tests the commands:
 
 Step 7 builds a small Go service from `testdata/dind/fixtures/service/` on the pinned images. It declares the secret `ECHO_TOKEN`.
 
+The app of the suite has the jobs module. After each deploy and rollback of step 7, the suite checks the jobs worker. Only the live color runs the worker. The worker has `SERVICE_ECHO_URL` and runs the image of the release. The worker does not restart during a short wait. The worker follows the color switch and the rollback.
+
 Step 8 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
 
 1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.

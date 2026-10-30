@@ -279,8 +279,8 @@ env_of() { docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1"; }
 running() {
   state=$(docker inspect -f '{{.State.Status}} {{.State.Restarting}} {{.RestartCount}}' "$1")
   [ "$state" = "running false 0" ] || bad "$1 state is '$state'"
-  health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1")
-  [ -z "$health" ] || [ "$health" = healthy ] || bad "$1 is $health"
+  hstat=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1")
+  [ -z "$hstat" ] || [ "$hstat" = healthy ] || bad "$1 is $hstat"
 }
 for spec in "$@"; do
   name=${spec%%:*}
