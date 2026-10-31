@@ -20,3 +20,15 @@ Set `PORT` to change the port.
 Run `service healthcheck` to test readiness inside the container.
 
 Keep the package name `service` to preserve the lockfile and the Docker build.
+
+## Tracing
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to the collector endpoint to export traces over OTLP HTTP.
+If the variable is unset or empty, the service writes JSON logs and exports no traces.
+Set `OTEL_SERVICE_NAME` to change the service name from `todo-ocr`.
+Set `OTEL_RESOURCE_ATTRIBUTES` to add resource attributes, such as `deployment.environment.name=production`.
+The dev and deploy Compose files provide these variables when monitoring is enabled.
+
+API requests continue the trace from a W3C `traceparent` header.
+`GET /healthz` creates no span.
+The service flushes traces during graceful shutdown.
