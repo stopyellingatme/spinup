@@ -122,6 +122,11 @@ func TestScripts(t *testing.T) {
 			for key, value := range nodeCaches() {
 				env.Setenv(key, value)
 			}
+			cacheDir, err := seedPnpmCache(env.Getenv("SPINUP_PNPM_HOME"), env.WorkDir)
+			if err != nil {
+				return err
+			}
+			env.Setenv("npm_config_cache_dir", cacheDir)
 			for _, key := range []string{"GOTOOLCHAIN", "GOFLAGS", "GOPROXY", "PATH", "DATABASE_URL", "CI"} {
 				if value, ok := os.LookupEnv(key); ok {
 					env.Setenv(key, value)
@@ -214,10 +219,8 @@ func nodeCaches() map[string]string {
 	// Scripts install offline from this pnpm store. CI sets SPINUP_PNPM_STORE (or
 	// npm_config_store_dir) to the store that scripts/ci/warm-cache.sh filled.
 	// Without them, use the default store of pnpm on this platform.
-	for _, key := range []string{"npm_config_store_dir", "npm_config_cache_dir"} {
-		if value := os.Getenv(key); value != "" {
-			caches[key] = value
-		}
+	if value := os.Getenv("npm_config_store_dir"); value != "" {
+		caches["npm_config_store_dir"] = value
 	}
 	switch {
 	case os.Getenv("SPINUP_PNPM_STORE") != "":
