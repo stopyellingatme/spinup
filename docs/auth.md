@@ -24,6 +24,7 @@ register
 $ ls api/db/migrations
 00001_init.sql
 00002_create_auth.sql
+00005_users_role.sql
 embed.go
 ```
 
@@ -344,6 +345,7 @@ $ ls api/db/migrations
 00001_init.sql
 00002_create_auth.sql
 00004_oidc_identities.sql
+00005_users_role.sql
 embed.go
 $ grep OidcButtons web/src/routes/login/+page.svelte
 	import OidcButtons from '#lib/components/OidcButtons.svelte';

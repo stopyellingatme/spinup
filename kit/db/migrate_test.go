@@ -3,6 +3,8 @@ package db_test
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -284,6 +286,57 @@ DROP TABLE settings;
 			}
 			if lock != tt.wantLock || stmt != tt.wantStatement {
 				t.Errorf("lock_timeout=%q statement_timeout=%q, want %q and %q", lock, stmt, tt.wantLock, tt.wantStatement)
+			}
+		})
+	}
+}
+
+func TestMigratorOutOfOrder(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("DATABASE_URL") == "" {
+		t.Skip("DATABASE_URL is not set")
+	}
+	for _, missing := range []int{4, 5} {
+		t.Run(fmt.Sprintf("pending version %d", missing), func(t *testing.T) {
+			t.Parallel()
+			pool := testkit.DB(t) // Skips without DATABASE_URL.
+			url := testkit.URL(t, pool)
+			fsys := fstest.MapFS{}
+			for version := 1; version <= 5; version++ {
+				if version == missing {
+					continue
+				}
+				name := fmt.Sprintf("%05d_step.sql", version)
+				fsys[name] = &fstest.MapFile{Data: []byte(fmt.Sprintf("-- +goose Up\nCREATE TABLE step%d (id int);\n-- +goose Down\nDROP TABLE step%d;\n", version, version))}
+			}
+			runCmd(t, url, fsys, "up")
+			name := fmt.Sprintf("%05d_step.sql", missing)
+			fsys[name] = &fstest.MapFile{Data: []byte(fmt.Sprintf("-- +goose Up\nCREATE TABLE step%d (id int);\n-- +goose Down\nDROP TABLE step%d;\n", missing, missing))}
+			if got := runCmd(t, url, fsys, "up"); got != "migrate: 1 pending\napplied  "+name+"\n" {
+				t.Fatalf("Up output = %q", got)
+			}
+			m, err := db.NewMigrator(url, fsys, db.WithOutput(&bytes.Buffer{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = m.Close() }()
+			statuses, err := m.Status(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(statuses) != 5 {
+				t.Fatalf("Status = %+v", statuses)
+			}
+			for _, status := range statuses {
+				if !status.Applied {
+					t.Errorf("migration %s remains pending", status.Name)
+				}
+			}
+			if version, err := m.Version(t.Context()); err != nil || version != 5 {
+				t.Fatalf("Version = %d, %v, want 5", version, err)
+			}
+			if got := runCmd(t, url, fsys, "up"); got != "migrate: no pending migrations\n" {
+				t.Fatalf("second Up = %q", got)
 			}
 		})
 	}

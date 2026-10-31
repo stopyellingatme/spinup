@@ -51,12 +51,15 @@ type User struct {
 	ID int64 `json:"id"`
 	// Email is the normalized (trimmed, lower-case) email address.
 	Email string `json:"email"`
+	// Role is the role of this account.
+	Role string `json:"role"`
 }
 
 // Option configures an Auth.
 type Option func(*options)
 
 type options struct {
+	roles       Roles
 	secure      bool
 	lifetime    time.Duration
 	idleTimeout time.Duration
@@ -125,6 +128,7 @@ func WithTrustedOrigins(origins ...string) Option {
 // Auth registers and authenticates users and owns their sessions.
 // Construct it with New. It is safe for concurrent use.
 type Auth struct {
+	roles     Roles
 	pool      *pgxpool.Pool
 	sessions  *scs.SessionManager
 	csrf      *http.CrossOriginProtection
@@ -156,11 +160,14 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	// GOMAXPROCS: with more, the goroutines that hold pool connections wait for
 	// CPU, and every request that needs the database queues behind them.
 	slots := max(1, runtime.GOMAXPROCS(0)/10)
-	o := options{secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
+	o := options{roles: DefaultRoles(), secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
 		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait,
 		lookup: os.LookupEnv, sweep: logSweepInterval}
 	for _, opt := range opts {
 		opt(&o)
+	}
+	if err := o.roles.Validate(); err != nil {
+		return nil, err
 	}
 	settings, err := loadRateSettings(o.lookup)
 	if err != nil {
@@ -195,6 +202,7 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		o.logger = slog.Default()
 	}
 	a := &Auth{
+		roles:     o.roles,
 		pool:      pool,
 		logger:    o.logger,
 		params:    o.params,
