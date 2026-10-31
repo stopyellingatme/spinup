@@ -1,6 +1,6 @@
 # ADR 0024: Roles guard
 
-Status: proposed
+Status: accepted
 Date: 2026-10-31
 Extends: ADR 0015 section 1 (resource ownership)
 
