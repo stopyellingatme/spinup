@@ -1,6 +1,12 @@
 {
   "schema": 1,
   "version": "0.1.0",
-  "steps": [],
+  "steps": [
+    {
+      "id": "auth-roles-schema",
+      "desc": "Run spinup db migrate before you start the new binary. The auth queries need the role column. Try: run spinup db migrate up.",
+      "kind": "manual"
+    }
+  ],
   "behaviors": []
 }

@@ -1,0 +1,55 @@
+# Simulate an app whose lock predates the two new auth files.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.0.1
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --module example.com/demo --modules ci,auth --non-interactive
+cd demo
+exec go run ../oldlock.go spinup.lock
+rm api/db/migrations/00005_users_role.sql api/internal/roles/roles.gen.go
+cp ../widgets.sql api/db/migrations/00005_widgets.sql
+exec sh -c 'cat ../auth.toml >> spinup.toml'
+exec git add -A
+exec git commit -q -m 'existing app with custom auth and migration'
+
+# A custom table does not change the default file that the upgrade creates.
+exec spinup upgrade --yes --no-verify --offline
+stdout 'Warning: migration version 5 is also used by 00005_widgets.sql'
+stdout 'Try: rename your migration to the next free number, then run spinup upgrade again\.'
+stdout 'Try: run spinup g roles after the upgrade\.'
+exists .spinup/upgrade/0.0.1/api/db/migrations/00005_users_role.sql
+exists .spinup/upgrade/0.0.1/api/db/migrations/00005_widgets.sql
+grep 'Manager = "manager"' .spinup/upgrade/0.0.1/api/internal/roles/roles.gen.go
+grep 'roles = \["owner", "cook"\]' .spinup/upgrade/0.0.1/spinup.toml
+
+-- auth.toml --
+
+[auth]
+roles = ["owner", "cook"]
+admin_role = "owner"
+default_role = "cook"
+-- widgets.sql --
+-- +goose Up
+CREATE TABLE widgets (id bigint);
+-- +goose Down
+DROP TABLE widgets;
+-- oldlock.go --
+package main
+
+import (
+ "encoding/json"
+ "os"
+)
+
+func main() {
+ path := os.Args[1]
+ data, err := os.ReadFile(path)
+ if err != nil { panic(err) }
+ var lock map[string]any
+ if err := json.Unmarshal(data, &lock); err != nil { panic(err) }
+ files := lock["files"].(map[string]any)
+ delete(files, "api/db/migrations/00005_users_role.sql")
+ delete(files, "api/internal/roles/roles.gen.go")
+ data, err = json.MarshalIndent(lock, "", "  ")
+ if err != nil { panic(err) }
+ if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil { panic(err) }
+}

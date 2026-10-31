@@ -1,0 +1,39 @@
+# Keep the database checks conditional. The static checks build the generated API offline.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --module example.com/demo --modules ci,auth --no-git --non-interactive
+cd demo
+cp $SPINUP_REPO/testdata/corpus/roles/old/api/db/migrations/00004_existing_users.sql api/db/migrations/00004_existing_users.sql
+cp api/db/migrations/00005_users_role.sql $WORK/role.sql
+rm api/db/migrations/00005_users_role.sql
+cp $SPINUP_REPO/testdata/corpus/roles/check/session_test.go api/upgrade_roles_test.go
+
+# The old app has users and an applied 00004. Upgrade adds the role migration.
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00004_existing_users\.sql'
+cp $WORK/role.sql api/db/migrations/00005_users_role.sql
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00005_users_role\.sql'
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^applied  00004_existing_users\.sql$'
+[env:DATABASE_URL] stdout '^applied  00005_users_role\.sql$'
+cd api
+exec go test -run '^$' ./...
+[env:DATABASE_URL] exec go test -count=1 -run TestUpgradedUsersDefaultRole .
+cd ..
+
+# Reset the schema. Apply 00005 before an app introduces a pending 00004.
+[env:DATABASE_URL] exec spinup db to 0 --i-know
+rm api/db/migrations/00004_existing_users.sql
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00005_users_role\.sql'
+cp $SPINUP_REPO/testdata/corpus/roles/old/api/db/migrations/00004_existing_users.sql api/db/migrations/00004_existing_users.sql
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'applied  00004_existing_users\.sql'
+[env:DATABASE_URL] ! stdout 'applied  00005_users_role\.sql'
+[env:DATABASE_URL] exec spinup db status
+[env:DATABASE_URL] stdout '^applied  00004_existing_users\.sql$'
+[env:DATABASE_URL] stdout '^applied  00005_users_role\.sql$'
+[env:DATABASE_URL] exec spinup db migrate up
+[env:DATABASE_URL] stdout 'migrate: no pending migrations'
+cd api
+[env:DATABASE_URL] exec go test -count=1 -run TestUpgradedUsersDefaultRole .
