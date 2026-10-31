@@ -20,4 +20,11 @@ If you change its port, change the Dockerfile command and `PORT` together.
 `POST /v1/sum` accepts `{"values": [1, 2.5]}` and returns `{"sum": 3.5}`.
 Run `python -m service.healthcheck` to test readiness inside the container.
 
+## Tracing
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to export traces with OTLP over HTTP.
+The service reads `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` through the OpenTelemetry SDK.
+The FastAPI instrumentation accepts the incoming W3C `traceparent` header.
+It does not trace `GET /healthz`.
+
 Keep the project name `service` to preserve the lockfile.
