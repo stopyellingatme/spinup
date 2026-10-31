@@ -11,6 +11,7 @@ import (
 
 	"example.com/todo/api/db/migrations"
 	mailapp "example.com/todo/api/internal/mail"
+	"example.com/todo/api/internal/roles"
 	"example.com/todo/api/internal/routes"
 	"example.com/todo/api/openapi"
 	"github.com/stopyellingatme/spinup/kit/app"
@@ -62,7 +63,12 @@ func run() (err error) {
 	if err := config.Load(&web); err != nil {
 		return err
 	}
-	authn, err := auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))
+	authn, err := auth.New(pool,
+		auth.WithRoles(roles.Set),
+		auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
+		auth.WithSecureCookie(cfg.Env != "dev"),
+		auth.WithTrustedOrigins(web.PublicOrigin),
+	)
 	if err != nil {
 		return err
 	}
@@ -78,6 +84,7 @@ func run() (err error) {
 		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 		app.WithMiddleware(authn.Middleware()),
 		app.WithRoutes(authn.Routes),
+		app.WithCommand("user", auth.UserCommand(authn)),
 		app.WithRoutes(resetRoutes),
 		app.WithCommand("mail-worker", mailers.WorkerCommand(pool)),
 		app.WithReadiness("db", pool.Ping),
