@@ -290,3 +290,65 @@ func TestBunDev(t *testing.T) {
 		t.Fatal("bun dev did not start")
 	}
 }
+
+func TestRunInstallsMissingWebDependencies(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		web         bool
+		manager     string
+		embed       bool
+		nodeModules bool
+		want        exec.Cmd
+	}{
+		{name: "pnpm", web: true, want: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "install", "--frozen-lockfile"}}},
+		{name: "bun", web: true, manager: "bun", want: exec.Cmd{Name: "bun", Args: []string{"install", "--frozen-lockfile"}}},
+		{name: "present dependencies", web: true, nodeModules: true},
+		{name: "API only"},
+		{name: "embed", web: true, embed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := devProject(t, tc.web)
+			lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.manager != "" {
+				lock.Answers["package_manager"] = tc.manager
+			}
+			if tc.embed {
+				lock.Answers["frontend_mode"] = "embed"
+			}
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			if tc.nodeModules {
+				if err := os.MkdirAll(filepath.Join(root, "web", "node_modules"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			fake := &stackFake{cancel: cancel, stopAt: 1}
+			if err := Run(ctx, Options{Dir: root, NoInfra: true, Starter: fake, PortAllocator: func(port int) (int, error) { return port, nil }}, fake); err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, command := range fake.commands {
+				if command.Name == tc.want.Name && reflect.DeepEqual(command.Args, tc.want.Args) {
+					found = true
+					if tc.want.Name == "pnpm" && command.Dir != root {
+						t.Fatalf("pnpm install directory = %q, want %q", command.Dir, root)
+					}
+					if tc.want.Name == "bun" && command.Dir != filepath.Join(root, "web") {
+						t.Fatalf("bun install directory = %q, want web", command.Dir)
+					}
+				}
+			}
+			if found != (tc.want.Name != "") {
+				t.Fatalf("install found=%v, want=%v: %#v", found, tc.want.Name != "", fake.commands)
+			}
+		})
+	}
+}
