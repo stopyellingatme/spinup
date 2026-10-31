@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/cloud/digitalocean"
 	"github.com/stopyellingatme/spinup/internal/deploy"
+	runexec "github.com/stopyellingatme/spinup/internal/exec"
 )
 
 func TestSuggestAlternatives(t *testing.T) {
@@ -71,6 +74,130 @@ func TestPreflightScaffoldsNewEnvironment(t *testing.T) {
 	if !strings.Contains(strings.Join(r.ownFiles(), ","), "deploy/environments/preview.toml") {
 		t.Errorf("own files = %v", r.ownFiles())
 	}
+}
+
+func TestPreflightPlanLoadsNewEnvironmentWithoutWriting(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	staging := filepath.Join(root, "deploy", "environments", "staging.toml")
+	if err := os.MkdirAll(filepath.Dir(staging), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staging, []byte("smoke_urls = [\"/healthz\"]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := &bytes.Buffer{}
+	r := &run{base: base{root: root, env: "preview", o: Options{Plan: true, Out: out}}}
+	if err := r.loadEnvironmentFile(); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := r.envFile.SmokeURLs, []string{"/healthz"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("environment settings = %v, want %v", got, want)
+	}
+	if !r.scaffoldedEnv {
+		t.Error("plan did not mark the environment as scaffolded")
+	}
+	path := filepath.Join(root, "deploy", "environments", "preview.toml")
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("preview environment exists after plan: %v", err)
+	}
+	if !strings.Contains(out.String(), "Would create deploy/environments/preview.toml from staging") {
+		t.Errorf("output = %q", out.String())
+	}
+}
+
+func TestCheckCleanRecognizesScaffoldedEnvironment(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name         string
+		status       string
+		envData      string
+		untracked    bool
+		wantClean    bool
+		wantScaffold bool
+	}{
+		{
+			name:         "untracked staging copy",
+			status:       "?? deploy/environments/preview.toml\n",
+			envData:      "smoke_urls = [\"/healthz\"]\n",
+			untracked:    true,
+			wantClean:    true,
+			wantScaffold: true,
+		},
+		{
+			name:      "tracked staging copy",
+			status:    " M deploy/environments/preview.toml\n",
+			envData:   "smoke_urls = [\"/healthz\"]\n",
+			wantClean: false,
+		},
+		{
+			name:      "untracked changed copy",
+			status:    "?? deploy/environments/preview.toml\n",
+			envData:   "smoke_urls = [\"/readyz\"]\n",
+			untracked: true,
+			wantClean: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := t.TempDir()
+			dir := filepath.Join(root, "deploy", "environments")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			staging := []byte("smoke_urls = [\"/healthz\"]\n")
+			if err := os.WriteFile(filepath.Join(dir, "staging.toml"), staging, 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "preview.toml"), []byte(tt.envData), 0644); err != nil {
+				t.Fatal(err)
+			}
+			fake := &execFake{porcelain: tt.status}
+			var runner runexec.Runner = fake
+			if tt.untracked {
+				runner = retryScaffoldExec{execFake: fake}
+			}
+			r := newRun(Options{Out: &bytes.Buffer{}}, Deps{Exec: runner})
+			r.root, r.env = root, "preview"
+
+			if err := r.loadEnvironmentFile(); err != nil {
+				t.Fatal(err)
+			}
+			err := r.checkClean(context.Background())
+			if (err == nil) != tt.wantClean {
+				t.Fatalf("checkClean() = %v, want clean = %v", err, tt.wantClean)
+			}
+			if r.scaffoldedEnv != tt.wantScaffold {
+				t.Errorf("scaffolded environment = %v, want %v", r.scaffoldedEnv, tt.wantScaffold)
+			}
+			if !tt.wantClean {
+				return
+			}
+			if _, err := r.commitFiles(context.Background()); err != nil {
+				t.Fatalf("commitFiles() = %v", err)
+			}
+			adds := fake.gitCalls("add")
+			if len(adds) != 1 || !strings.Contains(strings.Join(adds[0], " "), "deploy/environments/preview.toml") {
+				t.Fatalf("git add calls = %v, want the scaffolded environment file", adds)
+			}
+		})
+	}
+}
+
+type retryScaffoldExec struct {
+	*execFake
+}
+
+func (e retryScaffoldExec) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
+	if c.Name == "git" && len(c.Args) > 0 && c.Args[0] == "ls-files" {
+		_, _ = e.execFake.Run(ctx, c)
+		return runexec.Result{ExitCode: 1}, &runexec.ExitError{Cmd: c.String(), Code: 1}
+	}
+	return e.execFake.Run(ctx, c)
 }
 
 func TestCheckSizeExplainsUnavailableChoices(t *testing.T) {

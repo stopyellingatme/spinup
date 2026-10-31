@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -110,14 +111,20 @@ func (r *run) preflight(ctx context.Context) error {
 func (r *run) loadEnvironmentFile() error {
 	envFile, err := deploy.LoadEnvFile(r.root, r.env)
 	if errors.Is(err, fs.ErrNotExist) {
-		created, scaffoldErr := deploy.ScaffoldEnvFile(r.root, r.env)
-		if scaffoldErr != nil {
-			return failWrap("create the environment settings", scaffoldErr, "create deploy/environments/"+r.env+".toml from deploy/environments/staging.toml")
-		}
-		if created {
+		if r.o.Plan && r.env != "production" && r.env != "staging" {
+			envFile, err = deploy.LoadEnvFile(r.root, "staging")
 			r.scaffoldedEnv = true
-			r.say("Created deploy/environments/%s.toml from staging", r.env)
-			envFile, err = deploy.LoadEnvFile(r.root, r.env)
+			r.say("Would create deploy/environments/%s.toml from staging", r.env)
+		} else {
+			created, scaffoldErr := deploy.ScaffoldEnvFile(r.root, r.env)
+			if scaffoldErr != nil {
+				return failWrap("create the environment settings", scaffoldErr, "create deploy/environments/"+r.env+".toml from deploy/environments/staging.toml")
+			}
+			if created {
+				r.scaffoldedEnv = true
+				r.say("Created deploy/environments/%s.toml from staging", r.env)
+				envFile, err = deploy.LoadEnvFile(r.root, r.env)
+			}
 		}
 	}
 	if err != nil {
@@ -177,14 +184,45 @@ func (r *run) checkClean(ctx context.Context) error {
 	if err != nil {
 		return failWrap("read the git status", err, "run the command inside a git repository")
 	}
-	own := r.ownFiles()
 	for _, line := range strings.Split(string(res.Stdout), "\n") {
 		if len(line) < 4 {
 			continue
 		}
-		if !slices.Contains(own, strings.TrimSpace(line[3:])) {
+		path := strings.TrimSpace(line[3:])
+		if err := r.recognizeScaffoldedEnvironment(ctx, line, path); err != nil {
+			return err
+		}
+		if !slices.Contains(r.ownFiles(), path) {
 			return fail("provision with uncommitted changes", "the git tree is not clean", "commit or stash the changes, or pass --allow-dirty")
 		}
+	}
+	return nil
+}
+
+// recognizeScaffoldedEnvironment recognizes an untracked environment file from a failed provisioning run.
+func (r *run) recognizeScaffoldedEnvironment(ctx context.Context, status, name string) error {
+	want := "deploy/environments/" + r.env + ".toml"
+	if r.scaffoldedEnv || len(status) < 2 || status[:2] != "??" || name != want {
+		return nil
+	}
+	_, err := r.d.Exec.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"ls-files", "--error-unmatch", "--", want}, Dir: r.root})
+	if err == nil {
+		return nil
+	}
+	var exitErr *runexec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != 1 {
+		return failWrap("check whether the environment settings are tracked", err, "run git status, then retry")
+	}
+	envData, err := os.ReadFile(filepath.Join(r.root, filepath.FromSlash(want)))
+	if err != nil {
+		return failWrap("read the environment settings", err, "restore deploy/environments/"+r.env+".toml from staging.toml")
+	}
+	stagingData, err := os.ReadFile(filepath.Join(r.root, "deploy", "environments", "staging.toml"))
+	if err != nil {
+		return failWrap("read the staging environment settings", err, "restore deploy/environments/staging.toml")
+	}
+	if bytes.Equal(envData, stagingData) {
+		r.scaffoldedEnv = true
 	}
 	return nil
 }
