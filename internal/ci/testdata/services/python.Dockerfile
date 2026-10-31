@@ -3,4 +3,4 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02d
 WORKDIR /app
 COPY . .
 RUN uv sync --locked
-RUN uv run pytest
+RUN uv run python -m pytest

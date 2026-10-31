@@ -14,4 +14,4 @@ stdout '^\{"include":\[\{"name":"rs","lang":"rust"\},\{"name":"py","lang":"pytho
 exec spinup ci test-service rs --dry-run
 stdout 'RUN cargo test --locked'
 exec spinup ci test-service py --dry-run
-stdout 'uv run pytest'
+stdout 'uv run python -m pytest'

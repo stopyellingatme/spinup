@@ -107,7 +107,7 @@ func TestDockerfile(lang string, stack *stackversions.Stack) (string, error) {
 	case "rust":
 		return fmt.Sprintf("FROM %s\nWORKDIR /app\nCOPY . .\nRUN cargo test --locked\n", refs[0]), nil
 	case "python":
-		return fmt.Sprintf("FROM %s\nCOPY --from=%s /uv /bin/uv\nWORKDIR /app\nCOPY . .\nRUN uv sync --locked\nRUN uv run pytest\n", refs[0], refs[1]), nil
+		return fmt.Sprintf("FROM %s\nCOPY --from=%s /uv /bin/uv\nWORKDIR /app\nCOPY . .\nRUN uv sync --locked\nRUN uv run python -m pytest\n", refs[0], refs[1]), nil
 	default: // node
 		pnpm := stack.NPM["pnpm"]
 		if pnpm == "" {
