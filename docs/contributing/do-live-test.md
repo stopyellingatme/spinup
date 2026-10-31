@@ -45,6 +45,7 @@ It asks again before it destroys the environment.
 Set `SPINUP_BIN` to test a spinup binary that is not in `PATH`.
 Set `SPINUP_DO_DEPLOY_ARGS` for extra flags of the deploy runs.
 Set `SPINUP_DO_VERIFY_CMD` for your own check after the service step (see step 7 below).
+Set `SPINUP_DO_PUBLIC_COOKIE` to the session cookie for the checks of public routes with `auth = "session"`.
 
 ## What the script checks
 
@@ -60,8 +61,15 @@ Set `SPINUP_DO_VERIFY_CMD` for your own check after the service step (see step 7
    The private key is the `--ssh-key` public key without `.pub`. The default is `~/.ssh/id_ed25519`.
    If `spinup.toml` declares `[[services]]`, the live color must pass these checks for each service:
    - Each service container runs and is healthy, and the old color runs no such container.
-   - `GET <health>` answers through the `caddy` container. The services are not public.
+   - `GET <health>` answers through the `caddy` container.
    - The `api` container, and the `worker` container, have `SERVICE_<NAME>_URL`.
+
+   For each service with `public` in `spinup.toml`, the script requests `https://<host><public><health>`:
+   - With `auth = "none"`, the route must answer HTTP 200.
+   - With `auth = "session"`, a request with no cookie must answer HTTP 401.
+   - With `auth = "session"` and `SPINUP_DO_PUBLIC_COOKIE` set, a request with that cookie must answer HTTP 200.
+     The value is the full `Cookie` header of a signed-in session. The script never prints it.
+   - If no service is public, the script skips these checks.
 
    If the app has the `jobs` module, the `worker` container must run in the live color only.
    It must not restart during a wait of 10 seconds.

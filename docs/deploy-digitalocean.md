@@ -90,6 +90,11 @@ The default region is `nyc3`. Change it with `--region`.
 The default size for `production` is `s-2vcpu-4gb`. It costs about $24 each month.
 The default size for other environments is `s-1vcpu-2gb`.
 Change the size with `--size`.
+If the size or the region is not available, the error names up to three available sizes with their price for each month.
+It also names up to three regions that offer your size.
+The error ends in a `Try:` line, for example `pass --size s-2vcpu-4gb ($24.00/month)`.
+If the region slug does not exist, the error lists the available regions.
+If DigitalOcean answers HTTP 422 for a size, a region, or an image, the `Try:` line tells you to run `spinup deploy digital-ocean --plan`.
 spinup checks that the size has enough CPUs for `deploy/environments/<env>.toml` and at least 2 GiB of memory.
 Only Ubuntu images work. The default is `ubuntu-24-04-x64`.
 
@@ -121,9 +126,18 @@ It makes `POSTGRES_PASSWORD` and `DATABASE_URL`.
 It makes `GRAFANA_ADMIN_PASSWORD` when monitoring is on.
 spinup never replaces a value and never prints a value.
 
+## Other environments
+
+`production` and `staging` have a settings file in a new app.
+If you deploy another environment, for example `preview`, and `deploy/environments/preview.toml` does not exist, spinup creates it.
+It copies `deploy/environments/staging.toml` and prints `Created deploy/environments/preview.toml from staging`.
+It does not overwrite an existing file.
+The new file is not an uncommitted change for the clean-tree check.
+
 ## The commit
 
 The command commits `spinup.toml`, `.sops.yaml`, and `secrets/<env>.enc.yaml`.
+If the command made `deploy/environments/<env>.toml` in this run, it commits that file too.
 The message is "spinup: provision <env> on DigitalOcean".
 Pass `--no-commit` to stop before the deploy and commit the files yourself.
 
@@ -163,7 +177,7 @@ The database on the droplet is lost, so run `spinup backup` first.
 - **Another run works on the environment.** Only one `deploy digital-ocean` or `destroy` run can work on an environment at a time. The lock is `.spinup/provision-<env>.lock` in the project. Wait until the other run ends.
 - **cloud-init failed.** The command prints the errors and the line `Try: spinup deploy digital-ocean --recreate`. This deletes the droplet and creates a new one. If a release exists, add `--i-know`.
 - **Host key mismatch.** Someone replaced the droplet, or something else answers at the address. Check the droplet in the DigitalOcean console. Then run `--recreate` if you need a new droplet.
-- **HTTP 422 on create.** The droplet limit of the account is full. Delete a droplet or ask DigitalOcean to raise the limit.
+- **HTTP 422 on create.** If the message names the droplet limit, the limit of the account is full. Delete a droplet or ask DigitalOcean to raise the limit. If the message names a size, a region, or an image, run `spinup deploy digital-ocean --plan` and pass another `--size`, `--region`, or `--image`.
 - **HTTP 403.** The token lacks a scope. The message names the scope. Sign in again with `spinup deploy digital-ocean login`, or create a token with that scope.
 - **HTTP 401.** The token expired or DigitalOcean revoked it. Sign in again.
 - **Wrong team.** The token belongs to another team than the environment. Sign in to the team that owns the environment.

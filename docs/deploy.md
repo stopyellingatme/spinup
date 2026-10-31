@@ -43,6 +43,7 @@ staging.toml
 | `deploy/compose.edge.yml` | managed | The base project: `caddy` and `postgres`. |
 | `deploy/Caddyfile` | managed | The site, the security headers, compression, and the routes. |
 | `deploy/Caddyfile.d/` | seed | Your own site directives in `*.caddy` files. |
+| `Caddyfile.d/spinup-services.caddy` | generated | The public routes of the sidecar services. `spinup deploy` writes it into each release when a service has `public`. It is not a template file. |
 | `deploy/Dockerfile.postgres` | managed | The pinned Postgres image plus the pinned pgBackRest package. |
 | `deploy/postgres/postgresql.conf` | managed | The Postgres settings. |
 | `deploy/postgres/conf.d/` | seed | Your own Postgres settings in `*.conf` files. |
@@ -138,6 +139,36 @@ reverse_proxy {
 - `transport http { dial_timeout 250ms }` keeps a request to a stopped container short.
 - Do not set `fail_duration`. Docker gives the addresses of removed containers to new containers.
 - The global option `grace_period 10s` gives old requests 10 s to finish after a reload.
+
+The `upstream.caddy` file can take a block.
+A route can add subdirectives to `reverse_proxy` with `import upstream.caddy api 8080 { ... }`.
+The import with two arguments and no block expands as shown above.
+
+## Public service routes
+
+If a `[[services]]` table has `public = "/svc/<name>"`, the deploy writes the managed file `Caddyfile.d/spinup-services.caddy` into the release directory.
+The deploy copies it to `/opt/<app>/caddy/Caddyfile.d/` with the other Caddy files, and `caddy validate` checks it.
+An app with no public service gets no such file, and its release stays as before.
+If `deploy/Caddyfile.d/` holds a file with this name, the preflight fails.
+Rename your file.
+
+Each public service gets a `handle_path` route that imports `upstream.caddy` with the name and port of the service.
+The route follows the color switch and the rollback.
+A request to the bare prefix gets a 308 redirect to the prefix with a final `/`.
+This route, for `auth = "none"`, is the file content for a service named `ocr`:
+
+```
+redir /svc/ocr /svc/ocr/ 308
+handle_path /svc/ocr/* {
+	import ../upstream.caddy ocr 8081
+}
+```
+
+With `auth = "session"`, the route first sends `GET /api/session` to the API of the live color with the cookies of the request.
+A 2xx answer sends the request on to the service. Any other answer goes to the client unchanged.
+The route also answers 403 to a request that is not GET, HEAD, or OPTIONS when its `Origin` header is not `{scheme}://{host}`.
+Before the first switch, the route fails closed with the 503 placeholder.
+See [Sidecar services](services.md#public-routes) for the fields and the limits.
 
 The switch steps are in ADR 0003: start the new color with `up -d --wait`, check each replica, rename the new `upstream.caddy` into place, reload Caddy, drain the old color, and remove the old color with `down -t 15`.
 

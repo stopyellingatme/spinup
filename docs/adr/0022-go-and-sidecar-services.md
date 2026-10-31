@@ -136,6 +136,7 @@ Rules (`internal/services`, the contract package):
 - a secret that `secrets/<env>.enc.yaml` does not name
 
 **Out of scope for this version:** public routes through Caddy, OTel tracing inside the templates, more template languages, and per-service CI jobs. Each one is a later issue.
+ADR 0023 (`docs/adr/0023-services-follow-ups.md`) adds all four.
 
 ### 3. Work plan
 
