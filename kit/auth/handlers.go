@@ -30,7 +30,7 @@ type userResponse struct {
 
 // Routes registers the auth endpoints (ADR 0008 §3). They need Middleware.
 //
-//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 409, 422, 429, 503
+//	POST /api/auth/register  {"email","password"} -> 201 {"user"}, 403, 409, 422, 429, 503
 //	POST /api/auth/login     {"email","password"} -> 200 {"user"}, 401, 422, 429, 503
 //	POST /api/auth/logout                         -> 204
 //	GET  /api/session                             -> 200 {"user"}, 401
@@ -60,6 +60,10 @@ func (a *Auth) endpoint(h http.HandlerFunc) http.Handler {
 }
 
 func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
+	if a.registration == RegistrationClosed {
+		registrationClosed(w, r)
+		return
+	}
 	in, ok := decodeCredentials(w, r)
 	if !ok {
 		return
@@ -85,6 +89,10 @@ func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, created, err := a.createUser(r.Context(), email, hash)
+	if errors.Is(err, errRegistrationClosed) {
+		registrationClosed(w, r)
+		return
+	}
 	if err != nil {
 		a.internalError(w, r, "create a user", err)
 		return
