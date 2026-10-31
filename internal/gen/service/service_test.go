@@ -188,6 +188,8 @@ func TestErrors(t *testing.T) {
 		{name: "reserved", args: []string{"api", "--lang", "rust"}, want: "reserved"},
 		{name: "invalid", args: []string{"../ocr", "--lang", "rust"}, want: "must match"},
 		{name: "unsupported", args: []string{"ocr", "--lang", "go"}, want: "rust, python, or node"},
+		{name: "plugin validates public before resolving", args: []string{"ocr", "--lang", "missing/template", "--public", "svc/ocr"}, want: "must be a path"},
+		{name: "plugin validates auth before resolving", args: []string{"ocr", "--lang", "missing/template", "--public", "/svc/ocr", "--auth", "session"}, want: "needs the auth module"},
 		{name: "empty public", args: []string{"ocr", "--lang", "node", "--public="}, want: "--public requires"},
 		{name: "bad public", args: []string{"ocr", "--lang", "node", "--public", "svc/ocr"}, want: "must be a path"},
 		{name: "session needs auth", args: []string{"ocr", "--lang", "node", "--public", "/svc/ocr", "--auth", "session"}, want: "needs the auth module"},

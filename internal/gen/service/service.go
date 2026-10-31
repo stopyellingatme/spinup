@@ -79,27 +79,19 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 			return nil, fmt.Errorf("cannot generate service %q: spinup.toml already declares the name\nTry: choose another service name", name)
 		}
 	}
+	svc, noOpenAPI, err := serviceConfig(in, config, name)
+	if err != nil {
+		return nil, err
+	}
 	if pluginTemplate {
-		return planPlugin(ctx, in, src, config, name, pluginName, templateName)
-	}
-	port, _ := in.Flags.GetInt("port")
-	devPort, _ := in.Flags.GetInt("dev-port")
-	if !in.Flags.Changed("dev-port") {
-		devPort = nextDevPort(config.Services)
-	}
-	noOpenAPI, _ := in.Flags.GetBool("no-openapi")
-	svc := services.Service{Name: name, Port: port, DevPort: devPort, Health: "/healthz"}
-	if in.Flags.Changed("public") {
-		svc.Public, _ = in.Flags.GetString("public")
-		if svc.Public == "" {
-			return nil, fmt.Errorf("cannot generate service: --public requires a URL prefix\nTry: pass --public /svc/%s", name)
+		out, err := planPlugin(ctx, in, src, config, name, pluginName, templateName)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if in.Flags.Changed("auth") {
-		svc.Auth, _ = in.Flags.GetString("auth")
-	}
-	if !noOpenAPI {
-		svc.OpenAPI = "openapi.yaml"
+		if err := addPluginRouteConfig(out, src, svc); err != nil {
+			return nil, err
+		}
+		return out, nil
 	}
 	switch lang {
 	case "python":
@@ -109,17 +101,11 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	default:
 		svc.Healthcheck = []string{"/service", "healthcheck"}
 	}
-	if err := services.Validate(append(config.Services, svc), nil); err != nil {
-		return nil, err
-	}
-	if svc.AuthMode() == services.AuthSession && !slices.Contains(config.Modules, "auth") {
-		return nil, fmt.Errorf("cannot generate service: --auth session needs the auth module\nTry: add the auth module, or pass --auth none")
-	}
 	stack, err := stackversions.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load service versions: %w\nTry: report this as a spinup bug", err)
 	}
-	data := templateData{Name: name, App: config.App.Name, Port: port}
+	data := templateData{Name: name, App: config.App.Name, Port: svc.Port}
 	for _, image := range []struct {
 		name string
 		ref  *string
@@ -146,6 +132,57 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 		next = append([]string{"spinup g client"}, next...)
 	}
 	return &gen.Output{Plan: p, Edits: []string{project.ConfigFile}, Next: next}, nil
+}
+
+func addPluginRouteConfig(out *gen.Output, src []byte, route services.Service) error {
+	if !route.IsPublic() && route.Auth == "" {
+		return nil
+	}
+	for i := range out.Plan.Files {
+		file := &out.Plan.Files[i]
+		if file.Path != project.ConfigFile {
+			continue
+		}
+		config, err := project.Parse(file.Data)
+		if err != nil || len(config.Services) == 0 {
+			return fmt.Errorf("plan plugin service route: cannot read generated spinup.toml\nTry: report this as a spinup bug")
+		}
+		svc := config.Services[len(config.Services)-1]
+		svc.Public = route.Public
+		svc.Auth = route.Auth
+		file.Data = appendTable(src, svc)
+		return nil
+	}
+	return fmt.Errorf("plan plugin service route: generated spinup.toml is missing\nTry: report this as a spinup bug")
+}
+
+func serviceConfig(in gen.Input, config *project.Config, name string) (services.Service, bool, error) {
+	port, _ := in.Flags.GetInt("port")
+	devPort, _ := in.Flags.GetInt("dev-port")
+	if !in.Flags.Changed("dev-port") {
+		devPort = nextDevPort(config.Services)
+	}
+	noOpenAPI, _ := in.Flags.GetBool("no-openapi")
+	svc := services.Service{Name: name, Port: port, DevPort: devPort, Health: "/healthz"}
+	if in.Flags.Changed("public") {
+		svc.Public, _ = in.Flags.GetString("public")
+		if svc.Public == "" {
+			return services.Service{}, false, fmt.Errorf("cannot generate service: --public requires a URL prefix\nTry: pass --public /svc/%s", name)
+		}
+	}
+	if in.Flags.Changed("auth") {
+		svc.Auth, _ = in.Flags.GetString("auth")
+	}
+	if !noOpenAPI {
+		svc.OpenAPI = "openapi.yaml"
+	}
+	if err := services.Validate(append(config.Services, svc), nil); err != nil {
+		return services.Service{}, false, err
+	}
+	if svc.AuthMode() == services.AuthSession && !slices.Contains(config.Modules, "auth") {
+		return services.Service{}, false, fmt.Errorf("cannot generate service: --auth session needs the auth module\nTry: add the auth module, or pass --auth none")
+	}
+	return svc, noOpenAPI, nil
 }
 
 func nextDevPort(list []services.Service) int {

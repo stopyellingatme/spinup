@@ -4,7 +4,7 @@ exec spinup new todo --api-only --module example.com/todo --no-git --non-interac
 cd todo
 exec spinup plugin add path:$SPINUP_REPO/testdata/plugins/service-example --trust
 
-exec spinup g service ocr --lang service-example/go-http
+exec spinup g service ocr --lang service-example/go-http --public /svc/ocr --auth none
 exists services/ocr/Dockerfile services/ocr/main.go services/ocr/openapi.yaml
 ! exists services/ocr/service.toml
 grep '^EXPOSE 8080$' services/ocr/Dockerfile
@@ -13,6 +13,8 @@ grep '^name = "ocr"$' spinup.toml
 grep '^port = 8080$' spinup.toml
 grep '^dev_port = 8101$' spinup.toml
 grep '^health = "/ready"$' spinup.toml
+grep '^public = "/svc/ocr"$' spinup.toml
+grep '^auth = "none"$' spinup.toml
 grep '^healthcheck = \["/service", "healthcheck"\]$' spinup.toml
 grep 'plugin/service-example/@gen/service/go-http' spinup.lock
 
