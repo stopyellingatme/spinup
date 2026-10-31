@@ -82,9 +82,12 @@ report_packages() {
   local section=$1 kind=$2 base=$3 filter=$4 suffix=$5 name pinned latest same_major
   while IFS=$'\t' read -r name pinned; do
     # Disable curlrc and suppress registry diagnostics, which can contain credentials.
+    # The `|| exit 1` keeps the ERR trap quiet in bash 3.2 (macOS /bin/bash), which runs the trap
+    # inside a command substitution even when the substitution is an if condition.
     if ! latest=$(curl -q --fail --silent --location --connect-timeout 10 --max-time 30 \
       --user-agent spinup-bump-services --url "${base%/}/$name$suffix" 2>/dev/null |
-      jq -er "$filter | select(type == \"string\" and test(\"^[0-9][0-9A-Za-z.+-]*$\"))" 2>/dev/null); then
+      jq -er "$filter | select(type == \"string\" and test(\"^[0-9][0-9A-Za-z.+-]*$\"))" 2>/dev/null ||
+      exit 1); then
       latest=unknown
     fi
     same_major=no
