@@ -401,6 +401,38 @@ func TestPagesAuth(t *testing.T) {
 	}
 }
 
+func TestPagesRoles(t *testing.T) {
+	t.Parallel()
+	root := authApp(t)
+	spec, err := ParseSpec(root, goldenArgs, "resource")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec.Roles = []string{"manager", "staff"}
+	plan, _, err := planPages(t.Context(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guards := 0
+	for _, path := range todoPages {
+		if !strings.HasSuffix(path, ".server.ts") {
+			continue
+		}
+		file, _ := plan.Get(path)
+		data := string(file.Data)
+		if !strings.Contains(data, "import { requireRole } from '#lib/server/auth.js';") {
+			t.Errorf("%s does not import requireRole", path)
+		}
+		guards += strings.Count(data, "requireRole(locals, url, 'manager', 'staff');")
+		if strings.Contains(data, "requireUser(") {
+			t.Errorf("%s contains requireUser:\n%s", path, data)
+		}
+	}
+	if guards != 9 {
+		t.Errorf("found %d role guards, want 9", guards)
+	}
+}
+
 func TestPagePaths(t *testing.T) {
 	t.Parallel()
 	name, err := fields.ParseName("line_item")

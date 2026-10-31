@@ -19,6 +19,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/vfs"
 	"github.com/stopyellingatme/spinup/internal/webtool"
 )
@@ -30,6 +31,7 @@ func init() {
 		Usage: "<route>",
 		Flags: func(fs *pflag.FlagSet) {
 			fs.Bool("server", false, "also write +page.server.ts with a load function")
+			fs.String("role", "", "comma-separated roles that can use the server page")
 		},
 		Run: plan,
 	})
@@ -93,8 +95,22 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		return nil, err
 	}
 	server := false
+	roleValue := ""
+	roleSet := false
 	if in.Flags != nil {
 		server, _ = in.Flags.GetBool("server")
+		roleValue, _ = in.Flags.GetString("role")
+		roleSet = in.Flags.Changed("role")
+	}
+	roles, err := pageRoles(in.Root, roleValue, roleSet)
+	if err != nil {
+		return nil, err
+	}
+	if len(roles) > 0 && !server {
+		return nil, fmt.Errorf("cannot generate a role-guarded page without --server, because only a server load can guard a page\nTry: add --server")
+	}
+	if len(roles) > 0 && !slices.Contains(in.Lock.Packs, "auth") {
+		return nil, fmt.Errorf("cannot generate a role-guarded page because the auth module is missing\nTry: spinup add auth")
 	}
 	if server && in.Lock.Answers["frontend_mode"] == "embed" {
 		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")
@@ -108,7 +124,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server, header), Class: string(manifest.Scaffold)}}
 	if server {
 		auth := slices.Contains(in.Lock.Packs, "auth")
-		files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name, auth), Class: string(manifest.Scaffold)})
+		files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name, auth, roles), Class: string(manifest.Scaffold)})
 	}
 	var p vfs.Plan
 	for _, f := range files {
@@ -167,9 +183,17 @@ func pageSvelte(dir, name string, server, header bool) []byte {
 	return []byte(b.String())
 }
 
-func pageServerTS(name string, auth bool) []byte {
+func pageServerTS(name string, auth bool, roles []string) []byte {
 	imports, args, guard := "", "", ""
-	if auth {
+	if len(roles) > 0 {
+		imports = "import { requireRole } from '#lib/server/auth.js';\n"
+		args = "{ locals, url }"
+		quoted := make([]string, 0, len(roles))
+		for _, role := range roles {
+			quoted = append(quoted, fmt.Sprintf("'%s'", role))
+		}
+		guard = "\trequireRole(locals, url, " + strings.Join(quoted, ", ") + ");\n"
+	} else if auth {
 		imports = "import { requireUser } from '#lib/server/auth.js';\n"
 		args = "{ locals, url }"
 		guard = "\trequireUser(locals, url);\n"
@@ -184,4 +208,35 @@ export const load: PageServerLoad = (` + args + `) => {
 ` + guard + `	return { title: '` + name + `' };
 };
 `)
+}
+
+func pageRoles(root, value string, set bool) ([]string, error) {
+	if !set {
+		return nil, nil
+	}
+	config, err := project.Load(root)
+	if errors.Is(err, os.ErrNotExist) {
+		config = &project.Config{}
+	} else if err != nil {
+		return nil, fmt.Errorf("load %s: %w\nTry: fix %s", project.ConfigFile, err, project.ConfigFile)
+	}
+	declared := config.AuthRoles()
+	if err := declared.Validate(); err != nil {
+		return nil, err
+	}
+	var roles []string
+	for _, role := range strings.Split(value, ",") {
+		role = strings.TrimSpace(role)
+		if role == "" {
+			continue
+		}
+		if !slices.Contains(declared.Names, role) {
+			return nil, fmt.Errorf("cannot generate a role-guarded page because role %q is not declared\nTry: use one of: %s, or add the role to [auth] and run spinup g roles", role, strings.Join(declared.Names, ", "))
+		}
+		roles = append(roles, role)
+	}
+	if len(roles) == 0 {
+		return nil, fmt.Errorf("cannot generate a role-guarded page because the --role list is empty\nTry: pass --role manager")
+	}
+	return roles, nil
 }

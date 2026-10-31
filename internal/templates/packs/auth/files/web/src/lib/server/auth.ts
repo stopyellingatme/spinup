@@ -1,11 +1,18 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 // Form actions call the Go auth endpoints with this helper (kit auth, ADR 0008 §3).
-import { redirect, type Cookies } from '@sveltejs/kit';
+import { error, redirect, type Cookies } from '@sveltejs/kit';
 
 /** Require a signed-in user, or redirect to login with the current path and query. */
 export function requireUser(locals: App.Locals, url: URL): App.Locals['user'] {
 	if (!locals.user) redirect(303, '/login?redirectTo=' + encodeURIComponent(url.pathname + url.search));
 	return locals.user;
+}
+
+/** Require a signed-in user with a listed role, or show the access error. */
+export function requireRole(locals: App.Locals, url: URL, ...roles: string[]): App.Locals['user'] {
+	const user = requireUser(locals, url);
+	if (!roles.includes(user.role)) error(403, 'You do not have access to this page.');
+	return user;
 }
 
 /** Return a same-site path, or fallback. Validate raw and decoded paths like kit auth OIDC. */
