@@ -9,7 +9,8 @@ import (
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 )
 
-// commitFiles commits spinup.toml, .sops.yaml, and the secrets file (ADR 0017 §7 step 13).
+// commitFiles commits spinup.toml, .sops.yaml, the secrets file, and a scaffolded environment
+// settings file (ADR 0017 §7 step 13).
 // It returns true when the run may go on to the deploy.
 func (r *run) commitFiles(ctx context.Context) (bool, error) {
 	if r.o.NoCommit {
@@ -17,11 +18,20 @@ func (r *run) commitFiles(ctx context.Context) (bool, error) {
 			return true, nil
 		}
 		r.say("Stopped before the deploy, because of --no-commit.")
-		r.say("Commit spinup.toml, .sops.yaml, and secrets/%s.enc.yaml, then run: spinup deploy --env %s", r.env, r.env)
+		if r.scaffoldedEnv {
+			r.say("Commit spinup.toml, .sops.yaml, secrets/%s.enc.yaml, and deploy/environments/%s.toml, then run: spinup deploy --env %s", r.env, r.env, r.env)
+		} else {
+			r.say("Commit spinup.toml, .sops.yaml, and secrets/%s.enc.yaml, then run: spinup deploy --env %s", r.env, r.env)
+		}
 		return false, nil
 	}
+	candidates := []string{"spinup.toml", ".sops.yaml", "secrets/" + r.env + ".enc.yaml"}
+	if r.scaffoldedEnv {
+		// A new environment got its settings file from staging.toml in the preflight.
+		candidates = append(candidates, "deploy/environments/"+r.env+".toml")
+	}
 	var paths []string
-	for _, p := range []string{"spinup.toml", ".sops.yaml", "secrets/" + r.env + ".enc.yaml"} {
+	for _, p := range candidates {
 		if _, err := os.Stat(filepath.Join(r.root, filepath.FromSlash(p))); err == nil {
 			paths = append(paths, p)
 		}
