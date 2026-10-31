@@ -1,0 +1,48 @@
+name: Canary sidecar services
+
+on:
+  schedule:
+    - cron: '29 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Report sidecar updates
+        shell: bash
+        run: scripts/bump-services.sh report >> "$GITHUB_STEP_SUMMARY"
+
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+            testdata/golden/**/go.sum
+            testdata/golden/**/tools.sum
+            testdata/corpus/**/go.sum
+            testdata/corpus/**/tools.sum
+      - name: Prepare the test machine
+        uses: ./.github/actions/prepare-tests
+      - name: Refresh service lockfiles
+        shell: bash
+        run: scripts/bump-services.sh lock
+      - name: Build and test service templates
+        env:
+          SPINUP_APP_GATE: "1"
+        run: make script RUN=app_gate_services
