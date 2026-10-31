@@ -222,6 +222,24 @@ func TestRenderedOptions(t *testing.T) {
 	}
 }
 
+func TestBuiltinTemplatesRenderAllActions(t *testing.T) {
+	t.Parallel()
+	for _, lang := range []string{"rust", "python", "node"} {
+		t.Run(lang, func(t *testing.T) {
+			t.Parallel()
+			out, err := generator(t).Run(t.Context(), input(t, config, "scanner", "--lang", lang))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range out.Plan.Files {
+				if strings.Contains(string(file.Data), "{{") {
+					t.Errorf("generated file %s contains an unexpanded template action", file.Path)
+				}
+			}
+		})
+	}
+}
+
 func TestTemplateRustTelemetryRenders(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"ocr", "scanner"} {

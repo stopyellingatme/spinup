@@ -5,7 +5,7 @@ import { app } from "./app.ts";
 const port = Number.parseInt(process.env.PORT ?? "8080", 10);
 const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port });
 
-console.log(JSON.stringify({ app: "{{ .App }}", level: "info", port, service: "{{ .Name }}", message: "service started" }));
+console.log(JSON.stringify({ app: "todo", level: "info", port, service: "ocr", message: "service started" }));
 
 let closing = false;
 
