@@ -139,3 +139,25 @@ The runner runs them after it writes the files and before the post-steps.
 `--dry-run` and `--diff` print each command as `run <command> (in <directory>)` and run nothing.
 `--json` lists them in the `commands` field.
 If a command fails, the written files stay, and the error tells you how to run the command by hand.
+
+## Roles
+
+With `--role`, the page limits access to some roles of the app.
+The flag takes a comma list of names from the `[auth]` table of `spinup.toml`.
+It needs `--server`, because only a server `load` can guard a page.
+The `load` function and the actions call `requireRole`.
+A request without a user redirects to `/login`. A user with another role gets a 403 page.
+See [Accounts and sessions](../auth.md#roles).
+
+```console
+$ spinup new roleapp --module example.com/roleapp --modules ci,auth --no-git --non-interactive
+...
+$ cd roleapp
+$ spinup g page reports --server --role manager --dry-run
+create web/src/routes/reports/+page.server.ts (scaffold)
+create web/src/routes/reports/+page.svelte (scaffold)
+$ spinup g page reports --role manager
+Error: generator "page" failed: cannot generate a role-guarded page without --server, because only a server load can guard a page
+  Try: add --server
+[exit 1]
+```
