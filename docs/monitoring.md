@@ -104,6 +104,10 @@ spinup never changes a seed file after `spinup new`.
   In the profile `full`, it also scrapes Tempo and the exporters, and it probes `PUBLIC_URL`.
 - Prometheus evaluates the alert rules. Grafana sends the notifications. The stack has no Alertmanager.
 
+The `rust` and `python` sidecar service templates export traces to the same endpoint.
+Their spans are children of the API span, so one trace crosses the API and the service.
+See [Sidecar services](services.md#monitoring).
+
 The datasource UIDs are fixed: `prometheus`, `loki`, and `tempo`.
 In the profile `full`, a log line links to its trace, and a span links to its log lines.
 

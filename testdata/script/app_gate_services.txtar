@@ -1,5 +1,5 @@
-# App gate: sidecar services (ADR 0022 §2). A full app with the jobs module gets a Rust and a
-# Python service and their Go clients. The API builds. Both service images build, run, and answer
+# App gate: sidecar services (ADR 0022 §2). A full app with the jobs module gets Rust, Python, and
+# Node services and their Go clients. The API builds. All service images build, run, and answer
 # /healthz and POST /v1/sum, and the healthcheck command of each image passes.
 # The image builds need Docker and the network (crates.io, PyPI, and the pinned base images).
 [!exec:docker] skip 'docker is required for the service images'
@@ -18,28 +18,41 @@ exec spinup g service rs --lang rust
 exists services/rs/Dockerfile services/rs/Cargo.lock services/rs/openapi.yaml
 exec spinup g service py --lang python
 exists services/py/Dockerfile services/py/uv.lock services/py/openapi.yaml
+exec spinup g service nd --lang node
+exists services/nd/Dockerfile services/nd/pnpm-lock.yaml services/nd/openapi.yaml
 grep '^name = "rs"$' spinup.toml
 grep '^name = "py"$' spinup.toml
+grep '^name = "nd"$' spinup.toml
 grep '^healthcheck = \["/service", "healthcheck"\]$' spinup.toml
 grep '^healthcheck = \["/app/.venv/bin/python", "-m", "service.healthcheck"\]$' spinup.toml
+grep '^healthcheck = \["/usr/local/bin/node", "/app/src/healthcheck.ts"\]$' spinup.toml
 
-# The Go clients of both services, then the API with the clients and the jobs worker.
+# The Go clients of all services, then the API with the clients and the jobs worker.
 exec spinup g client
 exists api/internal/services/rs/client.gen.go api/internal/services/rs/rs.go
 exists api/internal/services/py/client.gen.go api/internal/services/py/py.go
+exists api/internal/services/nd/client.gen.go api/internal/services/nd/nd.go
 grep 'SERVICE_RS_URL' api/internal/services/rs/rs.go
 grep 'SERVICE_PY_URL' api/internal/services/py/py.go
+grep 'SERVICE_ND_URL' api/internal/services/nd/nd.go
 cd api
 exec go build ./...
 cd ..
 
-# Build the two images for the platform of the Docker daemon, run them, and call them.
+# Build the three images for the platform of the Docker daemon, run them, and call them.
 exec bash $WORK/images.sh
 stdout '^rs: /healthz ok, POST /v1/sum ok, healthcheck ok$'
 stdout '^py: /healthz ok, POST /v1/sum ok, healthcheck ok$'
+stdout '^nd: /healthz ok, POST /v1/sum ok, healthcheck ok$'
+
+exec spinup ci test-service rs
+exec spinup ci test-service py
+exec spinup ci test-service nd
+exec spinup ci services --json
+stdout '^\{"include":\[\{"name":"rs","lang":"rust"\},\{"name":"py","lang":"python"\},\{"name":"nd","lang":"node"\}\]\}$'
 
 -- images.sh --
-# images.sh builds the rs and py images with spinup build, runs each one, and checks /healthz,
+# images.sh builds the rs, py, and nd images with spinup build, runs each one, and checks /healthz,
 # POST /v1/sum, and the healthcheck command of the image. A trap removes the containers and
 # the images, also when a check fails.
 set -euo pipefail
@@ -58,13 +71,13 @@ cleanup() {
     fi
     docker rm -f "$c" >/dev/null 2>&1
   done
-  docker image rm -f "$app-rs:$tag" "$app-py:$tag" >/dev/null 2>&1
+  docker image rm -f "$app-rs:$tag" "$app-py:$tag" "$app-nd:$tag" >/dev/null 2>&1
   exit "$status"
 }
 trap cleanup EXIT
 
 arch="$(docker version --format '{{.Server.Arch}}')"
-spinup build --image --target rs,py --tag "$tag" --platform "linux/$arch" >&2
+spinup build --image --target rs,py,nd --tag "$tag" --platform "linux/$arch" >&2
 
 # check <name> <healthcheck command...> runs the image of the service <name> and calls it.
 check() {
@@ -93,3 +106,4 @@ check() {
 
 check rs /service healthcheck
 check py /app/.venv/bin/python -m service.healthcheck
+check nd /usr/local/bin/node /app/src/healthcheck.ts

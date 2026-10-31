@@ -5,13 +5,14 @@ Add a sidecar service
 ## Use
 
 ```text
-spinup generate service <name> --lang rust|python|<plugin>/<template> [--port 8080] [--dev-port N] [--no-openapi] [flags]
+spinup generate service <name> --lang rust|python|node|<plugin>/<template> [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi] [flags]
 ```
 
 ## Flags
 
 | Flag | Default | Description |
 | --- | --- | --- |
+| `--auth` | `none` | public route authentication: none or session |
 | `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--dev-port` | `0` | host port (default: first unused port from 8101) |
 | `--diff` | `false` | show unified diffs without writing |
@@ -26,5 +27,6 @@ spinup generate service <name> --lang rust|python|<plugin>/<template> [--port 80
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--port` | `8080` | container port |
+| `--public` | `` | public URL prefix |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |

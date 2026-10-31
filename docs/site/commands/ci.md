@@ -26,4 +26,6 @@ spinup ci
 ## Subcommands
 
 - [`spinup ci generate`](ci-generate.md) — Render the locked ci pack
+- [`spinup ci services`](ci-services.md) — List services for a GitHub Actions matrix
+- [`spinup ci test-service`](ci-test-service.md) — Run tests for one service
 - [`spinup ci verify`](ci-verify.md) — Check workflow safety and run optional actionlint

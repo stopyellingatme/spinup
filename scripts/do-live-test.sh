@@ -21,6 +21,8 @@
 #         SPINUP_DO_VERIFY_CMD         an optional command (run with bash -c) after the service checks.
 #                                      The script exports SPINUP_DO_HOST (the droplet IP) and
 #                                      SPINUP_DO_SSH_KEY (the private key file). A failure stops the script.
+#         SPINUP_DO_PUBLIC_COOKIE      the session cookie for authenticated public route checks.
+#                                      The script never prints this value.
 #         SPINUP_DO_LIVE_YES=1         answer yes to the create and destroy questions (no terminal
 #                                      needed). Set it only after a person approved the cost.
 # The script never prints a token value.
@@ -226,16 +228,19 @@ done
 ssh_pub=${ssh_pub/#\~/$HOME}
 ssh_key=${ssh_pub%.pub}
 
-# Services are declared as [[services]] tables. Each line holds: name port health.
+# Services are declared as [[services]] tables. Each line holds: name|port|health|public|auth.
 service_lines=$(awk '
-  /^\[\[services\]\]/ { if (n != "") print n, p, h; n = p = h = ""; ins = 1; next }
-  /^\[/ { if (ins && n != "") print n, p, h; n = p = h = ""; ins = 0 }
+  /^\[\[services\]\]/ { if (n != "") print n "|" p "|" h "|" u "|" a; n = p = h = u = ""; a = "none"; ins = 1; next }
+  /^\[/ { if (ins && n != "") print n "|" p "|" h "|" u "|" a; n = p = h = u = ""; a = "none"; ins = 0 }
   ins && $1 == "name" { gsub(/["\047]/, "", $3); n = $3 }
   ins && $1 == "port" { p = $3 }
   ins && $1 == "health" { gsub(/["\047]/, "", $3); h = $3 }
-  END { if (ins && n != "") print n, p, h }' "$app_dir/spinup.toml")
+  ins && $1 == "public" { gsub(/["\047]/, "", $3); u = $3 }
+  ins && $1 == "auth" { gsub(/["\047]/, "", $3); a = $3 }
+  END { if (ins && n != "") print n "|" p "|" h "|" u "|" a }' "$app_dir/spinup.toml")
 has_jobs=0
 if [[ -f "$app_dir/api/cmd/worker/main.go" ]]; then has_jobs=1; fi
+public_specs=()
 
 # Pin the host key of spinup.toml in a known_hosts file, as spinup does. Without a pin, accept the
 # key of the first connection.
@@ -255,9 +260,13 @@ if [[ -n "$service_lines" || "$has_jobs" -eq 1 ]]; then
   [[ -f "$ssh_key" ]] || die "the private key $ssh_key does not exist" \
     "pass --ssh-key <public key> in the provision flags, then run: ${destroy_cmd[*]}"
   specs=()
-  while read -r svc_name svc_port svc_health; do
+  public_specs=()
+  while IFS='|' read -r svc_name svc_port svc_health svc_public svc_auth; do
     [[ -n "$svc_name" ]] || continue
     specs+=("$svc_name:${svc_port:-8080}:${svc_health:-/healthz}")
+    if [[ -n "$svc_public" ]]; then
+      public_specs+=("$svc_name:${svc_public}:${svc_health:-/healthz}:${svc_auth:-none}")
+    fi
   done <<<"$service_lines"
   echo "Services: ${specs[*]:-none}. Jobs worker: $has_jobs."
   # The remote script runs on the droplet. The services are not public, so Caddy calls them.
@@ -322,6 +331,43 @@ fi
 REMOTE
 else
   echo "The app declares no [[services]] and has no jobs module. Skipped the service checks."
+fi
+
+if [[ ${#public_specs[@]} -eq 0 ]]; then
+  echo "The app declares no public services. Skipped the public route checks."
+else
+  echo "Checking public routes: ${#public_specs[@]}."
+  for public_spec in "${public_specs[@]}"; do
+    svc_name=${public_spec%%:*}
+    public_rest=${public_spec#*:}
+    svc_public=${public_rest%%:*}
+    public_rest=${public_rest#*:}
+    svc_health=${public_rest%%:*}
+    svc_auth=${public_rest#*:}
+    public_route="https://$host$svc_public$svc_health"
+    if [[ "$svc_auth" == session ]]; then
+      anonymous_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$public_route") ||
+        die "the anonymous public route check for $svc_name failed" "check the proxy logs, then run: ${destroy_cmd[*]}"
+      [[ "$anonymous_status" == 401 ]] || die "the anonymous public route $public_route answered HTTP $anonymous_status, not HTTP 401" \
+        "check the public route authentication, then run: ${destroy_cmd[*]}"
+      if [[ -n "${SPINUP_DO_PUBLIC_COOKIE:-}" ]]; then
+        cookie_status=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 \
+          -H "Cookie: $SPINUP_DO_PUBLIC_COOKIE" "$public_route") ||
+          die "the authenticated public route check for $svc_name failed" "check the proxy logs, then run: ${destroy_cmd[*]}"
+        [[ "$cookie_status" == 200 ]] || die "the authenticated public route $public_route answered HTTP $cookie_status, not HTTP 200" \
+          "check the public route authentication, then run: ${destroy_cmd[*]}"
+        echo "GET $svc_public$svc_health on $svc_name answers HTTP 200 with the configured cookie."
+      else
+        echo "GET $svc_public$svc_health on $svc_name answers HTTP 401 without a cookie."
+      fi
+    else
+      public_status=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 "$public_route") ||
+        die "the public route check for $svc_name failed" "check the proxy logs, then run: ${destroy_cmd[*]}"
+      [[ "$public_status" == 200 ]] || die "the public route $public_route answered HTTP $public_status, not HTTP 200" \
+        "check the public route, then run: ${destroy_cmd[*]}"
+      echo "GET $svc_public$svc_health on $svc_name answers HTTP 200."
+    fi
+  done
 fi
 
 if [[ -n "${SPINUP_DO_VERIFY_CMD:-}" ]]; then

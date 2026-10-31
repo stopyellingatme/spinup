@@ -1,0 +1,12 @@
+# Every script gets a writable cache under WORK.
+[windows] skip 'requires a POSIX shell and stat'
+exec sh -c 'case "$npm_config_cache_dir" in "$WORK"/pnpm-cache) ;; *) exit 1 ;; esac'
+exists $npm_config_cache_dir/lockfile-verified.jsonl
+
+# Read the real file size without Go or pnpm. A missing source must stay missing.
+exec sh -c 'case "$(uname -s)" in Darwin) source="$SPINUP_PNPM_HOME/Library/Caches/pnpm" ;; *) source="${XDG_CACHE_HOME:-$SPINUP_PNPM_HOME/.cache}/pnpm" ;; esac; file="$source/lockfile-verified.jsonl"; if test ! -e "$file"; then echo missing; elif test "$(uname -s)" = Darwin; then stat -f %z "$file"; else stat -c %s "$file"; fi'
+cp stdout before
+exec sh -c 'printf "script-only\n" >> "$npm_config_cache_dir/lockfile-verified.jsonl"'
+grep 'script-only' $npm_config_cache_dir/lockfile-verified.jsonl
+exec sh -c 'case "$(uname -s)" in Darwin) source="$SPINUP_PNPM_HOME/Library/Caches/pnpm" ;; *) source="${XDG_CACHE_HOME:-$SPINUP_PNPM_HOME/.cache}/pnpm" ;; esac; file="$source/lockfile-verified.jsonl"; if test ! -e "$file"; then echo missing; elif test "$(uname -s)" = Darwin; then stat -f %z "$file"; else stat -c %s "$file"; fi'
+cmp stdout before

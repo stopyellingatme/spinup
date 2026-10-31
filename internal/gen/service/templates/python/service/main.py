@@ -1,10 +1,25 @@
 """HTTP routes for the service."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="Service API")
+from service import telemetry
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Flush traces before the service stops."""
+    yield
+    if _telemetry_provider is not None:
+        _telemetry_provider.shutdown()
+
+
+app = FastAPI(title="Service API", lifespan=lifespan)
+_telemetry_provider = telemetry.setup(app)
 
 
 class SumRequest(BaseModel):

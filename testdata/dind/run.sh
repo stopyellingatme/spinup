@@ -9,9 +9,10 @@
 #   4. a good second release, then rollback to the first release
 #   5. lock contention: a held lock makes a deploy exit 5, then deploy unlock --force
 #   6. a deploy with a new secret: the secret file on the VM has mode 0600
-#   7. a sidecar service (ADR 0022): the service runs in the live color, the API reaches it through
-#      SERVICE_ECHO_URL, it sees only its own secret, a second deploy switches colors, and rollback
-#      restores the previous release with its service
+#   7. a public sidecar service (ADRs 0022 and 0023): the service runs in the live color.
+#      The API reaches it through SERVICE_ECHO_URL. The service sees only its own secret.
+#      The edge serves /svc/echo, redirects the bare prefix, and preserves the fallback for unknown services.
+#      A second deploy switches colors. Rollback restores the previous release, service, and Caddy content.
 #      The app also has the jobs module. The worker runs in the live color only, has SERVICE_ECHO_URL,
 #      does not restart, and follows the color switch and the rollback.
 #   8. deploy digital-ocean against the dofake binary, with the VM as the droplet: a provision run
@@ -247,6 +248,49 @@ check_service() {
   [[ "$(vm_docker exec "$svc_c" /service cat /run/secrets/ECHO_TOKEN)" == "$echo_token" ]] ||
     fail "the $svc service cannot read the value of ECHO_TOKEN"
   echo "    $svc sees only /run/secrets/ECHO_TOKEN"
+}
+
+# check_public <greeting> checks the service through the published edge port.
+check_public() {
+  local greeting=$1 body status path
+  body="$(http_get /svc/echo/healthz)" ||
+    fail "the public $svc route does not answer /healthz" "Try: read $logs and the Caddy logs on the VM"
+  [[ "$body" == ok ]] || fail "/svc/echo/healthz answers the wrong body" "got: $body"
+  body="$(http_get /svc/echo/info)" ||
+    fail "the public $svc route does not answer /info" "Try: read $logs and the Caddy logs on the VM"
+  [[ "$body" == *"\"greeting\":\"$greeting\""* ]] ||
+    fail "the public $svc route reports the wrong greeting" "want: $greeting" "got: $body"
+
+  status="$(curl -sS -m 10 -D "$work/public-redirect.headers" -o /dev/null -w '%{http_code}' \
+    "http://localhost:$http_port/svc/echo")" || fail "the public $svc prefix does not answer"
+  [[ "$status" == 308 ]] || fail "/svc/echo does not answer 308" "got: $status"
+  tr -d '\r' <"$work/public-redirect.headers" | grep -qi '^location: /svc/echo/$' ||
+    fail "/svc/echo does not redirect to /svc/echo/" "Try: read $work/public-redirect.headers"
+
+  # The fallback can answer 404. Do not use curl -f for these requests.
+  for path in /svc/unknown/healthz /svc/unknown/info; do
+    status="$(curl -sS -m 10 -o "$work/public-fallback.body" -w '%{http_code}' \
+      "http://localhost:$http_port$path")" || fail "$path does not answer"
+    [[ "$status" == 200 || "$status" == 404 ]] ||
+      fail "$path does not reach the web or API fallback" "got: $status"
+    body="$(cat "$work/public-fallback.body")"
+    [[ "$body" != ok && "$body" != *'"greeting":'* ]] ||
+      fail "$path reaches the $svc service instead of the fallback" "got: $body"
+  done
+  echo "    the edge serves $svc with greeting $greeting, redirects its prefix, and preserves the fallback"
+}
+
+# check_public_config <release> compares the active Caddy file with the release artifact.
+check_public_config() {
+  local rel=$1 file=Caddyfile.d/spinup-services.caddy
+  docker exec "$vm" cat "/opt/$app/caddy/$file" >"$work/public-active.caddy" ||
+    fail "cannot read the active public routes" "Try: inspect /opt/$app/caddy/$file on the VM"
+  [[ -s "$work/public-active.caddy" ]] || fail "the active public routes file is empty"
+  docker exec "$vm" cat "/opt/$app/releases/$rel/$file" >"$work/public-$rel.caddy" ||
+    fail "cannot read the public routes of $rel" "Try: inspect /opt/$app/releases/$rel/$file on the VM"
+  cmp -s "$work/public-active.caddy" "$work/public-$rel.caddy" ||
+    fail "the active public routes do not match release $rel" "Try: compare $work/public-active.caddy and $work/public-$rel.caddy"
+  echo "    the active public routes match release $rel"
 }
 
 # check_worker <release> checks the jobs worker of the live color (check_service sets live_color
@@ -529,7 +573,7 @@ fi
 echo "    secrets push wrote the new value with mode 0600"
 
 # ---------------------------------------------------------------------------------------------
-step "7. a sidecar service: deploy, switch colors, and roll back"
+step "7. a public sidecar service: deploy, switch colors, and restore routes on rollback"
 # The service is a small Go server on the pinned golang and distroless-static images. Like the
 # API, its image is built on the host, and deploy --skip-build finds it by the release ID.
 svc_dir="$work/$app/services/$svc"
@@ -547,6 +591,7 @@ port = $svc_port
 dev_port = 8101
 health = "/healthz"
 healthcheck = ["/service", "healthcheck"]
+public = "/svc/echo"
 secrets = ["ECHO_TOKEN"]
 env = { GREETING = "one" }
 EOF
@@ -565,6 +610,8 @@ sp deploy-svc-1 deploy --env staging --skip-build --tag "$rel4" --yes ||
   { show_log deploy-svc-1 60; fail "the first deploy with a service failed"; }
 expect_version "$rel4"
 check_service "$rel4" one
+check_public one
+check_public_config "$rel4"
 check_worker "$rel4"
 svc_color1="$live_color"
 release_services="$(docker exec "$vm" cat "/opt/$app/releases/$rel4/release.json")" ||
@@ -584,6 +631,8 @@ sp deploy-svc-2 deploy --env staging --skip-build --tag "$rel5" --yes ||
   { show_log deploy-svc-2 60; fail "the second deploy with a service failed"; }
 expect_version "$rel5"
 check_service "$rel5" two
+check_public two
+check_public_config "$rel5"
 check_worker "$rel5"
 [[ "$live_color" != "$svc_color1" ]] || fail "the second deploy did not switch colors" "color: $live_color"
 echo "    the second deploy switched from $svc_color1 to $live_color"
@@ -592,6 +641,8 @@ echo "    the second deploy switched from $svc_color1 to $live_color"
 sp svc-rollback rollback --env staging --yes || { show_log svc-rollback 60; fail "rollback with a service failed"; }
 expect_version "$rel4"
 check_service "$rel4" one
+check_public one
+check_public_config "$rel4"
 check_worker "$rel4"
 [[ "$live_color" == "$svc_color1" ]] || fail "rollback did not return to the color $svc_color1" "color: $live_color"
 echo "    rollback restored $rel4 and its service in $live_color"
@@ -681,6 +732,7 @@ sp do-up-2 "${do_args[@]}" --skip-build --tag "$rel6" || { show_log do-up-2 60; 
 if [[ "$(droplet_count)" != 1 ]]; then fail "the second run changed the number of droplets"; fi
 expect_version "$rel6"
 check_service "$rel6" two
+check_public two
 check_worker "$rel6"
 [[ "$(pinned_keys)" == "$vm_key" ]] || fail "the second run changed the pinned host key" "pinned: $(pinned_keys)"
 echo "    the second run created nothing and deployed $rel6"

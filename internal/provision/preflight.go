@@ -1,8 +1,11 @@
 package provision
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -24,21 +27,22 @@ const minMemoryMiB = 2048
 // run is the state of one Up.
 type run struct {
 	base
-	envFile  deploy.EnvFile
-	region   string
-	size     string
-	image    string
-	team     string
-	sizeInfo digitalocean.Size
-	pub      string // operator public key
-	sshKey   digitalocean.SSHKey
-	fw       digitalocean.Firewall
-	droplets []digitalocean.Droplet
-	droplet  *digitalocean.Droplet
-	ip       string
-	hostPub  string
-	hostPriv string // only in memory
-	runner   remote.Runner
+	envFile       deploy.EnvFile
+	scaffoldedEnv bool
+	region        string
+	size          string
+	image         string
+	team          string
+	sizeInfo      digitalocean.Size
+	pub           string // operator public key
+	sshKey        digitalocean.SSHKey
+	fw            digitalocean.Firewall
+	droplets      []digitalocean.Droplet
+	droplet       *digitalocean.Droplet
+	ip            string
+	hostPub       string
+	hostPriv      string // only in memory
+	runner        remote.Runner
 	// connected is true after the first SSH command worked.
 	connected bool
 	domain    string
@@ -64,11 +68,9 @@ func (r *run) preflight(ctx context.Context) error {
 	if _, err := os.Stat(filepath.Join(r.root, "deploy", "cloud-init", "user-data.yaml")); err != nil {
 		return fail("find the deploy pack", "deploy/cloud-init/user-data.yaml does not exist", "add the deploy pack to the app")
 	}
-	envFile, err := deploy.LoadEnvFile(r.root, r.env)
-	if err != nil {
-		return failWrap("read the environment settings", err, "create deploy/environments/"+r.env+".toml from deploy/environments/staging.toml")
+	if err := r.loadEnvironmentFile(); err != nil {
+		return err
 	}
-	r.envFile = envFile
 	if err := r.checkTools(ctx); err != nil {
 		return err
 	}
@@ -103,6 +105,32 @@ func (r *run) preflight(ctx context.Context) error {
 		return fail("create the secrets", "a recovery recipient is required", "pass --recovery-recipient age1... or --no-recovery")
 	}
 	r.domain = first(r.o.Domain, r.st.Domain)
+	return nil
+}
+
+func (r *run) loadEnvironmentFile() error {
+	envFile, err := deploy.LoadEnvFile(r.root, r.env)
+	if errors.Is(err, fs.ErrNotExist) {
+		if r.o.Plan && r.env != "production" && r.env != "staging" {
+			envFile, err = deploy.LoadEnvFile(r.root, "staging")
+			r.scaffoldedEnv = true
+			r.say("Would create deploy/environments/%s.toml from staging", r.env)
+		} else {
+			created, scaffoldErr := deploy.ScaffoldEnvFile(r.root, r.env)
+			if scaffoldErr != nil {
+				return failWrap("create the environment settings", scaffoldErr, "create deploy/environments/"+r.env+".toml from deploy/environments/staging.toml")
+			}
+			if created {
+				r.scaffoldedEnv = true
+				r.say("Created deploy/environments/%s.toml from staging", r.env)
+				envFile, err = deploy.LoadEnvFile(r.root, r.env)
+			}
+		}
+	}
+	if err != nil {
+		return failWrap("read the environment settings", err, "create deploy/environments/"+r.env+".toml from deploy/environments/staging.toml")
+	}
+	r.envFile = envFile
 	return nil
 }
 
@@ -144,7 +172,11 @@ func (r *run) checkTools(ctx context.Context) error {
 
 // ownFiles are the files that provisioning writes and commits. They do not make the tree dirty.
 func (r *run) ownFiles() []string {
-	return []string{"spinup.toml", ".sops.yaml", "secrets/", "secrets/" + r.env + ".enc.yaml"}
+	files := []string{"spinup.toml", ".sops.yaml", "secrets/", "secrets/" + r.env + ".enc.yaml"}
+	if r.scaffoldedEnv {
+		files = append(files, "deploy/environments/"+r.env+".toml")
+	}
+	return files
 }
 
 func (r *run) checkClean(ctx context.Context) error {
@@ -152,14 +184,45 @@ func (r *run) checkClean(ctx context.Context) error {
 	if err != nil {
 		return failWrap("read the git status", err, "run the command inside a git repository")
 	}
-	own := r.ownFiles()
 	for _, line := range strings.Split(string(res.Stdout), "\n") {
 		if len(line) < 4 {
 			continue
 		}
-		if !slices.Contains(own, strings.TrimSpace(line[3:])) {
+		path := strings.TrimSpace(line[3:])
+		if err := r.recognizeScaffoldedEnvironment(ctx, line, path); err != nil {
+			return err
+		}
+		if !slices.Contains(r.ownFiles(), path) {
 			return fail("provision with uncommitted changes", "the git tree is not clean", "commit or stash the changes, or pass --allow-dirty")
 		}
+	}
+	return nil
+}
+
+// recognizeScaffoldedEnvironment recognizes an untracked environment file from a failed provisioning run.
+func (r *run) recognizeScaffoldedEnvironment(ctx context.Context, status, name string) error {
+	want := "deploy/environments/" + r.env + ".toml"
+	if r.scaffoldedEnv || len(status) < 2 || status[:2] != "??" || name != want {
+		return nil
+	}
+	_, err := r.d.Exec.Run(ctx, runexec.Cmd{Name: "git", Args: []string{"ls-files", "--error-unmatch", "--", want}, Dir: r.root})
+	if err == nil {
+		return nil
+	}
+	var exitErr *runexec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != 1 {
+		return failWrap("check whether the environment settings are tracked", err, "run git status, then retry")
+	}
+	envData, err := os.ReadFile(filepath.Join(r.root, filepath.FromSlash(want)))
+	if err != nil {
+		return failWrap("read the environment settings", err, "restore deploy/environments/"+r.env+".toml from staging.toml")
+	}
+	stagingData, err := os.ReadFile(filepath.Join(r.root, "deploy", "environments", "staging.toml"))
+	if err != nil {
+		return failWrap("read the staging environment settings", err, "restore deploy/environments/staging.toml")
+	}
+	if bytes.Equal(envData, stagingData) {
+		r.scaffoldedEnv = true
 	}
 	return nil
 }
@@ -198,24 +261,27 @@ func (r *run) checkSize(ctx context.Context) error {
 	if err != nil {
 		return failWrap("list the DigitalOcean sizes", err, "run the command again")
 	}
+	regions, err := r.d.Cloud.Regions(ctx)
+	if err != nil {
+		return failWrap("list the DigitalOcean regions", err, "run the command again")
+	}
+	availableRegions := availableRegionSlugs(regions)
+	if !slices.Contains(availableRegions, r.region) {
+		return fail("use the region "+r.region, "DigitalOcean does not offer an available region with that slug", "pass --region with one of "+strings.Join(availableRegions, ", "))
+	}
+	need, err := r.minimumCPU()
+	if err != nil {
+		return err
+	}
 	i := slices.IndexFunc(sizes, func(s digitalocean.Size) bool { return s.Slug == r.size })
 	if i < 0 {
-		return fail("use the size "+r.size, "DigitalOcean does not offer it", "pass --size with a slug such as s-2vcpu-4gb")
+		alternatives, _ := suggestAlternatives(sizes, regions, sizeWant{Slug: r.size, Region: r.region}, need, minMemoryMiB)
+		return fail("use the size "+r.size, "DigitalOcean does not offer it", sizeAlternativeTry(alternatives, nil))
 	}
 	sz := sizes[i]
 	if !sz.Available || !slices.Contains(sz.Regions, r.region) {
-		return fail("use the size "+r.size, "it is not available in the region "+r.region, "pass another --size or --region")
-	}
-	need := 0.0
-	for service, limits := range r.envFile.Resources {
-		if limits.CPUs == "" {
-			continue
-		}
-		c, err := strconv.ParseFloat(limits.CPUs, 64)
-		if err != nil {
-			return fail("read the cpus limit of "+service, fmt.Sprintf("%q is not a number", limits.CPUs), "correct deploy/environments/"+r.env+".toml")
-		}
-		need = math.Max(need, c)
+		alternatives, sizeRegions := suggestAlternatives(sizes, regions, sizeWant{Slug: r.size, Region: r.region}, need, minMemoryMiB)
+		return fail("use the size "+r.size, "it is not available in the region "+r.region, sizeAlternativeTry(alternatives, sizeRegions))
 	}
 	if float64(sz.VCPUs) < need {
 		return fail("use the size "+r.size, fmt.Sprintf("it has %d vCPUs, and deploy/environments/%s.toml needs %.1f", sz.VCPUs, r.env, need), "pass a larger --size")
@@ -225,6 +291,94 @@ func (r *run) checkSize(ctx context.Context) error {
 	}
 	r.sizeInfo = sz
 	return nil
+}
+
+func (r *run) minimumCPU() (float64, error) {
+	services := make([]string, 0, len(r.envFile.Resources))
+	for service := range r.envFile.Resources {
+		services = append(services, service)
+	}
+	slices.Sort(services)
+	var need float64
+	for _, service := range services {
+		limits := r.envFile.Resources[service]
+		if limits.CPUs == "" {
+			continue
+		}
+		cpu, err := strconv.ParseFloat(limits.CPUs, 64)
+		if err != nil {
+			return 0, fail("read the cpus limit of "+service, fmt.Sprintf("%q is not a number", limits.CPUs), "correct deploy/environments/"+r.env+".toml")
+		}
+		need = math.Max(need, cpu)
+	}
+	return need, nil
+}
+
+type sizeWant struct {
+	Slug   string
+	Region string
+}
+
+// suggestAlternatives finds sizes in the region and regions with the requested size.
+func suggestAlternatives(sizes []digitalocean.Size, regions []digitalocean.Region, want sizeWant, minCPU float64, minMem int) ([]digitalocean.Size, []string) {
+	var alternatives []digitalocean.Size
+	for _, size := range sizes {
+		if size.Available && slices.Contains(size.Regions, want.Region) && float64(size.VCPUs) >= minCPU && size.Memory >= minMem {
+			alternatives = append(alternatives, size)
+		}
+	}
+	slices.SortFunc(alternatives, func(a, b digitalocean.Size) int {
+		if a.PriceMonthly < b.PriceMonthly {
+			return -1
+		}
+		if a.PriceMonthly > b.PriceMonthly {
+			return 1
+		}
+		return strings.Compare(a.Slug, b.Slug)
+	})
+	if len(alternatives) > 3 {
+		alternatives = alternatives[:3]
+	}
+	var available []string
+	for _, region := range regions {
+		if region.Available && region.Slug != want.Region && slices.Contains(region.Sizes, want.Slug) {
+			available = append(available, region.Slug)
+		}
+	}
+	slices.Sort(available)
+	if len(available) > 3 {
+		available = available[:3]
+	}
+	return alternatives, available
+}
+
+func availableRegionSlugs(regions []digitalocean.Region) []string {
+	slugs := make([]string, 0, len(regions))
+	for _, region := range regions {
+		if region.Available {
+			slugs = append(slugs, region.Slug)
+		}
+	}
+	slices.Sort(slugs)
+	return slugs
+}
+
+func sizeAlternativeTry(sizes []digitalocean.Size, regions []string) string {
+	parts := make([]string, 0, 2)
+	if len(sizes) > 0 {
+		choices := make([]string, len(sizes))
+		for i, size := range sizes {
+			choices[i] = fmt.Sprintf("%s ($%.2f/month)", size.Slug, size.PriceMonthly)
+		}
+		parts = append(parts, "pass --size "+strings.Join(choices, ", "))
+	}
+	if len(regions) > 0 {
+		parts = append(parts, "pass --region "+strings.Join(regions, ", "))
+	}
+	if len(parts) == 0 {
+		return "pass another --size or --region"
+	}
+	return strings.Join(parts, ", or ")
 }
 
 func money(monthly, hourly float64) string {

@@ -79,6 +79,9 @@ jobs:
   spinup:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.services.outputs.matrix }}
+      any: ${{ steps.services.outputs.any }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,9 +97,35 @@ jobs:
         with:
           package_json_file: web/package.json
       - uses: ./.github/actions/setup-spinup
+      - id: services
+        run: |
+          set -euo pipefail
+          matrix="$(spinup ci services --json)"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+          printf 'any=%s\n' "$(jq -r '(.include | length) > 0' <<<"$matrix")" >> "$GITHUB_OUTPUT"
       - run: |
           set -euo pipefail
           cp .env.example .env
           chmod 0600 .env
           spinup check --allow-behind
           spinup doctor
+
+  services:
+    needs: spinup
+    if: needs.spinup.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.spinup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-spinup
+      - env:
+          SERVICE: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          spinup build --image --target "$SERVICE"
+          spinup ci test-service "$SERVICE"

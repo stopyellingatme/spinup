@@ -45,7 +45,7 @@ It writes each step to the journal `/opt/<app>/deploy.state` on the VM.
 | (lock) | Opens SSH and takes the lock `/opt/<app>/deploy.lock`. A held lock gives exit code 5. |
 | `hooks` | Runs the pre-deploy hooks, for example the backup. |
 | `transport` | Moves the images to the VM. |
-| `upload` | Writes `releases/<id>/`: the files of `deploy/`, `.env`, and `release.json`. Pushes the secrets to `/opt/<app>/secrets/`. |
+| `upload` | Writes `releases/<id>/`: the files of `deploy/`, `.env`, `release.json`, and the generated files for services. Pushes the secrets to `/opt/<app>/secrets/`. |
 | `edge` | Copies the Caddy and Postgres settings to `/opt/<app>/caddy` and `/opt/<app>/postgres`. Starts Caddy and Postgres. |
 | `migrate` | Runs the migrations as a one-shot container. The old release is still live. |
 | `switch` | Starts the new color, checks each replica, switches Caddy, drains the old color, and removes it. |
@@ -242,11 +242,19 @@ It writes each value to `/opt/<app>/secrets/<NAME>` with mode 0600, and removes 
 `release.json` holds only the SHA-256 of each value.
 Secret values never enter an image, a Compose file, `.env`, the journal, or the output.
 
+## Public service routes
+
+If a service in `spinup.toml` has `public`, the `upload` step also writes `Caddyfile.d/spinup-services.caddy` into the release.
+The `switch` step puts it in place with the new `upstream.caddy`, so a rollback restores the routes of the old release.
+If `deploy/Caddyfile.d/` holds a user file with the same name, the `preflight` step fails with a `Try:` line.
+An app with no public service gets no such file.
+See [Sidecar services](../services.md#public-routes).
+
 ## Files on the VM
 
 ```
 /opt/<app>/
-  releases/<release-id>/   compose files, Caddyfile, .env, upstream.caddy, release.json
+  releases/<release-id>/   compose files, Caddyfile, Caddyfile.d/, .env, upstream.caddy, release.json
   current -> releases/<release-id>
   caddy/                   Caddyfile, Caddyfile.d/, upstream.caddy (the live color)
   postgres/                postgresql.conf, conf.d/

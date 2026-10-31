@@ -20,11 +20,39 @@ $ spinup new preview --api-only --modules ci --module example.com/preview --no-g
 
 | File | Trigger | Purpose |
 | --- | --- | --- |
-| `ci.yml` | Push to `main`, pull requests | Build, vet, and test the API with PostgreSQL. Check the app with spinup. |
+| `ci.yml` | Push to `main`, pull requests | Build, vet, and test the API with PostgreSQL. Check the app with spinup. Build and test each sidecar service. |
 | `e2e.yml` | Pull requests, with `web` | Migrate PostgreSQL, start both apps, and run Playwright. |
 | `deploy.yml` | Manual, with `deploy` | Deploy to the selected GitHub environment. |
 | `backup-verify.yml` | Weekly or manual, with `backups` | Verify the latest backup of the default environment. |
 | `upgrade-check.yml` | Weekly or manual | Install the newest release and propose an upgrade PR. |
+
+## Service jobs
+
+The `spinup` job of `ci.yml` runs `spinup ci services --json` and saves the matrix as a job output.
+The `services` job uses that matrix.
+It does not run when the app declares no service.
+For each service, the job runs these commands:
+
+<!-- doctest: skip -->
+```console
+$ spinup build --image --target ocr
+$ spinup ci test-service ocr
+```
+
+`spinup ci test-service` builds a temporary test Dockerfile from the pinned images.
+It runs the tests of the service in Docker, so the runner needs only Docker.
+
+| Language | Test commands |
+| --- | --- |
+| `rust` | `cargo test --locked` |
+| `python` | `uv sync --locked`, then `pytest` |
+| `node` | `pnpm install --frozen-lockfile`, then `pnpm test`, then `pnpm run typecheck` if the script exists |
+
+The language comes from the files in `services/<name>/`.
+A service with no known language is only built.
+`spinup g service` needs no edit of the workflow.
+An existing app gets the job through the three-way merge of the managed file `ci.yml`.
+See [Generate and verify CI files](commands/ci.md) for the commands.
 
 The web job runs `pnpm check` and `pnpm test`.
 An app without unit tests can pass the web job.

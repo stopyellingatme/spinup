@@ -41,6 +41,37 @@ type Service struct {
 	DB bool `toml:"db"`
 	// GPUs is "" (none), "all", or a count such as "1".
 	GPUs string `toml:"gpus"`
+	// Public is a URL path prefix, such as "/svc/ocr", that the edge (Caddy) routes to the
+	// service in the live color. The edge strips the prefix. Empty means internal only
+	// (ADR 0023).
+	Public string `toml:"public"`
+	// Auth is the edge check of a public route: "" or AuthNone (the service checks callers
+	// itself), or AuthSession (the edge asks the API for a valid user session first).
+	Auth string `toml:"auth"`
+}
+
+// The values of Service.Auth.
+const (
+	// AuthNone sends every request of a public route to the service.
+	AuthNone = "none"
+	// AuthSession sends a request of a public route to the service only when the API
+	// accepts its session cookie (GET /api/session answers 2xx). It needs the auth module.
+	AuthSession = "session"
+)
+
+// ReservedPublicPrefixes are the URL paths that the app itself serves. A public prefix
+// cannot equal one of them or sit under one.
+var ReservedPublicPrefixes = []string{"/api", "/_app", "/healthz", "/readyz", "/version", "/.well-known"}
+
+// IsPublic reports whether the service has a public route.
+func (s Service) IsPublic() bool { return s.Public != "" }
+
+// AuthMode returns the edge check of the public route: AuthNone or AuthSession.
+func (s Service) AuthMode() string {
+	if s.Auth == "" {
+		return AuthNone
+	}
+	return s.Auth
 }
 
 // Reserved holds the names that a service cannot use, because spinup uses them for its
@@ -57,6 +88,7 @@ var DefaultDevPorts = []int{8080, 5173, 5432, 1025, 8025, 3000, 4317, 4318}
 var (
 	namePattern = regexp.MustCompile(`^[a-z][a-z0-9]{0,19}$`)
 	varPattern  = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+	segPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 )
 
 // ValidName reports whether name is a valid, unreserved service name. A Go keyword
@@ -127,8 +159,62 @@ func Validate(list []Service, reservedDevPorts []int) error {
 				problems = append(problems, fmt.Errorf("%s: gpus %q must be \"\", \"all\", or a count of 1 or more. Try: set gpus = \"all\"", label, s.GPUs))
 			}
 		}
+		problems = append(problems, publicProblems(label, s)...)
 	}
+	problems = append(problems, prefixOverlaps(list)...)
 	return errors.Join(problems...)
+}
+
+// publicProblems checks the public and auth fields of one service.
+func publicProblems(label string, s Service) []error {
+	var problems []error
+	switch s.Auth {
+	case "", AuthNone, AuthSession:
+	default:
+		problems = append(problems, fmt.Errorf("%s: auth %q must be \"none\" or \"session\". Try: set auth = \"session\" or remove it", label, s.Auth))
+	}
+	if s.Public == "" {
+		if s.Auth != "" {
+			problems = append(problems, fmt.Errorf("%s: auth is set, but the service has no public route. Try: set public = \"/svc/%s\" or remove auth", label, s.Name))
+		}
+		return problems
+	}
+	try := fmt.Sprintf("Try: set public = \"/svc/%s\"", s.Name)
+	if !strings.HasPrefix(s.Public, "/") || s.Public == "/" || strings.HasSuffix(s.Public, "/") {
+		return append(problems, fmt.Errorf("%s: public %q must be a path that starts with / and does not end with /, and it cannot be /. %s", label, s.Public, try))
+	}
+	for _, seg := range strings.Split(s.Public[1:], "/") {
+		if !segPattern.MatchString(seg) {
+			return append(problems, fmt.Errorf("%s: public %q has the segment %q, which must match %s. %s", label, s.Public, seg, segPattern, try))
+		}
+	}
+	for _, r := range ReservedPublicPrefixes {
+		if underPrefix(s.Public, r) {
+			problems = append(problems, fmt.Errorf("%s: public %q is under %s, which the app serves itself. %s", label, s.Public, r, try))
+		}
+	}
+	return problems
+}
+
+// prefixOverlaps reports public prefixes that are equal or nested between services.
+func prefixOverlaps(list []Service) []error {
+	var problems []error
+	for i, a := range list {
+		for _, b := range list[i+1:] {
+			if a.Public == "" || b.Public == "" {
+				continue
+			}
+			if underPrefix(a.Public, b.Public) || underPrefix(b.Public, a.Public) {
+				problems = append(problems, fmt.Errorf("service %q: public %q overlaps public %q of service %q. Try: give each service its own prefix, such as /svc/<name>", a.Name, a.Public, b.Public, b.Name))
+			}
+		}
+	}
+	return problems
+}
+
+// underPrefix reports whether path equals prefix or sits under it.
+func underPrefix(path, prefix string) bool {
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }
 
 // EnvPrefix returns SERVICE_<NAME>, the prefix of the variables of a service.

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -204,6 +205,13 @@ func (c *Config) Validate() error {
 	}
 	if err := services.Validate(c.Services, nil); err != nil {
 		problems = append(problems, err)
+	}
+	if !slices.Contains(c.Modules, "auth") {
+		for _, service := range c.Services {
+			if service.AuthMode() == services.AuthSession {
+				problems = append(problems, fmt.Errorf("service %q: auth = \"session\" needs the auth module, and this app does not have it. Try: run spinup module add auth (needs the web app), or set auth = \"none\"", service.Name))
+			}
+		}
 	}
 	return errors.Join(problems...)
 }

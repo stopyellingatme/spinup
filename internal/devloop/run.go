@@ -127,6 +127,15 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	if err := prerequisites(ctx, root, o, hasWeb, runner); err != nil {
 		return err
 	}
+	if needsWebInstall(root, hasWeb) {
+		tool := webtool.FromLock(lock)
+		install := tool.InWeb(root, tool.Install(true, false))
+		install.Stdout = o.Out
+		install.Stderr = o.Out
+		if err := runCommand(ctx, runner, install); err != nil {
+			return err
+		}
+	}
 	running := map[string]int{}
 	if !o.NoInfra {
 		base := []string{"compose", "-f", "deploy/compose.dev.yml", "--project-directory", root, "--env-file", filepath.Join(root, ".env")}
@@ -216,6 +225,14 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	cancel()
 	watchErr := <-watchDone
 	return errors.Join(err, watchErr)
+}
+
+func needsWebInstall(root string, hasWeb bool) bool {
+	if !hasWeb {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(root, "web", "node_modules"))
+	return os.IsNotExist(err)
 }
 
 func validate(o Options, platform string) error {

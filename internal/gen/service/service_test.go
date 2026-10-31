@@ -70,11 +70,13 @@ func TestPlan(t *testing.T) {
 		flags         []string
 		port, devPort int
 		noOpenAPI     bool
+		healthcheck   []string
 	}{
-		{"rust", []string{"--lang", "rust"}, 8080, 8101, false},
-		{"python", []string{"--lang", "python"}, 8080, 8101, false},
-		{"custom ports", []string{"--lang", "rust", "--port", "9000", "--dev-port", "8200"}, 9000, 8200, false},
-		{"no OpenAPI", []string{"--lang", "python", "--no-openapi"}, 8080, 8101, true},
+		{"rust", []string{"--lang", "rust"}, 8080, 8101, false, []string{"/service", "healthcheck"}},
+		{"python", []string{"--lang", "python"}, 8080, 8101, false, []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}},
+		{"node", []string{"--lang", "node"}, 8080, 8101, false, []string{"/usr/local/bin/node", "/app/src/healthcheck.ts"}},
+		{"custom ports", []string{"--lang", "rust", "--port", "9000", "--dev-port", "8200"}, 9000, 8200, false, []string{"/service", "healthcheck"}},
+		{"no OpenAPI", []string{"--lang", "python", "--no-openapi"}, 8080, 8101, true, []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -128,11 +130,7 @@ func TestPlan(t *testing.T) {
 			} else if err != nil || svc.OpenAPI != "openapi.yaml" {
 				t.Fatalf("OpenAPI = %q, stat = %v", svc.OpenAPI, err)
 			}
-			if tc.flags[1] == "rust" {
-				if !reflect.DeepEqual(svc.Healthcheck, []string{"/service", "healthcheck"}) {
-					t.Fatalf("healthcheck = %v", svc.Healthcheck)
-				}
-			} else if !reflect.DeepEqual(svc.Healthcheck, []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}) {
+			if !reflect.DeepEqual(svc.Healthcheck, tc.healthcheck) {
 				t.Fatalf("healthcheck = %v", svc.Healthcheck)
 			}
 			original, err := os.ReadFile(filepath.Join(in.Root, "spinup.toml"))
@@ -189,7 +187,12 @@ func TestErrors(t *testing.T) {
 		{name: "extra name", args: []string{"ocr", "more", "--lang", "rust"}, want: "expected one name"},
 		{name: "reserved", args: []string{"api", "--lang", "rust"}, want: "reserved"},
 		{name: "invalid", args: []string{"../ocr", "--lang", "rust"}, want: "must match"},
-		{name: "unsupported", args: []string{"ocr", "--lang", "go"}, want: "rust or python"},
+		{name: "unsupported", args: []string{"ocr", "--lang", "go"}, want: "rust, python, or node"},
+		{name: "plugin validates public before resolving", args: []string{"ocr", "--lang", "missing/template", "--public", "svc/ocr"}, want: "must be a path"},
+		{name: "plugin validates auth before resolving", args: []string{"ocr", "--lang", "missing/template", "--public", "/svc/ocr", "--auth", "session"}, want: "needs the auth module"},
+		{name: "empty public", args: []string{"ocr", "--lang", "node", "--public="}, want: "--public requires"},
+		{name: "bad public", args: []string{"ocr", "--lang", "node", "--public", "svc/ocr"}, want: "must be a path"},
+		{name: "session needs auth", args: []string{"ocr", "--lang", "node", "--public", "/svc/ocr", "--auth", "session"}, want: "needs the auth module"},
 		{name: "empty language", args: []string{"ocr", "--lang="}, want: "--lang"},
 		{name: "invalid port", args: []string{"ocr", "--lang", "rust", "--port", "0"}, want: "port 0"},
 		{name: "large port", args: []string{"ocr", "--lang", "rust", "--port", "65536"}, want: "65536"},
@@ -233,7 +236,7 @@ func TestErrors(t *testing.T) {
 
 func TestGoldenService(t *testing.T) {
 	t.Parallel()
-	for _, lang := range []string{"rust", "python"} {
+	for _, lang := range []string{"rust", "python", "node"} {
 		t.Run(lang, func(t *testing.T) {
 			t.Parallel()
 			testutil.GoldenSelected(t, "service-"+lang)
@@ -252,5 +255,35 @@ func TestGoldenService(t *testing.T) {
 			testutil.Golden(t, "service-"+lang, got)
 			testutil.Deterministic(t, render)
 		})
+	}
+}
+
+func TestPublicService(t *testing.T) {
+	t.Parallel()
+	in := input(t, config, "ocr", "--lang", "node", "--public", "/svc/ocr", "--auth", "none")
+	out, err := generator(t).Run(t.Context(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := fs.ReadFile(out.Plan.FS(), "spinup.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"health = \"/healthz\"\npublic = \"/svc/ocr\"\nauth = \"none\"\nopenapi",
+		"healthcheck = [\"/usr/local/bin/node\", \"/app/src/healthcheck.ts\"]\n",
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("spinup.toml does not contain %q:\n%s", want, data)
+		}
+	}
+}
+
+func TestPublicServiceSessionAuth(t *testing.T) {
+	t.Parallel()
+	withAuth := "modules = [\"auth\"]\n\n" + config
+	in := input(t, withAuth, "ocr", "--lang", "node", "--public", "/svc/ocr", "--auth", "session")
+	if _, err := generator(t).Run(t.Context(), in); err != nil {
+		t.Fatal(err)
 	}
 }

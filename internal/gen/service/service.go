@@ -30,7 +30,7 @@ var templates embed.FS
 func init() {
 	registry.Register(gen.Generator{
 		Name: "service", Short: "Add a sidecar service",
-		Usage: "<name> --lang rust|python|<plugin>/<template> [--port 8080] [--dev-port N] [--no-openapi]",
+		Usage: "<name> --lang rust|python|node|<plugin>/<template> [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi]",
 		Flags: flags, Run: plan,
 	})
 }
@@ -39,6 +39,8 @@ func flags(fs *pflag.FlagSet) {
 	fs.String("lang", "", "service language or plugin template (required)")
 	fs.Int("port", 8080, "container port")
 	fs.Int("dev-port", 0, "host port (default: first unused port from 8101)")
+	fs.String("public", "", "public URL prefix")
+	fs.String("auth", "none", "public route authentication: none or session")
 	fs.Bool("no-openapi", false, "omit the OpenAPI file and Go client")
 }
 
@@ -55,8 +57,8 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	lang, _ := in.Flags.GetString("lang")
 	pluginName, templateName, pluginTemplate := strings.Cut(lang, "/")
-	if lang != "rust" && lang != "python" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
-		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust or python, got %q\nTry: spinup g service %s --lang rust", lang, name)
+	if lang != "rust" && lang != "python" && lang != "node" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
+		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust, python, or node, got %q\nTry: spinup g service %s --lang rust", lang, name)
 	}
 	dir := services.ContextDir(name)
 	if _, err := os.Lstat(filepath.Join(in.Root, filepath.FromSlash(dir))); err == nil {
@@ -77,37 +79,40 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 			return nil, fmt.Errorf("cannot generate service %q: spinup.toml already declares the name\nTry: choose another service name", name)
 		}
 	}
-	if pluginTemplate {
-		return planPlugin(ctx, in, src, config, name, pluginName, templateName)
-	}
-	port, _ := in.Flags.GetInt("port")
-	devPort, _ := in.Flags.GetInt("dev-port")
-	if !in.Flags.Changed("dev-port") {
-		devPort = nextDevPort(config.Services)
-	}
-	noOpenAPI, _ := in.Flags.GetBool("no-openapi")
-	svc := services.Service{Name: name, Port: port, DevPort: devPort, Health: "/healthz"}
-	if !noOpenAPI {
-		svc.OpenAPI = "openapi.yaml"
-	}
-	svc.Healthcheck = []string{"/service", "healthcheck"}
-	if lang == "python" {
-		svc.Healthcheck = []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}
-	}
-	if err := services.Validate(append(config.Services, svc), nil); err != nil {
+	svc, noOpenAPI, err := serviceConfig(in, config, name)
+	if err != nil {
 		return nil, err
+	}
+	if pluginTemplate {
+		out, err := planPlugin(ctx, in, src, config, name, pluginName, templateName)
+		if err != nil {
+			return nil, err
+		}
+		if err := addPluginRouteConfig(out, src, svc); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+	switch lang {
+	case "python":
+		svc.Healthcheck = []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}
+	case "node":
+		svc.Healthcheck = []string{"/usr/local/bin/node", "/app/src/healthcheck.ts"}
+	default:
+		svc.Healthcheck = []string{"/service", "healthcheck"}
 	}
 	stack, err := stackversions.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load service versions: %w\nTry: report this as a spinup bug", err)
 	}
-	data := templateData{Name: name, App: config.App.Name, Port: port}
+	data := templateData{Name: name, App: config.App.Name, Port: svc.Port}
 	for _, image := range []struct {
 		name string
 		ref  *string
 	}{
 		{"rust", &data.RustImage}, {"distroless-static-debian13", &data.DistrolessImage},
 		{"python", &data.PythonImage}, {"uv", &data.UVImage},
+		{"node", &data.NodeImage},
 	} {
 		pin, err := stack.Image(image.name)
 		if err != nil {
@@ -129,6 +134,57 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	return &gen.Output{Plan: p, Edits: []string{project.ConfigFile}, Next: next}, nil
 }
 
+func addPluginRouteConfig(out *gen.Output, src []byte, route services.Service) error {
+	if !route.IsPublic() && route.Auth == "" {
+		return nil
+	}
+	for i := range out.Plan.Files {
+		file := &out.Plan.Files[i]
+		if file.Path != project.ConfigFile {
+			continue
+		}
+		config, err := project.Parse(file.Data)
+		if err != nil || len(config.Services) == 0 {
+			return fmt.Errorf("plan plugin service route: cannot read generated spinup.toml\nTry: report this as a spinup bug")
+		}
+		svc := config.Services[len(config.Services)-1]
+		svc.Public = route.Public
+		svc.Auth = route.Auth
+		file.Data = appendTable(src, svc)
+		return nil
+	}
+	return fmt.Errorf("plan plugin service route: generated spinup.toml is missing\nTry: report this as a spinup bug")
+}
+
+func serviceConfig(in gen.Input, config *project.Config, name string) (services.Service, bool, error) {
+	port, _ := in.Flags.GetInt("port")
+	devPort, _ := in.Flags.GetInt("dev-port")
+	if !in.Flags.Changed("dev-port") {
+		devPort = nextDevPort(config.Services)
+	}
+	noOpenAPI, _ := in.Flags.GetBool("no-openapi")
+	svc := services.Service{Name: name, Port: port, DevPort: devPort, Health: "/healthz"}
+	if in.Flags.Changed("public") {
+		svc.Public, _ = in.Flags.GetString("public")
+		if svc.Public == "" {
+			return services.Service{}, false, fmt.Errorf("cannot generate service: --public requires a URL prefix\nTry: pass --public /svc/%s", name)
+		}
+	}
+	if in.Flags.Changed("auth") {
+		svc.Auth, _ = in.Flags.GetString("auth")
+	}
+	if !noOpenAPI {
+		svc.OpenAPI = "openapi.yaml"
+	}
+	if err := services.Validate(append(config.Services, svc), nil); err != nil {
+		return services.Service{}, false, err
+	}
+	if svc.AuthMode() == services.AuthSession && !slices.Contains(config.Modules, "auth") {
+		return services.Service{}, false, fmt.Errorf("cannot generate service: --auth session needs the auth module\nTry: add the auth module, or pass --auth none")
+	}
+	return svc, noOpenAPI, nil
+}
+
 func nextDevPort(list []services.Service) int {
 	used := make(map[int]bool, len(list))
 	for _, svc := range list {
@@ -143,9 +199,9 @@ func nextDevPort(list []services.Service) int {
 }
 
 type templateData struct {
-	Name, App                                        string
-	Port                                             int
-	RustImage, DistrolessImage, PythonImage, UVImage string
+	Name, App                                                   string
+	Port                                                        int
+	RustImage, DistrolessImage, PythonImage, UVImage, NodeImage string
 }
 
 func renderTemplates(lang string, svc services.Service, data templateData) (vfs.Plan, error) {
@@ -196,6 +252,12 @@ func appendTable(src []byte, svc services.Service) []byte {
 		buf.WriteByte('\n')
 	}
 	fmt.Fprintf(&buf, "[[services]]\nname = %q\nport = %d\ndev_port = %d\nhealth = %q\n", svc.Name, svc.Port, svc.DevPort, svc.Health)
+	if svc.Public != "" {
+		fmt.Fprintf(&buf, "public = %q\n", svc.Public)
+	}
+	if svc.Auth != "" {
+		fmt.Fprintf(&buf, "auth = %q\n", svc.Auth)
+	}
 	if svc.OpenAPI != "" {
 		fmt.Fprintf(&buf, "openapi = %q\n", svc.OpenAPI)
 	}

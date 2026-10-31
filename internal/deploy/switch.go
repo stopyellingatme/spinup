@@ -35,8 +35,10 @@ const (
 
 // UpstreamFile renders upstream.caddy for the live color. Each route of the Caddyfile
 // imports it with two arguments: the service and its port (docs/deploy.md).
+// An optional import block adds reverse_proxy subdirectives.
 func UpstreamFile(color string) []byte {
 	return []byte(`reverse_proxy {
+	{block}
 	dynamic a {
 		name {args[0]}-` + color + `
 		port {args[1]}

@@ -35,6 +35,11 @@ func TestUpstreamColor(t *testing.T) {
 	if !strings.Contains(string(UpstreamFile(Green)), "dial_timeout 250ms") || strings.Contains(string(UpstreamFile(Green)), "fail_duration") {
 		t.Fatal("upstream options do not follow ADR 0003")
 	}
+	for _, color := range []string{Blue, Green} {
+		if got := strings.Count(string(UpstreamFile(color)), "{block}"); got != 1 {
+			t.Errorf("UpstreamFile(%q) has %d block placeholders, want 1", color, got)
+		}
+	}
 }
 
 type switchFx struct {

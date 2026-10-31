@@ -82,6 +82,20 @@ bash testdata/dind/run.sh
 The script also needs `git`, `ssh`, `ssh-keygen`, `ssh-keyscan`, `sops`, `age-keygen`, `curl`, and `python3`.
 Run `spinup tools install` to get `sops` and `age`.
 
+## Public service route
+
+Step 7 of the suite declares the service `echo` with `public = "/svc/echo"`.
+It checks the route through the published edge port of the VM:
+
+- `GET /svc/echo/healthz` and `GET /svc/echo/info` reach the service in the live color.
+- `GET /svc/echo` answers 308 with the header `Location: /svc/echo/`.
+- `GET /svc/unknown/healthz` and `GET /svc/unknown/info` do not reach the service. They get the web or API fallback.
+- After each switch, the file `Caddyfile.d/spinup-services.caddy` in the live Caddy directory is the same as the file of the release.
+- After a rollback, the route answers with the greeting of the old release, and the live file is the file of the old release.
+
+The step proves that Caddy accepts the generated route and the `upstream.caddy` file with a block.
+It does not check `auth = "session"`, because the suite has no session. The DigitalOcean live test checks that mode.
+
 ## Limits
 
 - `server bootstrap` supports only Debian and Ubuntu. The VM is Alpine, so the script makes `/opt/<app>` and its directories itself. It does what bootstrap does for these directories.

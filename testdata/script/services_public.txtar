@@ -1,0 +1,69 @@
+# Public service routes validate before deployment. The fake commands make the
+# deploy plan read-only and avoid a Docker daemon or an SSH connection.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec sh -c 'printf "\\n[env.test]\\nhost = \"plan.example.com\"\\nuser = \"deploy\"\\npublic_url = \"https://plan.example.com\"\\n" >> spinup.toml'
+cp ../test.toml deploy/environments/test.toml
+
+# A public service loads, and the deploy plan includes the managed Caddy route file.
+exec spinup g service ocr --lang rust --public /svc/ocr
+grep '^public = "/svc/ocr"$' spinup.toml
+mkdir bin
+cp ../git bin/git
+cp ../sops bin/sops
+cp ../ssh bin/ssh
+chmod 0755 bin/git
+chmod 0755 bin/sops
+chmod 0755 bin/ssh
+env PATH=$WORK/todo/bin:$PATH
+env HOME=/tmp
+exec spinup deploy --env test --plan --skip-build --tag 20261031T000000Z-0123456789ab --allow-dirty
+stdout 'added Caddyfile.d/spinup-services.caddy'
+
+# Reserved and overlapping routes fail with a correction hint.
+! exec spinup g service reserved --lang rust --public /api/x
+stderr 'public "/api/x" is under /api'
+stderr 'Try:'
+! exec spinup g service nested --lang rust --public /svc/ocr/nested
+stderr 'public "/svc/ocr" overlaps'
+stderr 'Try:'
+
+# Session routes need the auth module. Unsupported route authentication fails too.
+! exec spinup g service session --lang rust --public /svc/session --auth session
+stderr 'needs the auth module'
+stderr 'Try:'
+! exec spinup g service basic --lang rust --public /svc/basic --auth basic
+stderr 'auth "basic" must be "none" or "session"'
+stderr 'Try:'
+
+-- git --
+#!/bin/sh
+case "$1 $2" in
+  'status --porcelain') exit 0 ;;
+  'rev-parse HEAD') printf '%s\n' 0123456789abcdef0123456789abcdef01234567 ;;
+esac
+exit 0
+
+-- sops --
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --output ]; then
+    shift
+    printf '%s\n' '{"DATABASE_URL":"postgres://app:pass@postgres:5432/app","POSTGRES_PASSWORD":"pass","GRAFANA_ADMIN_PASSWORD":"pass"}' > "$1"
+    exit 0
+  fi
+  shift
+done
+exit 1
+
+-- ssh --
+#!/bin/sh
+case "$*" in
+  *'id -u'*) printf '1000\n1000\n' ;;
+  *'owner.json'*) exit 3 ;;
+esac
+exit 0
+
+-- test.toml --
+smoke_urls = []

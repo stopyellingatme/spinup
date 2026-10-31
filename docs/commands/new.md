@@ -17,6 +17,27 @@ spinup.lock
 spinup.toml
 ```
 
+When the command ends, it prints a Next block with the steps to run.
+An app with a web frontend in `node` mode gets the install command of the web tool between `spinup doctor` and `spinup dev`.
+An API-only app, or an app in `embed` mode, has no install step.
+The block ends with the default URLs.
+
+```
+Next:
+  cd shop
+  spinup doctor
+  pnpm --dir web install
+  spinup dev
+
+App      http://localhost:5173
+API      http://localhost:8080
+Mailpit  http://localhost:8025
+```
+
+The line `App` appears only when the app has the web pack.
+The install line depends on the package manager that you selected. With pnpm, it is `pnpm --dir web install`.
+The ports are the defaults. `spinup dev` picks other ports when these are busy.
+
 The command creates `.env` from `.env.example` with private permissions.
 The lock excludes `.env`.
 The lock records all pinned stack images and the normalized hash of each rendered file.
@@ -28,7 +49,12 @@ It excludes `.env` and `spinup.lock`.
 | `--api-only` | Create the Go API without a web frontend. |
 | `--module <path>` | Set the Go module path. The API module adds `/api`. |
 | `--modules <names>` | Select optional packs with comma-separated names. The default is `ci,deploy`. Use `--modules=''` for none. |
+| `--frontend-mode node\|embed` | Select a SvelteKit server or a static web app in the Go API. |
+| `--package-manager pnpm\|bun` | Select the web package manager. |
+| `--api-client openapi-fetch\|heyapi` | Select the generated web API client. |
+| `--auth-oidc` | Enable OpenID Connect sign-in with the `auth` module. |
 | `--db-version <major>` | Select PostgreSQL `18`, `17`, or `16`. The default is `18`. |
+| `--plugin <source>` | Add a trusted pack source. Repeat the flag for more sources. |
 | `--shadcn-registry <version>` | Record the shadcn-svelte registry version of the web components. The default is `1.7.0`. |
 | `--no-git` | Do not initialize a git repository. |
 | `--dir`, `-C <directory>` | Create the app below this directory. The default is the current directory. |
@@ -36,6 +62,7 @@ It excludes `.env` and `spinup.lock`.
 | `--dry-run` | Print planned paths and file classes without writes. |
 | `--json` | Print an object with `dir`, `packs`, and `files`. |
 | `--env <name>` | Global flag. This command does not select an environment. |
+| `--confirm-env <name>` | Type a protected environment name without a terminal. |
 | `--yes`, `-y` | Global flag. This command does not require confirmation. |
 | `--verbose` | Enable extra diagnostics. |
 | `--no-color` | Disable color. |

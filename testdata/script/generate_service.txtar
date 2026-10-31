@@ -15,6 +15,7 @@ exec spinup g service ocr --lang rust
 stdout 'Next: spinup g client'
 stdout 'Next: spinup dev'
 exists services/ocr/Cargo.toml services/ocr/Cargo.lock services/ocr/src/main.rs
+exists services/ocr/src/telemetry.rs
 exists services/ocr/Dockerfile services/ocr/.dockerignore services/ocr/openapi.yaml services/ocr/README.md
 cmp services/ocr/Cargo.toml $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.toml
 cmp services/ocr/Cargo.lock $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.lock
@@ -25,6 +26,7 @@ grep '^dev_port = 8101$' spinup.toml
 grep '^health = "/healthz"$' spinup.toml
 grep '^openapi = "openapi.yaml"$' spinup.toml
 grep '^healthcheck = \["/service", "healthcheck"\]$' spinup.toml
+grep 'OTEL_EXPORTER_OTLP_ENDPOINT' services/ocr/src/telemetry.rs
 
 # Refuse a second run, including with --force.
 cp spinup.toml after.toml
@@ -45,6 +47,7 @@ stderr 'Try:'
 # Python uses the next host port and can omit the OpenAPI contract.
 exec spinup g service classify --lang python --port 9000 --no-openapi
 exists services/classify/service/main.py services/classify/service/healthcheck.py services/classify/service/__init__.py
+exists services/classify/service/telemetry.py
 exists services/classify/tests/test_main.py services/classify/Dockerfile services/classify/README.md
 ! exists services/classify/openapi.yaml
 cmp services/classify/pyproject.toml $SPINUP_REPO/internal/gen/service/templates/python/pyproject.toml
@@ -52,5 +55,6 @@ cmp services/classify/uv.lock $SPINUP_REPO/internal/gen/service/templates/python
 grep '^port = 9000$' spinup.toml
 grep '^dev_port = 8102$' spinup.toml
 grep '^healthcheck = \["/app/.venv/bin/python", "-m", "service.healthcheck"\]$' spinup.toml
+grep 'OTEL_EXPORTER_OTLP_ENDPOINT' services/classify/service/telemetry.py
 stdout 'Next: spinup dev'
 ! stdout 'Next: spinup g client'

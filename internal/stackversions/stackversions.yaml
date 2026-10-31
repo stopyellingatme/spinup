@@ -114,7 +114,7 @@ images:
   blackbox-exporter: { image: prom/blackbox-exporter, tag: "v0.29.0", digest: "sha256:9613f2884689b6fad9f1939f6a3b0388c93a022cfaededb19545b329b5c83dea" }
   mailpit:           { image: axllent/mailpit, tag: "v1.31.5", digest: "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea" }
   seaweedfs:         { image: chrislusf/seaweedfs, tag: "4.48", digest: "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d" }   # S3 for tests; MinIO is archived
-  node:              { image: node, tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0
+  node:              { image: node, tag: "24-bookworm-slim", digest: "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20" }  # Node 24.21.0; also the Node service image (ADR 0023)
   golang:            { image: golang, tag: "1.27-alpine", digest: "sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d" }   # recheck: tag moved 2026-10-14
   distroless-static: { image: gcr.io/distroless/static-debian12, tag: "nonroot", digest: "sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab" }
   docker-dind:       { image: docker, tag: "29.9.0-dind", digest: "sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c2218643d03ccfddc65995470" }
@@ -134,12 +134,26 @@ crates:   # the Rust service template (ADR 0022); internal/gen/service/templates
   tracing-subscriber: "0.3.23"
   http-body-util: "0.1.5"   # dev
   tower: "0.5.3"            # dev
+  opentelemetry: "0.33.1"          # tracing (ADR 0023); the opentelemetry crates share a minor
+  opentelemetry_sdk: "0.33.1"
+  opentelemetry-otlp: "0.33.1"     # http-proto and reqwest-blocking-client only: no TLS, no gRPC
+  opentelemetry-http: "0.33.1"
+  tracing-opentelemetry: "0.34.0"  # needs opentelemetry ^0.33
 
 python_packages:   # the Python service template (ADR 0022); templates/python/pyproject.toml pins these with ==
   fastapi: "0.162.0"
   uvicorn: "0.54.0"
   httpx: "0.28.1"    # dev
   pytest: "9.2.0"    # dev
+  opentelemetry-api: "1.45.2"                       # tracing (ADR 0023); api, sdk, and exporter share a version
+  opentelemetry-sdk: "1.45.2"
+  opentelemetry-exporter-otlp-proto-http: "1.45.2"  # HTTP only: never opentelemetry-exporter-otlp, which pulls grpcio
+  opentelemetry-instrumentation-fastapi: "0.66b2"   # pairs with 1.45.x
+
+node_packages:   # the Node service template (ADR 0023); templates/node/package.json pins these exactly
+  hono: "4.13.14"
+  "@hono/node-server": "2.1.5"   # peer hono ^4
+  "@types/node": "24.19.2"       # dev; follows the node image major
 
 apt:
   pgbackrest: "2.59.3"   # from apt.postgresql.org into the postgres:18.6-trixie image (2.59.3-1.pgdg13+1)

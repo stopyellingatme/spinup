@@ -1,8 +1,9 @@
-use axum::{routing::{get, post}, Json, Router};
+mod telemetry;
+
+use axum::{middleware, routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
 use std::{env, io::{Read, Write}, net::{SocketAddr, TcpStream}, process, time::Duration};
 use tokio::signal;
-use tracing_subscriber::EnvFilter;
 
 #[derive(Deserialize)]
 struct SumRequest {
@@ -16,8 +17,9 @@ struct SumResponse {
 
 fn routes() -> Router {
     Router::new()
-        .route("/healthz", get(|| async { "ok" }))
         .route("/v1/sum", post(sum))
+        .route_layer(middleware::from_fn(telemetry::trace_request))
+        .route("/healthz", get(|| async { "ok" }))
 }
 
 async fn sum(Json(request): Json<SumRequest>) -> Json<SumResponse> {
@@ -49,18 +51,18 @@ async fn main() {
     if env::args().nth(1).as_deref() == Some("healthcheck") {
         process::exit(if healthcheck(port).unwrap_or(false) { 0 } else { 1 });
     }
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+    let provider = telemetry::init();
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
         .await
         .expect("cannot bind service port");
     tracing::info!(service = "ocr", app = "todo", port, "service started");
-    axum::serve(listener, routes())
+    let result = axum::serve(listener, routes())
         .with_graceful_shutdown(shutdown())
-        .await
-        .expect("service failed");
+        .await;
+    if let Some(provider) = provider {
+        provider.shutdown().expect("cannot flush service traces\nTry: check the OTLP collector and its endpoint");
+    }
+    result.expect("service failed");
 }
 
 async fn shutdown() {

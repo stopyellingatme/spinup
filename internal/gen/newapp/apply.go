@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/ui"
 	"github.com/stopyellingatme/spinup/internal/vfs"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 // Apply writes the application, its local environment, and its lock.
@@ -63,8 +65,30 @@ func Apply(ctx context.Context, result *Result, o Options, runner run.Runner, pr
 		return nil
 	}
 	printer.Printf("Created %s (%d files) from packs %s\n", o.Name, len(result.Plan.Files), strings.Join(result.Packs, ", "))
-	printer.Printf("\nNext:\n  cd %s\n  spinup dev\n", o.Name)
+	printer.Printf("\nNext:\n  %s\n", strings.Join(nextSteps(result, o.Name), "\n  "))
+	printDefaultURLs(printer, hasWebPack(result))
 	return nil
+}
+
+func nextSteps(result *Result, name string) []string {
+	steps := []string{"cd " + name, "spinup doctor"}
+	if hasWebPack(result) {
+		tool := webtool.FromLock(result.Lock)
+		steps = append(steps, tool.InWeb("", tool.Install(false, false)).String())
+	}
+	return append(steps, "spinup dev")
+}
+
+func hasWebPack(result *Result) bool {
+	return slices.Contains(result.Packs, "web")
+}
+
+func printDefaultURLs(printer *ui.Printer, web bool) {
+	if web {
+		printer.Println("\nApp      http://localhost:5173")
+	}
+	printer.Println("API      http://localhost:8080")
+	printer.Println("Mailpit  http://localhost:8025")
 }
 
 func copyEnvironment(root string) error {

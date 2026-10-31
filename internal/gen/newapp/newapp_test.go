@@ -85,8 +85,57 @@ func TestGenerateAndApply(t *testing.T) {
 	if !strings.Contains(out.String(), "Created todo (") || !strings.Contains(out.String(), "Next:") {
 		t.Fatal(out.String())
 	}
+	for _, want := range []string{
+		"spinup doctor",
+		"spinup dev",
+		"API      http://localhost:8080",
+		"Mailpit  http://localhost:8025",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("next steps omit %q:\n%s", want, out.String())
+		}
+	}
+	if strings.Contains(out.String(), "pnpm --dir web install") {
+		t.Fatalf("API-only next steps install web dependencies:\n%s", out.String())
+	}
 	if _, err := Generate(context.Background(), o, nil); err == nil {
 		t.Fatal("accepted occupied directory")
+	}
+}
+
+func TestApplyPrintsWebNextSteps(t *testing.T) {
+	t.Parallel()
+	o := Options{Name: "todo", Dir: t.TempDir(), NoGit: true, Answers: map[string]any{"module": "example.com/todo"}}
+	result, err := Generate(t.Context(), o, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	if err := Apply(t.Context(), result, o, &run.Fake{}, ui.New(nil, &out, &stderr, ui.Options{})); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"pnpm --dir web install",
+		"App      http://localhost:5173",
+		"API      http://localhost:8080",
+		"Mailpit  http://localhost:8025",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("next steps omit %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestNextStepsIncludeWebInstallForEmbed(t *testing.T) {
+	t.Parallel()
+	o := Options{Name: "todo", Dir: t.TempDir(), Answers: map[string]any{"module": "example.com/todo", "frontend_mode": "embed"}}
+	result, err := Generate(t.Context(), o, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := nextSteps(result, o.Name)
+	if !slices.Contains(steps, "pnpm --dir web install") {
+		t.Fatalf("embed next steps omit web dependencies: %q", steps)
 	}
 }
 
