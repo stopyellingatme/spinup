@@ -61,7 +61,16 @@ type Config struct {
 	} `toml:"app"`
 	BehaviorVersion int      `toml:"behavior_version"`
 	Modules         []string `toml:"modules"`
-	Monitoring      struct {
+	// Auth declares the roles of the app.
+	Auth struct {
+		// Roles are the role names declared by the app.
+		Roles []string `toml:"roles"`
+		// AdminRole selects the administrator role.
+		AdminRole string `toml:"admin_role"`
+		// DefaultRole selects the role for new accounts.
+		DefaultRole string `toml:"default_role"`
+	} `toml:"auth"`
+	Monitoring struct {
 		Profile      string
 		HeartbeatURL string `toml:"heartbeat_url"`
 		// AlertEmail receives Grafana email notifications.
@@ -100,6 +109,9 @@ type Config struct {
 	// Services are the sidecar services of the app (ADR 0022).
 	Services []services.Service `toml:"services"`
 	Extra    map[string]any     `toml:"-"`
+	// Preserve explicit empty values so only omitted keys receive defaults.
+	authAdminSet   bool
+	authDefaultSet bool
 }
 
 // FindRoot finds the nearest parent directory containing spinup.toml.
@@ -151,7 +163,11 @@ func Parse(data []byte) (*Config, error) {
 	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse %s extra keys: %w", ConfigFile, err)
 	}
-	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services"} {
+	if auth, ok := raw["auth"].(map[string]any); ok {
+		_, config.authAdminSet = auth["admin_role"]
+		_, config.authDefaultSet = auth["default_role"]
+	}
+	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services", "auth"} {
 		delete(raw, key)
 	}
 	config.Extra = raw
@@ -212,6 +228,9 @@ func (c *Config) Validate() error {
 				problems = append(problems, fmt.Errorf("service %q: auth = \"session\" needs the auth module, and this app does not have it. Try: run spinup module add auth (needs the web app), or set auth = \"none\"", service.Name))
 			}
 		}
+	}
+	if err := c.AuthRoles().Validate(); err != nil {
+		problems = append(problems, err)
 	}
 	return errors.Join(problems...)
 }

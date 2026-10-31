@@ -56,3 +56,14 @@ class = "scaffold"
 path = "web/src/routes/account/+page.server.ts"
 source = "files/web/src/routes/account/+page.server.ts"
 class = "scaffold"
+
+# The role column keeps existing users without an assigned role.
+[[files]]
+path = "api/db/migrations/00005_users_role.sql"
+source = "files/api/db/migrations/00005_users_role.sql"
+class = "seed"
+
+[[files]]
+path = "api/internal/roles/roles.gen.go"
+source = "files/api/internal/roles/roles.gen.go"
+class = "managed"

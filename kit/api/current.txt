@@ -45,8 +45,13 @@ kit/auth field RateLimits.Register Limit
 kit/auth field RateLimits.ResetConfirm Limit
 kit/auth field RateLimits.ResetRequest Limit
 kit/auth field ResetData.URL string
+kit/auth field Roles.Admin string
+kit/auth field Roles.Default string
+kit/auth field Roles.Names []string
 kit/auth field User.Email string
 kit/auth field User.ID int64
+kit/auth field User.Role string
+kit/auth func DefaultRoles() Roles
 kit/auth func New(*pgxpool.Pool, ...Option) (*Auth, error)
 kit/auth func Required(http.Handler) http.Handler
 kit/auth func UserFrom(context.Context) (User, bool)
@@ -60,14 +65,20 @@ kit/auth func WithRateLimits(RateLimits) Option
 kit/auth func WithResetFrom(string) ResetOption
 kit/auth func WithResetTemplates(fs.FS) ResetOption
 kit/auth func WithResetURL(string) ResetOption
+kit/auth func WithRoles(Roles) Option
 kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
 kit/auth func WithTrustedProxies(...string) Option
 kit/auth func WithUser(context.Context, User) context.Context
+kit/auth method Roles.Valid(string) bool
+kit/auth method Roles.Validate() error
+kit/auth method User.HasRole(...string) bool
 kit/auth ptrmethod Auth.Close(context.Context) error
 kit/auth ptrmethod Auth.Middleware() httpx.Middleware
+kit/auth ptrmethod Auth.RequireRole(...string) func(http.Handler) http.Handler
 kit/auth ptrmethod Auth.RequireUser(http.Handler) http.Handler
 kit/auth ptrmethod Auth.ResetRoutes(*http.ServeMux, ...ResetOption) error
+kit/auth ptrmethod Auth.Roles() Roles
 kit/auth ptrmethod Auth.Routes(*http.ServeMux)
 kit/auth type Auth struct
 kit/auth type Limit struct
@@ -75,8 +86,11 @@ kit/auth type Option func(*options)
 kit/auth type RateLimits struct
 kit/auth type ResetData struct
 kit/auth type ResetOption func(*resetOptions)
+kit/auth type Roles struct
 kit/auth type User struct
 kit/auth/authtest func As(http.Handler, int64) http.Handler
+kit/auth/authtest func AsRole(http.Handler, int64, string) http.Handler
+kit/auth/authtest func AsUser(http.Handler, auth.User) http.Handler
 kit/backup const Path = "/_deploy/backup"
 kit/backup field Response.Error string
 kit/backup field Response.LastBackupAgeSeconds *float64

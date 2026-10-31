@@ -134,6 +134,7 @@ func NewMigrator(url string, fsys fs.FS, opts ...MigrateOption) (*Migrator, erro
 	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, fsys,
 		goose.WithSessionLocker(locker),
 		goose.WithDisableGlobalRegistry(true),
+		goose.WithAllowOutofOrder(true),
 	)
 	switch {
 	case errors.Is(err, goose.ErrNoMigrations):

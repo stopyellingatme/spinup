@@ -48,6 +48,8 @@ type Spec struct {
 	Owned bool
 	// Shared reports whether auth protects a table shared by all signed-in users.
 	Shared bool
+	// Roles are the declared roles that can use the resource.
+	Roles []string
 }
 
 // Part plans extra files for each resource, such as web pages.
