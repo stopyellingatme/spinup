@@ -30,7 +30,7 @@ var templates embed.FS
 func init() {
 	registry.Register(gen.Generator{
 		Name: "service", Short: "Add a sidecar service",
-		Usage: "<name> --lang rust|python|<plugin>/<template> [--port 8080] [--dev-port N] [--no-openapi]",
+		Usage: "<name> --lang rust|python|node|<plugin>/<template> [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi]",
 		Flags: flags, Run: plan,
 	})
 }
@@ -39,6 +39,8 @@ func flags(fs *pflag.FlagSet) {
 	fs.String("lang", "", "service language or plugin template (required)")
 	fs.Int("port", 8080, "container port")
 	fs.Int("dev-port", 0, "host port (default: first unused port from 8101)")
+	fs.String("public", "", "public URL prefix")
+	fs.String("auth", "none", "public route authentication: none or session")
 	fs.Bool("no-openapi", false, "omit the OpenAPI file and Go client")
 }
 
@@ -55,8 +57,8 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	lang, _ := in.Flags.GetString("lang")
 	pluginName, templateName, pluginTemplate := strings.Cut(lang, "/")
-	if lang != "rust" && lang != "python" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
-		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust or python, got %q\nTry: spinup g service %s --lang rust", lang, name)
+	if lang != "rust" && lang != "python" && lang != "node" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
+		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust, python, or node, got %q\nTry: spinup g service %s --lang rust", lang, name)
 	}
 	dir := services.ContextDir(name)
 	if _, err := os.Lstat(filepath.Join(in.Root, filepath.FromSlash(dir))); err == nil {
@@ -87,15 +89,31 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	noOpenAPI, _ := in.Flags.GetBool("no-openapi")
 	svc := services.Service{Name: name, Port: port, DevPort: devPort, Health: "/healthz"}
+	if in.Flags.Changed("public") {
+		svc.Public, _ = in.Flags.GetString("public")
+		if svc.Public == "" {
+			return nil, fmt.Errorf("cannot generate service: --public requires a URL prefix\nTry: pass --public /svc/%s", name)
+		}
+	}
+	if in.Flags.Changed("auth") {
+		svc.Auth, _ = in.Flags.GetString("auth")
+	}
 	if !noOpenAPI {
 		svc.OpenAPI = "openapi.yaml"
 	}
-	svc.Healthcheck = []string{"/service", "healthcheck"}
-	if lang == "python" {
+	switch lang {
+	case "python":
 		svc.Healthcheck = []string{"/app/.venv/bin/python", "-m", "service.healthcheck"}
+	case "node":
+		svc.Healthcheck = []string{"/usr/local/bin/node", "/app/src/healthcheck.ts"}
+	default:
+		svc.Healthcheck = []string{"/service", "healthcheck"}
 	}
 	if err := services.Validate(append(config.Services, svc), nil); err != nil {
 		return nil, err
+	}
+	if svc.AuthMode() == services.AuthSession && !slices.Contains(config.Modules, "auth") {
+		return nil, fmt.Errorf("cannot generate service: --auth session needs the auth module\nTry: add the auth module, or pass --auth none")
 	}
 	stack, err := stackversions.Load()
 	if err != nil {
@@ -108,6 +126,7 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	}{
 		{"rust", &data.RustImage}, {"distroless-static-debian13", &data.DistrolessImage},
 		{"python", &data.PythonImage}, {"uv", &data.UVImage},
+		{"node", &data.NodeImage},
 	} {
 		pin, err := stack.Image(image.name)
 		if err != nil {
@@ -143,9 +162,9 @@ func nextDevPort(list []services.Service) int {
 }
 
 type templateData struct {
-	Name, App                                        string
-	Port                                             int
-	RustImage, DistrolessImage, PythonImage, UVImage string
+	Name, App                                                   string
+	Port                                                        int
+	RustImage, DistrolessImage, PythonImage, UVImage, NodeImage string
 }
 
 func renderTemplates(lang string, svc services.Service, data templateData) (vfs.Plan, error) {
@@ -196,6 +215,12 @@ func appendTable(src []byte, svc services.Service) []byte {
 		buf.WriteByte('\n')
 	}
 	fmt.Fprintf(&buf, "[[services]]\nname = %q\nport = %d\ndev_port = %d\nhealth = %q\n", svc.Name, svc.Port, svc.DevPort, svc.Health)
+	if svc.Public != "" {
+		fmt.Fprintf(&buf, "public = %q\n", svc.Public)
+	}
+	if svc.Auth != "" {
+		fmt.Fprintf(&buf, "auth = %q\n", svc.Auth)
+	}
 	if svc.OpenAPI != "" {
 		fmt.Fprintf(&buf, "openapi = %q\n", svc.OpenAPI)
 	}
