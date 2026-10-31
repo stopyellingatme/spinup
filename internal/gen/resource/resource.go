@@ -442,7 +442,7 @@ func deniedRole(allowed, declared []string) string {
 			return role
 		}
 	}
-	return "undeclared"
+	return "__spinup_forbidden_role"
 }
 
 // hasAuth reports whether the lock lists the auth module.

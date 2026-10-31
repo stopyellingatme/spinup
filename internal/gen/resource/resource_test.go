@@ -88,6 +88,9 @@ func TestGoldenGenResource(t *testing.T) {
 				writeLock(t, root, packs)
 				if tc.role {
 					flags = append(flags, "--role", "manager")
+					write(t, root, map[string]string{
+						"api/db/migrations/00006_create_members.sql": "-- +goose Up\nCREATE TABLE members (\n    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY\n);\n-- +goose Down\nDROP TABLE members;\n",
+					})
 				}
 			}
 			if tc.shared {
@@ -95,7 +98,11 @@ func TestGoldenGenResource(t *testing.T) {
 				flags = append(flags, "--shared", "--api-only")
 			}
 			render := func() (fs.FS, error) {
-				out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, flags...)})
+				args := goldenArgs
+				if tc.role {
+					args = append(append([]string(nil), goldenArgs...), "owner:ref:member")
+				}
+				out, err := run(t.Context(), gen.Input{Root: root, Args: args, Flags: flagSet(t, flags...)})
 				if err != nil {
 					return nil, err
 				}
@@ -567,8 +574,28 @@ func TestResourceRolesPlan(t *testing.T) {
 			t.Fatal(err)
 		}
 		test, _ := out.Plan.Get("api/internal/handlers/todos_test.go")
-		if !strings.Contains(string(test.Data), `authtest.AsRole(handler, 1, "undeclared")`) {
+		if !strings.Contains(string(test.Data), `authtest.AsRole(handler, 1, "__spinup_forbidden_role")`) {
 			t.Fatalf("handler test lacks undeclared fallback:\n%s", test.Data)
+		}
+	})
+	t.Run("required reference", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		app := testutil.RenderPack(t, []string{"base", "api", "auth"}, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": []string{"auth"}})
+		if err := os.CopyFS(root, app); err != nil {
+			t.Fatal(err)
+		}
+		writeLock(t, root, []string{"base", "api", "auth"})
+		write(t, root, map[string]string{
+			"api/db/migrations/00006_create_members.sql": "-- +goose Up\nCREATE TABLE members (\n    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY\n);\n-- +goose Down\nDROP TABLE members;\n",
+		})
+		out, err := run(t.Context(), gen.Input{Root: root, Args: []string{"todo", "owner:ref:member"}, Flags: flagSet(t, "--role", "manager")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		test, _ := out.Plan.Get("api/internal/handlers/todos_test.go")
+		if !strings.Contains(string(test.Data), `{\"owner_id\": 1}`) {
+			t.Fatalf("handler test lacks a valid reference in the denied-role body:\n%s", test.Data)
 		}
 	})
 }
@@ -596,7 +623,7 @@ func TestDeniedRole(t *testing.T) {
 		allowed, all []string
 	}{
 		{name: "declared", allowed: []string{"manager"}, all: []string{"manager", "staff"}, want: "staff"},
-		{name: "undeclared fallback", allowed: []string{"manager", "staff"}, all: []string{"manager", "staff"}, want: "undeclared"},
+		{name: "undeclared configured", allowed: []string{"undeclared"}, all: []string{"undeclared"}, want: "__spinup_forbidden_role"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

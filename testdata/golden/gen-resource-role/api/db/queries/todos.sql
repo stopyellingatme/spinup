@@ -2,7 +2,7 @@
 -- Run `spinup db sqlc` after you change this file or a migration.
 
 -- name: ListTodos :many
-SELECT id, title, done, due, priority, created_at, updated_at
+SELECT id, title, done, due, priority, owner_id, created_at, updated_at
 FROM todos
 ORDER BY id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
@@ -11,20 +11,20 @@ LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 SELECT count(*) FROM todos;
 
 -- name: GetTodo :one
-SELECT id, title, done, due, priority, created_at, updated_at
+SELECT id, title, done, due, priority, owner_id, created_at, updated_at
 FROM todos
 WHERE id = $1;
 
 -- name: CreateTodo :one
-INSERT INTO todos (title, done, due, priority)
-VALUES ($1, $2, $3, $4)
-RETURNING id, title, done, due, priority, created_at, updated_at;
+INSERT INTO todos (title, done, due, priority, owner_id)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, title, done, due, priority, owner_id, created_at, updated_at;
 
 -- name: UpdateTodo :one
 UPDATE todos
-SET title = $2, done = $3, due = $4, priority = $5, updated_at = now()
+SET title = $2, done = $3, due = $4, priority = $5, owner_id = $6, updated_at = now()
 WHERE id = $1
-RETURNING id, title, done, due, priority, created_at, updated_at;
+RETURNING id, title, done, due, priority, owner_id, created_at, updated_at;
 
 -- name: DeleteTodo :execrows
 DELETE FROM todos

@@ -7,6 +7,7 @@ Todo:
     - done
     - due
     - priority
+    - owner_id
     - created_at
     - updated_at
   properties:
@@ -27,6 +28,10 @@ Todo:
         - low
         - normal
         - high
+    owner_id:
+      type: integer
+      format: int64
+      description: The id of a row in members.
     created_at:
       type: string
       format: date-time
@@ -39,6 +44,7 @@ TodoInput:
     - title
     - done
     - priority
+    - owner_id
   properties:
     title:
       type: string
@@ -54,6 +60,10 @@ TodoInput:
         - low
         - normal
         - high
+    owner_id:
+      type: integer
+      format: int64
+      description: The id of a row in members.
 TodoList:
   type: object
   required:

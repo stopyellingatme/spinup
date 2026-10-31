@@ -31,7 +31,13 @@ func TestTodosCRUD(t *testing.T) {
 	}
 	handler = authtest.AsRole(handler, userA, roles.Manager)
 
-	rec := testkit.Do(t, handler, http.MethodPost, "/api/todos", strings.NewReader(`{"title": "title 1", "done": true, "due": "2026-01-02", "priority": "low"}`))
+	// Rows that the todos refer to.
+	var memberID int64
+	if err := pool.QueryRow(t.Context(), `INSERT INTO members DEFAULT VALUES RETURNING id`).Scan(&memberID); err != nil {
+		t.Fatalf("insert a row into members: %v", err)
+	}
+
+	rec := testkit.Do(t, handler, http.MethodPost, "/api/todos", strings.NewReader(fmt.Sprintf(`{"title": "title 1", "done": true, "due": "2026-01-02", "priority": "low", "owner_id": %d}`, memberID)))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create: status %d, want %d\n%s", rec.Code, http.StatusCreated, rec.Body)
 	}
@@ -55,7 +61,7 @@ func TestTodosCRUD(t *testing.T) {
 		t.Fatalf("list: got %+v, want one item %+v", list, created)
 	}
 
-	rec = testkit.Do(t, handler, http.MethodPut, path, strings.NewReader(`{"title": "title 2", "done": false, "due": null, "priority": "high"}`))
+	rec = testkit.Do(t, handler, http.MethodPut, path, strings.NewReader(fmt.Sprintf(`{"title": "title 2", "done": false, "due": null, "priority": "high", "owner_id": %d}`, memberID)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update: status %d, want %d\n%s", rec.Code, http.StatusOK, rec.Body)
 	}
@@ -124,30 +130,38 @@ func TestTodosRequiresFields(t *testing.T) {
 	}{
 		{"missing all", "{}", []httpx.FieldError{
 			{Field: "done", Message: "is required"},
+			{Field: "owner_id", Message: "is required"},
 			{Field: "priority", Message: "is required"},
 			{Field: "title", Message: "is required"},
 		}},
 		{"body null", "null", []httpx.FieldError{
 			{Field: "done", Message: "is required"},
+			{Field: "owner_id", Message: "is required"},
 			{Field: "priority", Message: "is required"},
 			{Field: "title", Message: "is required"},
 		}},
-		{"missing done", "{\"title\": \"title 1\", \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+		{"missing done", "{\"title\": \"title 1\", \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "done", Message: "is required"},
 		}},
-		{"null done", "{\"title\": \"title 1\", \"done\": null, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+		{"null done", "{\"title\": \"title 1\", \"done\": null, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "done", Message: "is required"},
 		}},
-		{"missing priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\"}", []httpx.FieldError{
+		{"missing owner_id", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+			{Field: "owner_id", Message: "is required"},
+		}},
+		{"null owner_id", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": null}", []httpx.FieldError{
+			{Field: "owner_id", Message: "is required"},
+		}},
+		{"missing priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "priority", Message: "is required"},
 		}},
-		{"null priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": null}", []httpx.FieldError{
+		{"null priority", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": null, \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "priority", Message: "is required"},
 		}},
-		{"missing title", "{\"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+		{"missing title", "{\"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "title", Message: "is required"},
 		}},
-		{"null title", "{\"title\": null, \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}", []httpx.FieldError{
+		{"null title", "{\"title\": null, \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}", []httpx.FieldError{
 			{Field: "title", Message: "is required"},
 		}},
 	}
@@ -264,9 +278,9 @@ func TestTodosRejectsForbiddenRoles(t *testing.T) {
 	handler = authtest.AsRole(handler, 1, "staff")
 	tests := []struct{ method, path, body string }{
 		{http.MethodGet, "/api/todos", ""},
-		{http.MethodPost, "/api/todos", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}"},
+		{http.MethodPost, "/api/todos", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}"},
 		{http.MethodGet, "/api/todos/1", ""},
-		{http.MethodPut, "/api/todos/1", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\"}"},
+		{http.MethodPut, "/api/todos/1", "{\"title\": \"title 1\", \"done\": true, \"due\": \"2026-01-02\", \"priority\": \"low\", \"owner_id\": 1}"},
 		{http.MethodDelete, "/api/todos/1", ""},
 	}
 	for _, tc := range tests {
