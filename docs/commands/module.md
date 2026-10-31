@@ -28,6 +28,13 @@ In a terminal, the command asks unanswered questions for the new packs.
 Without a terminal, the command uses defaults or reports the missing flag.
 Use `--non-interactive` to prevent prompts and `--yes` to confirm the change.
 
+| Flag | Purpose |
+| --- | --- |
+| `--frontend-mode node\|embed` | Select a SvelteKit server or a static web app in the Go API. |
+| `--package-manager pnpm\|bun` | Select the web package manager. |
+| `--api-client openapi-fetch\|heyapi` | Select the generated web API client. |
+| `--auth-oidc` | Enable OpenID Connect sign-in with the `auth` module. |
+
 The command requires a clean Git repository and Git 2.44.0 or later.
 It prints a plan before confirmation.
 Use `--dry-run` to inspect the plan without creating a branch.
