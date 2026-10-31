@@ -298,14 +298,16 @@ func TestRunInstallsMissingWebDependencies(t *testing.T) {
 		web         bool
 		manager     string
 		embed       bool
+		noWeb       bool
 		nodeModules bool
 		want        exec.Cmd
 	}{
 		{name: "pnpm", web: true, want: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "install", "--frozen-lockfile"}}},
 		{name: "bun", web: true, manager: "bun", want: exec.Cmd{Name: "bun", Args: []string{"install", "--frozen-lockfile"}}},
 		{name: "present dependencies", web: true, nodeModules: true},
+		{name: "no web", web: true, noWeb: true},
 		{name: "API only"},
-		{name: "embed", web: true, embed: true},
+		{name: "embed", web: true, embed: true, want: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "install", "--frozen-lockfile"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -331,7 +333,7 @@ func TestRunInstallsMissingWebDependencies(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			fake := &stackFake{cancel: cancel, stopAt: 1}
-			if err := Run(ctx, Options{Dir: root, NoInfra: true, Starter: fake, PortAllocator: func(port int) (int, error) { return port, nil }}, fake); err != nil {
+			if err := Run(ctx, Options{Dir: root, NoWeb: tc.noWeb, NoInfra: true, Starter: fake, PortAllocator: func(port int) (int, error) { return port, nil }}, fake); err != nil {
 				t.Fatal(err)
 			}
 			found := false

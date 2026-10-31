@@ -72,7 +72,7 @@ func Apply(ctx context.Context, result *Result, o Options, runner run.Runner, pr
 
 func nextSteps(result *Result, name string) []string {
 	steps := []string{"cd " + name, "spinup doctor"}
-	if hasWebPack(result) && result.Lock.Answers["frontend_mode"] != "embed" {
+	if hasWebPack(result) {
 		tool := webtool.FromLock(result.Lock)
 		steps = append(steps, tool.InWeb("", tool.Install(false, false)).String())
 	}
