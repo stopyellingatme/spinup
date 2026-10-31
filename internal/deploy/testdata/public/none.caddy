@@ -1,0 +1,7 @@
+# Managed by spinup deploy from spinup.toml. Do not edit.
+# Do not use deploy/Caddyfile.d/spinup-services.caddy for a user file.
+
+redir /svc/ocr /svc/ocr/ 308
+handle_path /svc/ocr/* {
+	import ../upstream.caddy ocr 8081
+}
