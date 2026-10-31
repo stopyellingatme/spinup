@@ -1,0 +1,14 @@
+# A Node service can receive a public path with the no-auth edge mode.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+
+exec spinup g service files --lang node --public /svc/files --auth none
+exists services/files/package.json services/files/pnpm-lock.yaml services/files/src/main.ts services/files/src/healthcheck.ts
+grep '^public = "/svc/files"$' spinup.toml
+grep '^auth = "none"$' spinup.toml
+grep '^healthcheck = \["/usr/local/bin/node", "/app/src/healthcheck.ts"\]$' spinup.toml
+
+! exec spinup g service bad --lang node --public=
+stderr 'public requires a URL prefix'
+stderr 'Try:'

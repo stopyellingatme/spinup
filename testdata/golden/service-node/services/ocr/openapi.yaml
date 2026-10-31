@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Service API
+  version: 1.0.0
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Report readiness
+      responses:
+        '200':
+          description: The service is ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+  /v1/sum:
+    post:
+      operationId: sum
+      summary: Add numbers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SumRequest'
+      responses:
+        '200':
+          description: The sum of the numbers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SumResult'
+components:
+  schemas:
+    SumRequest:
+      type: object
+      required: [values]
+      properties:
+        values:
+          type: array
+          items:
+            type: number
+            format: double
+    SumResult:
+      type: object
+      required: [sum]
+      properties:
+        sum:
+          type: number
+          format: double
