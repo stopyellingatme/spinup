@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -30,5 +31,20 @@ func TestPrintKitNotesRejectsBadBehaviors(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "Try:") {
 			t.Fatalf("notes %s: error = %v", notes, err)
 		}
+	}
+}
+
+func TestRolesKitManualStep(t *testing.T) {
+	t.Parallel()
+	notes, err := os.ReadFile("../../kit/MIGRATION.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := printKitNotes(&out, &templates.Version{Version: "0.1.0", KitMigration: notes}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Kit auth-roles-schema [manual]: Run spinup db migrate before you start the new binary.") {
+		t.Fatal(out.String())
 	}
 }

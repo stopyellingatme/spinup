@@ -229,7 +229,7 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		}
 		p.Files = append(p.Files, d)
 	}
-	return p, nil
+	return p, authUpgradeWarnings(root, p)
 }
 
 // planClass preserves an ejected file unless the template changes it to seed.
