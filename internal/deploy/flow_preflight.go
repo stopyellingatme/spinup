@@ -149,6 +149,10 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	if l.files, err = deployFiles(root); err != nil {
 		return nil, preflightError(stripTry(err.Error()), "restore the deploy pack files with spinup restore")
 	}
+	if slices.ContainsFunc(l.sidecars, func(s services.Service) bool { return s.IsPublic() }) &&
+		slices.ContainsFunc(l.files, func(file releaseFile) bool { return file.Path == PublicRoutesFile }) {
+		return nil, preflightError("deploy/"+PublicRoutesFile+" is managed for public services", "rename your file in deploy/Caddyfile.d")
+	}
 	_, statErr := os.Stat(filepath.Join(root, "deploy", "Dockerfile.web"))
 	l.web = statErr == nil
 	if l.migrations, err = migrations(root); err != nil {

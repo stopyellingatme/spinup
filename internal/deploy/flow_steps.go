@@ -584,6 +584,13 @@ func (f *flow) releaseFiles() ([]releaseFile, error) {
 	if sidecars != nil {
 		files = append(files, releaseFile{Path: ServicesComposeFile, Data: sidecars, Mode: 0644})
 	}
+	routes, err := PublicRoutes(f.l.sidecars)
+	if err != nil {
+		return nil, err
+	}
+	if routes != nil {
+		files = append(files, releaseFile{Path: PublicRoutesFile, Data: routes, Mode: 0644})
+	}
 	slices.SortFunc(files, func(a, b releaseFile) int { return strings.Compare(a.Path, b.Path) })
 	return files, nil
 }
