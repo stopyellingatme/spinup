@@ -156,6 +156,13 @@ func TestRolesUpgradeCorpus(t *testing.T) {
 				t.Run("roles-drift", func(t *testing.T) {
 					// Resolve the conflict with the app version, which still lacks WithRoles.
 					writePlanFile(t, root, "api/cmd/api/main.go", string(edits[filepath.FromSlash("api/cmd/api/main.go")]), 0o644)
+					// The doctor check reads the modules from spinup.lock. The planner lock has only the
+					// synthetic base pack, so the saved copy also names the auth module.
+					doctorLock := *lock
+					doctorLock.Packs = append(slices.Clone(lock.Packs), "auth")
+					if err := doctorLock.Save(filepath.Join(root, project.LockFile)); err != nil {
+						t.Fatal(err)
+					}
 					for _, check := range doctor.Checks(doctor.Local, false) {
 						if check.ID != "roles-drift" {
 							continue
@@ -166,7 +173,7 @@ func TestRolesUpgradeCorpus(t *testing.T) {
 						}
 						return
 					}
-					t.Skip("roles-drift is a pre-seed stub. Run this check after its implementation is integrated")
+					t.Fatal("roles-drift is not registered")
 				})
 			}
 		})
