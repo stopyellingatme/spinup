@@ -126,17 +126,16 @@ func TestApplyPrintsWebNextSteps(t *testing.T) {
 	}
 }
 
-func TestNextStepsSkipWebInstallForEmbed(t *testing.T) {
+func TestNextStepsIncludeWebInstallForEmbed(t *testing.T) {
 	t.Parallel()
 	o := Options{Name: "todo", Dir: t.TempDir(), Answers: map[string]any{"module": "example.com/todo", "frontend_mode": "embed"}}
 	result, err := Generate(t.Context(), o, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, step := range nextSteps(result, o.Name) {
-		if strings.Contains(step, " install") {
-			t.Fatalf("embed next steps install web dependencies: %q", step)
-		}
+	steps := nextSteps(result, o.Name)
+	if !slices.Contains(steps, "pnpm --dir web install") {
+		t.Fatalf("embed next steps omit web dependencies: %q", steps)
 	}
 }
 

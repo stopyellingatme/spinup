@@ -127,7 +127,7 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	if err := prerequisites(ctx, root, o, hasWeb, runner); err != nil {
 		return err
 	}
-	if needsWebInstall(root, lock, hasWeb) {
+	if needsWebInstall(root, hasWeb) {
 		tool := webtool.FromLock(lock)
 		install := tool.InWeb(root, tool.Install(true, false))
 		install.Stdout = o.Out
@@ -227,8 +227,8 @@ func Run(ctx context.Context, o Options, runner exec.Runner) (runErr error) {
 	return errors.Join(err, watchErr)
 }
 
-func needsWebInstall(root string, lock *manifest.Lock, hasWeb bool) bool {
-	if !hasWeb || lock.Answers["frontend_mode"] == "embed" {
+func needsWebInstall(root string, hasWeb bool) bool {
+	if !hasWeb {
 		return false
 	}
 	_, err := os.Stat(filepath.Join(root, "web", "node_modules"))
