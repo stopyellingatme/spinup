@@ -1,0 +1,24 @@
+# {{ .Name }}
+
+This Node service belongs to {{ .App }}.
+It uses Hono and Node 24.
+
+Run the service from the application root with `spinup dev`.
+Generate the Go client with `spinup g client` when an OpenAPI file is declared.
+
+Run these commands in this directory for local development:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run typecheck
+pnpm start
+```
+
+The container listens on port {{ .Port }}.
+If you change the port, change the Dockerfile `PORT` value and its command together.
+`GET /healthz` returns `ok`.
+`POST /v1/sum` accepts `{"values": [1, 2.5]}` and returns `{"sum": 3.5}`.
+Run `node src/healthcheck.ts` to test readiness inside the container.
+
+Keep the package name `service` to preserve the lockfile and the Docker build.

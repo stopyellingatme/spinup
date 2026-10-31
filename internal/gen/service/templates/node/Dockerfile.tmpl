@@ -1,0 +1,10 @@
+# syntax=docker/dockerfile:1
+FROM {{ .NodeImage }}
+WORKDIR /app
+COPY --chown=node:node package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile --prod --ignore-scripts
+COPY --chown=node:node src ./src
+USER node
+ENV PORT={{ .Port }}
+EXPOSE {{ .Port }}
+CMD ["node", "src/main.ts"]
