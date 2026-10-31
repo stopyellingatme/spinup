@@ -18,10 +18,11 @@ func TestCheck(t *testing.T) {
 		name, roles, file, main, want string
 		status                        doctor.Status
 	}{
-		{name: "current", roles: "[auth]\nroles = [\"owner\", \"staff\"]\nadmin_role = \"owner\"\ndefault_role = \"staff\"\n", file: "custom", main: "auth.WithRoles(roles.Set)\napp.WithCommand(\"user\", auth.UserCommand(a))\n", status: doctor.OK},
-		{name: "missing file", roles: "", main: "auth.WithRoles(roles.Set)\napp.WithCommand(\"user\", auth.UserCommand(a))\n", status: doctor.Warn, want: "does not match"},
-		{name: "drift", roles: "", file: "old", main: "auth.WithRoles(roles.Set)\napp.WithCommand(\"user\", auth.UserCommand(a))\n", status: doctor.Warn, want: "does not match"},
+		{name: "current", roles: "[auth]\nroles = [\"owner\", \"staff\"]\nadmin_role = \"owner\"\ndefault_role = \"staff\"\n", file: "custom", main: completeMain("authn"), status: doctor.OK},
+		{name: "missing file", roles: "", main: completeMain("authn"), status: doctor.Warn, want: "does not match"},
+		{name: "drift", roles: "", file: "old", main: completeMain("authn"), status: doctor.Warn, want: "does not match"},
 		{name: "missing registration", roles: "", file: "default", main: "", status: doctor.Warn, want: "does not pass"},
+		{name: "missing registration call", roles: "", file: "default", main: "package main\nfunc main() { auth.WithRoles(roles.Set); app.WithCommand(\"user\", auth.UserCommand(a)) }\n", status: doctor.Warn, want: "does not pass"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -52,6 +53,10 @@ func TestCheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+func completeMain(authenticator string) string {
+	return "package main\nfunc main() { auth.WithRoles(roles.Set); auth.WithRegistration(auth.RegistrationMode(os.Getenv(\"AUTH_REGISTRATION\"))); app.WithCommand(\"user\", auth.UserCommand(" + authenticator + ")) }\n"
 }
 
 func TestCheckSkipsOutsideAndWithoutAuth(t *testing.T) {
