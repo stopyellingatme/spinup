@@ -724,6 +724,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		var parts []string
 		for _, f := range rc.fields {
 			value := sample(f, false, "")
+			if f.Type.Ref != "" && !f.Nullable {
+				value = "1"
+			}
 			if value == "%d" {
 				value = "1"
 			}

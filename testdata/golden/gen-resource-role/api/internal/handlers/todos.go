@@ -17,6 +17,7 @@ func init() {
 		"title",
 		"done",
 		"priority",
+		"owner_id",
 	}
 	requiredFields["POST /api/todos"] = required
 	requiredFields["PUT /api/todos/{id}"] = required
@@ -29,6 +30,7 @@ func todoFromStore(row store.Todo) gen.Todo {
 		Title:     row.Title,
 		Done:      row.Done,
 		Priority:  gen.TodoPriority(row.Priority),
+		OwnerId:   row.OwnerID,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}
@@ -45,6 +47,7 @@ func todoParams(in gen.TodoInput) (store.CreateTodoParams, error) {
 		Title:    in.Title,
 		Done:     in.Done,
 		Priority: string(in.Priority),
+		OwnerID:  in.OwnerId,
 	}
 	if in.Due != nil {
 		params.Due = &in.Due.Time
@@ -149,6 +152,7 @@ func (s *Server) UpdateTodo(ctx context.Context, req gen.UpdateTodoRequestObject
 		Done:     params.Done,
 		Due:      params.Due,
 		Priority: params.Priority,
+		OwnerID:  params.OwnerID,
 	})
 	if err != nil {
 		return nil, err
