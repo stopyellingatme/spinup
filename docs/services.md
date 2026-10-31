@@ -3,7 +3,8 @@
 A sidecar service is a part of your app in its own container.
 It runs next to the Go API and can use any language.
 The API and the jobs worker call it over HTTP on the private `app` network.
-In this version, the service is not public.
+By default, the service is not public.
+You can give it a public route through Caddy. See [Public routes](#public-routes).
 
 ## When to use a service
 
@@ -21,7 +22,7 @@ A service adds a container, an image to build, and a network call.
 
 ## Add a service
 
-Run `spinup g service <name> --lang rust|python` from the application root.
+Run `spinup g service <name> --lang rust|python|node` from the application root.
 The command writes `services/<name>/` and adds a `[[services]]` table to `spinup.toml`.
 See [Generate a service](commands/generate-service.md) for all flags.
 
@@ -46,8 +47,24 @@ health = "/healthz"
 
 The `rust` template uses axum on tokio.
 The `python` template uses FastAPI on uvicorn and uv.
+The `node` template uses Hono on Node 24 and pnpm.
 Each template has a Dockerfile, locked dependencies, a test, a README, and `openapi.yaml`.
 The `openapi.yaml` file is the contract that the Go client uses.
+
+## The Node template
+
+The `node` template is a TypeScript service on Hono (`hono` and `@hono/node-server`).
+It has no build step. Node 24 removes the types when it runs `node src/main.ts`.
+`tsconfig.json` sets `erasableSyntaxOnly` and `allowImportingTsExtensions`.
+`typescript` runs only as `tsc --noEmit`, through `pnpm run typecheck`.
+
+The template follows the same contract as the other templates:
+`GET /healthz`, `POST /v1/sum`, the shared `openapi.yaml`, and a pinned `pnpm-lock.yaml`.
+The image is the pinned `node` image.
+It runs as the user `node` (1000:1000) with a read-only root file system.
+It installs the dependencies with `pnpm install --frozen-lockfile --prod --ignore-scripts` and has no dev tools.
+The healthcheck command is `/usr/local/bin/node /app/src/healthcheck.ts`.
+Tests use `node --test` and `app.request()` from Hono, so they need no socket.
 
 The directory `services/<name>/` is the Docker build context.
 `services/<name>/Dockerfile` builds the image.
@@ -66,12 +83,17 @@ The directory `services/<name>/` is the Docker build context.
 | `env` | no | Literal variables that are not secret. A key cannot start with `SPINUP_` or `OTEL_`. |
 | `db` | no | If `true`, the service joins the `db` network. |
 | `gpus` | no | An empty value (none), `all`, or a count such as `1`. |
+| `public` | no | A public URL prefix such as `/svc/ocr`. See [Public routes](#public-routes). |
+| `auth` | no | The check on a public route: `none` (default) or `session`. It needs `public`. |
 
-The `rust` and `python` templates have a healthcheck command in the image.
-The Rust command is `/service healthcheck`, and the Python command is `/app/.venv/bin/python -m service.healthcheck`.
+The built-in templates have a healthcheck command in the image.
+The Rust command is `/service healthcheck`.
+The Python command is `/app/.venv/bin/python -m service.healthcheck`.
+The Node command is `/usr/local/bin/node /app/src/healthcheck.ts`.
 Both commands request `/healthz` on `127.0.0.1` and ignore the `health` field.
 If you change `health` in `spinup.toml`, change the healthcheck code of the template in the same way.
 The Rust code is in `src/main.rs`, and the Python code is in `service/healthcheck.py`.
+The Node code is in `src/healthcheck.ts`.
 
 A Go keyword such as `type` or `go` is not a valid name, because the name is the package name of the Go client.
 The reserved names are `api`, `web`, `migrate`, `worker`, `caddy`, `postgres`, `alloy`, `mailpit`, `grafana`, `loki`, `tempo`, `mimir`, `pyroscope`, `backup`, `backups`, `edge`, and `monitoring`.
@@ -179,8 +201,84 @@ If the monitoring module is on, a deployed service gets these variables:
 | `OTEL_SERVICE_NAME` | `<app>-<name>` |
 | `OTEL_RESOURCE_ATTRIBUTES` | `service.instance.id=${SPINUP_COLOR}` |
 
-The templates do not send traces. Add an OpenTelemetry SDK to your service to use these variables.
+The `rust` and `python` templates send traces to `OTEL_EXPORTER_OTLP_ENDPOINT` with OTLP over HTTP.
+If the variable is not set, as in tests or offline, the telemetry code does nothing.
+Each template reads the W3C `traceparent` header.
+A server span of the service is therefore a child of the span of the Go client in the API.
+`/healthz` makes no span.
+
+- The Rust code is in `src/telemetry.rs`. It uses a small axum middleware and the `opentelemetry` crates.
+- The Python code is in `service/telemetry.py`. It uses `FastAPIInstrumentor` and excludes `/healthz`.
+- The `node` template sends no traces. Add an OpenTelemetry SDK to your service to use these variables.
+
+Existing services keep their code, because `services/<name>/` is scaffold output.
+Only a new service gets the telemetry code.
+In the profile `lite`, Alloy drops traces. Use the profile `full` to see them in Tempo.
 The Go client already traces the call, so the API side of the trace is present.
+
+## Public routes
+
+A service is private by default. Only the API and the worker call it.
+To let browsers or other systems call a service, give it a public prefix.
+Caddy then serves the service below that prefix.
+
+```toml
+[[services]]
+name = "ocr"
+port = 8080
+dev_port = 8101
+health = "/healthz"
+public = "/svc/ocr"
+auth = "session"
+```
+
+You can also use the flags of the generator:
+
+<!-- doctest: skip -->
+```console
+$ spinup g service ocr --lang rust --public /svc/ocr --auth session
+```
+
+Follow these rules for the prefix:
+
+- It starts with `/`, does not end with `/`, and is not `/`.
+- Each segment matches `[a-z0-9][a-z0-9._-]*`.
+- It cannot equal or sit below `/api`, `/_app`, `/healthz`, `/readyz`, `/version`, or `/.well-known`.
+- It cannot equal or nest with the prefix of another service.
+
+`spinup deploy` writes the managed file `Caddyfile.d/spinup-services.caddy` into the release directory.
+It writes this file only when at least one service is public.
+An app with no public service gets no such file.
+If you have your own file with this name in `deploy/Caddyfile.d/`, the preflight fails.
+Rename your file.
+
+Each public service gets a route that strips the prefix.
+A request to `/svc/ocr/healthz` reaches the service as `/healthz`.
+A request to the bare prefix `/svc/ocr` gets a 308 redirect to `/svc/ocr/`.
+The route uses `upstream.caddy`, so it follows the color switch and the rollback.
+`spinup rollback` restores the route of the old release together with the service.
+
+The `auth` field selects the check on the route:
+
+| Value | Behavior |
+| --- | --- |
+| `none` | Caddy sends every request to the service. This is the default. |
+| `session` | Caddy first asks the API of the live color with `GET /api/session` and the cookies of the request. |
+
+With `auth = "session"`, a 2xx answer sends the request on to the service.
+Any other answer goes to the client unchanged, so a request with no session gets 401.
+Before the first switch, the route fails closed.
+The service gets the cookies of the request, but it gets no user identity header.
+The `session` mode needs the `auth` module.
+If the app does not have the module, `spinup` fails with a `Try:` line.
+
+The API middleware holds the CSRF check, and a public route skips it.
+So for `auth = "session"`, the route answers 403 to a request that is not GET, HEAD, or OPTIONS.
+This happens when the `Origin` header is not `{scheme}://{host}` of the request.
+
+The rate limits of the auth routes (see [Accounts and sessions](auth.md)) do not cover public routes.
+Each `session` request costs one session lookup in the API.
+The service owns its own limits, so add them in the service code.
 
 ## Limits and GPUs
 
@@ -254,7 +352,13 @@ See [Plugins](plugins.md).
 
 ## Limits of this version
 
-- A service has no public route through Caddy. Only the API and the worker call it.
-- The `rust` and `python` templates have no OpenTelemetry code inside.
-- Only `rust` and `python` are built in. Use a plugin template for other languages.
-- spinup adds no CI job for a service.
+- A public route passes no user identity header to the service.
+- The `node` template has no OpenTelemetry code inside.
+- Only `rust`, `python`, and `node` are built in. Use a plugin template for other languages.
+
+## CI
+
+The generated `ci.yml` has a `services` job when the app declares services.
+It builds each image and runs the tests of each service in Docker.
+You need no edit in the workflow when you add a service.
+See [Generated CI](ci.md).

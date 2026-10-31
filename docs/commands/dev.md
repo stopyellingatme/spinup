@@ -14,7 +14,10 @@ Error: unknown dev watcher "invalid"
 [exit 1]
 ```
 
-Copy `.env.example` to `.env` before the first start. Install the dependencies before you start the application.
+Copy `.env.example` to `.env` before the first start.
+If the app has a web frontend in `node` mode and `web/node_modules` does not exist, the command installs the web dependencies first.
+It uses the web tool of the lock, with a frozen lockfile.
+It does not install in `embed` mode, with `--no-web`, or when `web/node_modules` exists.
 Use Go 1.26 or later, Node 24 or later, pnpm through corepack, and Docker.
 On Windows, run the command in WSL2.
 

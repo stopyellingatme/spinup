@@ -17,6 +17,27 @@ spinup.lock
 spinup.toml
 ```
 
+When the command ends, it prints a Next block with the steps to run.
+An app with a web frontend in `node` mode gets the install command of the web tool between `spinup doctor` and `spinup dev`.
+An API-only app, or an app in `embed` mode, has no install step.
+The block ends with the default URLs.
+
+```
+Next:
+  cd shop
+  spinup doctor
+  pnpm --dir web install
+  spinup dev
+
+App      http://localhost:5173
+API      http://localhost:8080
+Mailpit  http://localhost:8025
+```
+
+The line `App` appears only when the app has the web pack.
+The install line depends on the package manager that you selected. With pnpm, it is `pnpm --dir web install`.
+The ports are the defaults. `spinup dev` picks other ports when these are busy.
+
 The command creates `.env` from `.env.example` with private permissions.
 The lock excludes `.env`.
 The lock records all pinned stack images and the normalized hash of each rendered file.
