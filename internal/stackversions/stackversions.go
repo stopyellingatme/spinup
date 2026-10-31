@@ -76,9 +76,11 @@ type Stack struct {
 	Images    map[string]Image  `yaml:"images"`
 	Binaries  map[string]Binary `yaml:"binaries"`
 	Actions   map[string]Action `yaml:"actions"`
-	// Crates and PythonPackages pin the sidecar service templates (ADR 0022).
+	// Crates, PythonPackages, and NodePackages pin the sidecar service templates
+	// (ADR 0022, ADR 0023).
 	Crates         map[string]string `yaml:"crates"`
 	PythonPackages map[string]string `yaml:"python_packages"`
+	NodePackages   map[string]string `yaml:"node_packages"`
 	// DigitalOcean holds the droplet defaults of `spinup deploy digital-ocean` (ADR 0017).
 	DigitalOcean DigitalOcean `yaml:"digitalocean"`
 }
@@ -142,6 +144,9 @@ func (s *Stack) Validate() error {
 	problems = append(problems, validateVersions("npm", s.NPM)...)
 	problems = append(problems, validateVersions("apt", s.Apt)...)
 	problems = append(problems, validateVersions("tools", s.Tools)...)
+	problems = append(problems, validateVersions("crates", s.Crates)...)
+	problems = append(problems, validateVersions("python_packages", s.PythonPackages)...)
+	problems = append(problems, validateVersions("node_packages", s.NodePackages)...)
 
 	for _, name := range sortedKeys(s.Images) {
 		image := s.Images[name]

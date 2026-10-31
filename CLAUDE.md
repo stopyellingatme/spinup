@@ -41,6 +41,7 @@ The Rust rewrite stopped after R2 (ADR `docs/adr/0022-go-and-sidecar-services.md
 - The DigitalOcean deploy contract (commands, the browser sign-in and token store, the API client, resources and tags, host key pins, provisioning steps, sslip.io, secret generation) is in `docs/adr/0017-digitalocean-deploy.md`.
 - The changes from the first live DigitalOcean test (the public repository and the kit pin, the local kit build context, the kit replace on upgrade, `--confirm-env`, the fake API rules, the live test script) are in `docs/adr/0018-live-test-learnings.md`.
 - The sidecar services contract (`[[services]]` in `spinup.toml`, `services/<name>/`, the generated Compose files, build and deploy, the Go client, the service templates, plugin service templates, the jobs worker in dev and deploy) is in `docs/adr/0022-go-and-sidecar-services.md`. The contract package `internal/services` is a shared file (main loop only).
+- The services follow-ups (public routes and the session check, OTel in the templates, the Node template, `spinup ci services` and `ci test-service`, the upkeep of the sidecar pins) are in `docs/adr/0023-services-follow-ups.md`.
 
 ## Commands
 
@@ -101,7 +102,7 @@ Only the main loop writes these files. A unit never edits them:
 - the M3 contract file `internal/gen/contract.go` (see `docs/adr/0007-m3-contracts.md`)
 - the M7 contract files `internal/backup/registry.go` and `internal/maintain/window.go` (see `docs/adr/0011-m7-contracts.md`)
 - the M9 contract file `internal/plugin/contract.go` (see `docs/adr/0013-m9-contracts.md`)
-- the services contract file `internal/services/services.go`, and the service template lockfiles `internal/gen/service/templates/rust/Cargo.toml`, `Cargo.lock`, `templates/python/pyproject.toml`, and `uv.lock` (see `docs/adr/0022-go-and-sidecar-services.md`)
+- the services contract file `internal/services/services.go`, and the service template lockfiles `internal/gen/service/templates/rust/Cargo.toml`, `Cargo.lock`, `templates/python/pyproject.toml`, `uv.lock`, `templates/node/package.json`, and `pnpm-lock.yaml` (see `docs/adr/0022-go-and-sidecar-services.md` and `docs/adr/0023-services-follow-ups.md`)
 - the web pack fragments `pack.d/deps.toml`, `pack.d/modes.toml`, and `pack.d/shadcn.toml` with their sources (`web/package.json.tmpl`, `web/pnpm-lock.yaml`, `web/bun.lock`, `web/pnpm-workspace.yaml`, `web/src/lib/components/ui/**`), the monitoring pack fragment `pack.d/vendor.toml` with the vendored dashboards, and `scripts/bin/`
 
 The pre-seed commit creates stub files (`doc.go`, or a stub `main.go`) for the packages of a milestone. A stub belongs to the unit whose file set contains it. That unit replaces the stub.

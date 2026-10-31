@@ -84,3 +84,56 @@ func TestDerivedNames(t *testing.T) {
 		}
 	}
 }
+
+func TestValidatePublicRoutes(t *testing.T) {
+	ok := valid()
+	ok.Public, ok.Auth = "/svc/ocr", AuthSession
+	other := valid()
+	other.Name, other.DevPort, other.Public = "embed", 8102, "/svc/embed"
+	if err := Validate([]Service{ok, other}, nil); err != nil {
+		t.Fatalf("Validate() = %v", err)
+	}
+	if !ok.IsPublic() || ok.AuthMode() != AuthSession || other.AuthMode() != AuthNone || valid().IsPublic() {
+		t.Fatalf("IsPublic or AuthMode is wrong")
+	}
+	for _, tc := range []struct {
+		name, public, auth, want string
+	}{
+		{"trailing slash", "/svc/ocr/", "", "does not end with /"},
+		{"not rooted", "svc/ocr", "", "starts with /"},
+		{"root", "/", "", "cannot be /"},
+		{"empty segment", "/svc//ocr", "", "segment"},
+		{"upper case", "/Svc", "", "segment"},
+		{"reserved api", "/api/ocr", "", "under /api"},
+		{"reserved exact", "/healthz", "", "under /healthz"},
+		{"bad auth", "/svc/ocr", "basic", "must be \"none\" or \"session\""},
+		{"auth without public", "", "session", "no public route"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := valid()
+			s.Public, s.Auth = tc.public, tc.auth
+			err := Validate([]Service{s}, nil)
+			if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "Try:") {
+				t.Fatalf("Validate() = %v, want an error with %q and a Try: line", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidatePublicOverlaps(t *testing.T) {
+	for _, tc := range []struct{ a, b string }{{"/svc/ocr", "/svc/ocr"}, {"/svc", "/svc/ocr"}} {
+		a, b := valid(), valid()
+		b.Name, b.DevPort = "embed", 8102
+		a.Public, b.Public = tc.a, tc.b
+		err := Validate([]Service{a, b}, nil)
+		if err == nil || !strings.Contains(err.Error(), "overlaps") || !strings.Contains(err.Error(), "Try:") {
+			t.Fatalf("Validate(%q, %q) = %v, want an overlap error", tc.a, tc.b, err)
+		}
+	}
+	a, b := valid(), valid()
+	b.Name, b.DevPort = "embed", 8102
+	a.Public, b.Public = "/svc/ocr", "/svc/ocrx"
+	if err := Validate([]Service{a, b}, nil); err != nil {
+		t.Fatalf("a sibling prefix with the same start is not an overlap: %v", err)
+	}
+}
