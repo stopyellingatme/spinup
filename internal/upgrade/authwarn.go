@@ -34,7 +34,7 @@ func authUpgradeWarnings(root *os.Root, plan *Plan) error {
 				}
 			}
 			if len(names) > 0 {
-				file.Reason = "Warning: migration version 5 is also used by " + strings.Join(names, ", ") + ".\nTry: rename your migration to the next free number, then run spinup upgrade again."
+				file.Reason = "Warning: migration version 5 is also used by " + strings.Join(names, ", ") + ".\nPending migration: Try: rename your migration to the next free number, then run spinup upgrade again.\nApplied migration: keep version 5. Try: rename 00005_users_role.sql to the next free number before you run spinup db migrate."
 			}
 		case project.RolesFilePath:
 			data, err := root.ReadFile(project.ConfigFile)
