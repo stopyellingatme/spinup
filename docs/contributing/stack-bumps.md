@@ -11,7 +11,7 @@ A dry run needs none of these tools.
 
 ## Report newer versions
 
-Run the `report` mode. It lists newer versions of the sidecar images, crates, Python packages, and Node packages.
+Run the `report` mode. It lists newer versions of the crates, Python packages, and Node packages. For each image, it prints the pinned tag and `manual check`.
 It writes nothing.
 
 <!-- doctest: skip -->
@@ -41,6 +41,7 @@ Run `make script RUN=app_gate_services` to build and test the three templates.
 The workflow `.github/workflows/canary-services.yml` runs every week.
 Its `report` job writes the output of `report` to the job summary.
 Its `canary` job runs `lock` and then the script `app_gate_services`.
+The direct pins and the image digests do not change, so the canary tests newer transitive dependencies only.
 The workflow opens no pull request.
 Read the summary, then change the pins by hand in one commit.
 

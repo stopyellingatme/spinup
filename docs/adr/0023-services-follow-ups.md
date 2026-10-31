@@ -55,10 +55,10 @@ ADR 0022 added sidecar services and put four items out of scope: public routes t
 
 ## 5. Upkeep of the sidecar pins (#42)
 
-- `scripts/bump-services.sh report` lists newer versions of the sidecar images, crates, Python packages, and Node packages. It writes nothing.
+- `scripts/bump-services.sh report` lists newer versions of the crates, Python packages, and Node packages from crates.io, PyPI, and npm. For each image, it prints the pinned tag and `manual check`, because tag schemes differ by registry. It writes nothing.
 - `scripts/bump-services.sh lock` regenerates `Cargo.lock`, `uv.lock`, and `pnpm-lock.yaml` inside the pinned images, from the pins of the manifests. `--dry-run` prints the commands.
-- Only CI or the main loop runs the script, because it writes shared files. A weekly canary workflow builds the templates with the newest versions and posts the report. It opens no pull request.
-- A tool that opens bump pull requests for the whole stack is a later issue.
+- Only CI or the main loop runs the script, because it writes shared files. A weekly canary workflow posts the report, regenerates the lockfiles, and runs the services app gate. The direct pins and the image digests do not change, so the canary tests newer transitive dependencies only. A newer direct pin or image needs a manual bump, which the report shows. The canary opens no pull request.
+- A tool that resolves newer direct pins and image tags, tests them, and opens bump pull requests for the whole stack is a later issue.
 
 ## Consequences
 
