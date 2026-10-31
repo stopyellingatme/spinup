@@ -44,6 +44,7 @@ func TestGoldenCi(t *testing.T) {
 				t.Errorf("files = %v, want %d", names, tc.files)
 			}
 			data := readCIFile(t, tree, ".github/workflows/ci.yml")
+			assertServicesCIWorkflow(t, data)
 			if strings.Contains(data, "\n  web:\n") != tc.web {
 				t.Error("wrong web job condition")
 			}
@@ -74,6 +75,38 @@ func TestGoldenCi(t *testing.T) {
 			}
 		})
 	}
+}
+
+func assertServicesCIWorkflow(t *testing.T, data string) {
+	t.Helper()
+	for _, want := range []string{
+		"\n  services:\n",
+		"${{ fromJSON(needs.spinup.outputs.matrix) }}",
+	} {
+		if !strings.Contains(data, want) {
+			t.Errorf("CI workflow lacks %q", want)
+		}
+	}
+
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(data), &document); err != nil {
+		t.Fatal(err)
+	}
+	var visit func(*yaml.Node)
+	visit = func(node *yaml.Node) {
+		if node.Kind == yaml.MappingNode {
+			for i := 0; i < len(node.Content); i += 2 {
+				key, value := node.Content[i], node.Content[i+1]
+				if key.Value == "run" && strings.Contains(value.Value, "${{ matrix.") {
+					t.Errorf("run block uses a matrix expression: %s", value.Value)
+				}
+			}
+		}
+		for _, child := range node.Content {
+			visit(child)
+		}
+	}
+	visit(&document)
 }
 
 // renderCI mirrors pack selection: web is independent of the optional modules.
