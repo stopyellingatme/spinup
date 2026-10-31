@@ -1,0 +1,207 @@
+use axum::{
+    extract::{MatchedPath, Request},
+    middleware::Next,
+    response::Response,
+};
+use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry_http::HeaderExtractor;
+use opentelemetry_otlp::{Protocol, WithExportConfig};
+use opentelemetry_sdk::{
+    Resource,
+    propagation::TraceContextPropagator,
+    trace::{BatchSpanProcessor, SdkTracerProvider},
+};
+use std::env;
+use tracing::{Instrument, field::Empty};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Install JSON logging and enable tracing when a collector endpoint is configured.
+pub fn init() -> Option<SdkTracerProvider> {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let fmt = tracing_subscriber::fmt::layer().json();
+    if env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        tracing_subscriber::registry().with(filter).with(fmt).init();
+        return None;
+    }
+
+    // The exporter reads the endpoint from the environment and adds /v1/traces.
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .with_protocol(Protocol::HttpBinary)
+        .build()
+        .expect("cannot create the OTLP exporter\nTry: check OTEL_EXPORTER_OTLP_ENDPOINT");
+    let resource = Resource::builder()
+        .with_service_name(
+            env::var("OTEL_SERVICE_NAME")
+                .ok()
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| "{{ .App }}-{{ .Name }}".to_owned()),
+        )
+        .build();
+    let provider = SdkTracerProvider::builder()
+        .with_resource(resource)
+        .with_span_processor(BatchSpanProcessor::builder(exporter).build())
+        .build();
+    global::set_text_map_propagator(TraceContextPropagator::new());
+    let tracer = provider.tracer("{{ .App }}-{{ .Name }}");
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt)
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
+    Some(provider)
+}
+
+/// Trace API requests and preserve the remote W3C parent context.
+pub async fn trace_request(request: Request, next: Next) -> Response {
+    let parent = global::get_text_map_propagator(|propagator| {
+        propagator.extract(&HeaderExtractor(request.headers()))
+    });
+    let method = request.method().as_str();
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+        .unwrap_or(request.uri().path());
+    let span = tracing::info_span!(
+        "HTTP",
+        otel.name = %format!("HTTP {method} {route}"),
+        otel.kind = "server",
+        http.request.method = method,
+        url.path = request.uri().path(),
+        http.response.status_code = Empty,
+        otel.status_code = Empty,
+    );
+    let _ = span.set_parent(parent);
+    async move {
+        let response = next.run(request).await;
+        let span = tracing::Span::current();
+        // The OTel visitor records unsigned integers as strings. Use its i64 path.
+        span.record(
+            "http.response.status_code",
+            i64::from(response.status().as_u16()),
+        );
+        if response.status().is_server_error() {
+            span.record("otel.status_code", "ERROR");
+        }
+        response
+    }
+    .instrument(span)
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{Router, body::Body, http::StatusCode, middleware, routing::get};
+    use opentelemetry::trace::{SpanId, SpanKind, Status, TraceId};
+    use opentelemetry_sdk::trace::{InMemorySpanExporter, SimpleSpanProcessor, SpanData};
+    use std::sync::Once;
+    use tower::ServiceExt;
+    use tracing::instrument::WithSubscriber;
+
+    async fn traced_request(router: Router, request: Request) -> (Response, Vec<SpanData>) {
+        // Each test has its own subscriber and exporter. The propagator is stateless.
+        static PROPAGATOR: Once = Once::new();
+        PROPAGATOR.call_once(|| global::set_text_map_propagator(TraceContextPropagator::new()));
+        let exporter = InMemorySpanExporter::default();
+        let provider = SdkTracerProvider::builder()
+            .with_span_processor(SimpleSpanProcessor::new(exporter.clone()))
+            .build();
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(provider.tracer("test")));
+        let response = router
+            .oneshot(request)
+            .with_subscriber(subscriber)
+            .await
+            .unwrap();
+        provider.force_flush().unwrap();
+        let spans = exporter.get_finished_spans().unwrap();
+        provider.shutdown().unwrap();
+        (response, spans)
+    }
+
+    #[tokio::test]
+    async fn sum_trace_has_remote_parent() {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/sum")
+            .header("content-type", "application/json")
+            .header(
+                "traceparent",
+                "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            )
+            .body(Body::from(r#"{"values":[1,2.5,-0.5]}"#))
+            .unwrap();
+        let (response, spans) = traced_request(crate::routes(), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(spans.len(), 1);
+        let span = &spans[0];
+        assert_eq!(
+            span.span_context.trace_id(),
+            TraceId::from_hex("4bf92f3577b34da6a3ce929d0e0e4736").unwrap()
+        );
+        assert_eq!(
+            span.parent_span_id,
+            SpanId::from_hex("00f067aa0ba902b7").unwrap()
+        );
+        assert_eq!(span.span_kind, SpanKind::Server);
+        assert_eq!(span.name.as_ref(), "HTTP POST /v1/sum");
+        for (key, value) in [
+            ("http.request.method", opentelemetry::Value::from("POST")),
+            ("url.path", opentelemetry::Value::from("/v1/sum")),
+            (
+                "http.response.status_code",
+                opentelemetry::Value::from(200_i64),
+            ),
+        ] {
+            assert!(
+                span.attributes
+                    .iter()
+                    .any(|attribute| attribute.key.as_str() == key && attribute.value == value)
+            );
+        }
+        assert!(!matches!(span.status, Status::Error { .. }));
+    }
+
+    #[tokio::test]
+    async fn health_route_has_no_span() {
+        let request = Request::builder()
+            .uri("/healthz")
+            .header(
+                "traceparent",
+                "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            )
+            .body(Body::empty())
+            .unwrap();
+        let (response, spans) = traced_request(crate::routes(), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(spans.is_empty());
+    }
+
+    #[tokio::test]
+    async fn server_error_marks_span() {
+        let router = Router::new()
+            .route(
+                "/v1/error",
+                get(|| async { StatusCode::INTERNAL_SERVER_ERROR }),
+            )
+            .route_layer(middleware::from_fn(trace_request));
+        let request = Request::builder()
+            .uri("/v1/error")
+            .body(Body::empty())
+            .unwrap();
+        let (response, spans) = traced_request(router, request).await;
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(spans.len(), 1);
+        assert!(matches!(spans[0].status, Status::Error { .. }));
+        assert!(spans[0].attributes.iter().any(|attribute| {
+            attribute.key.as_str() == "http.response.status_code"
+                && attribute.value == opentelemetry::Value::from(500_i64)
+        }));
+    }
+}

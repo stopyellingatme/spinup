@@ -153,3 +153,27 @@ func TestRenderedOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateRustTelemetryRenders(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"ocr", "scanner"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			out, err := generator(t).Run(t.Context(), input(t, config, name, "--lang", "rust"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files := out.Plan.FS()
+			data, err := fs.ReadFile(files, services.ContextDir(name)+"/src/telemetry.rs")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(data), `"todo-`+name+`"`) {
+				t.Fatal("telemetry has no rendered service name")
+			}
+			if strings.Contains(string(data), "{{") {
+				t.Fatal("telemetry contains an unexpanded template action")
+			}
+		})
+	}
+}
