@@ -20,6 +20,7 @@ import (
 [[- end ]]
  "github.com/stopyellingatme/spinup/kit/app"
 [[- if has "auth" .modules ]]
+ "[[ .module ]]/api/internal/roles"
  "github.com/stopyellingatme/spinup/kit/auth"
 [[- end ]]
  "github.com/stopyellingatme/spinup/kit/config"
@@ -70,7 +71,12 @@ func run() (err error) {
  if err := config.Load(&web); err != nil {
   return err
  }
- authn, err := auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))
+ authn, err := auth.New(pool,
+  auth.WithRoles(roles.Set),
+  auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
+  auth.WithSecureCookie(cfg.Env != "dev"),
+  auth.WithTrustedOrigins(web.PublicOrigin),
+ )
  if err != nil {
   return err
  }
@@ -91,6 +97,7 @@ func run() (err error) {
 [[- if has "auth" .modules ]]
   app.WithMiddleware(authn.Middleware()),
   app.WithRoutes(authn.Routes),
+  app.WithCommand("user", auth.UserCommand(authn)),
 [[- if has "mail" .modules ]]
   app.WithRoutes(resetRoutes),
 [[- end ]]

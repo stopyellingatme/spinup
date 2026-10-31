@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"example.com/todo/api/db/migrations"
+	"example.com/todo/api/internal/roles"
 	"example.com/todo/api/internal/routes"
 	"example.com/todo/api/openapi"
 	"github.com/stopyellingatme/spinup/kit/app"
@@ -55,7 +56,12 @@ func run() (err error) {
 	if err := config.Load(&web); err != nil {
 		return err
 	}
-	authn, err := auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))
+	authn, err := auth.New(pool,
+		auth.WithRoles(roles.Set),
+		auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
+		auth.WithSecureCookie(cfg.Env != "dev"),
+		auth.WithTrustedOrigins(web.PublicOrigin),
+	)
 	if err != nil {
 		return err
 	}
@@ -67,6 +73,7 @@ func run() (err error) {
 		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 		app.WithMiddleware(authn.Middleware()),
 		app.WithRoutes(authn.Routes),
+		app.WithCommand("user", auth.UserCommand(authn)),
 		app.WithReadiness("db", pool.Ping),
 		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
 		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),

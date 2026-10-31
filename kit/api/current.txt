@@ -58,6 +58,7 @@ kit/auth func DefaultRoles() Roles
 kit/auth func New(*pgxpool.Pool, ...Option) (*Auth, error)
 kit/auth func ParseRegistration(string) (RegistrationMode, error)
 kit/auth func Required(http.Handler) http.Handler
+kit/auth func UserCommand(*Auth) func(ctx context.Context, args []string) error
 kit/auth func UserFrom(context.Context) (User, bool)
 kit/auth func WithHashLimits(int, int, time.Duration) Option
 kit/auth func WithIdleTimeout(time.Duration) Option
