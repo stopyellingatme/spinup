@@ -1,0 +1,27 @@
+# Managed by spinup deploy from spinup.toml. Do not edit.
+# Do not use deploy/Caddyfile.d/spinup-services.caddy for a user file.
+
+redir /svc/ocr /svc/ocr/ 308
+handle_path /svc/ocr/* {
+	import ../upstream.caddy ocr 8081
+}
+
+redir /search /search/ 308
+handle_path /search/* {
+	route {
+		@crossOrigin {
+			not method GET HEAD OPTIONS
+			not header Origin {http.request.scheme}://{http.request.host}
+		}
+		respond @crossOrigin 403
+		import ../upstream.caddy api 8080 {
+			method GET
+			rewrite /api/session
+			header_up X-Forwarded-Method {method}
+			header_up X-Forwarded-Uri {http.request.orig_uri}
+			@good status 2xx
+			handle_response @good
+		}
+		import ../upstream.caddy search 9090
+	}
+}
