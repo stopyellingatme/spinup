@@ -39,4 +39,5 @@ spinup generate <kind> [args...]
 - [`spinup generate openapi`](generate-openapi.md) — Bundle OpenAPI files and generate Go types
 - [`spinup generate page`](generate-page.md) — Generate a SvelteKit page in web/src/routes
 - [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
+- [`spinup generate roles`](generate-roles.md) — Generate the app role set
 - [`spinup generate service`](generate-service.md) — Add a sidecar service

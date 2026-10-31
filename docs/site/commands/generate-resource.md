@@ -24,6 +24,7 @@ spinup generate resource <name> <field:type>... [flags]
 | `--no-tests` | `false` | skip the handler test file |
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
+| `--role` | `` | comma-separated roles that can use the resource (requires auth) |
 | `--shared` | `false` | share rows between signed-in users (requires auth) |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
