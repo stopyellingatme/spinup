@@ -41,6 +41,48 @@ func TestUserCommandUsage(t *testing.T) {
 	}
 }
 
+func TestUserCommandDoesNotExposeArgumentValues(t *testing.T) {
+	t.Parallel()
+	a := &Auth{roles: Roles{Names: []string{"owner", "cook"}, Admin: "owner", Default: "cook"}}
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "unexpected argument",
+			args: []string{"create", "--email", "a@example.com", "--role", "cook", "--password-stdin", "secret-password"},
+		},
+		{
+			name: "flag parser error",
+			args: []string{"create", "--email", "a@example.com", "--role", "cook", "--password-stdin=secret-password"},
+		},
+		{
+			name: "set role argument",
+			args: []string{"set-role", "--email", "a@example.com", "--role", "cook", "secret-password"},
+		},
+		{
+			name: "list argument",
+			args: []string{"list", "secret-password"},
+		},
+		{
+			name: "backfill argument",
+			args: []string{"backfill", "secret-password"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			err := runUserCommand(t.Context(), a, tt.args, strings.NewReader(""), &out)
+			if err == nil {
+				t.Fatal("runUserCommand returned nil")
+			}
+			if strings.Contains(err.Error(), "secret-password") {
+				t.Fatalf("error exposes an argument value: %q", err)
+			}
+		})
+	}
+}
+
 func TestUserCommandStore(t *testing.T) {
 	t.Parallel()
 	roles := Roles{Names: []string{"owner", "cook"}, Admin: "owner", Default: "cook"}

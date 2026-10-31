@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -54,10 +57,58 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 	if err != nil {
 		return warn("cannot read "+mainPath, "check the file permissions")
 	}
-	if !bytes.Contains(main, []byte("auth.WithRoles(")) || !bytes.Contains(main, []byte("app.WithCommand(\"user\", auth.UserCommand(a))")) {
+	if !hasMainCalls(main) {
 		return warn(mainPath+" does not pass the role set to the auth module.", "add auth.WithRoles(roles.Set), auth.WithRegistration(...) and app.WithCommand(\"user\", auth.UserCommand(a)) to main.go")
 	}
 	return doctor.Result{Status: doctor.OK, Message: "generated roles match [auth] in spinup.toml"}
+}
+
+func hasMainCalls(source []byte) bool {
+	file, err := parser.ParseFile(token.NewFileSet(), mainPath, source, parser.SkipObjectResolution)
+	if err != nil {
+		return false
+	}
+	var withRoles, withRegistration, userCommand bool
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch callName(call) {
+		case "WithRoles":
+			withRoles = true
+		case "WithRegistration":
+			withRegistration = true
+		case "WithCommand":
+			userCommand = userCommand || isUserCommandRegistration(call)
+		}
+		return true
+	})
+	return withRoles && withRegistration && userCommand
+}
+
+func callName(call *ast.CallExpr) string {
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	return selector.Sel.Name
+}
+
+func isUserCommandRegistration(call *ast.CallExpr) bool {
+	if len(call.Args) != 2 || stringLiteral(call.Args[0]) != "user" {
+		return false
+	}
+	command, ok := call.Args[1].(*ast.CallExpr)
+	return ok && callName(command) == "UserCommand"
+}
+
+func stringLiteral(expr ast.Expr) string {
+	literal, ok := expr.(*ast.BasicLit)
+	if !ok || literal.Kind != token.STRING {
+		return ""
+	}
+	return literal.Value[1 : len(literal.Value)-1]
 }
 
 func skip(reason string) doctor.Result {

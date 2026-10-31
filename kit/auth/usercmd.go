@@ -43,10 +43,10 @@ func createUserCommand(ctx context.Context, a *Auth, args []string, in io.Reader
 	role := flags.String("role", "", "declared role")
 	passwordStdin := flags.Bool("password-stdin", false, "read the password from standard input")
 	if err := parseUserFlags(flags, args); err != nil {
-		return userCommandError("user create", "invalid flags: "+err.Error(), "user create --email a@b.c --role staff --password-stdin")
+		return userCommandError("user create", "invalid flags", "user create --email a@b.c --role staff --password-stdin")
 	}
 	if flags.NArg() != 0 {
-		return userCommandError("user create", fmt.Sprintf("unexpected arguments %q", flags.Args()), "user create --email a@b.c --role staff --password-stdin")
+		return userCommandError("user create", "unexpected arguments", "user create --email a@b.c --role staff --password-stdin")
 	}
 	if *email == "" {
 		return userCommandError("user create", "--email is required", "user create --email a@b.c --role staff --password-stdin")
@@ -76,10 +76,10 @@ func setUserRoleCommand(ctx context.Context, a *Auth, args []string, out io.Writ
 	email := flags.String("email", "", "account email")
 	role := flags.String("role", "", "declared role")
 	if err := parseUserFlags(flags, args); err != nil {
-		return userCommandError("user set-role", "invalid flags: "+err.Error(), "user set-role --email a@b.c --role staff")
+		return userCommandError("user set-role", "invalid flags", "user set-role --email a@b.c --role staff")
 	}
 	if flags.NArg() != 0 {
-		return userCommandError("user set-role", fmt.Sprintf("unexpected arguments %q", flags.Args()), "user set-role --email a@b.c --role staff")
+		return userCommandError("user set-role", "unexpected arguments", "user set-role --email a@b.c --role staff")
 	}
 	if *email == "" {
 		return userCommandError("user set-role", "--email is required", "user set-role --email a@b.c --role staff")
@@ -95,7 +95,7 @@ func setUserRoleCommand(ctx context.Context, a *Auth, args []string, out io.Writ
 
 func listUsersCommand(ctx context.Context, a *Auth, args []string, out io.Writer) error {
 	if len(args) != 0 {
-		return userCommandError("user list", fmt.Sprintf("unexpected arguments %q", args), "user list")
+		return userCommandError("user list", "unexpected arguments", "user list")
 	}
 	users, err := a.ListUsers(ctx)
 	if err != nil {
@@ -112,7 +112,7 @@ func listUsersCommand(ctx context.Context, a *Auth, args []string, out io.Writer
 
 func backfillRolesCommand(ctx context.Context, a *Auth, args []string, out io.Writer) error {
 	if len(args) != 0 {
-		return userCommandError("user backfill", fmt.Sprintf("unexpected arguments %q", args), "user backfill")
+		return userCommandError("user backfill", "unexpected arguments", "user backfill")
 	}
 	count, err := a.BackfillRoles(ctx)
 	if err != nil {
