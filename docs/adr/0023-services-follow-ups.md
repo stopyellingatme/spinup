@@ -39,7 +39,7 @@ ADR 0022 added sidecar services and put four items out of scope: public routes t
 - `spinup g service <name> --lang node` adds a Node 24 TypeScript service on Hono (`hono`, `@hono/node-server`). There is no build step: Node 24 strips the types (`node src/main.ts`). `tsconfig.json` sets `erasableSyntaxOnly` and `allowImportingTsExtensions`, and `typescript` runs only as `tsc --noEmit`.
 - It follows the template contract of ADR 0022: `GET /healthz`, `POST /v1/sum` with the `SumResult` schema, the shared `openapi.yaml` (byte-identical across languages), a pinned lockfile, and an in-image health check command declared in `spinup.toml`.
   - The image is the pinned `node` image. It runs as user `node` (1000:1000), works with a read-only root file system, installs with `pnpm install --frozen-lockfile --prod --ignore-scripts` through corepack, and has no dev tools.
-  - The health check command is `["node", "src/healthcheck.ts"]`.
+  - The health check command is `["/usr/local/bin/node", "/app/src/healthcheck.ts"]`. Absolute paths keep it independent of the working directory of the exec.
 - Tests use `node --test` and `app.request()` from Hono, so they need no socket and no extra dependency.
 - The pins are in `stackversions.yaml` `node_packages` (`Stack.NodePackages`), and `typescript` is in `npm`. `TestTemplatePins` checks that `package.json` matches them exactly. `package.json` and `pnpm-lock.yaml` are shared files.
 
