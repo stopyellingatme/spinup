@@ -354,22 +354,69 @@ func migrationVersion(ms []migration) string {
 	return strconv.FormatInt(ms[len(ms)-1].Version, 10)
 }
 
-// pendingMigrations returns the migrations newer than the deployed version.
-func pendingMigrations(ms []migration, deployed string) []string {
-	var since int64 = -1
-	if deployed != "" {
-		v, err := strconv.ParseInt(deployed, 10, 64)
-		if err == nil {
-			since = v
-		}
+// pendingMigrations returns every migration absent from the complete applied set.
+func pendingMigrations(ms []migration, applied []int64) []string {
+	set := make(map[int64]bool, len(applied))
+	for _, version := range applied {
+		set[version] = true
 	}
 	var out []string
 	for _, m := range ms {
-		if m.Version > since {
+		if !set[m.Version] {
 			out = append(out, m.Name)
 		}
 	}
 	return out
+}
+
+const (
+	gooseTableQuery   = "SELECT CASE WHEN to_regclass('public.goose_db_version') IS NULL THEN '-1' ELSE '0' END"
+	gooseAppliedQuery = "SELECT version_id FROM goose_db_version WHERE is_applied ORDER BY version_id"
+)
+
+// AppliedMigrations returns all applied goose versions on the VM, in version order.
+// A database without the goose table gives an empty set.
+func AppliedMigrations(ctx context.Context, r remote.Runner, app string) ([]int64, error) {
+	psql := []string{"docker", "compose", "-p", app, "exec", "-T", "postgres", "psql", "-U", "app", "-d", "app", "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c"}
+	result, err := r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseTableQuery)})
+	if err != nil {
+		return nil, fmt.Errorf("query the goose table: %w\nTry: check postgres on the VM", err)
+	}
+	if strings.TrimSpace(string(result.Stdout)) == "-1" {
+		return nil, nil
+	}
+	result, err = r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseAppliedQuery)})
+	if err != nil {
+		return nil, fmt.Errorf("query the applied migrations: %w\nTry: check postgres on the VM", err)
+	}
+	var applied []int64
+	for _, value := range strings.Fields(string(result.Stdout)) {
+		version, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse the applied migration version %q: %w\nTry: inspect goose_db_version on the VM", value, err)
+		}
+		applied = append(applied, version)
+	}
+	return applied, nil
+}
+
+// pendingOnVM checks every applied version on an existing deployment.
+// Without a running database, every local migration is potentially pending.
+func (f *flow) pendingOnVM(ctx context.Context, cur *Release) ([]string, error) {
+	var applied []int64
+	if cur != nil {
+		result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"docker", "compose", "-p", f.l.app, "ps", "--status", "running", "-q", "postgres"}})
+		if err != nil {
+			return nil, fmt.Errorf("list the running postgres container: %w\nTry: check Docker on the VM", err)
+		}
+		if strings.TrimSpace(string(result.Stdout)) != "" {
+			applied, err = AppliedMigrations(ctx, f.vm, f.l.app)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return pendingMigrations(f.l.migrations, applied), nil
 }
 
 // readRemoteFileScript prints a file when it exists. A missing file prints nothing.

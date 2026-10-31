@@ -14,6 +14,11 @@ import (
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
+const (
+	gooseTableQuery   = "SELECT CASE WHEN to_regclass('public.goose_db_version') IS NULL THEN '-1' ELSE '0' END"
+	gooseAppliedQuery = "SELECT version_id FROM goose_db_version WHERE is_applied ORDER BY version_id"
+)
+
 const testConfig = "[global]\nrepo1-type=s3\nrepo1-retention-full=4\n"
 
 // newProject writes a project with the backups module and the supplied migrations.
@@ -62,13 +67,66 @@ func TestHookRegistered(t *testing.T) {
 	t.Fatal("the backup pre-deploy hook is not registered")
 }
 
+func TestHookOutOfOrderMigrations(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		skip    bool
+		running bool
+	}{
+		{"skip backup", true, true},
+		{"record rollback safety", false, true},
+		{"stopped database", true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := newProject(t, true, "", map[string]string{
+				"00004_drop.sql":    "-- +goose Up\nDROP TABLE todos;\n",
+				"00006_applied.sql": "-- +goose Up\n-- spinup:safe\nSELECT 1;\n",
+			})
+			f := &remote.Fake{}
+			releaseHistory(f, `[{"migration_version":"6"}]`)
+			container := ""
+			if tt.running {
+				container = "postgres\n"
+			}
+			f.Expect(psRunning...).Return(container, "", 0)
+			if tt.running {
+				f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("0\n", "", 0)
+				f.Expect(append(append([]string(nil), psql...), gooseAppliedQuery)...).Return("6\n", "", 0)
+			}
+			if !tt.skip {
+				f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				expectMetrics(f)
+			}
+			results := map[string]string{}
+			ctx := WithDeployOptions(context.Background(), DeployOptions{Dir: dir, SkipBackup: tt.skip})
+			err := Hook(ctx, &deploy.HookContext{App: "todo", Remote: f, Results: results})
+			switch {
+			case tt.skip:
+				if err == nil || !strings.Contains(err.Error(), "00004_drop.sql") || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("err = %v, want refusal for pending migration 4", err)
+				}
+			case err != nil:
+				t.Fatal(err)
+			case results[deploy.ResultMigrationsSafe] != "false":
+				t.Fatalf("migrations_safe = %q, want false", results[deploy.ResultMigrationsSafe])
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+
 func TestHook(t *testing.T) {
 	t.Parallel()
 	safe := "-- +goose Up\n-- spinup:safe adds a nullable column\nALTER TABLE todos ADD COLUMN note text;\n"
 	unsafe := "-- +goose Up\nALTER TABLE todos DROP COLUMN note;\n"
 	gooseExists := func(f *remote.Fake, version string) {
 		f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("0\n", "", 0)
-		f.Expect(append(append([]string(nil), psql...), gooseVersionQuery)...).Return(version+"\n", "", 0)
+		f.Expect(append(append([]string(nil), psql...), gooseAppliedQuery)...).Return(version+"\n", "", 0)
 	}
 	backupRun := func(f *remote.Fake) {
 		f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
@@ -241,17 +299,17 @@ func TestUnsafePending(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := UnsafePending(dir, 1)
+	got, err := UnsafePending(dir, []int64{1})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"00003_alter.sql", "00010_drop.sql"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("UnsafePending = %q, want %q", got, want)
 	}
-	if got, _ := UnsafePending(dir, 10); len(got) != 0 {
+	if got, _ := UnsafePending(dir, []int64{1, 2, 3, 10}); len(got) != 0 {
 		t.Fatalf("all applied gives %q", got)
 	}
-	if _, err := UnsafePending(filepath.Join(dir, "missing"), 0); err == nil {
+	if _, err := UnsafePending(filepath.Join(dir, "missing"), nil); err == nil {
 		t.Fatal("missing directory succeeded")
 	}
 }
@@ -262,9 +320,15 @@ func TestHookRecordsResults(t *testing.T) {
 		name      string
 		migration string
 		wantSafe  string
+		applied   string
+		queryCode int
+		skip      bool
 	}{
-		{"safe pending migration", "-- +goose Up\n-- spinup:safe adds a nullable column\nALTER TABLE todos ADD COLUMN note text;\n", "true"},
-		{"unsafe pending migration", "-- +goose Up\nALTER TABLE todos DROP COLUMN note;\n", "false"},
+		{name: "safe pending migration", migration: "-- +goose Up\n-- spinup:safe adds a nullable column\nALTER TABLE todos ADD COLUMN note text;\n", wantSafe: "true", applied: "1\n6\n"},
+		{name: "unsafe pending migration", migration: "-- +goose Up\nALTER TABLE todos DROP COLUMN note;\n", wantSafe: "false", applied: "1\n6\n"},
+		{name: "unsafe migration already applied", migration: "-- +goose Up\nALTER TABLE todos DROP COLUMN note;\n", wantSafe: "true", applied: "1\n2\n6\n"},
+		{name: "unknown safety", migration: "-- spinup:safe\nSELECT 1;\n", wantSafe: "false", queryCode: 1},
+		{name: "skip safe lower migration", migration: "-- spinup:safe\nSELECT 1;\n", wantSafe: "true", applied: "1\n6\n", skip: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -273,13 +337,16 @@ func TestHookRecordsResults(t *testing.T) {
 			releaseHistory(f, "[{}]")
 			f.Expect(psRunning...).Return("4f2a\n", "", 0)
 			f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("0\n", "", 0)
-			f.Expect(append(append([]string(nil), psql...), gooseVersionQuery)...).Return("1\n", "", 0)
-			f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
-			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
-			f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
-			f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+			f.Expect(append(append([]string(nil), psql...), gooseAppliedQuery)...).Return(tt.applied, "query failed", tt.queryCode)
+			if !tt.skip {
+				f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				expectMetrics(f)
+			}
 			results := map[string]string{}
-			ctx := WithDeployOptions(context.Background(), DeployOptions{Dir: dir})
+			ctx := WithDeployOptions(context.Background(), DeployOptions{Dir: dir, SkipBackup: tt.skip})
 			var out strings.Builder
 			if err := Hook(ctx, &deploy.HookContext{App: "todo", Release: "r1", Remote: f, Out: &out, Results: results}); err != nil {
 				t.Fatal(err)
@@ -288,7 +355,11 @@ func TestHookRecordsResults(t *testing.T) {
 			if results[deploy.ResultMigrationsSafe] != tt.wantSafe {
 				t.Fatalf("migrations_safe = %q, want %q", results[deploy.ResultMigrationsSafe], tt.wantSafe)
 			}
-			if _, err := time.Parse(time.RFC3339, results[deploy.ResultBackupTime]); err != nil {
+			if tt.skip {
+				if results[deploy.ResultBackupTime] != "" {
+					t.Fatal("skipped backup recorded a recovery time")
+				}
+			} else if _, err := time.Parse(time.RFC3339, results[deploy.ResultBackupTime]); err != nil {
 				t.Fatalf("backup time %q: %v", results[deploy.ResultBackupTime], err)
 			}
 		})

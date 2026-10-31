@@ -9,8 +9,8 @@ type HookOptions struct {
 	SkipBackup bool
 	// Root is the local project root.
 	Root string
-	// PendingMigrations are the local migration files (api/db/migrations) newer than the
-	// migration version of the current release. All files are pending on the first deploy.
+	// PendingMigrations are local migration files absent from the applied set.
+	// All files are potentially pending without a running database or a recorded release.
 	PendingMigrations []string
 }
 
