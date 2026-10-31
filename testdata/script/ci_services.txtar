@@ -1,0 +1,17 @@
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --modules ci --module example.com/todo --no-git --non-interactive
+cd todo
+
+exec spinup ci services --json
+stdout '^\{"include":\[\]\}$'
+
+exec spinup g service rs --lang rust
+exec spinup g service py --lang python
+
+exec spinup ci services --json
+stdout '^\{"include":\[\{"name":"rs","lang":"rust"\},\{"name":"py","lang":"python"\}\]\}$'
+
+exec spinup ci test-service rs --dry-run
+stdout 'RUN cargo test --locked'
+exec spinup ci test-service py --dry-run
+stdout 'uv run pytest'

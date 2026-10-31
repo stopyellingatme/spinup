@@ -16,6 +16,25 @@ $ spinup ci verify --json
 ...
 ```
 
+Use `spinup ci services --json` to create a GitHub Actions service matrix.
+The output is one compact JSON line.
+Use `spinup ci services` to show a table.
+
+Use `spinup ci test-service <name>` to test one declared service in Docker.
+Use `--dry-run` to print the temporary Dockerfile without Docker.
+
+```console
+$ spinup g service ocr --lang rust
+...
+$ spinup ci services --json
+{"include":[{"name":"ocr","lang":"rust"}]}
+$ spinup ci test-service ocr --dry-run
+FROM rust:1.99.1-alpine3.24@sha256:b1d5dd5a22a09404d3e798c0cf051b689077360374eb505fa5bb93c479693d87
+WORKDIR /app
+COPY . .
+RUN cargo test --locked
+```
+
 Use `--dry-run` to list the file actions without changes.
 Use `--diff` to display the differences without changes.
 Select only one preview flag.
