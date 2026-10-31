@@ -53,7 +53,13 @@ type fixture struct {
 
 func newFixture(t *testing.T, opts ...Option) *fixture {
 	t.Helper()
+	if os.Getenv("DATABASE_URL") == "" {
+		t.Skip("DATABASE_URL is not set")
+	}
 	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
+	if _, err := pool.Exec(t.Context(), `ALTER TABLE users ADD COLUMN role text NOT NULL DEFAULT ''`); err != nil {
+		t.Fatal(err)
+	}
 	c := &clock{now: time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)}
 	base := []Option{WithSecureCookie(false), withEnv(map[string]string{"AUTH_RATE_LIMIT": "off"}), func(o *options) { o.params = testParams; o.now = c.Now }}
 	a, err := New(pool, append(base, opts...)...)
@@ -445,7 +451,7 @@ type loginCheckKey struct{}
 
 // TraceQueryStart marks credential queries for TraceQueryEnd.
 func (tr *loginCheckTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	return context.WithValue(ctx, loginCheckKey{}, strings.HasPrefix(data.SQL, "SELECT id, email, password_hash FROM users"))
+	return context.WithValue(ctx, loginCheckKey{}, strings.Contains(data.SQL, ", password_hash FROM users WHERE email = $1"))
 }
 
 // TraceQueryEnd reports a completed credential query.
@@ -592,7 +598,11 @@ func TestBusyHashSlots(t *testing.T) {
 
 func TestHashLimitsValidation(t *testing.T) {
 	t.Parallel()
-	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
+	pool, err := pgxpool.New(t.Context(), "postgres://localhost/unused")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
 	for _, limits := range [][3]int{{0, 1, 1}, {1, -1, 1}, {1, 1, 0}} {
 		a, err := New(pool, WithHashLimits(limits[0], limits[1], time.Duration(limits[2])), withEnv(nil))
 		if err == nil {
@@ -763,7 +773,11 @@ func TestSessionStoreFailure(t *testing.T) {
 
 func TestNewErrors(t *testing.T) {
 	t.Parallel()
-	pool := testkit.DBWithMigrations(t, os.DirFS("testdata/migrations"))
+	pool, err := pgxpool.New(t.Context(), "postgres://localhost/unused")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
 	for _, tc := range []struct {
 		name string
 		pool *pgxpool.Pool

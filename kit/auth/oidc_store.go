@@ -23,8 +23,9 @@ func (a *Auth) oidcUser(ctx context.Context, provider, subject, email string, ve
 		return User{}, err
 	}
 	var user User
-	err = tx.QueryRow(ctx, `SELECT u.id,u.email FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = $1 AND i.subject = $2`, provider, subject).Scan(&user.ID, &user.Email)
+	err = tx.QueryRow(ctx, `SELECT `+userColumnsU+` FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = $1 AND i.subject = $2`, provider, subject).Scan(&user.ID, &user.Email, &user.Role)
 	if err == nil {
+		user.Role = a.effectiveRole(user.Role)
 		return user, tx.Commit(ctx)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -32,10 +33,20 @@ func (a *Auth) oidcUser(ctx context.Context, provider, subject, email string, ve
 	}
 	// The unique email key serializes different identities that share an email.
 	// Lock an existing account before removing its password and sessions.
-	err = tx.QueryRow(ctx, `INSERT INTO users (email,password_hash) VALUES ($1,NULL) ON CONFLICT (email) DO NOTHING RETURNING id,email`, email).Scan(&user.ID, &user.Email)
-	existing := errors.Is(err, pgx.ErrNoRows)
-	if existing {
-		err = tx.QueryRow(ctx, `SELECT id,email FROM users WHERE email = $1 FOR UPDATE`, email).Scan(&user.ID, &user.Email)
+	err = tx.QueryRow(ctx, `SELECT id, email, role FROM users WHERE email = $1 FOR UPDATE`, email).Scan(&user.ID, &user.Email, &user.Role)
+	existing := err == nil
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Linking a verified email to an existing account remains available.
+		// Only creation applies the registration mode and the first-user lock.
+		role, roleErr := a.registrationRole(ctx, tx)
+		if roleErr != nil {
+			return User{}, roleErr
+		}
+		err = tx.QueryRow(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, NULL, $2) ON CONFLICT (email) DO NOTHING RETURNING id, email, role`, email, role).Scan(&user.ID, &user.Email, &user.Role)
+		existing = errors.Is(err, pgx.ErrNoRows)
+		if existing {
+			err = tx.QueryRow(ctx, `SELECT id, email, role FROM users WHERE email = $1 FOR UPDATE`, email).Scan(&user.ID, &user.Email, &user.Role)
+		}
 	}
 	if err != nil {
 		return User{}, err
@@ -51,6 +62,7 @@ func (a *Auth) oidcUser(ctx context.Context, provider, subject, email string, ve
 	if _, err := tx.Exec(ctx, `INSERT INTO user_identities (provider,subject,user_id,email) VALUES ($1,$2,$3,$4)`, provider, subject, user.ID, email); err != nil {
 		return User{}, err
 	}
+	user.Role = a.effectiveRole(user.Role)
 	return user, tx.Commit(ctx)
 }
 

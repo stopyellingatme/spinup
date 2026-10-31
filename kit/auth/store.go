@@ -8,34 +8,67 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// userColumns qualifies columns only for queries without joins.
+const userColumns = "id, email, role"
+
+// userColumnsU avoids ambiguous email columns in identity joins.
+const userColumnsU = "u.id, u.email, u.role"
+
+// effectiveRole maps a stored role without granting implicit administrator access.
+func (a *Auth) effectiveRole(role string) string {
+	if role == "" && a.roles.Default != a.roles.Admin {
+		return a.roles.Default
+	}
+	return role
+}
+
 // userByID returns the user with id. found is false when no such user exists.
 func (a *Auth) userByID(ctx context.Context, id int64) (user User, found bool, err error) {
-	err = a.pool.QueryRow(ctx, `SELECT id, email FROM users WHERE id = $1`, id).Scan(&user.ID, &user.Email)
+	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id).Scan(&user.ID, &user.Email, &user.Role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, false, nil
 	}
+	user.Role = a.effectiveRole(user.Role)
 	return user, err == nil, err
 }
 
 // credentialsByEmail returns the user and the password hash for email. An account without a
 // password (OIDC only) is not found, so the password login gives the same generic error.
 func (a *Auth) credentialsByEmail(ctx context.Context, email string) (user User, hash string, found bool, err error) {
-	err = a.pool.QueryRow(ctx, `SELECT id, email, password_hash FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&user.ID, &user.Email, &hash)
+	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+`, password_hash FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&user.ID, &user.Email, &user.Role, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", false, nil
 	}
+	user.Role = a.effectiveRole(user.Role)
 	return user, hash, err == nil, err
 }
 
-// createUser inserts a user. created is false when the email is taken.
+// createUser applies the registration mode and inserts a user.
+// created is false when the email is taken.
 func (a *Auth) createUser(ctx context.Context, email, hash string) (user User, created bool, err error) {
-	err = a.pool.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING RETURNING id, email`,
-		email, hash).Scan(&user.ID, &user.Email)
+	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return User{}, false, err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	role, err := a.registrationRole(ctx, tx)
+	if err != nil {
+		return User{}, false, err
+	}
+	err = tx.QueryRow(ctx,
+		`INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id, email, role`,
+		email, hash, role).Scan(&user.ID, &user.Email, &user.Role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, false, nil
 	}
-	return user, err == nil, err
+	if err != nil {
+		return User{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return User{}, false, err
+	}
+	user.Role = a.effectiveRole(user.Role)
+	return user, true, nil
 }
 
 // updatePasswordHash replaces the hash of a user, but only when it still equals old.

@@ -59,17 +59,18 @@ type User struct {
 type Option func(*options)
 
 type options struct {
-	roles       Roles
-	secure      bool
-	lifetime    time.Duration
-	idleTimeout time.Duration
-	threshold   int
-	window      time.Duration
-	logger      *slog.Logger
-	origins     []string
-	params      params
-	cleanup     time.Duration
-	now         func() time.Time
+	registration RegistrationMode
+	roles        Roles
+	secure       bool
+	lifetime     time.Duration
+	idleTimeout  time.Duration
+	threshold    int
+	window       time.Duration
+	logger       *slog.Logger
+	origins      []string
+	params       params
+	cleanup      time.Duration
+	now          func() time.Time
 
 	hashConcurrent int
 	hashWaiting    int
@@ -128,20 +129,21 @@ func WithTrustedOrigins(origins ...string) Option {
 // Auth registers and authenticates users and owns their sessions.
 // Construct it with New. It is safe for concurrent use.
 type Auth struct {
-	roles     Roles
-	pool      *pgxpool.Pool
-	sessions  *scs.SessionManager
-	csrf      *http.CrossOriginProtection
-	logger    *slog.Logger
-	params    params
-	dummy     string
-	slots     *hashSlots
-	threshold int
-	window    time.Duration
-	now       func() time.Time
-	limits    *limiter // nil: no rate limit
-	proxies   proxySet
-	warnedAt  atomic.Int64
+	registration RegistrationMode
+	roles        Roles
+	pool         *pgxpool.Pool
+	sessions     *scs.SessionManager
+	csrf         *http.CrossOriginProtection
+	logger       *slog.Logger
+	params       params
+	dummy        string
+	slots        *hashSlots
+	threshold    int
+	window       time.Duration
+	now          func() time.Time
+	limits       *limiter // nil: no rate limit
+	proxies      proxySet
+	warnedAt     atomic.Int64
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -160,13 +162,17 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	// GOMAXPROCS: with more, the goroutines that hold pool connections wait for
 	// CPU, and every request that needs the database queues behind them.
 	slots := max(1, runtime.GOMAXPROCS(0)/10)
-	o := options{roles: DefaultRoles(), secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
+	o := options{registration: RegistrationOpen, roles: DefaultRoles(), secure: true, lifetime: DefaultLifetime, threshold: DefaultLockoutThreshold, window: DefaultLockoutWindow, params: defaultParams, cleanup: cleanupInterval, now: time.Now,
 		hashConcurrent: slots, hashWaiting: DefaultHashQueue * slots, hashWait: DefaultHashWait,
 		lookup: os.LookupEnv, sweep: logSweepInterval}
 	for _, opt := range opts {
 		opt(&o)
 	}
 	if err := o.roles.Validate(); err != nil {
+		return nil, err
+	}
+	registration, err := ParseRegistration(string(o.registration))
+	if err != nil {
 		return nil, err
 	}
 	settings, err := loadRateSettings(o.lookup)
@@ -202,17 +208,18 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		o.logger = slog.Default()
 	}
 	a := &Auth{
-		roles:     o.roles,
-		pool:      pool,
-		logger:    o.logger,
-		params:    o.params,
-		slots:     newHashSlots(o.hashConcurrent, o.hashWaiting, o.hashWait),
-		threshold: o.threshold,
-		window:    o.window,
-		now:       o.now,
-		proxies:   proxies,
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+		registration: registration,
+		roles:        o.roles,
+		pool:         pool,
+		logger:       o.logger,
+		params:       o.params,
+		slots:        newHashSlots(o.hashConcurrent, o.hashWaiting, o.hashWait),
+		threshold:    o.threshold,
+		window:       o.window,
+		now:          o.now,
+		proxies:      proxies,
+		stop:         make(chan struct{}),
+		done:         make(chan struct{}),
 	}
 
 	a.csrf = http.NewCrossOriginProtection()
