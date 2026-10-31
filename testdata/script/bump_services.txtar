@@ -1,0 +1,192 @@
+# These checks need no Docker daemon or network.
+[!exec:bash] skip 'bash is unavailable'
+[!exec:git] skip 'git is unavailable'
+[!exec:jq] skip 'jq is unavailable'
+
+# Use a temporary repository, including paths with spaces.
+mkdir 'repo with spaces/scripts' 'repo with spaces/internal/stackversions'
+cp $SPINUP_REPO/scripts/bump-services.sh 'repo with spaces/scripts/bump-services.sh'
+cp $SPINUP_REPO/internal/stackversions/stackversions.yaml 'repo with spaces/internal/stackversions/stackversions.yaml'
+cd 'repo with spaces'
+exec git init -q
+exec git add .
+exec git commit -qm baseline
+
+! exec bash scripts/bump-services.sh
+stderr 'Try: scripts/bump-services.sh report \| lock \[--dry-run\]'
+! exec bash scripts/bump-services.sh invalid
+stderr 'Try:'
+! exec bash scripts/bump-services.sh report --dry-run
+stderr 'Try:'
+! exec bash scripts/bump-services.sh lock --invalid
+stderr 'Try:'
+! exec bash scripts/bump-services.sh lock --dry-run extra
+stderr 'Try:'
+
+# A Docker stub fails if dry-run invokes it.
+exec chmod +x $WORK/tools/docker $WORK/tools/curl
+env PATH=$WORK/tools:$PATH
+exec bash scripts/bump-services.sh lock --dry-run
+stdout 'docker run --rm .*rust:.*@sha256:'
+stdout 'docker create .*ghcr.io/astral-sh/uv:.*@sha256:'
+stdout 'docker run --rm .*python:.*@sha256:'
+stdout 'docker run --rm .*node:.*@sha256:'
+stdout 'cargo generate-lockfile'
+stdout 'uv lock'
+stdout 'corepack pnpm install --lockfile-only'
+cp stdout $WORK/dry-run.txt
+exec bash $WORK/check-digests.sh internal/stackversions/stackversions.yaml $WORK/dry-run.txt
+env BUMP_SERVICES_DRY_RUN=1
+exec bash scripts/bump-services.sh lock
+cmp stdout $WORK/dry-run.txt
+env BUMP_SERVICES_FRESH=1
+exec bash scripts/bump-services.sh lock
+stdout 'cargo update'
+stdout 'uv lock --upgrade'
+env BUMP_SERVICES_DRY_RUN=
+env BUMP_SERVICES_FRESH=
+
+# The fake curl reads only these overridden registry endpoints.
+env BUMP_SERVICES_CRATES_API=https://fixtures.invalid/crates
+env BUMP_SERVICES_PYPI_API=https://fixtures.invalid/pypi
+env BUMP_SERVICES_NPM_API=https://fixtures.invalid/npm
+exec bash scripts/bump-services.sh report
+stdout '\| kind \| name \| pinned \| latest \| same-major \|'
+stdout '\| crate \| axum \| 0.8.9 \| 0.9.0 \| yes \|'
+stdout '\| crate \| serde \| 1.0.229 \| 2.0.0 \| no \|'
+stdout '\| crate \| tokio \| 1.54.1 \| unknown \| no \|'
+stdout '\| crate \| tower \| 0.5.3 \| unknown \| no \|'
+stdout '\| python \| fastapi \| 0.162.0 \| 0.163.0 \| yes \|'
+stdout '\| node \| @hono/node-server \| 2.1.5 \| 3.0.0 \| no \|'
+stdout '\| node \| @types/node \| 24.19.2 \| 3.0.0 \| no \|'
+stdout '\| image \| rust \| 1.99.1-alpine3.24 \| manual check \| no \|'
+stdout '\| image \| python \| 3.15.2-slim-trixie \| manual check \| no \|'
+stdout '\| image \| uv \| 0.13.6 \| manual check \| no \|'
+stdout '\| image \| node \| 24-bookworm-slim \| manual check \| no \|'
+stdout '\| image \| distroless-static-debian13 \| nonroot \| manual check \| no \|'
+! stdout 'fixture-secret'
+! stderr .
+
+# Failures for every registry still produce a complete report and exit zero.
+env REGISTRY_DOWN=1
+exec bash scripts/bump-services.sh report
+stdout '\| crate \| axum \| 0.8.9 \| unknown \| no \|'
+stdout '\| python \| fastapi \| 0.162.0 \| unknown \| no \|'
+stdout '\| node \| hono \| 4.13.14 \| unknown \| no \|'
+! stdout 'fixture-secret'
+! stderr .
+exec git status --porcelain
+! stdout .
+
+# Emulate Docker to check publication and cleanup without running containers.
+mkdir internal/gen/service/templates/rust internal/gen/service/templates/python internal/gen/service/templates/node
+cp $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.toml internal/gen/service/templates/rust/Cargo.toml
+cp $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.lock internal/gen/service/templates/rust/Cargo.lock
+cp $SPINUP_REPO/internal/gen/service/templates/python/pyproject.toml internal/gen/service/templates/python/pyproject.toml
+cp $SPINUP_REPO/internal/gen/service/templates/python/uv.lock internal/gen/service/templates/python/uv.lock
+cp $SPINUP_REPO/internal/gen/service/templates/node/package.json internal/gen/service/templates/node/package.json
+cp $SPINUP_REPO/internal/gen/service/templates/node/pnpm-lock.yaml internal/gen/service/templates/node/pnpm-lock.yaml
+exec git add .
+exec git commit -qm templates
+cp $WORK/docker-lock $WORK/tools/docker
+exec chmod +x $WORK/tools/docker
+env LOCK_WORK=$WORK/lock-work.txt
+
+# A failure in the final container leaves every source file unchanged.
+env DOCKER_FAIL=1
+! exec bash scripts/bump-services.sh lock
+stderr 'Try:'
+exec git status --porcelain
+! stdout .
+exec bash $WORK/check-cleanup.sh
+
+env DOCKER_FAIL=
+exec bash scripts/bump-services.sh lock
+stdout 'refreshed Cargo.lock, uv.lock, and pnpm-lock.yaml'
+grep '^refreshed rust$' internal/gen/service/templates/rust/Cargo.lock
+grep '^refreshed python$' internal/gen/service/templates/python/uv.lock
+grep '^refreshed node$' internal/gen/service/templates/node/pnpm-lock.yaml
+exec git diff --name-only
+stdout 'internal/gen/service/templates/rust/Cargo.lock'
+stdout 'internal/gen/service/templates/python/uv.lock'
+stdout 'internal/gen/service/templates/node/pnpm-lock.yaml'
+! stdout 'Cargo.toml|pyproject.toml|package.json|toolchain'
+exec git ls-files --others --exclude-standard
+! stdout .
+exec bash $WORK/check-cleanup.sh
+
+-- check-digests.sh --
+set -eu
+for name in rust python uv node; do
+  digest=$(awk -v key="$name:" '$1 == key { print }' "$1" | sed -E 's/.*digest: "([^"]+)".*/\1/')
+  test -n "$digest"
+  grep -F "$digest" "$2"
+done
+
+-- check-cleanup.sh --
+set -eu
+work=$(cat "$LOCK_WORK")
+test -n "$work"
+test ! -e "$work"
+
+-- docker-lock --
+#!/usr/bin/env bash
+set -eu
+case "$1" in
+  create) echo fixture-uv-container ;;
+  cp) printf 'uv fixture\n' > "$3" ;;
+  rm) test "$2" == fixture-uv-container ;;
+  run)
+    shift
+    project=
+    while [[ $# != 0 ]]; do
+      if [[ $1 == -v && $2 == *:/work ]]; then project=${2%:/work}; fi
+      shift
+    done
+    test -n "$project"
+    printf '%s\n' "${project%/*}" > "$LOCK_WORK"
+    case "$project" in
+      */rust)
+        test -f "$project/Cargo.lock"
+        test -f "$project/src/main.rs"
+        echo 'refreshed rust' > "$project/Cargo.lock"
+        echo 'changed manifest' > "$project/Cargo.toml"
+        echo 'toolchain fixture' > "$project/rust-toolchain.toml" ;;
+      */python)
+        test -f "$project/../uv"
+        test -f "$project/uv.lock"
+        echo 'refreshed python' > "$project/uv.lock"
+        echo 'changed manifest' > "$project/pyproject.toml" ;;
+      */node)
+        if [[ ${DOCKER_FAIL:-0} == 1 ]]; then exit 1; fi
+        echo 'refreshed node' > "$project/pnpm-lock.yaml"
+        echo 'changed manifest' > "$project/package.json" ;;
+      *) exit 1 ;;
+    esac ;;
+  *) exit 1 ;;
+esac
+
+-- tools/docker --
+#!/usr/bin/env bash
+echo 'dry-run invoked Docker' >&2
+exit 1
+
+-- tools/curl --
+#!/usr/bin/env bash
+set -eu
+for url in "$@"; do :; done
+if [[ ${REGISTRY_DOWN:-0} == 1 ]]; then
+  echo 'fixture-secret' >&2
+  exit 22
+fi
+case "$url" in
+  https://fixtures.invalid/crates/tokio)
+    echo 'fixture-secret' >&2
+    exit 22 ;;
+  https://fixtures.invalid/crates/tower) echo 'invalid JSON fixture-secret' ;;
+  https://fixtures.invalid/crates/axum) echo '{"crate":{"max_stable_version":"0.9.0"}}' ;;
+  https://fixtures.invalid/crates/*) echo '{"crate":{"max_stable_version":"2.0.0"}}' ;;
+  https://fixtures.invalid/pypi/*/json) echo '{"info":{"version":"0.163.0"}}' ;;
+  https://fixtures.invalid/npm/*) echo '{"dist-tags":{"latest":"3.0.0"}}' ;;
+  *) echo 'unexpected registry endpoint fixture-secret' >&2; exit 1 ;;
+esac
