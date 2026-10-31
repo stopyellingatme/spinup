@@ -101,6 +101,9 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 	for name := range lock.Files {
 		paths[name] = true
 	}
+	if err := addPlanMigrationPaths(r.Root, paths); err != nil {
+		return nil, fmt.Errorf("inspect project migrations for planning: %w\nTry: check permissions on api/db/migrations", err)
+	}
 	for _, version := range versions {
 		to, loadErr := r.Source.Load(ctx, version)
 		if loadErr != nil {
@@ -178,6 +181,25 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		}
 	}
 	return report, nil
+}
+
+func addPlanMigrationPaths(source string, paths map[string]bool) error {
+	root, err := os.OpenRoot(source)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	entries, err := fs.ReadDir(root.FS(), "api/db/migrations")
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		paths["api/db/migrations/"+entry.Name()] = true
+	}
+	return nil
 }
 
 // printKitNotes prints the kit steps of a target version and the behavior versions that are

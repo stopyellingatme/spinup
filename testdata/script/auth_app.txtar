@@ -18,7 +18,12 @@ stdout '"web/src/lib/server/auth.ts": \{\n[[:space:]]+"class": "managed"'
 stdout '"web/src/routes/login/\+page.server.ts": \{\n[[:space:]]+"class": "scaffold"'
 
 # main.go wires kit auth. Form actions re-set the Go cookie with getSetCookie() (ADR 0002 rule 7).
-grep 'auth.New\(pool, auth.WithSecureCookie\(cfg.Env != "dev"\), auth.WithTrustedOrigins\(web.PublicOrigin\)\)' api/cmd/api/main.go
+grep 'auth.New\(pool,$' api/cmd/api/main.go
+grep 'auth.WithRoles\(roles.Set\),' api/cmd/api/main.go
+grep 'auth.WithRegistration\(auth.RegistrationMode\(os.Getenv\("AUTH_REGISTRATION"\)\)\),' api/cmd/api/main.go
+grep 'auth.WithSecureCookie\(cfg.Env != "dev"\),' api/cmd/api/main.go
+grep 'auth.WithTrustedOrigins\(web.PublicOrigin\),' api/cmd/api/main.go
+grep 'app.WithCommand\("user", auth.UserCommand\(authn\)\)' api/cmd/api/main.go
 grep 'app.WithMiddleware\(authn.Middleware\(\)\)' api/cmd/api/main.go
 grep 'app.WithRoutes\(authn.Routes\)' api/cmd/api/main.go
 grep 'res.headers.getSetCookie\(\)' web/src/lib/server/auth.ts

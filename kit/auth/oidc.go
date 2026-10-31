@@ -325,6 +325,10 @@ func (h *oidcHandler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, err := h.user(ctx, p.name, id.Subject, email, verified)
+	if errors.Is(err, errRegistrationClosed) {
+		registrationClosed(w, r)
+		return
+	}
 	if err != nil {
 		h.auth.internalError(w, r, "link the OIDC identity", err)
 		return

@@ -77,3 +77,90 @@ $ test ! -e corpus/.env
 Use the generated files as the synthetic tree when you deliberately refresh the development corpus.
 Preserve dotfiles and file permissions when you copy them.
 Refresh the schema fixtures only when their intended inputs change.
+
+## Upgrade an app to roles
+
+The roles cases are in `testdata/corpus/roles/`.
+They use a small synthetic tree and the real Git merger.
+They check existing users, an app migration at version 5, a `main.go` conflict, and custom roles.
+The upgrade creates `00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
+It preserves app files and `spinup.toml`.
+
+Run the roles checks:
+
+```sh
+go test -race ./internal/upgrade/... -run 'AuthUpgradeWarnings|RolesUpgradeCorpus'
+make script RUN='upgrade_roles_*'
+```
+
+The script compiles the API without a database.
+With `DATABASE_URL`, it applies version 5 after version 4.
+It also applies a new version 4 after version 5.
+It checks that existing sessions read the default role.
+It uses a recorder and needs no HTTP listener.
+Run the database checks after all roles units are integrated.
+
+If another `00005_*.sql` exists, the plan warns about the duplicate version.
+Rename the app migration to the next free number before you migrate.
+Check applied versions before you rename an applied migration.
+The kit accepts a pending migration below the highest applied version.
+
+The plan stores each warning in the reason for the new file.
+The JSON report also includes this reason.
+The preview currently copies only tracked and rendered paths.
+An app migration outside those paths needs integration work in `internal/upgrade/run_plan.go`.
+The applied plan reads the complete worktree and reports the collision.
+
+If `[auth]` exists without `roles.gen.go`, the plan creates the default file and prints a note.
+Run `spinup g roles` after the upgrade.
+A custom `[auth]` does not change the template merge base.
+No codemod is necessary for the `auth`, `web`, or `api` pack.
+New files and the merge process handle these changes.
+The behavior version stays at 1.
+
+### Complete the auth configuration
+
+Resolve a conflict in `api/cmd/api/main.go` before you start the new binary.
+Import the app package `api/internal/roles` through its module path.
+Parse `AUTH_REGISTRATION` with `auth.ParseRegistration` and handle its error.
+Pass these options to `auth.New`:
+
+```go
+auth.WithRoles(roles.Set),
+auth.WithRegistration(registration),
+```
+
+Register the operator command in `app.New`:
+
+```go
+app.WithCommand("user", auth.UserCommand(authn)),
+```
+
+Run `spinup doctor` to check the role file and the auth configuration.
+The `roles-drift` check reports missing configuration in `main.go`.
+If `main.go` keeps its previous configuration, the kit uses `auth.DefaultRoles()`.
+Custom roles require `auth.WithRoles(roles.Set)`.
+
+Run `spinup db migrate up` before you start the new binary.
+The new auth queries need the `role` column.
+An old schema causes login to fail with HTTP 500.
+Deploy already migrates before it starts the new binary.
+
+Assign an administrator to the existing app.
+Run the app binary with `user set-role --email <email> --role <admin_role>`.
+Then run the app binary with `user backfill`.
+The first command assigns the administrator role from `[auth]`.
+The second command assigns the default role to rows with an empty role.
+It refuses when the default role equals the administrator role.
+
+If `main.go` does not register `user`, use this SQL fallback:
+
+```sql
+UPDATE users SET role = '<admin_role>' WHERE email = lower('<email>');
+```
+
+Replace both placeholders with the app values.
+Then add the command registration and run `user backfill`.
+Before assignment, existing users have an empty stored role.
+They read as the default role unless it equals the administrator role.
+In that case, an empty role grants no role.

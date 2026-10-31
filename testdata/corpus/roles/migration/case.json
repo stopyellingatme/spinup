@@ -1,0 +1,3 @@
+{
+  "warning": "Try: rename your migration to the next free number, then run spinup upgrade again."
+}

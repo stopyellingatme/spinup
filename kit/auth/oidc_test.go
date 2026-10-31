@@ -431,12 +431,12 @@ func TestOIDCRoutesEnvironment(t *testing.T) {
 	}
 }
 
-func oidcDBFixture(t *testing.T) *fixture {
+func oidcDBFixture(t *testing.T, opts ...Option) *fixture {
 	t.Helper()
 	if os.Getenv("DATABASE_URL") == "" {
 		t.Skip("OIDC database integration tests require DATABASE_URL")
 	}
-	f := newFixture(t)
+	f := newFixture(t, opts...)
 	sql, err := os.ReadFile("../../internal/templates/packs/auth/files/api/db/migrations/00004_oidc_identities.sql")
 	if err != nil {
 		t.Fatal(err)

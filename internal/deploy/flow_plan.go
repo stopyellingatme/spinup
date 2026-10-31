@@ -95,11 +95,10 @@ func (f *flow) plan(ctx context.Context) error {
 		fmt.Fprintf(w, "  %s: %s -> %s\n", img.Service, old, img.Tag)
 	}
 
-	deployed := ""
-	if cur != nil {
-		deployed = cur.MigrationVersion
+	pending, err := f.pendingOnVM(ctx, cur)
+	if err != nil {
+		return err
 	}
-	pending := pendingMigrations(f.l.migrations, deployed)
 	fmt.Fprintf(w, "Migrations: %d pending\n", len(pending))
 	for _, m := range pending {
 		fmt.Fprintf(w, "  %s\n", m)

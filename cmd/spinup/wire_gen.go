@@ -55,7 +55,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/plugin/rpc"
 
 	// Sidecar services (ADR 0022)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/rolesdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/services"
+	_ "github.com/stopyellingatme/spinup/internal/gen/roles"
 	_ "github.com/stopyellingatme/spinup/internal/gen/service"
 	_ "github.com/stopyellingatme/spinup/internal/gen/serviceclient"
 )

@@ -34,6 +34,9 @@ kit/auth const DefaultLockoutThreshold = 5
 kit/auth const DefaultLockoutWindow = 15 * time.Minute
 kit/auth const MaxPasswordLength = 512
 kit/auth const MinPasswordLength = 12
+kit/auth const RegistrationClosed RegistrationMode = "closed"
+kit/auth const RegistrationFirstUser RegistrationMode = "first-user"
+kit/auth const RegistrationOpen RegistrationMode = "open"
 kit/auth const ResetLifetime = time.Hour
 kit/auth field Limit.Burst int
 kit/auth field Limit.Every time.Duration
@@ -45,10 +48,17 @@ kit/auth field RateLimits.Register Limit
 kit/auth field RateLimits.ResetConfirm Limit
 kit/auth field RateLimits.ResetRequest Limit
 kit/auth field ResetData.URL string
+kit/auth field Roles.Admin string
+kit/auth field Roles.Default string
+kit/auth field Roles.Names []string
 kit/auth field User.Email string
 kit/auth field User.ID int64
+kit/auth field User.Role string
+kit/auth func DefaultRoles() Roles
 kit/auth func New(*pgxpool.Pool, ...Option) (*Auth, error)
+kit/auth func ParseRegistration(string) (RegistrationMode, error)
 kit/auth func Required(http.Handler) http.Handler
+kit/auth func UserCommand(*Auth) func(ctx context.Context, args []string) error
 kit/auth func UserFrom(context.Context) (User, bool)
 kit/auth func WithHashLimits(int, int, time.Duration) Option
 kit/auth func WithIdleTimeout(time.Duration) Option
@@ -57,26 +67,44 @@ kit/auth func WithLockout(int, time.Duration) Option
 kit/auth func WithLogger(*slog.Logger) Option
 kit/auth func WithMailer(mail.Mailer) ResetOption
 kit/auth func WithRateLimits(RateLimits) Option
+kit/auth func WithRegistration(RegistrationMode) Option
 kit/auth func WithResetFrom(string) ResetOption
 kit/auth func WithResetTemplates(fs.FS) ResetOption
 kit/auth func WithResetURL(string) ResetOption
+kit/auth func WithRoles(Roles) Option
 kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
 kit/auth func WithTrustedProxies(...string) Option
 kit/auth func WithUser(context.Context, User) context.Context
+kit/auth method Roles.Valid(string) bool
+kit/auth method Roles.Validate() error
+kit/auth method User.HasRole(...string) bool
+kit/auth ptrmethod Auth.BackfillRoles(context.Context) (int64, error)
 kit/auth ptrmethod Auth.Close(context.Context) error
+kit/auth ptrmethod Auth.CreateUser(context.Context, string, string, string) (User, error)
+kit/auth ptrmethod Auth.ListUsers(context.Context) ([]User, error)
 kit/auth ptrmethod Auth.Middleware() httpx.Middleware
+kit/auth ptrmethod Auth.RequireRole(...string) func(http.Handler) http.Handler
 kit/auth ptrmethod Auth.RequireUser(http.Handler) http.Handler
 kit/auth ptrmethod Auth.ResetRoutes(*http.ServeMux, ...ResetOption) error
+kit/auth ptrmethod Auth.Roles() Roles
 kit/auth ptrmethod Auth.Routes(*http.ServeMux)
+kit/auth ptrmethod Auth.SetRole(context.Context, string, string) error
 kit/auth type Auth struct
 kit/auth type Limit struct
 kit/auth type Option func(*options)
 kit/auth type RateLimits struct
+kit/auth type RegistrationMode string
 kit/auth type ResetData struct
 kit/auth type ResetOption func(*resetOptions)
+kit/auth type Roles struct
 kit/auth type User struct
+kit/auth var ErrLastAdmin error
+kit/auth var ErrUnknownRole error
+kit/auth var ErrUserNotFound error
 kit/auth/authtest func As(http.Handler, int64) http.Handler
+kit/auth/authtest func AsRole(http.Handler, int64, string) http.Handler
+kit/auth/authtest func AsUser(http.Handler, auth.User) http.Handler
 kit/backup const Path = "/_deploy/backup"
 kit/backup field Response.Error string
 kit/backup field Response.LastBackupAgeSeconds *float64

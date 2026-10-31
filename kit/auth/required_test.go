@@ -76,3 +76,74 @@ func TestWithUser(t *testing.T) {
 		t.Fatalf("UserFrom = %+v, want %+v", got, want)
 	}
 }
+
+func TestRequireRole(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		user *User
+		want int
+	}{
+		{"no user", nil, http.StatusUnauthorized},
+		{"wrong role", &User{ID: 1, Role: "front_desk"}, http.StatusForbidden},
+		{"empty role", &User{ID: 1}, http.StatusForbidden},
+		{"undeclared stored role", &User{ID: 1, Role: "removed"}, http.StatusForbidden},
+		{"right role", &User{ID: 1, Role: "owner"}, http.StatusOK},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := &Auth{roles: Roles{[]string{"owner", "front_desk"}, "owner", "front_desk"}}
+			called := false
+			h := a.RequireRole("owner")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) }))
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			if tt.user != nil {
+				req = req.WithContext(WithUser(req.Context(), *tt.user))
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.want || called != (tt.want == http.StatusOK) {
+				t.Fatalf("status = %d, called = %v, want %d", rec.Code, called, tt.want)
+			}
+			if tt.want == http.StatusOK {
+				return
+			}
+			if rec.Header().Get("Content-Type") != "application/problem+json" || rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("WWW-Authenticate") != "" {
+				t.Fatalf("headers = %v", rec.Header())
+			}
+			problem := testkit.DecodeJSON[httpx.Problem](t, rec)
+			if problem.Status != tt.want {
+				t.Fatalf("problem = %+v", problem)
+			}
+			if tt.want == http.StatusForbidden && problem.Detail != "Your role cannot use this endpoint. Try: sign in with an account that has a required role." {
+				t.Fatalf("detail = %q", problem.Detail)
+			}
+		})
+	}
+}
+
+func TestRequireRoleConstruction(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		roles []string
+		panic bool
+	}{
+		{"empty", nil, true},
+		{"empty name", []string{""}, true},
+		{"undeclared", []string{"manager"}, true},
+		{"mixed", []string{"owner", "manager"}, true},
+		{"one", []string{"owner"}, false},
+		{"several", []string{"owner", "front_desk"}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if got := recover(); (got != nil) != tt.panic {
+					t.Errorf("panic = %v, want panic %v", got, tt.panic)
+				}
+			}()
+			a := &Auth{roles: Roles{[]string{"owner", "front_desk"}, "owner", "front_desk"}}
+			a.RequireRole(tt.roles...)
+		})
+	}
+}

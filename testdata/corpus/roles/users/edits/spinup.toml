@@ -1,0 +1,7 @@
+modules = ["auth"]
+
+[app]
+name = "roles-corpus"
+module = "example.com/roles-corpus"
+
+# The app owns this configuration.

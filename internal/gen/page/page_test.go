@@ -65,6 +65,7 @@ func flags(t *testing.T, args ...string) *pflag.FlagSet {
 	t.Helper()
 	fs := pflag.NewFlagSet("page", pflag.ContinueOnError)
 	fs.Bool("server", false, "")
+	fs.String("role", "", "")
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(err)
 	}
@@ -247,5 +248,26 @@ func TestPlanShellAndAuth(t *testing.T) {
 	page, _ := out.Plan.Get("web/src/routes/about/+page.svelte")
 	if !strings.Contains(string(page.Data), `<PageHeader title="About" />`) || strings.Contains(string(page.Data), "$props") {
 		t.Fatalf("client page:\n%s", page.Data)
+	}
+}
+
+func TestRolePage(t *testing.T) {
+	t.Parallel()
+	lock := webLock()
+	lock.Packs = append(lock.Packs, "auth")
+	root := t.TempDir()
+	out, err := plan(t.Context(), gen.Input{Root: root, Lock: lock, Args: []string{"admin"}, Flags: flags(t, "--server", "--role", "manager,staff")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, _ := out.Plan.Get("web/src/routes/admin/+page.server.ts")
+	if got := string(server.Data); !strings.Contains(got, "import { requireRole } from '#lib/server/auth.js';") || !strings.Contains(got, "requireRole(locals, url, 'manager', 'staff');") {
+		t.Fatalf("server page =\n%s", got)
+	}
+	for _, args := range [][]string{{"--role", "manager"}, {"--server", "--role", "other"}, {"--server", "--role", ""}} {
+		_, err := plan(t.Context(), gen.Input{Root: root, Lock: lock, Args: []string{"admin"}, Flags: flags(t, args...)})
+		if err == nil || !strings.Contains(err.Error(), "Try:") {
+			t.Fatalf("flags %v error = %v", args, err)
+		}
 	}
 }

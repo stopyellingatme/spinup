@@ -94,7 +94,7 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 		return vfs.Plan{}, nil, err
 	}
 	data := newPageData(spec)
-	data.Auth = slices.Contains(lock.Packs, "auth")
+	data.Auth = slices.Contains(lock.Packs, "auth") || len(spec.Roles) > 0
 	var plan vfs.Plan
 	for _, f := range pageFiles {
 		out, err := renderPage(f.path, f.source, data)
@@ -212,6 +212,10 @@ type pageData struct {
 	// Auth is true when the app has the auth module: every load and action
 	// requires a signed-in user.
 	Auth bool
+	// Roles lists the roles that can use this resource.
+	Roles []string
+	// RoleLiterals is the TypeScript list of role string literals.
+	RoleLiterals string
 	// Fields are the form fields, in argument order.
 	Fields []pageField
 	// TitleCol is the first string field, the title of an item. It is empty
@@ -247,6 +251,14 @@ func newPageData(spec Spec) pageData {
 		PluralWords: words(spec.Name.PluralSnake()),
 		Route:       "/" + spec.Name.PluralKebab(),
 		APIPath:     "/api/" + spec.Name.PluralSnake(),
+		Roles:       slices.Clone(spec.Roles),
+	}
+	if len(d.Roles) > 0 {
+		quoted := make([]string, 0, len(d.Roles))
+		for _, role := range d.Roles {
+			quoted = append(quoted, fmt.Sprintf("'%s'", role))
+		}
+		d.RoleLiterals = strings.Join(quoted, ", ")
 	}
 	d.Name, d.Title = capitalize(d.Words), capitalize(d.PluralWords)
 	d.TitleLabel = d.Name

@@ -80,8 +80,8 @@ cd owned
 exec spinup g resource note title:string --api-only
 exec spinup g resource bulletin title:string --shared --api-only
 exec spinup g resource entry title:string note:ref:note count:int total:bigint done:bool score:float price:decimal day:date at:time uid:uuid meta:json 'state:enum:draft|published' optional:string? --api-only
-grep 'user_id bigint NOT NULL REFERENCES users' api/db/migrations/00003_create_notes.sql
-! grep 'user_id' api/db/migrations/00004_create_bulletins.sql
+grep 'user_id bigint NOT NULL REFERENCES users' api/db/migrations/00006_create_notes.sql
+! grep 'user_id' api/db/migrations/00007_create_bulletins.sql
 cd api
 exec go build ./...
 exec go vet ./...

@@ -1,0 +1,79 @@
+# Schemas of the todo resource. spinup bundles them into api/openapi/bundle.gen.yaml.
+Todo:
+  type: object
+  required:
+    - id
+    - title
+    - done
+    - due
+    - priority
+    - owner_id
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    title:
+      type: string
+    done:
+      type: boolean
+    due:
+      type: string
+      format: date
+      nullable: true
+    priority:
+      type: string
+      enum:
+        - low
+        - normal
+        - high
+    owner_id:
+      type: integer
+      format: int64
+      description: The id of a row in members.
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+TodoInput:
+  type: object
+  required:
+    - title
+    - done
+    - priority
+    - owner_id
+  properties:
+    title:
+      type: string
+    done:
+      type: boolean
+    due:
+      type: string
+      format: date
+      nullable: true
+    priority:
+      type: string
+      enum:
+        - low
+        - normal
+        - high
+    owner_id:
+      type: integer
+      format: int64
+      description: The id of a row in members.
+TodoList:
+  type: object
+  required:
+    - items
+    - total
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/components/schemas/Todo"
+    total:
+      type: integer
+      format: int64

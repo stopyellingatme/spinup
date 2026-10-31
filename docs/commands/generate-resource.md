@@ -190,3 +190,68 @@ Next: spinup db migrate up
 The handler tests need PostgreSQL.
 They use the server in `DATABASE_URL` when it is set.
 Run `spinup db migrate up`, then `cd api && go test ./...`.
+
+## Roles
+
+Use `--role` to limit a resource to some roles of the app.
+The flag takes a comma list of names from the `[auth]` table of `spinup.toml`.
+It applies to all five operations.
+Without `--role`, the resource only needs a signed-in user.
+See [Accounts and sessions](../auth.md#roles).
+
+```console
+$ spinup new roleapp --module example.com/roleapp --modules ci,auth --no-git --non-interactive
+...
+$ cd roleapp
+$ spinup g resource todo title:string --role manager,staff --dry-run
+create api/db/migrations/00006_create_todos.sql (seed)
+create api/db/queries/todos.sql (scaffold)
+create api/internal/handlers/server.go (scaffold)
+create api/internal/handlers/todos.go (scaffold)
+create api/internal/handlers/todos_test.go (scaffold)
+create api/internal/handlers/validation.go (scaffold)
+update api/internal/routes/routes_gen.go (managed)
+create api/openapi/paths/todos.yaml (scaffold)
+create api/openapi/schemas/todo.yaml (scaffold)
+update web/src/lib/nav.gen.ts (managed)
+create web/src/routes/todos/+page.server.ts (scaffold)
+create web/src/routes/todos/+page.svelte (scaffold)
+create web/src/routes/todos/[id]/+page.server.ts (scaffold)
+create web/src/routes/todos/[id]/+page.svelte (scaffold)
+create web/src/routes/todos/[id]/edit/+page.server.ts (scaffold)
+create web/src/routes/todos/[id]/edit/+page.svelte (scaffold)
+create web/src/routes/todos/fields.svelte (scaffold)
+create web/src/routes/todos/new/+page.server.ts (scaffold)
+create web/src/routes/todos/new/+page.svelte (scaffold)
+create web/src/routes/todos/schema.ts (scaffold)
+$ spinup g resource todo title:string --role manager --api-only
+Created 8, updated 1 files
+Next: spinup db migrate up
+Next: cd api && go test ./...
+Next: a role guard does not share owned rows. Try: add --shared to share rows between users.
+```
+
+Each handler checks `user.HasRole(roles.Manager)` after it checks the user.
+A caller with another role gets a 403 problem response.
+The OpenAPI file lists a `403` response for each operation.
+The generated tests run as an allowed role, and a new test sends a request from a role outside the list to each operation.
+
+The generator stops in these cases:
+
+```console
+$ spinup g resource note body:text --role admin
+Error: generator "resource" failed: cannot generate a role-guarded resource because role "admin" is not declared
+  Try: use one of: manager, staff, or add the role to [auth] and run spinup g roles
+[exit 1]
+```
+
+- The app has no `auth` module. Run `spinup add auth`.
+- A role is not in `[auth]`.
+- `api/internal/roles/roles.gen.go` is missing or differs from `[auth]`. Run `spinup g roles`.
+
+Two rules matter:
+
+- A role does not change the owner filter. A resource with `--role` and without `--shared` still shows each user only the rows of that user. Add `--shared` to share the rows between the allowed roles.
+- A caller with the wrong role, who sends bad input, gets 400 or 422 before 403. The caller learns only the shape of the schema.
+
+If the resource has web pages, they call `requireRole` in the `load` function and in each form action.

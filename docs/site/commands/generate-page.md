@@ -22,6 +22,7 @@ spinup generate page <route> [flags]
 | `--no-color` | `false` | turn off color |
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
+| `--role` | `` | comma-separated roles that can use the server page |
 | `--server` | `false` | also write +page.server.ts with a load function |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |

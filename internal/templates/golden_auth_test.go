@@ -17,6 +17,8 @@ import (
 // which wires kit auth when the auth module is on.
 func authGoldenPath(path string) bool {
 	return path == "api/db/migrations/00002_create_auth.sql" ||
+		path == "api/db/migrations/00005_users_role.sql" ||
+		path == "api/internal/roles/roles.gen.go" ||
 		path == "api/cmd/api/main.go" ||
 		path == "web/src/lib/server/auth.ts" ||
 		path == "web/src/lib/server/auth.test.ts" ||
@@ -66,10 +68,13 @@ func TestGoldenAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
+		`"example.com/todo/api/internal/roles"`,
 		`"github.com/stopyellingatme/spinup/kit/auth"`,
-		`auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))`,
+		"auth.WithRoles(roles.Set)",
+		`auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION")))`,
 		"app.WithMiddleware(authn.Middleware())",
 		"app.WithRoutes(authn.Routes)",
+		`app.WithCommand("user", auth.UserCommand(authn))`,
 		"app.WithShutdown(authn.Close)",
 	} {
 		if !bytes.Contains(main, []byte(want)) {
@@ -79,7 +84,7 @@ func TestGoldenAuth(t *testing.T) {
 }
 
 // TestAuthPackClasses checks the file classes of ADR 0008 §3: the migration is a seed, the
-// pages are scaffolds, and the cookie helper and its test are managed.
+// pages are scaffolds, and the cookie helper, its test, and generated roles are managed.
 func TestAuthPackClasses(t *testing.T) {
 	t.Parallel()
 	p, err := templates.Load(templates.Embedded(), "auth")
@@ -94,7 +99,7 @@ func TestAuthPackClasses(t *testing.T) {
 		switch {
 		case strings.HasPrefix(f.Path, "api/db/migrations/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
 			want = "seed"
-		case strings.HasPrefix(f.Path, "web/src/lib/server/"), f.Path == "api/cmd/api/reset.go":
+		case strings.HasPrefix(f.Path, "web/src/lib/server/"), f.Path == "api/cmd/api/reset.go", f.Path == "api/internal/roles/roles.gen.go":
 			want = "managed"
 		}
 		if f.Class != want {

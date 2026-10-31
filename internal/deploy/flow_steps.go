@@ -468,15 +468,15 @@ func (f *flow) hooks(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	deployed := ""
-	if cur != nil {
-		deployed = cur.MigrationVersion
-	}
 	hooks := f.d.PreDeploy()
 	if len(hooks) == 0 {
 		return "no hooks", nil
 	}
-	hctx := WithHookOptions(ctx, HookOptions{SkipBackup: f.o.SkipBackup, Root: f.l.root, PendingMigrations: pendingMigrations(f.l.migrations, deployed)})
+	pending, err := f.pendingOnVM(ctx, cur)
+	if err != nil {
+		return "", err
+	}
+	hctx := WithHookOptions(ctx, HookOptions{SkipBackup: f.o.SkipBackup, Root: f.l.root, PendingMigrations: pending})
 	f.hookResults = map[string]string{}
 	if err := RunHooks(hctx, hooks, &HookContext{Env: f.l.env, App: f.l.app, Release: f.release, Remote: f.vm, Out: f.out, Results: f.hookResults}); err != nil {
 		return "", err

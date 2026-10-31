@@ -1,0 +1,6 @@
+{
+  "conflicts": [
+    "api/cmd/api/main.go"
+  ],
+  "doctor_warning": "api/cmd/api/main.go does not pass the role set to the auth module."
+}
