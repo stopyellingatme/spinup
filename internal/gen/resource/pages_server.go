@@ -6,7 +6,9 @@ package resource
 
 const listServerTS = `import { error, fail, redirect } from '@sveltejs/kit';
 import { api } from '#lib/api/client.js';
-[[- if .Auth ]]
+[[- if .Roles ]]
+import { requireRole } from '#lib/server/auth.js';
+[[- else if .Auth ]]
 import { requireUser } from '#lib/server/auth.js';
 [[- end ]]
 import { [[ if .Toggle ]]fromItem, [[ end ]]problemMessage[[ if .Toggle ]], toBody[[ end ]] } from './schema';
@@ -28,7 +30,9 @@ function id(value: FormDataEntryValue | null): number {
 }
 
 export const load: PageServerLoad = async ({ fetch, [[ if .Auth ]]locals, [[ end ]]url }) => {
-[[- if .Auth ]]
+	[[- if .Roles ]]
+	requireRole(locals, url, [[ .RoleLiterals ]]);
+	[[- else if .Auth ]]
 	requireUser(locals, url);
 [[- end ]]
 	const page = pageNumber(url.searchParams.get('page'));
@@ -52,7 +56,9 @@ export const actions: Actions = {
 [[- if .Toggle ]]
 	// toggle sets [[ .Toggle.Col ]] of one [[ .Words ]]. PUT replaces the whole [[ .Words ]], so it sends every field.
 	toggle: async ({ request, fetch[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+		[[- if .Roles ]]
+		requireRole(locals, url, [[ .RoleLiterals ]]);
+		[[- else if .Auth ]]
 		requireUser(locals, url);
 [[- end ]]
 		const form = await request.formData();
@@ -77,7 +83,9 @@ export const actions: Actions = {
 	},
 [[- end ]]
 	delete: async ({ request, fetch[[ if .Auth ]], locals[[ end ]], url }) => {
-[[- if .Auth ]]
+		[[- if .Roles ]]
+		requireRole(locals, url, [[ .RoleLiterals ]]);
+		[[- else if .Auth ]]
 		requireUser(locals, url);
 [[- end ]]
 		const form = await request.formData();
@@ -100,7 +108,9 @@ export const actions: Actions = {
 
 const itemServerTS = `import { error, fail, redirect } from '@sveltejs/kit';
 import { api } from '#lib/api/client.js';
-[[- if .Auth ]]
+[[- if .Roles ]]
+import { requireRole } from '#lib/server/auth.js';
+[[- else if .Auth ]]
 import { requireUser } from '#lib/server/auth.js';
 [[- end ]]
 import { problemMessage } from '../schema';
@@ -115,7 +125,9 @@ function id(param: string): number {
 }
 
 export const load: PageServerLoad = async ({ fetch, params[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+[[- if .Roles ]]
+	requireRole(locals, url, [[ .RoleLiterals ]]);
+[[- else if .Auth ]]
 	requireUser(locals, url);
 [[- end ]]
 	const path = { id: id(params.id) };
@@ -132,7 +144,9 @@ export const load: PageServerLoad = async ({ fetch, params[[ if .Auth ]], locals
 
 export const actions: Actions = {
 	delete: async ({ fetch, params[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+		[[- if .Roles ]]
+		requireRole(locals, url, [[ .RoleLiterals ]]);
+		[[- else if .Auth ]]
 		requireUser(locals, url);
 [[- end ]]
 		const path = { id: id(params.id) };
@@ -160,7 +174,9 @@ import {
 } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { api } from '#lib/api/client.js';
-[[- if .Auth ]]
+[[- if .Roles ]]
+import { requireRole } from '#lib/server/auth.js';
+[[- else if .Auth ]]
 import { requireUser } from '#lib/server/auth.js';
 [[- end ]]
 import { fromItem, problemMessage, schema, toBody, type Item, type Problem, type Values } from '../../schema';
@@ -201,7 +217,9 @@ function failure(form: SuperValidated<Values>, problem: Problem | undefined, sta
 }
 
 export const load: PageServerLoad = async ({ fetch, params[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+[[- if .Roles ]]
+	requireRole(locals, url, [[ .RoleLiterals ]]);
+[[- else if .Auth ]]
 	requireUser(locals, url);
 [[- end ]]
 	const item = await get(fetch, params.id);
@@ -210,7 +228,9 @@ export const load: PageServerLoad = async ({ fetch, params[[ if .Auth ]], locals
 
 export const actions: Actions = {
 	default: async ({ request, fetch, params[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+		[[- if .Roles ]]
+		requireRole(locals, url, [[ .RoleLiterals ]]);
+		[[- else if .Auth ]]
 		requireUser(locals, url);
 [[- end ]]
 		const form = await superValidate(request, zod4(schema));
@@ -251,7 +271,9 @@ import {
 } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { api } from '#lib/api/client.js';
-[[- if .Auth ]]
+[[- if .Roles ]]
+import { requireRole } from '#lib/server/auth.js';
+[[- else if .Auth ]]
 import { requireUser } from '#lib/server/auth.js';
 [[- end ]]
 import { problemMessage, schema, toBody, type Problem, type Values } from '../schema';
@@ -270,7 +292,9 @@ function failure(form: SuperValidated<Values>, problem: Problem | undefined, sta
 }
 
 export const load: PageServerLoad = async ([[ if .Auth ]]{ locals, url }[[ end ]]) => {
-[[- if .Auth ]]
+[[- if .Roles ]]
+	requireRole(locals, url, [[ .RoleLiterals ]]);
+[[- else if .Auth ]]
 	requireUser(locals, url);
 [[- end ]]
 	return { form: await superValidate(zod4(schema)) };
@@ -278,7 +302,9 @@ export const load: PageServerLoad = async ([[ if .Auth ]]{ locals, url }[[ end ]
 
 export const actions: Actions = {
 	default: async ({ request, fetch[[ if .Auth ]], locals, url[[ end ]] }) => {
-[[- if .Auth ]]
+		[[- if .Roles ]]
+		requireRole(locals, url, [[ .RoleLiterals ]]);
+		[[- else if .Auth ]]
 		requireUser(locals, url);
 [[- end ]]
 		const form = await superValidate(request, zod4(schema));

@@ -5,7 +5,7 @@ import { home } from '#lib/nav.gen.js';
 import { actions as loginActions, load as loginLoad } from '../../routes/login/+page.server.js';
 import { actions as registerActions, load as registerLoad } from '../../routes/register/+page.server.js';
 import { actions as logoutActions } from '../../routes/logout/+page.server.js';
-import { forwardSessionCookie, postAuth, requireUser, safeRedirect } from './auth.js';
+import { forwardSessionCookie, postAuth, requireRole, requireUser, safeRedirect } from './auth.js';
 
 // Exercise a resource home instead of the empty app's root.
 vi.mock('#lib/nav.gen.js', () => ({ home: '/workspace' }));
@@ -166,8 +166,24 @@ describe('requireUser', () => {
 	});
 
 	it('returns the signed-in user', () => {
-		const user = { id: 1, email: 'ada@example.com' };
+		const user = { id: 1, email: 'ada@example.com', role: 'staff' };
 		expect(requireUser({ user }, new URL('https://app.example.com/account'))).toBe(user);
+	});
+});
+
+describe('requireRole', () => {
+	it('returns a user with a listed role', () => {
+		const user = { id: 1, email: 'ada@example.com', role: 'manager' };
+		expect(requireRole({ user }, new URL('https://app.example.com/admin'), 'manager')).toBe(user);
+	});
+
+	it('shows 403 for a user with another role', () => {
+		try {
+			requireRole({ user: { id: 1, email: 'ada@example.com', role: 'staff' } }, new URL('https://app.example.com/admin'), 'manager');
+			throw new Error('Expected an error');
+		} catch (reason) {
+			expect(reason).toMatchObject({ status: 403, body: { message: 'You do not have access to this page.' } });
+		}
 	});
 });
 
@@ -196,7 +212,7 @@ describe.each([
 
 	it('sends signed-in users to home', () => {
 		const event = {
-			locals: { user: { id: 1, email: 'ada@example.com' } },
+			locals: { user: { id: 1, email: 'ada@example.com', role: 'staff' } },
 			url: new URL(`https://app.example.com/${route}?redirectTo=/todos`)
 		} as Parameters<typeof load>[0];
 		try {

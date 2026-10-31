@@ -9,6 +9,7 @@ declare global {
 		interface User {
 			id: number;
 			email: string;
+			role: string;
 		}
 		interface Locals {
 			user: User | null;
