@@ -128,6 +128,7 @@ func (w *yamlWriter) problems(words string, codes ...string) {
 	descriptions := map[string]string{
 		"400": "The request is malformed.",
 		"401": "A signed-in user is required.",
+		"403": "The signed-in user does not have a required role.",
 		"404": "The " + words + " does not exist.",
 		"409": "The request conflicts with other data.",
 		"422": "The request has invalid values.",
@@ -162,6 +163,9 @@ func pathsYAML(spec Spec) []byte {
 	problems := func(words string, codes ...string) {
 		if spec.Owned || spec.Shared {
 			codes = append(codes, "401")
+		}
+		if len(spec.Roles) > 0 {
+			codes = append(codes, "403")
 		}
 		w.problems(words, codes...)
 	}
