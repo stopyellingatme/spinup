@@ -18,7 +18,7 @@ func TestAuthUpgradeWarnings(t *testing.T) {
 		rolesExist, noAuth            bool
 	}{
 		{name: "old auth app"},
-		{name: "app migration", migration: "00005_widgets.sql", want: "Try: rename your migration to the next free number, then run spinup upgrade again."},
+		{name: "app migration", migration: "00005_widgets.sql", want: "Applied migration: keep version 5. Try: rename 00005_users_role.sql to the next free number before you run spinup db migrate."},
 		{name: "other version", migration: "00004_widgets.sql"},
 		{name: "same migration", migration: "00005_users_role.sql"},
 		{name: "custom auth", config: "[auth]\nroles = ['owner', 'cook']\nadmin_role = 'owner'\ndefault_role = 'cook'\n", want: "Try: run spinup g roles after the upgrade."},

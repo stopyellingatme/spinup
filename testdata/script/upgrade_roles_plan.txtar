@@ -11,15 +11,13 @@ exec sh -c 'cat ../auth.toml >> spinup.toml'
 exec git add -A
 exec git commit -q -m 'existing app with custom auth and migration'
 
-# A custom table does not change the default file that the upgrade creates.
-exec spinup upgrade --yes --no-verify --offline
+# The preview finds an untracked migration before the upgrade starts.
+exec spinup upgrade --plan --offline
 stdout 'Warning: migration version 5 is also used by 00005_widgets.sql'
-stdout 'Try: rename your migration to the next free number, then run spinup upgrade again\.'
+stdout 'Applied migration: keep version 5\. Try: rename 00005_users_role.sql to the next free number before you run spinup db migrate\.'
 stdout 'Try: run spinup g roles after the upgrade\.'
-exists .spinup/upgrade/0.0.1/api/db/migrations/00005_users_role.sql
-exists .spinup/upgrade/0.0.1/api/db/migrations/00005_widgets.sql
-grep 'Manager = "manager"' .spinup/upgrade/0.0.1/api/internal/roles/roles.gen.go
-grep 'roles = \["owner", "cook"\]' .spinup/upgrade/0.0.1/spinup.toml
+exists .spinup/plan.json
+! exists .spinup/upgrade/0.0.1
 
 -- auth.toml --
 
