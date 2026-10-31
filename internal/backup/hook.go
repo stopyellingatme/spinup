@@ -111,12 +111,15 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 			return nil
 		}
 		if o.SkipBackup {
-			unsafe, err := unsafePendingAfter(filepath.Join(root, filepath.FromSlash(MigrationsDir)), releases[0].MigrationVersion)
+			unsafe, err := UnsafePending(filepath.Join(root, filepath.FromSlash(MigrationsDir)), nil)
 			if err != nil {
 				return fmt.Errorf("refuse --skip-backup: the pending migrations could not be checked: %w\nTry: start postgres, then deploy again", err)
 			}
 			if len(unsafe) > 0 {
 				return fmt.Errorf("refuse --skip-backup: pending migrations lack the %q marker: %s\nTry: start postgres, or add a %q line to every pending migration that keeps all data", SafeMarker, strings.Join(unsafe, ", "), SafeMarker)
+			}
+			if c.Results != nil {
+				c.Results[deploy.ResultMigrationsSafe] = "true"
 			}
 			_, _ = fmt.Fprintln(out, "backup: skipped (--skip-backup), every pending migration is marked safe")
 			return nil
@@ -131,12 +134,17 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 		if len(unsafe) > 0 {
 			return fmt.Errorf("refuse --skip-backup: pending migrations lack the %q marker: %s\nTry: deploy without --skip-backup, or add a %q line to a migration that keeps all data", SafeMarker, strings.Join(unsafe, ", "), SafeMarker)
 		}
+		if c.Results != nil {
+			c.Results[deploy.ResultMigrationsSafe] = "true"
+		}
 		_, _ = fmt.Fprintln(out, "backup: skipped (--skip-backup), every pending migration is marked safe")
 		return nil
 	}
 	// Record whether every pending migration is marked safe (rollback --with-db-plan uses it).
-	if unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir))); err == nil && c.Results != nil {
-		c.Results[deploy.ResultMigrationsSafe] = strconv.FormatBool(len(unsafe) == 0)
+	if c.Results != nil {
+		unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir)))
+		// A failed check cannot establish that a rollback is safe.
+		c.Results[deploy.ResultMigrationsSafe] = strconv.FormatBool(err == nil && len(unsafe) == 0)
 	}
 	backend := &PGBackRest{App: app, Remote: c.Remote, Config: data, RetentionFull: retention, Progress: out}
 	_, _ = fmt.Fprintf(out, "backup: taking a %s backup before release %s\n", Diff, c.Release)
@@ -167,53 +175,38 @@ func postgresRunning(ctx context.Context, r remote.Runner, app string) (bool, er
 	return strings.TrimSpace(string(result.Stdout)) != "", nil
 }
 
-// The queries of AppliedVersion. A missing goose table gives -1.
-const (
-	gooseTableQuery   = "SELECT CASE WHEN to_regclass('public.goose_db_version') IS NULL THEN '-1' ELSE '0' END"
-	gooseVersionQuery = "SELECT COALESCE(MAX(version_id), 0) FROM goose_db_version WHERE is_applied"
-)
-
 // AppliedVersion returns the newest applied goose migration version on the VM.
 // A database without the goose table gives zero.
+// Use deploy.AppliedMigrations for pending migration checks.
 func AppliedVersion(ctx context.Context, r remote.Runner, app string) (int64, error) {
-	psql := append(composeExec(app), "psql", "-U", "app", "-d", "app", "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c")
-	result, err := r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseTableQuery)})
+	applied, err := deploy.AppliedMigrations(ctx, r, app)
 	if err != nil {
-		return 0, fmt.Errorf("query the goose table: %w", err)
+		return 0, err
 	}
-	if strings.TrimSpace(string(result.Stdout)) == "-1" {
-		return 0, nil
+	var newest int64
+	for _, version := range applied {
+		if version > newest {
+			newest = version
+		}
 	}
-	result, err = r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseVersionQuery)})
-	if err != nil {
-		return 0, fmt.Errorf("query the applied migration version: %w", err)
-	}
-	version, err := strconv.ParseInt(strings.TrimSpace(string(result.Stdout)), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("parse the applied migration version %q: %w", strings.TrimSpace(string(result.Stdout)), err)
-	}
-	return version, nil
+	return newest, nil
 }
 
 func unsafePending(ctx context.Context, r remote.Runner, app, dir string) ([]string, error) {
-	applied, err := AppliedVersion(ctx, r, app)
+	applied, err := deploy.AppliedMigrations(ctx, r, app)
 	if err != nil {
 		return nil, err
 	}
 	return UnsafePending(dir, applied)
 }
 
-func unsafePendingAfter(dir, version string) ([]string, error) {
-	applied, err := strconv.ParseInt(version, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parse the recorded migration version %q: %w", version, err)
+// UnsafePending returns migrations absent from applied that lack the SafeMarker line.
+// The result follows version order. A nil applied set treats every migration as pending.
+func UnsafePending(dir string, applied []int64) ([]string, error) {
+	appliedSet := make(map[int64]bool, len(applied))
+	for _, version := range applied {
+		appliedSet[version] = true
 	}
-	return UnsafePending(dir, applied)
-}
-
-// UnsafePending returns the migration files in dir with a version above applied that lack
-// the SafeMarker line, in version order.
-func UnsafePending(dir string, applied int64) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read migrations directory %s: %w", dir, err)
@@ -233,7 +226,7 @@ func UnsafePending(dir string, applied int64) ([]string, error) {
 		if !ok || err != nil {
 			continue
 		}
-		if version <= applied {
+		if appliedSet[version] {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(dir, name))

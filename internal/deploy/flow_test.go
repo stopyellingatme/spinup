@@ -146,13 +146,15 @@ func TestFlowRegistrySecondDeploy(t *testing.T) {
 	t.Parallel()
 	x := newFx(t, true, "registry")
 	x.o.SkipBackup = true
-	current, _ := json.Marshal(Release{Release: "20261014T080000Z-ffffffffffff", Color: Blue, MigrationVersion: "1", Secrets: map[string]string{"DATABASE_URL": "old"}})
+	writeTree(t, x.root, map[string]string{"api/db/migrations/00004_drop.sql": "-- +goose Up\nDROP TABLE todos;\n", "api/db/migrations/00006_applied.sql": "-- +goose Up\nSELECT 1;\n"})
+	current, _ := json.Marshal(Release{Release: "20261014T080000Z-ffffffffffff", Color: Blue, MigrationVersion: "6", Secrets: map[string]string{"DATABASE_URL": "old"}})
 	x.expectLocalGit()
 	x.expectConnect()
 	x.expectLock()
 	x.expectBegin()
 	x.journal(1)
 	x.expectReadCurrent(string(current))
+	expectAppliedMigrations(x.vm, "1\n6\n")
 	x.journal(1)
 	x.journal(1)
 	x.ok("docker", "pull", "--quiet", "ghcr.io/acme/todo-api@"+digestAPI)
@@ -199,7 +201,7 @@ func TestFlowRegistrySecondDeploy(t *testing.T) {
 	if !x.built[0].Push || !reflect.DeepEqual(x.built[0].Targets, []string{"api", "web"}) {
 		t.Fatalf("build = %#v", x.built)
 	}
-	if !x.hookOpts[0].SkipBackup || !reflect.DeepEqual(x.hookOpts[0].PendingMigrations, []string{"00002_more.sql"}) {
+	if !x.hookOpts[0].SkipBackup || !reflect.DeepEqual(x.hookOpts[0].PendingMigrations, []string{"00002_more.sql", "00004_drop.sql"}) {
 		t.Fatalf("hook options = %#v", x.hookOpts)
 	}
 	env := string(x.upload(testRelDir + "/.env"))
@@ -435,8 +437,9 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 	t.Parallel()
 	x := newFx(t, false, "")
 	x.o.Plan = true
+	writeTree(t, x.root, map[string]string{"api/db/migrations/00004_drop.sql": "-- +goose Up\nDROP TABLE todos;\n", "api/db/migrations/00006_applied.sql": "-- +goose Up\nSELECT 1;\n"})
 	x.o.Confirm = project.Confirm{} // --plan never asks
-	current := Release{Release: "20261014T080000Z-ffffffffffff", Color: Blue, MigrationVersion: "1", Images: []Image{{Service: "api", Ref: "todo-api:20261014T080000Z-ffffffffffff"}}, Secrets: SecretHashes(map[string]string{"DATABASE_URL": "old-value", "POSTGRES_PASSWORD": testSecrets["POSTGRES_PASSWORD"], "REMOVED": "x"})}
+	current := Release{Release: "20261014T080000Z-ffffffffffff", Color: Blue, MigrationVersion: "6", Images: []Image{{Service: "api", Ref: "todo-api:20261014T080000Z-ffffffffffff"}}, Secrets: SecretHashes(map[string]string{"DATABASE_URL": "old-value", "POSTGRES_PASSWORD": testSecrets["POSTGRES_PASSWORD"], "REMOVED": "x"})}
 	currentJSON, _ := json.Marshal(current)
 	tarball := tarOf(t, map[string]string{
 		"compose.yml":      "name: todo-${SPINUP_COLOR}\nold: true\n",
@@ -450,6 +453,7 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 	x.expectReadCurrent(string(currentJSON))
 	x.vm.Expect("sh", "-c", readCurrentScript, "spinup-current", testRoot+"/current").Return(tarball, "", 0)
 	x.vm.Expect("sh", "-c").Return("", "", 3) // no lock
+	expectAppliedMigrations(x.vm, "1\n6\n")
 	x.vm.ExpectClose().Return("", "", 0)
 	if err := x.run(); err != nil {
 		t.Fatalf("plan: %v", err)
@@ -460,7 +464,12 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 		t.Fatal("--plan changed something")
 	}
 	for _, c := range x.vm.Calls() {
-		if c.Argv[0] != "sh" {
+		if c.Argv[0] == "docker" {
+			query := c.Argv[len(c.Argv)-1]
+			if !slices.Equal(c.Argv, migrationStatusArgv()) && query != gooseTableQuery && query != gooseAppliedQuery {
+				t.Fatalf("--plan ran %v", c.Argv)
+			}
+		} else if c.Argv[0] != "sh" {
 			t.Fatalf("--plan ran %v", c.Argv)
 		}
 	}
@@ -469,7 +478,7 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 		"Plan: deploy release " + testRelease + " to staging (vm.example.com)",
 		"Color: blue -> green",
 		"api: todo-api:20261014T080000Z-ffffffffffff -> todo-api:" + testRelease,
-		"Migrations: 1 pending\n  00002_more.sql",
+		"Migrations: 2 pending\n  00002_more.sql\n  00004_drop.sql",
 		"  added API_TOKEN", "  changed DATABASE_URL", "  removed REMOVED",
 		"  changed compose.yml", "-old: true", "  added Caddyfile", "  removed old.caddy", "  added upstream.caddy",
 		"Nothing changed on the VM (--plan).",
@@ -647,7 +656,7 @@ func TestReleaseHelpers(t *testing.T) {
 	if got := ids(kept); !reflect.DeepEqual(got, []string{"new", "a", "b", "c", "d"}) || !reflect.DeepEqual(ids(pruned), []string{"e"}) {
 		t.Fatalf("kept %v pruned %v", got, ids(pruned))
 	}
-	if got := pendingMigrations([]migration{{1, "1_a.sql"}, {2, "2_b.sql"}, {10, "10_c.sql"}}, "2"); !reflect.DeepEqual(got, []string{"10_c.sql"}) {
+	if got := pendingMigrations([]migration{{1, "1_a.sql"}, {2, "2_b.sql"}, {10, "10_c.sql"}}, []int64{1, 2}); !reflect.DeepEqual(got, []string{"10_c.sql"}) {
 		t.Fatalf("pending = %v", got)
 	}
 	if repository("ghcr.io:443/acme/app:tag") != "ghcr.io:443/acme/app" || repository("localhost:5000/app") != "localhost:5000/app" {
