@@ -1,0 +1,24 @@
+# The generated API exposes the operator command only with the auth module.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --module example.com/demo --modules auth --no-git --non-interactive
+cd demo
+[env:DATABASE_URL] exec spinup db migrate up
+cd api
+exec go test -run '^$' ./...
+[env:DATABASE_URL] exec sh -c 'printf "%s\n" "correct horse battery" | go run ./cmd/api user create --email operator@example.com --role manager --password-stdin'
+[env:DATABASE_URL] stdout '^created operator@example\.com\tmanager$'
+# The last manager cannot lose the role.
+[env:DATABASE_URL] ! exec go run ./cmd/api user set-role --email operator@example.com --role staff
+[env:DATABASE_URL] stderr 'last account with role "manager"'
+[env:DATABASE_URL] stderr '^Try: '
+# After a second manager exists, the first one can become staff.
+[env:DATABASE_URL] exec sh -c 'printf "%s\n" "correct horse battery" | go run ./cmd/api user create --email second@example.com --role staff --password-stdin'
+[env:DATABASE_URL] exec go run ./cmd/api user set-role --email second@example.com --role manager
+[env:DATABASE_URL] stdout '^updated second@example\.com\tmanager$'
+[env:DATABASE_URL] exec go run ./cmd/api user set-role --email operator@example.com --role staff
+[env:DATABASE_URL] stdout '^updated operator@example\.com\tstaff$'
+[env:DATABASE_URL] exec go run ./cmd/api user list
+[env:DATABASE_URL] stdout '^operator@example\.com\tstaff$'
+[env:DATABASE_URL] stdout '^second@example\.com\tmanager$'
+[env:DATABASE_URL] ! exec go run ./cmd/api user create --email missing-password@example.com --role staff
+[env:DATABASE_URL] stderr 'password-stdin is required'

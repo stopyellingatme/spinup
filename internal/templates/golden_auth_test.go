@@ -68,10 +68,13 @@ func TestGoldenAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
+		`"example.com/todo/api/internal/roles"`,
 		`"github.com/stopyellingatme/spinup/kit/auth"`,
-		`auth.New(pool, auth.WithSecureCookie(cfg.Env != "dev"), auth.WithTrustedOrigins(web.PublicOrigin))`,
+		"auth.WithRoles(roles.Set)",
+		`auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION")))`,
 		"app.WithMiddleware(authn.Middleware())",
 		"app.WithRoutes(authn.Routes)",
+		`app.WithCommand("user", auth.UserCommand(authn))`,
 		"app.WithShutdown(authn.Close)",
 	} {
 		if !bytes.Contains(main, []byte(want)) {
