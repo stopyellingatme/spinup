@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
+	"github.com/stopyellingatme/spinup/internal/project"
 )
 
 // field holds the names of one field in each generated layer.
@@ -30,15 +31,18 @@ type resourceCode struct {
 	item string
 	// conv is the lower camel case prefix of the conversion functions.
 	conv string
+	// deniedRole is outside the roles that can use this resource.
+	deniedRole string
 }
 
-func newResourceCode(spec Spec, module string) resourceCode {
+func newResourceCode(spec Spec, module, deniedRole string) resourceCode {
 	rc := resourceCode{
-		spec:   spec,
-		module: module,
-		row:    storeStruct(spec.Name.Table()),
-		item:   spec.Name.Pascal(),
-		conv:   spec.Name.Camel(),
+		spec:       spec,
+		module:     module,
+		row:        storeStruct(spec.Name.Table()),
+		item:       spec.Name.Pascal(),
+		conv:       spec.Name.Camel(),
+		deniedRole: deniedRole,
 	}
 	for _, f := range spec.Fields {
 		rc.fields = append(rc.fields, field{Field: f, col: f.Column(), store: storeName(f.Column()), api: apiName(f.Column())})
@@ -47,7 +51,7 @@ func newResourceCode(spec Spec, module string) resourceCode {
 }
 
 func (rc resourceCode) imports() []string {
-	return []string{
+	imports := []string{
 		rc.module + "/db/migrations",
 		rc.module + "/internal/gen",
 		rc.module + "/internal/handlers",
@@ -56,6 +60,10 @@ func (rc resourceCode) imports() []string {
 		"github.com/stopyellingatme/spinup/kit/auth",
 		"github.com/stopyellingatme/spinup/kit/auth/authtest",
 	}
+	if len(rc.spec.Roles) > 0 {
+		imports = append(imports, rc.module+"/internal/roles")
+	}
+	return imports
 }
 
 // pgtypeOf returns the pgtype struct and its value field of a nullable column
@@ -320,10 +328,10 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	}
 
 	guard := func(operation string) {
-		if !rc.spec.Owned && !rc.spec.Shared {
+		if !rc.spec.Owned && !rc.spec.Shared && len(rc.spec.Roles) == 0 {
 			return
 		}
-		if rc.spec.Owned {
+		if rc.spec.Owned || len(rc.spec.Roles) > 0 {
 			g.p("user, ok := auth.UserFrom(ctx)")
 		} else {
 			g.p("_, ok := auth.UserFrom(ctx)")
@@ -332,6 +340,16 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 		g.p("detail := \"A signed-in user is required.\"")
 		g.p("return gen.%s401ApplicationProblemPlusJSONResponse{Type: \"about:blank\", Status: http.StatusUnauthorized, Title: http.StatusText(http.StatusUnauthorized), Detail: &detail}, nil", operation)
 		g.p("}")
+		if len(rc.spec.Roles) > 0 {
+			constants := make([]string, 0, len(rc.spec.Roles))
+			for _, role := range rc.spec.Roles {
+				constants = append(constants, "roles."+project.RoleConst(role))
+			}
+			g.p("if !user.HasRole(%s) {", strings.Join(constants, ", "))
+			g.p("detail := \"Your role cannot use this resource. Try: sign in with an account that has a required role.\"")
+			g.p("return gen.%s403ApplicationProblemPlusJSONResponse{Type: \"about:blank\", Status: http.StatusForbidden, Title: http.StatusText(http.StatusForbidden), Detail: &detail}, nil", operation)
+			g.p("}")
+		}
 	}
 
 	g.p("// List%s returns one page of %s in id order, and the total count.", plural, pluralWords)
@@ -567,9 +585,17 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 			g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-b@example.com', 'test-hash-b') RETURNING id`).Scan(&userB); err != nil {")
 			g.p("t.Fatalf(\"insert user B: %%v\", err)")
 			g.p("}")
-			g.p("other := authtest.As(handler, userB)")
+			if len(rc.spec.Roles) > 0 {
+				g.p("other := authtest.AsRole(handler, userB, roles.%s)", project.RoleConst(rc.spec.Roles[0]))
+			} else {
+				g.p("other := authtest.As(handler, userB)")
+			}
 		}
-		g.p("handler = authtest.As(handler, userA)")
+		if len(rc.spec.Roles) > 0 {
+			g.p("handler = authtest.AsRole(handler, userA, roles.%s)", project.RoleConst(rc.spec.Roles[0]))
+		} else {
+			g.p("handler = authtest.As(handler, userA)")
+		}
 	}
 	if len(parents) > 0 {
 		g.p("")
@@ -659,7 +685,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{})")
 	g.p("})).Handler()")
-	if rc.spec.Owned || rc.spec.Shared {
+	if len(rc.spec.Roles) > 0 {
+		g.p("handler = authtest.AsRole(handler, 1, roles.%s)", project.RoleConst(rc.spec.Roles[0]))
+	} else if rc.spec.Owned || rc.spec.Shared {
 		g.p("handler = authtest.As(handler, 1)")
 	}
 	g.p("tests := []struct {")
@@ -691,6 +719,17 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	rc.requiredFieldsTest(g, base)
 	if rc.spec.Owned || rc.spec.Shared {
 		rc.authenticationTest(g, base)
+	}
+	if len(rc.spec.Roles) > 0 {
+		var parts []string
+		for _, f := range rc.fields {
+			value := sample(f, false, "")
+			if value == "%d" {
+				value = "1"
+			}
+			parts = append(parts, fmt.Sprintf("%q: %s", f.col, value))
+		}
+		rc.roleTest(g, base, "{"+strings.Join(parts, ", ")+"}")
 	}
 	return g.bytes()
 }
@@ -731,7 +770,9 @@ func (rc resourceCode) requiredFieldsTest(g *goFile, base string) {
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{})")
 	g.p("})).Handler()")
-	if rc.spec.Owned || rc.spec.Shared {
+	if len(rc.spec.Roles) > 0 {
+		g.p("handler = authtest.AsRole(handler, 1, roles.%s)", project.RoleConst(rc.spec.Roles[0]))
+	} else if rc.spec.Owned || rc.spec.Shared {
 		g.p("handler = authtest.As(handler, 1)")
 	}
 	g.p("tests := []struct {")
@@ -810,5 +851,36 @@ func (rc resourceCode) authenticationTest(g *goFile, base string) {
 		g.p("if !ok || problem.Status != http.StatusUnauthorized { t.Fatalf(\"response = %%+v, want 401 problem\", response) }")
 		g.p("})")
 	}
+	g.p("}")
+}
+
+// roleTest checks every CRUD operation with a role outside the allowed set.
+func (rc resourceCode) roleTest(g *goFile, base, body string) {
+	g.p("")
+	g.p("func Test%sRejectsForbiddenRoles(t *testing.T) {", rc.spec.Name.PluralPascal())
+	g.p("t.Parallel()")
+	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
+	g.p("routes.Register(mux, routes.Deps{})")
+	g.p("})).Handler()")
+	g.p("handler = authtest.AsRole(handler, 1, %q)", rc.deniedRole)
+	g.p("tests := []struct { method, path, body string }{")
+	for _, route := range []struct{ method, suffix, body string }{
+		{"Get", "", ""},
+		{"Post", "", body},
+		{"Get", "/1", ""},
+		{"Put", "/1", body},
+		{"Delete", "/1", ""},
+	} {
+		g.p("{http.Method%s, %q, %q},", route.method, base+route.suffix, route.body)
+	}
+	g.p("}")
+	g.p("for _, tc := range tests {")
+	g.p("t.Run(tc.method+tc.path, func(t *testing.T) {")
+	g.p("t.Parallel()")
+	g.p("rec := testkit.Do(t, handler, tc.method, tc.path, strings.NewReader(tc.body))")
+	g.p("if rec.Code != http.StatusForbidden { t.Fatalf(\"status %%d, want 403: %%s\", rec.Code, rec.Body) }")
+	g.p("if got := rec.Header().Get(\"Content-Type\"); got != \"application/problem+json\" { t.Fatalf(\"Content-Type %%q, want application/problem+json\", got) }")
+	g.p("})")
+	g.p("}")
 	g.p("}")
 }

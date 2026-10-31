@@ -18,6 +18,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
@@ -31,6 +32,7 @@ func init() {
 			fs.Bool("api-only", false, "skip the parts that other packs register, such as web pages")
 			fs.Bool("no-tests", false, "skip the handler test file")
 			fs.Bool("shared", false, "share rows between signed-in users (requires auth)")
+			fs.String("role", "", "comma-separated roles that can use the resource (requires auth)")
 		},
 		Run: run,
 	})
@@ -245,6 +247,23 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	if err != nil {
 		return nil, err
 	}
+	config, err := loadResourceConfig(in.Root)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := resourceRoles(config, in.Flags)
+	if err != nil {
+		return nil, err
+	}
+	spec.Roles = roles
+	if len(spec.Roles) > 0 {
+		if !authenticated {
+			return nil, fmt.Errorf("cannot generate a role-guarded resource because the auth module is missing\nTry: spinup add auth")
+		}
+		if err := rolesFileMatches(in.Root, config); err != nil {
+			return nil, err
+		}
+	}
 	spec.Shared = Bool(in.Flags, "shared")
 	if spec.Shared && !authenticated {
 		return nil, fmt.Errorf("cannot generate a shared resource without the auth module\nTry: drop --shared")
@@ -261,7 +280,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	if err != nil {
 		return nil, err
 	}
-	apiPlan, err := planAPI(spec, !Bool(in.Flags, "no-tests"))
+	apiPlan, err := planAPI(spec, !Bool(in.Flags, "no-tests"), config.AuthRoles().Names)
 	if err != nil {
 		return nil, err
 	}
@@ -288,21 +307,86 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 			return nil, err
 		}
 	}
+	next := []string{"spinup db migrate up", "cd api && go test ./..."}
+	if len(spec.Roles) > 0 && !spec.Shared {
+		next = append(next, "a role guard does not share owned rows. Try: add --shared to share rows between users.")
+	}
 	return &gen.Output{
 		Plan:      plan,
 		PostSteps: steps,
-		Next:      []string{"spinup db migrate up", "cd api && go test ./..."},
+		Next:      next,
 	}, nil
+}
+
+// loadResourceConfig reads the project configuration or supplies its defaults
+// when unit-test input has no spinup.toml.
+func loadResourceConfig(root string) (*project.Config, error) {
+	config, err := project.Load(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return &project.Config{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load %s: %w\nTry: fix %s", project.ConfigFile, err, project.ConfigFile)
+	}
+	return config, nil
+}
+
+// resourceRoles reads the --role flag and validates each requested role.
+func resourceRoles(config *project.Config, flags *pflag.FlagSet) ([]string, error) {
+	if flags == nil || !flags.Changed("role") {
+		return nil, nil
+	}
+	value, err := flags.GetString("role")
+	if err != nil {
+		return nil, fmt.Errorf("read --role: %w\nTry: pass --role manager", err)
+	}
+	var roles []string
+	for _, role := range strings.Split(value, ",") {
+		role = strings.TrimSpace(role)
+		if role != "" {
+			roles = append(roles, role)
+		}
+	}
+	if len(roles) == 0 {
+		return nil, fmt.Errorf("cannot generate a role-guarded resource because the --role list is empty\nTry: pass --role manager")
+	}
+	declared := config.AuthRoles()
+	if err := declared.Validate(); err != nil {
+		return nil, err
+	}
+	for _, role := range roles {
+		if !slices.Contains(declared.Names, role) {
+			return nil, fmt.Errorf("cannot generate a role-guarded resource because role %q is not declared\nTry: use one of: %s, or add the role to [auth] and run spinup g roles", role, strings.Join(declared.Names, ", "))
+		}
+	}
+	return roles, nil
+}
+
+// rolesFileMatches checks that the generated constants match the project roles.
+func rolesFileMatches(root string, config *project.Config) error {
+	want := project.RenderRolesFile(config.AuthRoles())
+	path := filepath.Join(root, filepath.FromSlash(project.RolesFilePath))
+	got, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("cannot generate a role-guarded resource because %s is missing\nTry: spinup g roles", project.RolesFilePath)
+	}
+	if err != nil {
+		return fmt.Errorf("read %s: %w\nTry: check the file permissions", project.RolesFilePath, err)
+	}
+	if !slices.Equal(got, want) {
+		return fmt.Errorf("cannot generate a role-guarded resource because %s differs from [auth] in %s\nTry: spinup g roles", project.RolesFilePath, project.ConfigFile)
+	}
+	return nil
 }
 
 // planAPI plans the OpenAPI paths, the handlers, their test, and the shared
 // server and route files.
-func planAPI(spec Spec, tests bool) (vfs.Plan, error) {
+func planAPI(spec Spec, tests bool, declaredRoles []string) (vfs.Plan, error) {
 	module, err := apiModule(spec.Root)
 	if err != nil {
 		return vfs.Plan{}, err
 	}
-	rc := newResourceCode(spec, module)
+	rc := newResourceCode(spec, module, deniedRole(spec.Roles, declaredRoles))
 	handlers, err := rc.handlersGo()
 	if err != nil {
 		return vfs.Plan{}, err
@@ -348,6 +432,17 @@ func planAPI(spec Spec, tests bool) (vfs.Plan, error) {
 		}
 	}
 	return plan, nil
+}
+
+// deniedRole returns a declared role outside allowed, or an undeclared value
+// when every declared role can use the resource.
+func deniedRole(allowed, declared []string) string {
+	for _, role := range declared {
+		if !slices.Contains(allowed, role) {
+			return role
+		}
+	}
+	return "undeclared"
 }
 
 // hasAuth reports whether the lock lists the auth module.
