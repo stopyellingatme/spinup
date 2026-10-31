@@ -39,7 +39,27 @@ Other arguments go to `playwright test`.
 
 If a run fails, read the logs in the work directory that the script prints.
 
+## Service traces
+
+Run `bash testdata/e2e/services-trace/run.sh` to check trace propagation in the Rust and Python templates.
+The script requires Docker, Go, curl, and Python 3.
+The image builds require network access for the pinned images and packages.
+The script does not require `DATABASE_URL`.
+
+The script generates an app and both services, then builds their images.
+It starts the pinned `grafana/otel-lgtm` image and both services on a private Docker network.
+It sends `POST /v1/sum` to each service with the same sampled `traceparent` header.
+It reads the trace from Tempo and checks both service spans against the supplied parent ID.
+The output shows the trace ID and each parent link.
+
+The script removes its containers, network, and service images when it exits.
+Set `E2E_KEEP=1` to keep the work directory and logs after a successful run.
+Failed runs always keep the work directory and logs.
+Set `SERVICES_TRACE_LOG_DIR` to choose a separate log directory.
+The logs include the Tempo response and the expected trace and parent IDs.
+
 ## Workflows
 
 - `.github/workflows/nightly.yml` runs `make e2e` every night, with a PostgreSQL service.
+- Its `services-trace` job runs the service trace script and uploads the logs when it fails.
 - `.github/workflows/canary-sveltekit.yml` runs every week. It bumps `@sveltejs/kit`, `svelte`, `vite`, `bits-ui`, and the shadcn-svelte components to the latest versions. It runs `pnpm check` and `pnpm build`. If a step fails, it opens an issue.
