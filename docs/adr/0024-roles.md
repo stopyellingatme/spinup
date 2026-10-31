@@ -240,7 +240,7 @@ The change adds API. The only change to a public type is the new `User` field.
 1. `app.d.ts` adds `role: string` to `App.User`. `hooks.server.ts` does not change.
 2. `lib/server/auth.ts` (managed) adds `requireRole(locals, url, ...roles)`.
    - It calls `requireUser`, so a missing user redirects 303 to `/login?redirectTo=...`.
-   - If the role is not listed, it calls `error(403, 'You do not have access to this page.')`. The existing `+error.svelte` shows it.
+   - If the role is not listed, it calls `error(403, 'Your role cannot open this page. Try: sign in with an account that has a required role.')`. The existing `+error.svelte` shows it.
 3. Navigation does not filter by role in the first version. Hiding an item would be cosmetic. `PlanNav` rebuilds `nav.gen.ts` from disk and has no source for roles.
 4. The Go guard and `requireRole` are the enforcement. `home` stays one value for all roles.
 

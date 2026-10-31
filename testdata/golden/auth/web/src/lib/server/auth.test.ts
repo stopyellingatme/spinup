@@ -182,7 +182,7 @@ describe('requireRole', () => {
 			requireRole({ user: { id: 1, email: 'ada@example.com', role: 'staff' } }, new URL('https://app.example.com/admin'), 'manager');
 			throw new Error('Expected an error');
 		} catch (reason) {
-			expect(reason).toMatchObject({ status: 403, body: { message: 'You do not have access to this page.' } });
+			expect(reason).toMatchObject({ status: 403, body: { message: 'Your role cannot open this page. Try: sign in with an account that has a required role.' } });
 		}
 	});
 });

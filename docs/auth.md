@@ -248,7 +248,7 @@ See [Generate pages and components](commands/generate-page.md).
 
 A web page calls `requireRole(locals, url, ...roles)` in each `load` function and form action.
 Without a user, the helper redirects with status 303 to `/login?redirectTo=<path>`.
-If the role is not in the list, it answers 403 with the text `You do not have access to this page.`
+If the role is not in the list, it answers 403 with the text `Your role cannot open this page. Try: sign in with an account that has a required role.`
 
 ```ts
 import { requireRole } from '#lib/server/auth.js';
