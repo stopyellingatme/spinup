@@ -132,6 +132,45 @@ func LoadEnvFile(root, env string) (EnvFile, error) {
 	return f, nil
 }
 
+// ScaffoldEnvFile copies the staging environment file for a new non-default environment.
+// It reports whether it created the file.
+func ScaffoldEnvFile(root, env string) (bool, error) {
+	if env == "production" || env == "staging" {
+		return false, nil
+	}
+	dir := filepath.Join(root, "deploy", "environments")
+	target := filepath.Join(dir, env+".toml")
+	if _, err := os.Stat(target); err == nil {
+		return false, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, fmt.Errorf("inspect deploy/environments/%s.toml: %w\nTry: check the directory permissions", env, err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "staging.toml"))
+	if err != nil {
+		return false, fmt.Errorf("read deploy/environments/staging.toml: %w\nTry: restore deploy/environments/staging.toml", err)
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return false, fmt.Errorf("create deploy/environments: %w\nTry: check the directory permissions", err)
+	}
+	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if errors.Is(err, fs.ErrExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("create deploy/environments/%s.toml: %w\nTry: check the directory permissions", env, err)
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		_ = os.Remove(target)
+		return false, fmt.Errorf("write deploy/environments/%s.toml: %w\nTry: check the free disk space", env, err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(target)
+		return false, fmt.Errorf("save deploy/environments/%s.toml: %w\nTry: check the free disk space", env, err)
+	}
+	return true, nil
+}
+
 var envValuePattern = regexp.MustCompile(`^[A-Za-z0-9._:/@+=,%-]*$`)
 
 // dotEnv renders the release .env file that Compose reads. It holds no secret.
