@@ -19,11 +19,11 @@ spinup test [flags]
 | --- | --- | --- |
 | `--api` | `true` | run API tests (default) |
 | `--confirm-env` | `` | type the protected environment name without a terminal |
-| `--contract` | `false` | run contract tests (M4) |
+| `--contract` | `false` | run contract tests (not available yet) |
 | `--cover` | `false` | report Go test coverage |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
-| `--e2e` | `false` | run end-to-end tests (M4) |
+| `--e2e` | `false` | run end-to-end tests (not available yet) |
 | `--env` | `` | target environment |
 | `--json` | `false` | write JSON output |
 | `--no-color` | `false` | turn off color |
@@ -32,7 +32,7 @@ spinup test [flags]
 | `--race` | `false` | enable the Go race detector |
 | `--run` | `` | run tests matching this regular expression |
 | `--verbose` | `false` | write extra detail |
-| `--web` | `false` | run web tests (M4) |
+| `--web` | `false` | run web tests (not available yet) |
 | `-y, --yes` | `false` | answer yes to prompts |
 
 ## Examples

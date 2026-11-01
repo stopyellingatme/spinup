@@ -58,7 +58,6 @@ Use it to look at old data or to copy rows back.
 ```console
 $ spinup backup restore --env production --into new --label 20261015-082351F
 Restored database at 127.0.0.1:5433 on the VM
-Connect: spinup server ssh --env production -L 5433:127.0.0.1:5433
 OpenSSH tunnel: ssh -N -L 5433:127.0.0.1:5433 'deploy@app.example.com'
 ```
 

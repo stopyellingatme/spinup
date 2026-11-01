@@ -280,7 +280,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	spec.Roles = roles
 	if len(spec.Roles) > 0 {
 		if !authenticated {
-			return nil, fmt.Errorf("cannot generate a role-guarded resource because the auth module is missing\nTry: spinup add auth")
+			return nil, fmt.Errorf("cannot generate a role-guarded resource because the auth module is missing\nTry: spinup module add auth")
 		}
 		if err := rolesFileMatches(in.Root, config); err != nil {
 			return nil, err

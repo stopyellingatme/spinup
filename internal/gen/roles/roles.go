@@ -24,7 +24,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		return nil, fmt.Errorf("cannot generate roles: expected no positional arguments\nTry: spinup g roles")
 	}
 	if in.Lock == nil || !slices.Contains(in.Lock.Packs, "auth") {
-		return nil, fmt.Errorf("cannot generate roles: the app has no auth module\nTry: spinup add auth")
+		return nil, fmt.Errorf("cannot generate roles: the app has no auth module\nTry: spinup module add auth")
 	}
 	config, err := project.Load(in.Root)
 	if err != nil {

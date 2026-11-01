@@ -115,7 +115,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 		return nil, fmt.Errorf("cannot generate a role-guarded page without --server, because only a server load can guard a page\nTry: add --server")
 	}
 	if len(roles) > 0 && !slices.Contains(in.Lock.Packs, "auth") {
-		return nil, fmt.Errorf("cannot generate a role-guarded page because the auth module is missing\nTry: spinup add auth")
+		return nil, fmt.Errorf("cannot generate a role-guarded page because the auth module is missing\nTry: spinup module add auth")
 	}
 	if server && in.Lock.Answers["frontend_mode"] == "embed" {
 		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")

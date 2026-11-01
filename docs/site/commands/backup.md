@@ -5,7 +5,7 @@ parent: CLI reference
 
 # spinup backup
 
-Back up the production database with pgBackRest
+Back up the production database (pgBackRest, pg_dump, or WAL-G)
 
 ## Use
 

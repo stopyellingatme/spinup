@@ -19,7 +19,7 @@ func TestTestCommand(t *testing.T) {
 	}
 	for _, target := range []string{"web", "e2e", "contract"} {
 		code, _, errOut = run(t, "test", "--"+target)
-		if code == 0 || !strings.Contains(errOut, "Try:") || !strings.Contains(errOut, "M4") {
+		if code == 0 || !strings.Contains(errOut, "Try:") || !strings.Contains(errOut, "not available yet") {
 			t.Fatalf("%s: code %d: %s", target, code, errOut)
 		}
 	}

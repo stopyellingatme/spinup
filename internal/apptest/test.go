@@ -19,7 +19,7 @@ type Options struct {
 	Run string
 	// Race and Cover enable Go test diagnostics.
 	Race, Cover bool
-	// Web, E2E, and Contract select targets deferred to M4.
+	// Web, E2E, and Contract select targets that are not available yet.
 	Web, E2E, Contract bool
 	// DryRun prints the command without execution.
 	DryRun bool
@@ -34,7 +34,7 @@ func Run(ctx context.Context, o Options, runner exec.Runner) error {
 		selected bool
 	}{{"web", o.Web}, {"e2e", o.E2E}, {"contract", o.Contract}} {
 		if target.selected {
-			return fmt.Errorf("cannot run %s tests: this target is unavailable\nTry: use --api until M4 adds %s tests", target.name, target.name)
+			return fmt.Errorf("cannot run %s tests: this target is unavailable\nTry: run spinup test --api (%s tests are not available yet)", target.name, target.name)
 		}
 	}
 	args := []string{"test"}

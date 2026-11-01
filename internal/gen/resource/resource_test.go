@@ -497,7 +497,7 @@ func TestResourceRolesRefusals(t *testing.T) {
 		role    string
 		want    string
 	}{
-		{name: "auth missing", role: "manager", want: "Try: spinup add auth"},
+		{name: "auth missing", role: "manager", want: "Try: spinup module add auth"},
 		{name: "empty", auth: true, role: ",", want: "role list is empty"},
 		{name: "undeclared", auth: true, role: "guest", want: "use one of: manager, staff"},
 		{name: "roles file missing", auth: true, remove: true, role: "manager", want: "Try: spinup g roles"},

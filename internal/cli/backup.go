@@ -25,7 +25,7 @@ func backupOptions(app *App, c *cobra.Command) backup.Options {
 }
 
 func newBackup(app *App) *cobra.Command {
-	group := &cobra.Command{Use: "backup", Short: "Back up the production database with pgBackRest", Args: cobra.NoArgs}
+	group := &cobra.Command{Use: "backup", Short: "Back up the production database (pgBackRest, pg_dump, or WAL-G)", Args: cobra.NoArgs}
 	var kind string
 	now := &cobra.Command{Use: "now", Example: `  # Take a differential backup now
   spinup backup now

@@ -86,7 +86,7 @@ func Restore(ctx context.Context, o RestoreOptions) (err error) {
 		if err = backend.Restore(ctx, o.Target, Into{New: true}); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "Restored database at 127.0.0.1:5433 on the VM\nConnect: spinup server ssh --env %s -L 5433:127.0.0.1:5433\n", s.Environment.Name)
+		_, err = fmt.Fprintf(out, "Restored database at 127.0.0.1:5433 on the VM\n")
 		if err == nil {
 			_, err = fmt.Fprintf(out, "OpenSSH tunnel: %s\n", restoreTunnel(s.Environment))
 		}

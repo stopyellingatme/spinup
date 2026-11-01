@@ -14,7 +14,7 @@ func newTools(app *App) *cobra.Command {
   spinup tools install`, Short: "Install and inspect checksum-verified host tools"}
 	var force bool
 	install := &cobra.Command{
-		Use: "install [sops|age...]", Example: `  # Install every pinned tool
+		Use: "install [sops|age|tofu...]", Example: `  # Install every pinned tool
   spinup tools install
 
   # Install two tools

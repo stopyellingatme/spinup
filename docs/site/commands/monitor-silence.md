@@ -35,8 +35,8 @@ spinup monitor silence <matcher> [flags]
 
 ```sh
 # Silence one alert for 2 hours (the default)
-spinup monitor silence alertname=HighErrorRate --env production
+spinup monitor silence prometheus_alertname=HighErrorRate --env production
 
 # Silence for 30 minutes
-spinup monitor silence alertname=HighErrorRate --for 30m --env production
+spinup monitor silence prometheus_alertname=HighErrorRate --for 30m --env production
 ```

@@ -36,8 +36,8 @@ func newTest(app *App) *cobra.Command {
 	c.Flags().StringVar(&o.Run, "run", "", "run tests matching this regular expression")
 	c.Flags().BoolVar(&o.Race, "race", false, "enable the Go race detector")
 	c.Flags().BoolVar(&o.Cover, "cover", false, "report Go test coverage")
-	c.Flags().BoolVar(&o.Web, "web", false, "run web tests (M4)")
-	c.Flags().BoolVar(&o.E2E, "e2e", false, "run end-to-end tests (M4)")
-	c.Flags().BoolVar(&o.Contract, "contract", false, "run contract tests (M4)")
+	c.Flags().BoolVar(&o.Web, "web", false, "run web tests (not available yet)")
+	c.Flags().BoolVar(&o.E2E, "e2e", false, "run end-to-end tests (not available yet)")
+	c.Flags().BoolVar(&o.Contract, "contract", false, "run contract tests (not available yet)")
 	return c
 }

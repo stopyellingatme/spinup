@@ -11,7 +11,7 @@ Download and verify pinned tool releases
 ## Use
 
 ```text
-spinup tools install [sops|age...] [flags]
+spinup tools install [sops|age|tofu...] [flags]
 ```
 
 ## Flags

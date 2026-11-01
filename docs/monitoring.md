@@ -198,9 +198,12 @@ $ spinup monitor test-alert --env production
 ...
 $ spinup monitor alerts --env production
 ...
-$ spinup monitor silence 'alertname=HighErrorRate' --for 2h --env production
+$ spinup monitor silence 'prometheus_alertname=HighErrorRate' --for 2h --env production
 ...
 ```
+
+To silence a built-in alert, match its `prometheus_alertname` label, as in the last command.
+Grafana sets the `alertname` label to the title of its forwarding rule, so that label is the same for every built-in alert.
 
 If the monitoring step fails during a deploy, the app keeps running and the deploy fails.
 Fix the problem, then run `spinup deploy --resume --env production`.

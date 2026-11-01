@@ -231,7 +231,7 @@ A CDN has public addresses. Without these three steps, all users share the addre
 
    `Caddyfile.d/*.caddy` cannot hold global options.
    `spinup upgrade` shows a conflict in this managed file when the template changes. Keep this block when you resolve it.
-2. In `deploy/compose.override.yml`, trust the CDN in the `api` service:
+2. In `deploy/compose.yml`, trust the CDN. Add one line to the `environment` of the `api` service, and change `XFF_DEPTH` of the `web` service:
 
    ```yaml
    services:
@@ -243,6 +243,8 @@ A CDN has public addresses. Without these three steps, all users share the addre
          XFF_DEPTH: "2"
    ```
 
+   Do not put these lines in `compose.override.yml`. `compose.yml` includes that file, and Compose rejects a service that both files define.
+   `compose.yml` is a managed file, so `spinup upgrade` shows a conflict when the template changes. Keep your lines when you resolve it.
 3. Check it. Send a request with a forged `X-Forwarded-For` header. The API must use the address that the CDN wrote.
 
 See [Sign-in security](build/auth-security.md) for the rate limits.

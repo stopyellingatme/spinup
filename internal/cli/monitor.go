@@ -63,10 +63,10 @@ func newMonitor(app *App) *cobra.Command {
 	}})
 	var duration string
 	silence := &cobra.Command{Use: "silence <matcher>", Example: `  # Silence one alert for 2 hours (the default)
-  spinup monitor silence alertname=HighErrorRate --env production
+  spinup monitor silence prometheus_alertname=HighErrorRate --env production
 
   # Silence for 30 minutes
-  spinup monitor silence alertname=HighErrorRate --for 30m --env production`, Short: "Silence alerts matching label=value", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+  spinup monitor silence prometheus_alertname=HighErrorRate --for 30m --env production`, Short: "Silence alerts matching label=value", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		o := options(c, "silence")
 		o.Matcher, o.For = args[0], duration
 		return run(c, o)

@@ -369,7 +369,7 @@ func monitoring(ctx context.Context, c *doctor.Context) doctor.Result {
 	}
 	out, err := run(ctx, r, "docker", "compose", "--project-name", config.App.Name+"-monitoring", "ps", "--status", "running", "--services")
 	if err != nil || out == "" {
-		return doctor.Result{Status: doctor.Fail, Message: "The monitoring stack is not running.", Try: "Run spinup deploy monitoring --env " + c.Env + "."}
+		return doctor.Result{Status: doctor.Fail, Message: "The monitoring stack is not running.", Try: "Run spinup deploy --env " + c.Env + "."}
 	}
 	return doctor.Result{Status: doctor.OK, Message: "The monitoring stack is running."}
 }

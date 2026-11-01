@@ -27,7 +27,7 @@ func TestRun(t *testing.T) {
 	}
 	for _, target := range []string{"web", "e2e", "contract"} {
 		o := Options{Web: target == "web", E2E: target == "e2e", Contract: target == "contract"}
-		if err := Run(context.Background(), o, &exec.Fake{}); err == nil || !strings.Contains(err.Error(), "M4") {
+		if err := Run(context.Background(), o, &exec.Fake{}); err == nil || !strings.Contains(err.Error(), "not available yet") {
 			t.Fatalf("%s: %v", target, err)
 		}
 	}
