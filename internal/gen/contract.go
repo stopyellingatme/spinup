@@ -68,6 +68,8 @@ type Generator struct {
 	Aliases []string
 	// Short is one help line. Usage is the argument synopsis, such as "<name> <field:type>...".
 	Short, Usage string
+	// Example is the help example: one or more indented command lines, each after a "#" comment line.
+	Example string
 	// Flags adds the generator's own flags.
 	Flags func(fs *pflag.FlagSet)
 	// Run plans the files. It must be deterministic for the same input.

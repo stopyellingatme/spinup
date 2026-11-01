@@ -39,7 +39,7 @@ func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interac
 		if child := children[g.Name]; child != nil {
 			return child
 		}
-		child := &cobra.Command{Use: g.Name, Aliases: g.Aliases, Short: g.Short}
+		child := &cobra.Command{Use: g.Name, Aliases: g.Aliases, Short: g.Short, Example: g.Example}
 		if g.Usage != "" {
 			child.Use += " " + g.Usage
 		}
