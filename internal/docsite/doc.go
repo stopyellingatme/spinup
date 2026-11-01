@@ -99,7 +99,9 @@ func ReferencePages(root *cobra.Command) map[string][]byte {
 	pages := map[string][]byte{}
 	commands := commandTree(root)
 	index := &strings.Builder{}
-	index.WriteString("# Command reference\n\n")
+	index.WriteString(referenceIndexFrontMatter)
+	index.WriteString("# CLI reference\n\n")
+	index.WriteString("Each page lists the flags of one command. For examples and how-to guides, see the [command guides](../../commands/index.md).\n\n")
 	for _, command := range commands {
 		path := commandPath(command)
 		pages[path] = []byte(renderCommand(command))
@@ -143,8 +145,35 @@ func commandPath(command *cobra.Command) string {
 	return filepath.ToSlash(filepath.Join("commands", strings.Join(parts, "-"))) + ".md"
 }
 
+// referenceIndexFrontMatter places the command index in the site navigation.
+const referenceIndexFrontMatter = "---\ntitle: CLI reference\nnav_order: 8\nhas_children: true\nhas_toc: false\n---\n\n"
+
+// referenceTitle is the navigation title of the command index. Command pages name it as their parent.
+const referenceTitle = "CLI reference"
+
+// frontMatter places a command page in the site navigation. A top-level command is a child of
+// the command index, and a subcommand is a child of its parent command. The sidebar shows two
+// levels, so a deeper command is left out of it and is reached from its parent's page.
+func frontMatter(command *cobra.Command) string {
+	var out strings.Builder
+	out.WriteString("---\n")
+	fmt.Fprintf(&out, "title: %s\n", command.CommandPath())
+	depth := len(strings.Fields(command.CommandPath())) - 1
+	switch {
+	case depth <= 1:
+		fmt.Fprintf(&out, "parent: %s\n", referenceTitle)
+	case depth == 2:
+		fmt.Fprintf(&out, "parent: %s\ngrand_parent: %s\n", command.Parent().CommandPath(), referenceTitle)
+	default:
+		out.WriteString("nav_exclude: true\n")
+	}
+	out.WriteString("---\n\n")
+	return out.String()
+}
+
 func renderCommand(command *cobra.Command) string {
 	var out strings.Builder
+	out.WriteString(frontMatter(command))
 	fmt.Fprintf(&out, "# %s\n\n", command.CommandPath())
 	fmt.Fprintf(&out, "%s\n\n", command.Short)
 	if command.Long != "" && command.Long != command.Short {
@@ -179,11 +208,35 @@ func renderCommand(command *cobra.Command) string {
 		}
 	}
 	if command.Example != "" {
-		out.WriteString("\n## Examples\n\n```text\n")
-		out.WriteString(strings.TrimSpace(command.Example))
+		out.WriteString("\n## Examples\n\n```sh\n")
+		out.WriteString(dedent(command.Example))
 		out.WriteString("\n```\n")
 	}
 	return out.String()
+}
+
+// dedent removes the blank edge lines and the indent that every line of a cobra example shares.
+// cobra prints the example as written in --help, which is indented by convention.
+func dedent(text string) string {
+	lines := strings.Split(strings.Trim(text, "\n"), "\n")
+	indent := -1
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		width := len(line) - len(strings.TrimLeft(line, " \t"))
+		if indent < 0 || width < indent {
+			indent = width
+		}
+	}
+	for index, line := range lines {
+		if len(line) >= indent && indent > 0 {
+			lines[index] = line[indent:]
+		} else {
+			lines[index] = strings.TrimSpace(line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func commandFlags(command *cobra.Command) []*pflag.Flag {

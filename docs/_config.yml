@@ -1,12 +1,60 @@
 title: spinup
-description: Full-stack application generator and operations CLI
-theme: minima
+description: Create, deploy, and run a full-stack Go and SvelteKit app
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache
 markdown: kramdown
 
+# The sidebar, search, and the header links.
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+aux_links:
+  "spinup on GitHub": "https://github.com/stopyellingatme/spinup"
+aux_links_new_tab: true
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/stopyellingatme/spinup"
+gh_edit_branch: "main"
+gh_edit_source: docs
+gh_edit_view_mode: "edit"
+
+callouts:
+  note:
+    title: Note
+    color: blue
+  tip:
+    title: Tip
+    color: green
+  important:
+    title: Important
+    color: yellow
+  warning:
+    title: Warning
+    color: red
+
+# The generated pages of docs/site/ that do not carry their own front matter.
+defaults:
+  - scope:
+      path: "site/compat.md"
+    values:
+      title: Compatibility matrix
+      parent: Versions and policies
+      nav_order: 2
+  - scope:
+      path: "site/stack.md"
+    values:
+      title: Pinned stack
+      parent: Versions and policies
+      nav_order: 3
+  - scope:
+      path: "site/index.md"
+    values:
+      nav_exclude: true
 
 # Internal design records are not part of the published site.
 exclude:
   - design
   - adr
-  - policy
-  - contributing
