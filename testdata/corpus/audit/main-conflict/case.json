@@ -1,0 +1,6 @@
+{
+  "conflicts": [
+    "api/cmd/api/main.go"
+  ],
+  "doctor_warning": "api/cmd/api/main.go lacks audit.Command( or authsink. wiring"
+}
