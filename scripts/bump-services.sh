@@ -107,6 +107,7 @@ report() {
   printf '| --- | --- | --- | --- | --- |\n'
   report_packages crates crate "${BUMP_SERVICES_CRATES_API:-https://crates.io/api/v1/crates}" '.crate.max_stable_version' ''
   report_packages python_packages python "${BUMP_SERVICES_PYPI_API:-https://pypi.org/pypi}" '.info.version' /json
+  report_packages python_pdf_packages python-pdf "${BUMP_SERVICES_PYPI_API:-https://pypi.org/pypi}" '.info.version' /json
   report_packages node_packages node "${BUMP_SERVICES_NPM_API:-https://registry.npmjs.org}" '.["dist-tags"].latest' ''
   for name in rust python uv node distroless-static-debian13; do
     ref=$(image_ref "$name")
@@ -137,7 +138,7 @@ cleanup() {
 trap cleanup EXIT
 
 lock() {
-  local rust_ref python_ref uv_ref node_ref cargo_command=generate-lockfile
+  local rust_ref python_ref uv_ref node_ref project cargo_command=generate-lockfile
   local uv_args=(lock)
   rust_ref=$(image_ref rust)
   python_ref=$(image_ref python)
@@ -152,10 +153,11 @@ lock() {
   else
     command -v docker >/dev/null || fail 'lock requires Docker' 'install Docker, or use lock --dry-run'
     work=$(mktemp -d)
-    mkdir -p "$work/rust/src" "$work/python" "$work/node"
+    mkdir -p "$work/rust/src" "$work/python" "$work/python-pdf" "$work/node"
     cp "$templates/rust/Cargo.toml" "$templates/rust/Cargo.lock" "$work/rust/"
     printf 'fn main() {}\n' > "$work/rust/src/main.rs"
     cp "$templates/python/pyproject.toml" "$templates/python/uv.lock" "$work/python/"
+    cp "$templates/python-pdf/pyproject.toml" "$templates/python-pdf/uv.lock" "$work/python-pdf/"
     cp "$templates/node/package.json" "$templates/node/pnpm-lock.yaml" "$work/node/"
     if [[ ${BUMP_SERVICES_FRESH:-0} == 1 ]]; then rm "$work/node/pnpm-lock.yaml"; fi
   fi
@@ -172,16 +174,20 @@ lock() {
     docker rm "$uv_container" >/dev/null
     uv_container=
   fi
-  run docker run --rm -v "$work/python:/work" -v "$work/uv:/usr/local/bin/uv:ro" -w /work \
-    -e UV_PYTHON_DOWNLOADS=never "$python_ref" uv "${uv_args[@]}"
+  # The PDF variant (ADR 0026) has its own lock, made with the same image and uv.
+  for project in python python-pdf; do
+    run docker run --rm -v "$work/$project:/work" -v "$work/uv:/usr/local/bin/uv:ro" -w /work \
+      -e UV_PYTHON_DOWNLOADS=never "$python_ref" uv "${uv_args[@]}"
+  done
   run docker run --rm -v "$work/node:/work" -w /work "$node_ref" \
     corepack pnpm install --lockfile-only --ignore-scripts
   if [[ "$dry_run" != 1 ]]; then
-    # Publish only lockfiles after all three commands succeed. Manifests stay untouched.
+    # Publish only lockfiles after all four commands succeed. Manifests stay untouched.
     cp "$work/rust/Cargo.lock" "$templates/rust/Cargo.lock"
     cp "$work/python/uv.lock" "$templates/python/uv.lock"
+    cp "$work/python-pdf/uv.lock" "$templates/python-pdf/uv.lock"
     cp "$work/node/pnpm-lock.yaml" "$templates/node/pnpm-lock.yaml"
-    printf 'bump-services: refreshed Cargo.lock, uv.lock, and pnpm-lock.yaml\n'
+    printf 'bump-services: refreshed Cargo.lock, uv.lock (python and python-pdf), and pnpm-lock.yaml\n'
   fi
 }
 

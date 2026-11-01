@@ -118,7 +118,11 @@ func deployService(in DeployInput, s services.Service) (*yaml.Node, error) {
 	m.add("read_only", boolean(true))
 	m.add("cap_drop", flow(plain("ALL")))
 	m.add("security_opt", flow(quoted("no-new-privileges:true")))
-	m.add("tmpfs", seq(plain("/tmp")))
+	tmp := "/tmp"
+	if s.TmpSize != "" {
+		tmp += ":size=" + s.TmpSize
+	}
+	m.add("tmpfs", seq(plain(tmp)))
 	m.add("environment", env)
 	if len(s.Secrets) > 0 {
 		// The long syntax with create_host_path: false makes Compose fail on a missing
@@ -172,7 +176,12 @@ func deploySection(in DeployInput, s services.Service) *yaml.Node {
 	}
 	d.add("replicas", integer(replicas))
 	res := newMap()
-	if r := in.Resources[s.Name]; r.CPUs != "" || r.Memory != "" {
+	r := in.Resources[s.Name]
+	if r.Memory == "" {
+		// The environment file wins. The memory key of spinup.toml is the default.
+		r.Memory = s.Memory
+	}
+	if r.CPUs != "" || r.Memory != "" {
 		limits := newMap()
 		if r.CPUs != "" {
 			limits.add("cpus", quoted(r.CPUs))

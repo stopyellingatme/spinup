@@ -15,6 +15,15 @@ func TestLoad(t *testing.T) {
 	if err := stack.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}
+	// The PDF service template (ADR 0026) adds these pins to python_packages.
+	for _, name := range []string{"weasyprint", "jinja2", "pypdf"} {
+		if stack.PythonPDFPackages[name] == "" {
+			t.Errorf("python_pdf_packages.%s is missing", name)
+		}
+		if _, ok := stack.PythonPackages[name]; ok {
+			t.Errorf("python_packages.%s is set: the base template must not pin a PDF package", name)
+		}
+	}
 }
 
 func TestParseRejectsUnknownField(t *testing.T) {
@@ -65,6 +74,7 @@ func TestValidate(t *testing.T) {
 		{"toolchain", func(s *Stack) { s.Go.Toolchain = "1.27.2" }, "go.toolchain"},
 		{"minimum-go", func(s *Stack) { s.Go.Min = "" }, "go.min"},
 		{"module-version", func(s *Stack) { s.GoModules["example/module"] = "" }, "go_modules.example/module"},
+		{"python-pdf-version", func(s *Stack) { s.PythonPDFPackages = map[string]string{"weasyprint": " "} }, "python_pdf_packages.weasyprint"},
 		{"image-name", func(s *Stack) { image := s.Images["example"]; image.Image = ""; s.Images["example"] = image }, "images.example.image"},
 		{"image-tag", func(s *Stack) { image := s.Images["example"]; image.Tag = ""; s.Images["example"] = image }, "images.example.tag"},
 		{"image-digest", func(s *Stack) { image := s.Images["example"]; image.Digest = "sha256:bad"; s.Images["example"] = image }, "images.example.digest"},

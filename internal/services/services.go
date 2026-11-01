@@ -48,6 +48,13 @@ type Service struct {
 	// Auth is the edge check of a public route: "" or AuthNone (the service checks callers
 	// itself), or AuthSession (the edge asks the API for a valid user session first).
 	Auth string `toml:"auth"`
+	// Memory is the default memory limit of the service in deploy, such as "3g". The
+	// memory of [resources.<name>] in deploy/environments/<env>.toml wins. Empty means no
+	// default limit (ADR 0026).
+	Memory string `toml:"memory"`
+	// TmpSize is the size limit of the /tmp tmpfs, such as "256m". Empty means the Docker
+	// default (ADR 0026).
+	TmpSize string `toml:"tmp_size"`
 }
 
 // The values of Service.Auth.
@@ -89,6 +96,7 @@ var (
 	namePattern = regexp.MustCompile(`^[a-z][a-z0-9]{0,19}$`)
 	varPattern  = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 	segPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+	sizePattern = regexp.MustCompile(`^[1-9][0-9]{0,5}[kmg]$`)
 )
 
 // ValidName reports whether name is a valid, unreserved service name. A Go keyword
@@ -158,6 +166,12 @@ func Validate(list []Service, reservedDevPorts []int) error {
 			if n, err := strconv.Atoi(s.GPUs); err != nil || n < 1 {
 				problems = append(problems, fmt.Errorf("%s: gpus %q must be \"\", \"all\", or a count of 1 or more. Try: set gpus = \"all\"", label, s.GPUs))
 			}
+		}
+		if s.Memory != "" && !sizePattern.MatchString(s.Memory) {
+			problems = append(problems, fmt.Errorf("%s: memory %q must be a number with the unit k, m, or g. Try: set memory = \"3g\"", label, s.Memory))
+		}
+		if s.TmpSize != "" && !sizePattern.MatchString(s.TmpSize) {
+			problems = append(problems, fmt.Errorf("%s: tmp_size %q must be a number with the unit k, m, or g. Try: set tmp_size = \"256m\"", label, s.TmpSize))
 		}
 		problems = append(problems, publicProblems(label, s)...)
 	}

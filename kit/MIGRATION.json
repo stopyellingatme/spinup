@@ -6,6 +6,11 @@
       "id": "auth-roles-schema",
       "desc": "Run spinup db migrate before you start the new binary. The auth queries need the role column. Try: run spinup db migrate up.",
       "kind": "manual"
+    },
+    {
+      "id": "audit-schema",
+      "desc": "Run spinup db migrate before you start the new binary when the audit module is on. Try: run spinup db migrate up.",
+      "kind": "manual"
     }
   ],
   "behaviors": []
