@@ -68,3 +68,27 @@ $ spinup module add --help
 Enable modules on a branch at the locked template version
 ...
 ```
+
+## Audit
+
+Run `spinup upgrade` before adding audit to an existing app.
+Then run `spinup module add audit --yes --non-interactive`.
+The module requires `auth` and the web frontend.
+It has no questions or additional flags.
+
+```console
+$ spinup new audit-plan --module example.com/audit-plan --modules auth --no-git --non-interactive
+...
+$ cd audit-plan
+$ spinup module add audit --dry-run --yes --non-interactive
+...
+```
+
+Inspect warnings about duplicate migration versions before applying migrations.
+The API main file has the class `scaffold`.
+Add the audit imports, the two auth options, and the audit command to that file.
+The `Next:` output lists the exact lines.
+Run `spinup db migrate up` before starting the new binary.
+Use `spinup g audit <resource>` for each existing table.
+Wrap existing writes in `audit.InTx` and use `s.Queries.WithTx(tx)`.
+Read [Audit trail](../audit.md) for the wiring, access rules, retention, and limits.

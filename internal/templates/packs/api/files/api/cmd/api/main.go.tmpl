@@ -19,6 +19,10 @@ import (
  mailapp "[[ .module ]]/api/internal/mail"
 [[- end ]]
  "github.com/stopyellingatme/spinup/kit/app"
+[[- if has "audit" .modules ]]
+ "github.com/stopyellingatme/spinup/kit/audit"
+ "github.com/stopyellingatme/spinup/kit/audit/authsink"
+[[- end ]]
 [[- if has "auth" .modules ]]
  "[[ .module ]]/api/internal/roles"
  "github.com/stopyellingatme/spinup/kit/auth"
@@ -73,6 +77,10 @@ func run() (err error) {
  }
  authn, err := auth.New(pool,
   auth.WithRoles(roles.Set),
+[[- if has "audit" .modules ]]
+  auth.WithEvents(authsink.New(pool)),
+  auth.WithActorContext(authsink.ActorContext),
+[[- end ]]
   auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
   auth.WithSecureCookie(cfg.Env != "dev"),
   auth.WithTrustedOrigins(web.PublicOrigin),
@@ -106,6 +114,9 @@ func run() (err error) {
 [[- if has "jobs" .modules ]]
   app.WithCommand("mail-worker", mailers.WorkerCommand(pool)),
 [[- end ]]
+[[- end ]]
+[[- if has "audit" .modules ]]
+  app.WithCommand("audit", audit.Command(pool)),
 [[- end ]]
   app.WithReadiness("db", pool.Ping),
   app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),
