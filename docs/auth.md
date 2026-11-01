@@ -1,10 +1,17 @@
-# Accounts and sessions (`auth` module)
+---
+title: Accounts and sign-in
+parent: Build your app
+nav_order: 3
+---
 
-The `auth` module adds user accounts to an app.
-Users can register, log in, and log out.
-The Go API owns the session. The web app shows the login pages and reads the session on the server.
+# Accounts and sign-in
 
-The module needs the web app, so you cannot use it with `--api-only`.
+The `auth` module adds user accounts to your app.
+Users can register, sign in, and sign out.
+The Go API owns the session. The web app shows the sign-in pages and reads the session on the server.
+
+To add the module to an app that exists, run [`spinup module add auth`](site/commands/module-add.md).
+To start a new app with it, use `--modules`:
 
 ```console
 $ spinup new todo --module example.com/todo --modules ci,auth --no-git --non-interactive
@@ -28,7 +35,7 @@ $ ls api/db/migrations
 embed.go
 ```
 
-An API-only app fails with an error:
+The module needs the web app, so you cannot use it with `--api-only`:
 
 ```console
 $ spinup new apionly --api-only --module example.com/apionly --modules auth --no-git --non-interactive
@@ -37,36 +44,55 @@ Error: module "auth" needs the web frontend, and --api-only leaves it out
 [exit 1]
 ```
 
-## Files
+To try it, start the development stack and open `/register`:
 
-| Path | Class | Purpose |
-| --- | --- | --- |
-| `api/db/migrations/00002_create_auth.sql` | seed | The tables `users`, `sessions`, and `login_attempts`. |
-| `api/cmd/api/main.go` | scaffold | The api pack adds kit `auth` to this file when the module is on. |
-| `web/src/lib/server/auth.ts` | managed | The guard, redirect validation, API requests, and session cookies. |
-| `web/src/lib/server/auth.test.ts` | managed | The vitest tests of the helper. |
-| `web/src/routes/login/` | scaffold | The login page and its form action. |
-| `web/src/routes/register/` | scaffold | The registration page and its form action. |
-| `web/src/routes/logout/+page.server.ts` | scaffold | The logout action. It has no page. A `GET /logout` goes to `/login`. |
-| `web/src/routes/account/` | scaffold | Shows the email of the user. Without a user, it redirects to login with `redirectTo`. |
-
-The API main file creates kit `auth`. It adds the middleware, the routes, and the `user` command:
-
+<!-- doctest: skip -->
 ```console
-$ grep authn api/cmd/api/main.go
-	authn, err := auth.New(pool,
-		app.WithMiddleware(authn.Middleware()),
-		app.WithRoutes(authn.Routes),
-		app.WithCommand("user", auth.UserCommand(authn)),
-		app.WithShutdown(authn.Close),
+$ spinup dev
+...
 ```
 
-## The sign-in flow
+Open `http://localhost:5173/register`, create an account, and you land on your first page.
 
-Call `requireUser(locals, url)` first in each protected load function and form action.
-The helper returns the signed-in user.
+## What users see
+
+| Page | What it does |
+| --- | --- |
+| `/register` | Creates an account and signs the user in. |
+| `/login` | Signs the user in. A failure shows the field errors and keeps the email. |
+| `/logout` | Signs the user out and goes to `/login`. It has no page of its own. |
+| `/account` | Shows the email of the signed-in user. Without a user, it goes to `/login`. |
+
+After a sign-in, the user goes to the page they wanted, or to the first resource page.
+If the app has no resource page, the user goes to `/`.
+A signed-in user who opens `/login` or `/register` goes to the same place.
+A signed-in user who opens `/` also goes there when it is not `/`.
+
+Want a different sign-in method, such as Google? Read [Sign in with an identity provider](build/oidc.md).
+Want users to reset a lost password? Add the [mail module](mail.md).
+
+## Protect an API route
+
+Wrap a handler with `RequireUser`. Read the user with `auth.UserFrom`:
+
+```go
+mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.UserFrom(r.Context())
+	// Load the todos of user.ID.
+})))
+```
+
+`RequireUser` answers 401 when nobody is signed in.
+To allow only some roles, use `RequireRole`. See [Roles](build/roles.md).
+
+Every route of a resource from `spinup g resource` already requires a signed-in user.
+You do not add `RequireUser` to them.
+
+## Protect a web page
+
+Call `requireUser(locals, url)` first in each protected `load` function and form action.
+It returns the signed-in user.
 Without a user, it redirects to `/login?redirectTo=<path>` with status 303.
-The encoded path includes the query string.
 
 ```ts
 import { requireUser } from '#lib/server/auth.js';
@@ -77,25 +103,27 @@ export const load: PageServerLoad = ({ locals, url }) => {
 };
 ```
 
-Login and registration preserve `redirectTo` through form submissions and the links between these pages.
-After success, their actions call `safeRedirect(target, home)`.
-The `home` value comes from `web/src/lib/nav.gen.ts`.
-It names the first resource page, or `/` when there are no resource pages.
-Signed-in users who open login or registration go to `home`.
-Signed-in users who open `/` also go to `home` when it differs from `/`.
-Logout redirects to `/login`.
+The encoded path in `redirectTo` includes the query string.
+The login and register pages keep `redirectTo` when the user moves between them.
+To guard a page by role, read [Roles](build/roles.md).
 
-`safeRedirect` accepts a path such as `/todos` or `/todos?page=2`.
-The path must start with `/`.
-It rejects absolute URLs, `//evil.com`, backslashes, and control characters.
-It checks the decoded path too.
-Empty, null, malformed, or unsafe targets use `home` instead.
-Pass a trusted local path as the fallback when you use this helper elsewhere.
-OIDC buttons send the validated destination as the `next` parameter.
+### Read the current user
+
+In a Go handler, call `auth.UserFrom(r.Context())`.
+It returns the user with the fields `ID`, `Email`, and `Role`.
+
+In a Svelte page, the user comes from the `load` function above.
+In `hooks.server.ts`, the app reads the user from `GET /api/session` on every request.
+The user is then in `locals.user`, with the fields `id`, `email`, and `role`.
+
+### Send the user to a safe path
+
+`safeRedirect(target, home)` returns `target` when it is a local path such as `/todos` or `/todos?page=2`.
+It returns `home` for an empty, malformed, or unsafe target.
+Unsafe targets include `https://evil.com`, `//evil.com`, backslashes, and control characters.
+Use it whenever you redirect to a path that came from a URL.
 
 ```console
-$ grep 'requireUser(locals, url)' web/src/routes/account/+page.server.ts
-	return { user: requireUser(locals, url) };
 $ grep 'safeRedirect(url.searchParams' web/src/routes/login/+page.server.ts
 	return { redirectTo: safeRedirect(url.searchParams.get('redirectTo'), home) };
 		redirect(303, safeRedirect(url.searchParams.get('redirectTo'), home));
@@ -106,7 +134,92 @@ export const nav: NavItem[] = [];
 export const home: string = '/';
 ```
 
-## The API
+The value `home` comes from `web/src/lib/nav.gen.ts`.
+It is the first resource page, or `/` when the app has none.
+
+## Choose who can register
+
+The API reads the variable `AUTH_REGISTRATION`.
+
+| Value | Who can register | Example |
+| --- | --- | --- |
+| `open` | Anyone. The account gets `default_role`. This is the default. | `AUTH_REGISTRATION=open` |
+| `first-user` | Only the first person, while the `users` table is empty. That account gets `admin_role`. | `AUTH_REGISTRATION=first-user` |
+| `closed` | Nobody. You create accounts with the `user` command. | `AUTH_REGISTRATION=closed` |
+
+{: .warning }
+For an app with a public URL, use `first-user` or `closed`. In `first-user` mode, a stranger can take the first slot of a public, empty site. Create the first administrator before you publish the site.
+
+For a deployed app, add the variable to the `environment` of the `api` service in `deploy/compose.yml`:
+
+```yaml
+services:
+  api:
+    environment:
+      AUTH_REGISTRATION: first-user
+```
+
+{: .note }
+Edit `deploy/compose.yml` itself. If you define the `api` service again in `deploy/compose.override.yml`, Compose stops with `services.api conflicts with imported resource`. The file `compose.yml` is managed, so `spinup upgrade` can show a conflict near your line. Keep your line when you resolve it.
+
+### Secure a public site
+
+1. Set `AUTH_REGISTRATION=first-user` and deploy.
+2. Open `/register` and create your own account. It gets `admin_role`.
+3. From now on, registration answers 403. Add other people with `user create`.
+
+Other facts about registration:
+
+- A refused registration answers 403 with the text `Registration is closed. Try: ask an administrator to create your account.`
+- A database lock makes the `first-user` rule safe. Two requests at the same time cannot both become the first administrator.
+- OIDC follows the mode. In `first-user` mode, OIDC creates an account only while `users` is empty. A known identity can always sign in.
+- A value that is not valid stops the API at startup. The error names the variable and the valid values.
+- The register request never reads a role from the body.
+
+## Create accounts and change roles
+
+The app binary has the command `user`.
+An operator uses it to create accounts and to change roles.
+It is the only way to change a role.
+The command never prompts. If a flag is missing, it fails and names the flag.
+
+<!-- doctest: skip -->
+```console
+$ cd api
+$ printf '%s' 'correct horse battery' | go run ./cmd/api user create --email ada@example.com --role manager --password-stdin
+created ada@example.com	manager
+$ go run ./cmd/api user set-role --email bob@example.com --role staff
+updated bob@example.com	staff
+$ go run ./cmd/api user list
+ada@example.com	manager
+bob@example.com	staff
+```
+
+| Action | What it does |
+| --- | --- |
+| `user create --email E --role R --password-stdin` | Creates an account with the role `R`. The password comes from standard input. |
+| `user set-role --email E --role R` | Changes the role of the account. |
+| `user list` | Prints the email and the role of each account. |
+| `user backfill` | Writes `default_role` into each account that has an empty role. It prints the number of accounts. |
+
+`user create` and `user set-role` also take `--reason TEXT`. With the [audit trail](audit.md), the text goes in the event.
+
+In a deployed app, run the same command in the `api` container. Open a shell with `spinup server ssh --env production`, then run:
+
+```sh
+docker exec -i "$(docker ps --filter name=api --format '{{.Names}}' | head -n 1)" /api user list
+```
+
+- The command checks `--role` against the declared roles. An unknown role fails with the list of declared roles and a `Try:` line.
+- `user set-role` fails when the change removes the last account with `admin_role`. Give the role to another account first.
+- `user list` marks an empty role as `<default_role> (default)`. If `default_role` equals `admin_role`, it prints `(none)`. It marks a role that the app no longer declares as `(undeclared)`.
+- `user backfill` refuses to run when `default_role` equals `admin_role`. Run `user set-role` for each account instead.
+
+A role change applies to the next request with the same cookie.
+The user does not sign in again.
+For the rules about roles, read [Roles](build/roles.md).
+
+## The API routes
 
 | Route | Body | Success | Errors |
 | --- | --- | --- | --- |
@@ -119,6 +232,7 @@ export const home: string = '/';
 - A 422 problem has an `errors` list with the fields `email` and `password`.
 - The register and login routes accept only `application/json` bodies, up to 16 KiB.
 - The auth responses have `Cache-Control: no-store`.
+- A password has 12 to 512 characters. The API removes the spaces around an email and changes it to lower case.
 
 Try the API with `curl` while the API runs on port 8080:
 
@@ -130,450 +244,17 @@ $ curl -b jar http://localhost:8080/api/session
 {"user":{"id":1,"email":"ada@example.com","role":"staff"}}
 ```
 
-### Protect a route
-
-Wrap a handler with `RequireUser`. Read the user with `auth.UserFrom`:
-
-```go
-mux.Handle("GET /api/todos", authn.RequireUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	user, _ := auth.UserFrom(r.Context())
-	// Load the todos of user.ID.
-})))
-```
-
-`RequireUser` answers 401 without a user.
-To limit a route to some roles, use `RequireRole` (see Roles below).
-
-## Roles
-
-Each user has one role. The app declares the roles in the `[auth]` table of `spinup.toml`.
-A role is an app word. The kit, the generators, and the web app never test for a role name.
-
-### Declare the roles
-
-```toml
-[auth]
-roles = ["manager", "staff"]
-admin_role = "manager"
-default_role = "staff"
-```
-
-| Key | Meaning | Default |
-| --- | --- | --- |
-| `roles` | The list of role names. It has 1 to 16 unique names. | `["manager", "staff"]` |
-| `admin_role` | The role of the first account in `first-user` mode. The kit also keeps at least one account with this role. | `manager` |
-| `default_role` | The role of a self-service account and of an OIDC account. | `staff` |
-
-- A name uses lower-case letters, digits, and underscores. It starts with a letter and has 32 characters at most.
-- A name has no double underscore and no trailing underscore.
-- `admin_role` and `default_role` must be in `roles`.
-- If the table or a key is absent, the key has its default. An app without `[auth]` has the roles `manager` and `staff`.
-- Two names must not give the same Go constant. The name `set` is not allowed, because the generated file declares `Set`.
-
-`spinup g roles` writes `api/internal/roles/roles.gen.go` from the table.
-The file has one constant for each role and the value `Set`. The app passes `Set` to the auth module.
-Run the command again after each change to `[auth]`.
-See [spinup g roles](commands/generate-roles.md).
-
-```console
-$ spinup new roleapp --module example.com/roleapp --modules ci,auth --no-git --non-interactive
-...
-$ cd roleapp
-$ cat api/internal/roles/roles.gen.go
-// Code generated by spinup. DO NOT EDIT.
-
-package roles
-
-import "github.com/stopyellingatme/spinup/kit/auth"
-
-const (
-	// Manager is the "manager" role.
-	Manager = "manager"
-	// Staff is the "staff" role.
-	Staff = "staff"
-)
-
-// Set is the role set of this app. Pass it to auth.WithRoles.
-var Set = auth.Roles{Names: []string{Manager, Staff}, Admin: Manager, Default: Staff}
-$ grep -E 'WithRoles|WithRegistration|WithCommand\("user"' api/cmd/api/main.go
-		auth.WithRoles(roles.Set),
-		auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
-		app.WithCommand("user", auth.UserCommand(authn)),
-```
-
-The doctor check `roles-drift` warns in three cases:
-
-- `roles.gen.go` differs from `[auth]`. The fix is `spinup g roles`.
-- `roles.gen.go` is missing in an app with the `auth` module. The fix is `spinup g roles`.
-- `api/cmd/api/main.go` has no `auth.WithRoles(` call. The fix is to add the call by hand.
-
-If the doctor check warns, the app can run with a role set that differs from `spinup.toml`.
-If `main.go` does not call `auth.WithRoles`, the kit uses the default roles.
-
-### Protect an API route
-
-Use `RequireRole` with the constants from the `roles` package.
-It answers 401 without a user and 403 when the role of the user is not in the list.
-The 403 body is a problem detail with the text `Your role cannot use this endpoint. Try: sign in with an account that has a required role.`
-
-```go
-mux.Handle("DELETE /api/todos/{id}", authn.RequireRole(roles.Manager)(deleteTodo))
-```
-
-- `RequireRole` is a method of the auth module, so it can check the names. A call with no name, or with a name that the app does not declare, panics at startup.
-- The check runs after the rate limit and the cross-origin check.
-- Inside a handler, `user.HasRole(roles.Manager, roles.Staff)` is true when the role of the user is one of the names. It is false for an empty list.
-
-```go
-user, _ := auth.UserFrom(r.Context())
-if !user.HasRole(roles.Manager) {
-	// Show the manager view only.
-}
-```
-
-In tests, `authtest.AsRole(handler, userID, roles.Manager)` and `authtest.AsUser(handler, user)` run a handler as a user with a role.
-`authtest.As` gives a user with an empty role.
-
-### Protect a resource and a page
-
-`spinup g resource todo title:string --role manager` guards the five operations of the resource.
-`--role manager,staff` allows more than one role.
-The handlers check the role after they check the user.
-The OpenAPI file gets a `403` response for each operation.
-See [Generate resources](commands/generate-resource.md).
-
-`spinup g page reports --server --role manager` guards a page.
-Only a server `load` can guard a page, so `--role` needs `--server`.
-See [Generate pages and components](commands/generate-page.md).
-
-A web page calls `requireRole(locals, url, ...roles)` in each `load` function and form action.
-Without a user, the helper redirects with status 303 to `/login?redirectTo=<path>`.
-If the role is not in the list, it answers 403 with the text `Your role cannot open this page. Try: sign in with an account that has a required role.`
-
-```ts
-import { requireRole } from '#lib/server/auth.js';
-import type { PageServerLoad } from './$types';
-
-export const load: PageServerLoad = ({ locals, url }) => {
-	requireRole(locals, url, 'manager');
-	return { title: 'Reports' };
-};
-```
-
-The navigation does not hide items by role. The Go guard and `requireRole` enforce access.
-`App.User` has the field `role`.
-
-Two behaviors of a guarded resource need care:
-
-- A caller with the wrong role, who sends bad input, gets 400 or 422 before 403. The caller learns only the shape of the schema.
-- A role does not change the owner filter. A resource with `--role` and without `--shared` still shows each user only the rows of that user. To share rows between users, add `--shared`. The generator prints a note about this.
-
-### Registration modes
-
-The app binary reads `AUTH_REGISTRATION` and passes it to `auth.WithRegistration`.
-
-| Value | Self-service registration |
-| --- | --- |
-| `open` | Anyone can register. The account gets `default_role`. This is the default, also when the variable is unset. |
-| `first-user` | Registration is open only while the `users` table is empty. The first account gets `admin_role`. After that, registration answers 403. |
-| `closed` | Registration always answers 403. |
-
-- OIDC follows the mode. In `first-user` mode, OIDC creates an account only while `users` is empty, and that account gets `admin_role`. A known identity can always sign in.
-- A refused registration answers 403 with the text `Registration is closed. Try: ask an administrator to create your account.`
-- A lock in the database makes the first-user rule safe. Two requests at the same time cannot both become the first administrator.
-- A value that is not valid stops the API at startup. The error names the variable and the valid values.
-- The register request never reads a role from the body.
-
-For an app with a public URL, use `first-user` or `closed`.
-Create the first administrator before you publish the site.
-In `first-user` mode, a stranger can take the first slot of a public, empty site.
-
-For Compose, set the variable in `deploy/compose.override.yml`, as for the rate limit settings:
-
-```yaml
-services:
-  api:
-    environment:
-      AUTH_REGISTRATION: first-user
-```
-
-### The user command
-
-The app binary has the command `user`. The operator uses it to create accounts and to change roles.
-It is the only way to change a role. The first version has no page and no route for this.
-The command never prompts. If a flag is missing, it fails and names the flag.
-
-| Action | What it does |
-| --- | --- |
-| `user create --email E --role R --password-stdin` | Creates an account with the role `R`. The password comes from standard input. |
-| `user set-role --email E --role R` | Changes the role of the account. |
-| `user list` | Prints the email and the role of each account. |
-| `user backfill` | Writes `default_role` into each account that has an empty role. It prints the number of accounts. |
-
-<!-- doctest: skip -->
-```console
-$ cd api
-$ printf '%s' 'correct horse battery' | go run ./cmd/api user create --email ada@example.com --role manager --password-stdin
-created ada@example.com	manager
-$ go run ./cmd/api user set-role --email bob@example.com --role staff
-updated bob@example.com	staff
-$ go run ./cmd/api user list
-ada@example.com	manager
-bob@example.com	staff
-$ go run ./cmd/api user create --email cy@example.com --password-stdin
-user create: --role is required. Declared roles: manager, staff.
-Try: user create --email cy@example.com --role staff --password-stdin
-```
-
-In a deployed app, run the same command in the `api` container.
-
-- The command checks `--role` against the declared roles. An unknown role fails with the list of declared roles and a `Try:` line.
-- `user set-role` fails with `ErrLastAdmin` when the change removes the last account with `admin_role`. Give the role to another account first.
-- `user list` marks an empty role as `<default_role> (default)`. If `default_role` equals `admin_role`, it prints `(none)`. It marks a stored role that the app no longer declares as `(undeclared)`.
-- `user backfill` refuses to run when `default_role` equals `admin_role`. Run `user set-role` for each account instead.
-
-### The session and the role
-
-The cookie stores only the user ID. The API reads the role on each request.
-A role change applies to the next request with the same cookie. The user does not sign in again.
-
-```json
-{"user":{"id":1,"email":"ada@example.com","role":"manager"}}
-```
-
-### Empty and undeclared roles
-
-- The migration `00005_users_role.sql` adds the column `role` with an empty default. Accounts from before the migration have an empty role.
-- An empty role reads as `default_role`. An empty role never gives administrator rights. If `default_role` equals `admin_role`, an empty role matches no name.
-- New accounts always store a named role.
-- Run `user backfill` once after the migration. It writes `default_role` into the empty rows, so a later change of `default_role` does not move old accounts. Until then, an empty row follows `default_role`.
-- A stored role that the app no longer declares keeps its text. `HasRole` is false for every declared role.
-- If you add that name to `[auth]` again, the old rows get power again, maybe with a new meaning. Before you rename or remove a role, run `user set-role` for each account that holds it. `user list` shows these rows.
-
-## Security defaults
-
-### Sessions
-
-- The session cookie is `session`. It is `HttpOnly`, `SameSite=Lax`, and `Path=/`.
-- The cookie is `Secure` unless `SPINUP_ENV=dev`.
-- If `SPINUP_ENV` is unset after dotenv loading, kit `config` defaults to `production`. This keeps cookies `Secure` and disables `/_dev`.
-- When `SPINUP_ENV` is empty, kit `config` still reads `.env`, or `../.env` when `.env` is absent. A file with `SPINUP_ENV=dev` enables development.
-- The generated `Dockerfile.api` sets `SPINUP_ENV=production`. `spinup dev` and `.env.example` explicitly select `dev`.
-- The sessions are in the `sessions` table (scs with the pgxstore store). The table holds a SHA-256 hash of each token, not the token.
-- A session lives for 7 days. A new login starts a new lifetime. `auth.WithLifetime` changes the lifetime.
-- There is no idle timeout by default. `auth.WithIdleTimeout` adds one. With an idle timeout, the browser cookie can expire before the server session, because server-side calls do not refresh the browser cookie.
-- Login and registration rotate the session token. The old token stops working.
-- Logout deletes the session from the store and expires the cookie.
-- A session of a deleted user ends at its next request.
-- A goroutine deletes expired sessions and old login attempts every 5 minutes. `authn.Close` stops it.
-
-### Passwords
-
-- A password has 12 to 512 characters (Unicode code points).
-- kit `auth` hashes passwords with argon2id and stores PHC strings, for example `$argon2id$v=19$m=65536,t=3,p=4$<salt>$<key>`.
-- The parameters follow the second recommended option of RFC 9106: 64 MiB of memory, 3 passes, and 4 lanes. The salt has 16 random bytes. The key has 32 bytes.
-- The comparison runs in constant time.
-- If the parameters of a stored hash differ from the current parameters, a successful login stores a new hash.
-- One hash runs at the same time for each 10 CPUs of `GOMAXPROCS` (at least 1). Each hash uses 4 lanes, so argon2 takes at most about 40% of the CPUs. Thus a burst of logins cannot use all the memory, and it cannot starve the other routes.
-- Four more requests for each slot can wait, for a maximum of 2 seconds. A request that finds the queue full, or that waits too long, gets 503 with `Retry-After: 1`. Thus a burst of logins cannot hold the CPU and the connections of the other routes.
-- A login takes its place in the queue before its database work. Thus a login that the queue refuses never waits for a database connection, and a burst of logins cannot hold the pool that other requests need.
-- A login that gets 503 checked no password, so it does not count toward the lockout.
-- `auth.WithHashLimits(concurrent, waiting, wait)` changes the limits.
-- One hash takes about 0.14 CPU-seconds and about 43 ms on an idle machine. Thus one slot checks about 23 passwords each second.
-- The load test of the todo app compared the limits on 10 CPUs during a burst of logins. With one hash for each CPU, reads waited up to 12 seconds (p99). With one hash in total, reads stayed below 0.32 seconds, and logins ran at 9 to 27 each second.
-- To check more passwords each second, raise the limit with `auth.WithHashLimits`, or run more API replicas.
-- A login for an unknown email checks a dummy hash, so the response time does not show which emails have accounts.
-
-### Emails
-
-kit `auth` removes the spaces around an email and changes it to lower case.
-The result must be a bare address that `net/mail` accepts, with a maximum of 254 characters.
-
-### Lockout
-
-- After 5 failed logins for one email in 15 minutes, logins for that email get 429 with `Retry-After`.
-- Each login reserves an attempt before password verification. A transaction with a PostgreSQL advisory lock keeps concurrent requests within the threshold.
-- The lock also applies to emails without an account, so it does not show which emails have accounts.
-- The lock opens when the oldest of the 5 failures is 15 minutes old.
-- A successful login clears the failures of the email.
-- `auth.WithLockout(threshold, window)` changes the values.
-
-An attacker who knows an email can lock it. The rate limit for each client (next section) does not prevent this. One client can send the 5 failed logins that lock an email, because the burst is larger than 5. A captcha or an unlock link can reduce this risk. The kit does not have them.
-
-### Rate limits for each client
-
-kit `auth` limits the requests that cost the most for each client.
-`authn.Middleware()` does the check before the cross-origin check, the session load, and every query.
-A client that is over its limit gets 429 with `Retry-After`.
-The 429 request does not touch the database.
-The detail text says how long to wait, for example `Too many sign-in attempts from your network. Try again in 12 seconds.`
-The login and registration forms show this text.
-
-Each class has its own limit.
-Burst requests pass at once. After that, one request passes each Every.
-
-| Class | Route | Burst | Every |
-| --- | --- | --- | --- |
-| `login` | `POST /api/auth/login` | 20 | 3 s |
-| `register` | `POST /api/auth/register` | 20 | 20 s |
-| `reset_request` | `POST /api/auth/reset/request` | 10 | 30 s |
-| `reset_confirm` | `POST /api/auth/reset/confirm` | 10 | 30 s |
-| `oidc_callback` | `GET /api/auth/oidc/<provider>/callback` | 100 | 1 s |
-
-- Logout, `GET /api/session`, the provider list, and the OIDC start route have no limit.
-- A refused OIDC callback answers a redirect to `/login?error=rate_limited`, because the callback is a browser navigation.
-- A request that gets 503 from the hash queue returns its token.
-- After its burst, one client uses at most about 7% of one CPU with the default login, registration, and reset limits. The burst itself costs about 8 CPU-seconds. An IPv6 client that uses many /64 networks of one /48 network can use 8 times this share. Without the limit, one client can use all of the CPU.
-
-#### Which address is the client
-
-- If the TCP peer is not trusted, the peer is the client. The API ignores `X-Forwarded-For`.
-- If the TCP peer is trusted, it is a proxy. The client is the first `X-Forwarded-For` entry from the right that is not trusted. A client cannot choose this entry, because the proxy writes it.
-- Caddy replaces `X-Forwarded-For` with the address of its peer. The web service sends the client address to the API in the same header (`ADDRESS_HEADER=X-Forwarded-For` in `deploy/compose.yml`).
-- A request from a local process (loopback) has no limit. `spinup dev`, tests, and health checks use loopback.
-- A trusted proxy that does not tell the client address goes into one shared bucket for each class. The bucket is large, and it is not unlimited. The API writes a warning to the log when this happens. The warning has the `Try:` hint.
-- An IPv4 client has its own bucket. An IPv6 client has a bucket for its /64 network and a bucket for its /48 network. The /48 bucket has 8 times the budget.
-
-#### Settings
-
-Set these variables in the environment of the API.
-The kit does not read them from a `.env` file.
-
-| Variable | Value | Default |
-| --- | --- | --- |
-| `AUTH_RATE_LIMIT` | `on` or `off`. `off` turns every class off. | `on` |
-| `AUTH_RATE_LIMIT_LOGIN`, `_REGISTER`, `_RESET_REQUEST`, `_RESET_CONFIRM`, `_OIDC_CALLBACK` | `off`, or `burst=<n>,every=<duration>`. Each key is optional. | see the table above |
-| `AUTH_RATE_LIMIT_CLIENTS` | The number of clients to keep in memory, 1024 to 4194304. | `65536` (about 5 MB) |
-| `AUTH_TRUSTED_PROXIES` | A comma list of CIDRs, addresses, and the words `private`, `loopback`, and `none`. | `private` |
-
-- `private` is loopback, RFC 1918, `fc00::/7`, `100.64.0.0/10`, `169.254.0.0/16`, and `fe80::/10`.
-- A value that does not parse stops the start of the API. The error names the variable and has a `Try:` line.
-- In code, `auth.WithRateLimits(auth.RateLimits{Login: auth.Limit{Burst: 60, Every: time.Second}})` and `auth.WithTrustedProxies("private", "203.0.113.0/24")` set the same values. A value in code wins over the environment. The environment wins over the default.
-- A non-zero `Burst` or `Every` in code turns the class on again, also when `AUTH_RATE_LIMIT=off`.
-
-For Compose, set the variables in `deploy/compose.override.yml`. The generated `api` service has an explicit list of variables, so the shell of the VM does not reach it:
-
-```yaml
-services:
-  api:
-    environment:
-      AUTH_RATE_LIMIT_LOGIN: burst=60,every=1s
-      AUTH_TRUSTED_PROXIES: private,203.0.113.0/24
-```
-
-#### Choose the values
-
-Many users can share one address, for example an office or a mobile network.
-With the default `login` limit, one address passes 20 logins at once and then 20 each minute.
-That is 40 in the first minute, 120 in 5 minutes, and 220 in 10 minutes.
-A session lasts 7 days, so a user logs in about once each week.
-If a site needs more, raise the limit.
-Use this formula to find the CPU share: `CPU share = (1 / every in seconds) x 0.16 / CPUs`.
-For example, `burst=60,every=1s` uses about 16% of one CPU at full rate.
-An intranet app has private client addresses.
-Set `AUTH_TRUSTED_PROXIES=172.16.0.0/12` to trust only the Docker networks.
-
-#### A CDN in front of Caddy
-
-A CDN sends the client address in a header, and Caddy adds the address of the CDN.
-Make three changes:
-
-1. Set `trusted_proxies` in Caddy to the CDN ranges.
-2. Add the CDN ranges to `AUTH_TRUSTED_PROXIES`, for example `private,<CDN ranges>`.
-3. Set `XFF_DEPTH=2` on the web service.
-
-#### Limits of the rate limit
-
-- Each API process has its own counters. With 2 replicas, a client can pass about twice the numbers. The CPU share of the client for each replica stays the same. Use a firewall or a CDN for an exact global limit.
-- The limit stops expensive work, not a flood of cheap requests. A refused request still costs the access log and the response. Use a firewall or a CDN to stop that flood.
-- The counters are empty after a restart.
-- The generated Docker network has no IPv6. Docker then shows an IPv6 client to Caddy as the address of the bridge gateway. All IPv6 clients then share the infrastructure bucket, and one IPv6 flood can make the login fail for every IPv6 user. To give each IPv6 client its own bucket, turn on IPv6 in Docker and on the `app` network. spinup does not test this setup yet.
-- Some providers give each customer a /56 network inside a shared /48 network. One customer can then empty the /48 bucket for the other customers of that /48 network.
-- A proxy with a public address that is not in `AUTH_TRUSTED_PROXIES` makes all users share one bucket. Add the proxy to the list.
-- The API trusts a private address that sends `X-Forwarded-For`. Do not publish the API port. If you must, set `AUTH_TRUSTED_PROXIES` to the proxy addresses only.
-- The API logs one warning each minute with the number of refused requests for each class. The counter `auth.rate_limited` has the attribute `class`. The log never has an address.
-
-### Cross-site requests
-
-`authn.Middleware()` uses `http.CrossOriginProtection` of the Go standard library.
-It rejects a request with 403 when all of these conditions are true:
-
-- The method is not `GET`, `HEAD`, or `OPTIONS`.
-- The browser sends `Sec-Fetch-Site: cross-site` or `same-site`, or the `Origin` header is different from the `Host` header.
-- The `Origin` is not a trusted origin.
-
-SvelteKit form actions call the API on `API_URL`, with the `Origin` of the web app.
-Thus `main.go` trusts `PUBLIC_ORIGIN` (default `http://localhost:5173`).
-Give the API the same `PUBLIC_ORIGIN` as the web build.
-If the values are different, the API rejects all form actions with 403.
-
-### Content Security Policy
-
-The middleware sets `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` on API responses that have no policy.
-
-## Account events (audit module)
-
-The audit module records account events. See [Audit trail](audit.md) for the module.
-Without the module, the auth module records no event of its own.
-A new app with `--modules auth,audit` has the wiring in `api/cmd/api/main.go`.
-
-```console
-$ spinup new events --module example.com/events --modules auth,audit --no-git --non-interactive
-...
-$ grep -E 'WithEvents|WithActorContext' events/api/cmd/api/main.go
-		auth.WithEvents(authsink.New(pool)),
-		auth.WithActorContext(authsink.ActorContext),
-```
-
-`auth.WithEvents` sets the event sink. `authsink.New(pool)` is the sink of the audit module.
-`auth.WithActorContext` makes the middleware store the signed-in user as the audit actor.
-A handler then reaches `audit.InTx` with that actor.
-
-The auth module writes these events.
-
-| Event | When | Where the sink runs | If the sink fails |
-| --- | --- | --- | --- |
-| `register` | A new account, through the register endpoint or the first OIDC sign-in | Inside the transaction of the insert | The insert fails |
-| `user_create` | `user create` of the operator command | Inside the transaction | The insert fails |
-| `role_change` | `user set-role` and `user backfill` | Inside the transaction | The change fails |
-| `password_reset` | A new password through a reset token | Inside the transaction | The change fails |
-| `password_rehash` | A new hash of the same password, with new parameters | Inside the transaction | The change fails |
-| `sign_in` | A successful sign-in, with the method `password` or `oidc` | After the sign-in | The kit logs the error, and the user signs in |
-| `sign_out` | A sign-out | After the sign-out | The kit logs the error, and the user signs out |
-| `lockout` | The start of a lockout of an existing account | After the lockout starts | The kit logs the error |
-
-- The first five events are row changes of `users`. The sink binds the actor to the transaction. The trigger on `users` writes the event.
-  In `audit list`, these events show as `create` and `update`.
-- `sign_in`, `sign_out`, and `lockout` are explicit events. The sink writes the action `auth.sign_in`, `auth.sign_out`, or `auth.lockout` on the table `users`.
-  A `sign_in` event holds the method in its changes.
-- The actor of `register` is the new account, with the kind `system` and the reason `register`. The account has no ID before the insert.
-- The actor of `user_create` and `role_change` is `operator:<login>`. The login is `SUDO_USER`, then `USER`, then `unknown`.
-  Add `--reason` to `user create` and `user set-role` to record why.
-- A failed login for an email that has no account writes nothing. A `lockout` event is written once for each lockout.
-- The trigger never stores `password_hash`. The event shows `changed (value hidden)`.
-
-Read the events with the operator command.
-
-<!-- doctest: skip -->
-```console
-$ go run ./cmd/api audit list --resource users --action auth.sign_in --since 2026-11-01
-$ go run ./cmd/api audit list --resource users --actor operator:ada
-```
-
-## The web pages
+## How the web app talks to the API
 
 The form actions post to the API with the `fetch` of the action.
 `handleFetch` in `hooks.server.ts` sends these requests to `API_URL` with the browser cookie.
 It also sends the client address in `X-Forwarded-For` for the rate limit, when `ADDRESS_HEADER` is set.
-The `Set-Cookie` header of a server-side fetch does not go to the browser by itself.
-Thus `forwardSessionCookie()` reads `res.headers.getSetCookie()` and calls `cookies.set()` with the same attributes (ADR 0002 rule 7).
 
-- A successful login or registration goes to `redirectTo`, or to `home` when there is none.
-- A failure shows the field errors and keeps the email. The password is never sent back to the page.
-- On every request, `hooks.server.ts` reads the user from `GET /api/session`. Thus `/account` renders the email on the server.
-- SvelteKit checks the `Origin` of form posts in production builds. A post without an `Origin` gets 403.
+A server-side fetch does not pass `Set-Cookie` to the browser by itself.
+So the helper `forwardSessionCookie()` copies the cookie from the API response with `cookies.set()`.
 
-Run the flow with `curl` against a production build. Send the `Origin` and `Accept` headers as a browser does:
+SvelteKit checks the `Origin` of form posts in production builds. A post without an `Origin` gets 403.
+To run the flow with `curl` against a production build, send the `Origin` and `Accept` headers as a browser does:
 
 <!-- doctest: skip -->
 ```console
@@ -583,148 +264,55 @@ $ curl -b jar -s http://localhost:3000/account | grep -o 'ada@example.com' | hea
 ada@example.com
 ```
 
-Run the tests of the helper in `web/`:
+Run the tests of the web helper in `web/`:
 
 <!-- doctest: skip -->
 ```console
 $ pnpm test
 ```
 
-## OpenID Connect
+## Files the module adds
 
-Enable OIDC with `--auth-oidc` when you create an app:
+| Path | Class | Purpose |
+| --- | --- | --- |
+| `api/db/migrations/00002_create_auth.sql` | seed | The tables `users`, `sessions`, and `login_attempts`. |
+| `api/db/migrations/00005_users_role.sql` | seed | The `role` column of `users`. |
+| `api/cmd/api/main.go` | scaffold | Your API main file. The module adds the auth middleware, the routes, and the `user` command. |
+| `api/internal/roles/roles.gen.go` | managed | The role set of the app. See [Roles](build/roles.md). |
+| `web/src/lib/server/auth.ts` | managed | The page guards, redirect check, API requests, and session cookies. |
+| `web/src/lib/server/auth.test.ts` | managed | The vitest tests of the helper. |
+| `web/src/routes/login/` | scaffold | The sign-in page and its form action. |
+| `web/src/routes/register/` | scaffold | The registration page and its form action. |
+| `web/src/routes/logout/+page.server.ts` | scaffold | The sign-out action. |
+| `web/src/routes/account/` | scaffold | The account page. |
+
+The API main file wires in the module with these lines:
 
 ```console
-$ spinup new oidcapp --module example.com/oidcapp --modules auth --auth-oidc --no-git --non-interactive
-...
-$ cd oidcapp
-$ ls api/db/migrations
-00001_init.sql
-00002_create_auth.sql
-00004_oidc_identities.sql
-00005_users_role.sql
-embed.go
-$ grep OidcButtons web/src/routes/login/+page.svelte
-	import OidcButtons from '#lib/components/OidcButtons.svelte';
-		<OidcButtons next={data.redirectTo} />
+$ grep authn api/cmd/api/main.go
+	authn, err := auth.New(pool,
+		app.WithMiddleware(authn.Middleware()),
+		app.WithRoutes(authn.Routes),
+		app.WithCommand("user", auth.UserCommand(authn)),
+		app.WithShutdown(authn.Close),
 ```
 
-The question `auth_oidc` defaults to false.
-The migration follows `00003_password_resets.sql`, which exists only when the mail module is enabled.
-The migration permits a NULL password hash and creates `user_identities`.
-Existing migrations remain unchanged.
+A `managed` file is replaced on upgrade. A `scaffold` file is yours, and upgrade merges changes into it. A `seed` file is written once.
 
-Configure each provider in the API environment:
+## Troubleshooting
 
-```sh
-PUBLIC_ORIGIN=https://app.example.com
-AUTH_OIDC_PROVIDERS=google,acme
-AUTH_OIDC_GOOGLE_ISSUER=https://accounts.google.com
-AUTH_OIDC_GOOGLE_CLIENT_ID=your-client-id
-AUTH_OIDC_GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google-client-secret
-AUTH_OIDC_GOOGLE_LABEL=Google
-AUTH_OIDC_ACME_ISSUER=https://identity.example.com/realms/acme
-AUTH_OIDC_ACME_CLIENT_ID=your-client-id
-AUTH_OIDC_ACME_CLIENT_SECRET_FILE=/run/secrets/acme-client-secret
-AUTH_OIDC_ACME_LABEL=Acme
-AUTH_OIDC_ACME_SCOPES=groups,offline_access
-```
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Every form action answers 403 | The API and the web build have different `PUBLIC_ORIGIN` values. | Set the same `PUBLIC_ORIGIN` for both. |
+| Login answers 500 after an upgrade | The `role` column does not exist yet. | Run `spinup db migrate up`. |
+| The sign-in answers 429 | The lockout or the rate limit applies. | Read [Sign-in security](build/auth-security.md). |
+| A new account cannot register | `AUTH_REGISTRATION` is `closed`, or `first-user` and an account exists. | Create the account with `user create`. |
 
-Register this callback URL with each provider:
-`https://app.example.com/api/auth/oidc/<provider>/callback`.
-Use the name from `AUTH_OIDC_PROVIDERS` for `<provider>`.
-Use lower-case names with letters, digits, or underscores.
-Start each name with a letter.
-The API reads provider settings when it registers the routes.
-Restart the API after you change these settings.
+## See also
 
-Use `_CLIENT_SECRET` or `_CLIENT_SECRET_FILE` for the secret.
-Do not set both forms.
-The scopes always include `openid`, `email`, and `profile`.
-The optional `_SCOPES` adds scopes separated by commas or spaces.
-The optional `_LABEL` controls the button text.
-The provider name supplies the default label.
-
-The login component reads names and labels from `GET /api/auth/oidc/providers`.
-This route never returns secrets.
-A button opens `GET /api/auth/oidc/<provider>/start`.
-Discovery runs on the first attempt and caches successful results.
-A failed attempt returns a 503 problem with a `Try:` instruction.
-An unavailable provider does not prevent API startup or password login.
-
-The flow uses PKCE with S256, state, and a nonce.
-An encrypted cookie expires after ten minutes.
-The cookie uses HttpOnly and SameSite=Lax.
-The cookie uses Secure when the session cookie uses Secure.
-The callback verifies the signature, issuer, audience, expiry, and nonce of the ID token.
-
-The API requires a verified email claim.
-The `email_verified` claim must be the boolean `true` or the exact string `"true"`.
-An existing identity keeps its account even when the provider changes its email.
-A new identity links to an account with the same normalized email.
-Linking a provider to an existing account removes the account's password and signs out its other sessions.
-Use password reset to set a password again.
-If no account matches, the API creates an account with no password.
-Password login rejects an account with no password with the usual generic error.
-The callback uses the existing session method, which rotates the token.
-
-OIDC buttons send `?next=<destination>` with the validated `redirectTo` value or `home`.
-For a direct API request, use `?next=/account` to select a destination after login.
-The destination must start with one slash and remain a relative path within the same origin.
-The API rejects absolute URLs, protocol-relative URLs, and backslashes.
-The API default destination is `/account` when `next` is absent.
-The callback origin comes from `PUBLIC_ORIGIN`, never from request headers.
-Production requires an HTTPS origin.
-
-For multiple API instances, configure `AUTH_OIDC_COOKIE_KEY` with the same key on each instance.
-Use 32 random bytes encoded as unpadded base64url.
-The `_FILE` form is also supported.
-Without this setting, each process creates a key at startup.
-A restart then invalidates pending flows.
-A key change also invalidates pending flows.
-
-Before you revert the OIDC migration, set a password for each account that has no password.
-The reverse migration refuses to require passwords while these accounts exist.
-It never deletes these accounts.
-
-## Add roles to an existing app
-
-`spinup upgrade` adds the role column and the role files to an app that has the `auth` module.
-It creates `api/db/migrations/00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
-It does not change `spinup.toml`.
-
-Follow these steps:
-
-1. Run `spinup upgrade --plan`. Read the notes. Then run `spinup upgrade --yes`.
-2. If your app has its own file `00005_*.sql`, the plan prints a warning. Rename your migration to the next free number. Then run the upgrade again.
-3. If `spinup.toml` has an `[auth]` table, run `spinup g roles` after the upgrade. The upgrade writes the default role file.
-4. Check `api/cmd/api/main.go`. The upgrade merges this file in three ways. If the merge conflicts, or an edit blocks it, add these lines to the `auth.New` call and to the app options by hand:
-
-```go
-auth.WithRoles(roles.Set),
-auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
-app.WithCommand("user", auth.UserCommand(authn)),
-```
-
-   Import `<module>/api/internal/roles` for `roles.Set`. Run `spinup doctor`. The check `roles-drift` warns while a line is missing.
-5. Run `spinup db migrate up` before you start the new binary. The new auth queries need the role column. Without it, login fails with a 500. `spinup deploy` already migrates first.
-6. Give the first administrator the admin role. Then run `user backfill`:
-
-<!-- doctest: skip -->
-```console
-$ cd api
-$ go run ./cmd/api user set-role --email ada@example.com --role manager
-updated ada@example.com	manager
-$ go run ./cmd/api user backfill
-backfilled 12 accounts
-```
-
-If `main.go` does not register the `user` command, use SQL for the first administrator. Replace `manager` with your `admin_role`:
-
-```sql
-UPDATE users SET role = 'manager' WHERE email = lower('ada@example.com');
-```
-
-The migrator applies a pending migration with a lower version than the latest applied one.
-Thus `00005` applies in an app that already applied `00004` or higher.
-Until you run the steps, every existing account reads as `default_role`, and none is an administrator.
+- [Roles](build/roles.md) to limit routes and pages by role
+- [Sign-in security](build/auth-security.md) for sessions, passwords, lockout, and rate limits
+- [Sign in with an identity provider](build/oidc.md)
+- [Audit trail](audit.md) to record sign-ins and role changes
+- [Mail](mail.md) for password reset
+- [spinup module](site/commands/module.md) to add the module

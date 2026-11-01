@@ -1,13 +1,71 @@
-# Backups
+---
+title: backup — back up the database
+parent: Command guides
+---
 
-`spinup backup` backs up the production database with pgBackRest.
-pgBackRest is the default backup backend (`docs/adr/0004-backup-backend.md`).
-It writes full, differential, and WAL backups to S3-compatible storage, and it encrypts the repository.
-Select the environment with `--env`.
-Select another project with `--dir`.
+# backup: back up the database
 
-The `backups` module adds the files.
-It requires the `deploy` module.
+`spinup backup` takes, lists, checks, and removes backups of the production database.
+It runs on the VM through SSH, so use it after your first deploy.
+
+```sh
+spinup backup now --env production
+```
+
+```console
+$ spinup backup --help
+...
+Available Commands:
+  list        List the backups in the repository
+  now         Take a backup now and print its label, size, and duration
+  prune       Apply backup retention and list the remaining backups
+  restore     Restore a backup into a new or live database
+  schedule    Install or remove backup timers on the VM
+  status      Show the repository status and the last backup
+  verify      Restore a backup in isolation and check the database
+...
+```
+
+Every `backup` command needs `--env`, for example `--env production`.
+Use `--dir` (or `-C`) to run the command for a project in another directory:
+
+```sh
+spinup backup list --env production -C ~/code/todo
+```
+
+## Pick a command
+
+| I want to ... | Run | Read |
+| --- | --- | --- |
+| Take a backup now | `spinup backup now --env production` | [Take a backup](#take-a-backup) |
+| See my backups | `spinup backup list --env production` | [List and check backups](#list-and-check-backups) |
+| Check the repository | `spinup backup status --env production` | [List and check backups](#list-and-check-backups) |
+| Prove a backup restores | `spinup backup verify --env production` | [backup restore](backup-restore.md) |
+| Bring a backup back | `spinup backup restore --env production --into new` | [backup restore](backup-restore.md) |
+| Remove old backups | `spinup backup prune --env production` | [backup restore](backup-restore.md#remove-old-backups) |
+| Back up on a timer | `spinup backup schedule --env production` | [backup schedule](backup-schedule.md) |
+
+## Choose a backend
+
+The `backend` key in `spinup.toml` selects how spinup stores the backups.
+The default is `pgbackrest`. The commands on this page work the same way for every backend.
+
+| Backend | Good for | Point-in-time restore | Guide |
+| --- | --- | --- | --- |
+| `pgbackrest` (default) | Most production apps. Full, differential, and WAL backups in S3-compatible storage, encrypted. | Yes | This page |
+| `walg` | The same storage model, with WAL-G. | Yes | [Backups with WAL-G](../backups-walg.md) |
+| `pgdump` | A small app or a staging environment. Full dumps on the VM disk, seven kept. | No | [Backups with pg_dump](../backups-pgdump.md) |
+
+```toml
+[backups]
+backend = "pgbackrest"
+```
+
+## Set up pgBackRest backups
+
+Add the `backups` module to an app that has the `deploy` module.
+For an existing app, run `spinup module add backups` and merge the branch it prints. See [module](module.md).
+The module adds the files in the table below.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --modules ci,deploy,backups --no-git --non-interactive
@@ -15,53 +73,27 @@ $ spinup new todo --api-only --module example.com/todo --modules ci,deploy,backu
 $ cd todo
 $ ls deploy/pgbackrest
 pgbackrest.conf
-$ spinup backup now
-Error: select backup environment: --env is missing
-  Try: pass --env <environment>
-[exit 1]
 ```
 
-## Files
+| File | Purpose |
+| --- | --- |
+| `deploy/pgbackrest/pgbackrest.conf` | The repository settings, the encryption type, the retention, and the stanza name. |
+| `deploy/compose.backups.yml` | Turns on WAL archiving for the `postgres` service. `spinup deploy` loads it after `compose.edge.yml`. |
 
-| File | Class | Purpose |
-| --- | --- | --- |
-| `deploy/pgbackrest/pgbackrest.conf` | managed | The repository settings, the encryption type, the retention, and the stanza. |
-| `deploy/compose.backups.yml` | managed | The override of `compose.edge.yml` for the `postgres` service. |
+WAL archiving ships the write-ahead log to storage at least every five minutes.
+A quiet database therefore loses at most five minutes of changes if the VM dies.
 
-`compose.backups.yml` changes only the `postgres` service:
-
-- It sets `archive_mode=on` and `archive_command='pgbackrest --stanza=<app> archive-push %p'`.
-- It sets `archive_timeout=300`. A quiet database loses at most 5 minutes of changes.
-- It mounts `/opt/<app>/backups` at `/var/lib/pgbackrest`. This directory holds `pgbackrest.conf` and the WAL spool.
-- It adds the network `<app>-backup`. pgBackRest uses it to reach the S3 endpoint. The `<app>-db` network stays internal.
-- Before the server starts, it exports each `/run/secrets/PGBACKREST_*` file as an environment variable.
-
-spinup deploy loads the override after `compose.edge.yml`:
-
-<!-- doctest: skip -->
-```console
-$ docker compose -p todo -f compose.edge.yml -f compose.backups.yml up -d
-```
-
-## Secrets
-
-The repository location and the keys are secrets.
+Next, put the storage keys in the encrypted secrets file.
 They are never in `pgbackrest.conf`, in an image, or in `docker inspect`.
-Add them to `secrets/<env>.enc.yaml`:
 
-| Name | Value |
+| Secret name | Value |
 | --- | --- |
 | `PGBACKREST_REPO1_S3_ENDPOINT` | The S3 host, for example `s3.eu-central-1.amazonaws.com` |
 | `PGBACKREST_REPO1_S3_BUCKET` | The bucket |
 | `PGBACKREST_REPO1_S3_REGION` | The region, for example `eu-central-1` |
 | `PGBACKREST_REPO1_S3_KEY` | The access key ID |
 | `PGBACKREST_REPO1_S3_KEY_SECRET` | The secret access key |
-| `PGBACKREST_REPO1_CIPHER_PASS` | The passphrase of the `aes-256-cbc` repository encryption |
-
-Keep a copy of `PGBACKREST_REPO1_CIPHER_PASS` outside the VM and outside the repository.
-Without it, nobody can restore a backup.
-Each other `PGBACKREST_*` secret also becomes a pgBackRest option.
-For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests for storage without virtual-host buckets.
+| `PGBACKREST_REPO1_CIPHER_PASS` | The passphrase for the `aes-256-cbc` repository encryption |
 
 <!-- doctest: skip -->
 ```console
@@ -69,11 +101,17 @@ $ printf '%s' 'backups-todo' | spinup secrets set --env production PGBACKREST_RE
 $ spinup secrets push --env production
 ```
 
-## Back up now
+{: .warning }
+Keep a copy of `PGBACKREST_REPO1_CIPHER_PASS` outside the VM and outside the repository. Without it, nobody can restore a backup.
+
+Any other `PGBACKREST_*` secret becomes a pgBackRest option.
+For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests for storage that has no virtual-host buckets.
+
+## Take a backup
 
 `backup now` takes one backup and prints its label, size, stored size, and duration.
-The default type is `diff`.
-pgBackRest takes a full backup when the repository has no full backup.
+The default type is `diff`. If the repository has no full backup yet, pgBackRest takes a full backup.
+The first run also creates the stanza. A stanza is the entry that pgBackRest keeps for your database in the repository.
 
 <!-- doctest: skip -->
 ```console
@@ -81,23 +119,20 @@ $ spinup backup now --env production --type full
 backup 20261015-082351F (full) of production: size 29.9 MiB, stored 3.6 MiB, took 1s
 ```
 
-Each run uploads `deploy/pgbackrest/pgbackrest.conf` to `/opt/<app>/backups/pgbackrest.conf`.
-The first run creates the stanza with `pgbackrest stanza-create`.
-spinup runs pgBackRest in the `postgres` container through SSH:
+| Flag | Meaning | Example |
+| --- | --- | --- |
+| `--type` | `full`, `diff` (default), or `incr` | `spinup backup now --env production --type incr` |
+| `--json` | Print the result as JSON on stdout | `spinup backup now --env production --json` |
 
-<!-- doctest: skip -->
-```console
-$ docker compose -p todo exec -T postgres sh -c '<load PGBACKREST_* secrets>; exec pgbackrest "$@"' pgbackrest --stanza=todo --type=diff backup
-```
+Each run uploads `deploy/pgbackrest/pgbackrest.conf` to the VM first.
+The progress of pgBackRest goes to stderr, so `--json` stays easy to parse.
 
-The progress of pgBackRest goes to stderr.
-`--json` prints the result as JSON on stdout.
+## List and check backups
 
-## List and status
-
-`backup list` prints each backup, oldest first: the label, the type, the finish time, the size, and the stored size.
-`backup status` prints the stanza status, the encryption type, the last backup, and the WAL range of the archive.
-Both commands read `pgbackrest info --output=json`. They change nothing.
+`backup list` prints each backup, oldest first, with its label, type, finish time, size, and stored size.
+`backup status` prints the stanza status, the encryption type, the last backup, and the range of archived WAL.
+If you installed [a schedule](backup-schedule.md), it also lists the timers and the backup metrics.
+Both commands only read. They change nothing.
 
 <!-- doctest: skip -->
 ```console
@@ -112,30 +147,38 @@ backups: 2
 WAL archive: 000000010000000000000001 to 000000010000000000000005
 ```
 
-## Retention
+Use `--json` for a script:
+
+<!-- doctest: skip -->
+```console
+$ spinup backup list --env production --json
+...
+```
+
+## Keep more or fewer backups
 
 pgBackRest keeps 4 full backups by default, with their differential backups and their WAL.
-Set another number in `spinup.toml`:
+Set another whole number from 1 to 999 in `spinup.toml`.
+Each backup removes the backups that the retention no longer keeps.
 
 ```toml
 [backups]
 retention = "8"
 ```
 
-spinup writes the value into `repo1-retention-full` when it uploads `pgbackrest.conf`.
-Each backup removes the backups that the retention no longer keeps.
+To apply a new retention now, run `spinup backup prune`. See [backup restore](backup-restore.md#remove-old-backups).
 
-## Backup before each deploy
+## Back up before each deploy
 
-`spinup deploy` runs the pre-deploy hook `backup`.
-The hook takes a `diff` backup before each deploy.
+`spinup deploy` takes a `diff` backup before it changes the VM.
+If the backup fails, the deploy stops, so a bad deploy never starts without a restore point.
 
-- A project without the `backups` module skips the hook.
+- An app without the `backups` module skips the backup.
 - The first deploy skips the backup, because the database does not run yet.
-- If the backup fails, the deploy stops before it changes the VM.
 
-`spinup deploy --skip-backup` skips the backup only when each pending migration is safe.
-A pending migration is a file in `api/db/migrations` with a version above the newest applied goose version on the VM.
+To skip the backup, run `spinup deploy --skip-backup`.
+This works only when every pending migration is safe.
+A pending migration is a file in `api/db/migrations` that is newer than the newest migration the VM applied.
 A safe migration has a line that starts with `-- spinup:safe`, followed by an optional reason:
 
 ```sql
@@ -147,14 +190,30 @@ ALTER TABLE todos ADD COLUMN note text;
 If a pending migration has no marker, the deploy fails with a `Try:` line.
 Deploy without `--skip-backup`, or add the marker to a migration that keeps all data.
 
-## Last backup age in the app
+## Check the age of the last backup
 
-The kit package `backup` gives the age of the newest backup.
-`backup.Handler` serves it as JSON at `/_deploy/backup`, for example `{"last_backup_age_seconds":3600}`.
+The app serves the age of its newest backup at `/_deploy/backup`:
+
+```json
+{"last_backup_age_seconds":3600}
+```
+
 The value is `null` when no backup exists.
-The monitoring stack maps the value to a gauge, and alerts use it.
+The monitoring stack turns the value into a metric, and an alert fires when it grows too old.
+See [Monitoring](../monitoring.md) for the backup metrics and alerts.
 
-## Not in this version
+## Troubleshooting
 
-`backup verify`, `backup restore`, and `backup expire` arrive in milestone M7.
-The `Backend` interface already has these operations.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `select backup environment: --env is missing` | The command needs an environment. | Pass `--env production`. |
+| `backup now` fails with an S3 error | A storage secret is wrong or missing. | Reset it with `spinup secrets set`, then run `spinup secrets push`. |
+| `/opt/<app>/backups` does not exist | The VM is not set up. | Run `spinup server bootstrap --env production`. |
+
+## See also
+
+- [backup restore](backup-restore.md): verify, restore, and prune
+- [backup schedule](backup-schedule.md): back up on a timer
+- [Backups with WAL-G](../backups-walg.md) and [Backups with pg_dump](../backups-pgdump.md)
+- [Monitoring](../monitoring.md): backup metrics and alerts
+- Flag reference: [backup](../site/commands/backup.md), [backup now](../site/commands/backup-now.md), [backup list](../site/commands/backup-list.md), [backup status](../site/commands/backup-status.md)

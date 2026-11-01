@@ -1,18 +1,13 @@
-# Generate resources, models, handlers, and migrations
+---
+title: generate resource — add a CRUD API
+parent: Command guides
+---
 
-These four generators add database and API code to the application.
-Run them from the application root.
-Each generator shows its plan with `--dry-run` or `--diff`, and does not write.
-Without `--force`, a generator does not change a file that you edited.
+# generate resource — add a CRUD API
 
-| Command | What it writes |
-| --- | --- |
-| `spinup g resource <name> <field:type>...` | A full CRUD API: migration, queries, OpenAPI files, handlers, and a test |
-| `spinup g model <name> <field:type>...` | The migration, the queries, and the OpenAPI schemas only |
-| `spinup g handler <name>` | A plain `net/http` handler and its test |
-| `spinup g migration <snake_name>` | An empty goose migration |
-
-## Resource
+`spinup g resource` turns one line into a working REST API for a database table.
+It writes the migration, the SQL queries, the OpenAPI files, the handlers, and a test.
+In an app with a web app, it also writes the pages.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
@@ -32,69 +27,98 @@ $ spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|n
 Created 8, updated 1 files
 Next: spinup db migrate up
 Next: cd api && go test ./...
-$ test -s api/internal/store/todos.sql.go
-$ test -s api/internal/gen/api.gen.go
 ```
 
-The resource name can be singular or plural, in snake, kebab, or camel case.
-The table and the URL use the plural snake case name, such as `todos` and `/api/todos`.
-Each field is `<name>:<type>`. These are the types:
+Run the two `Next:` commands. The API now has these routes:
 
-| Type | SQL | OpenAPI | Go API type |
+| Route | What it does |
+| --- | --- |
+| `GET /api/todos` | List the todos. |
+| `POST /api/todos` | Create a todo. |
+| `GET /api/todos/{id}` | Read one todo. |
+| `PUT /api/todos/{id}` | Replace one todo. |
+| `DELETE /api/todos/{id}` | Delete one todo. |
+
+## Name the resource and its fields
+
+The name can be singular or plural, and in snake, kebab, or camel case.
+`todo`, `todos`, and `Todo` all give the table `todos` and the URL `/api/todos`.
+
+Write each field as `<name>:<type>`.
+Put `?` after the type to allow `null`, such as `'due:date?'`.
+Quote a field in the shell when it has `?` or `|`.
+
+| Type | Database column | Go type | Example |
 | --- | --- | --- | --- |
-| `string`, `text` | `text` | `string` | `string` |
-| `int` | `integer` | `integer` (int32) | `int32` |
-| `bigint` | `bigint` | `integer` (int64) | `int64` |
-| `bool` | `boolean` | `boolean` | `bool` |
-| `float` | `double precision` | `number` (double) | `float64` |
-| `decimal` | `numeric` | `string` (decimal) | `string` |
-| `time` | `timestamptz` | `string` (date-time) | `time.Time` |
-| `date` | `date` | `string` (date) | `openapi_types.Date` |
-| `uuid` | `uuid` | `string` (uuid) | `uuid.UUID` |
-| `json` | `jsonb` | `object` | `map[string]interface{}` |
-| `ref:<model>` | `bigint REFERENCES <models> (id)` | `integer` (int64) | `int64` |
-| `enum:a\|b` | `text CHECK (... IN ('a', 'b'))` | `string` with `enum` | a named string type |
+| `string`, `text` | `text` | `string` | `title:string` |
+| `int` | `integer` | `int32` | `quantity:int` |
+| `bigint` | `bigint` | `int64` | `views:bigint` |
+| `bool` | `boolean` | `bool` | `done:bool` |
+| `float` | `double precision` | `float64` | `ratio:float` |
+| `decimal` | `numeric` (a string in JSON) | `string` | `price:decimal` |
+| `time` | `timestamptz` | `time.Time` | `sent_at:time` |
+| `date` | `date` | `openapi_types.Date` | `due:date` |
+| `uuid` | `uuid` | `uuid.UUID` | `token:uuid` |
+| `json` | `jsonb` | `map[string]interface{}` | `meta:json` |
+| `ref:<model>` | `bigint` with a foreign key and an index | `int64` | `owner:ref:user` |
+| `enum:a\|b` | `text` with a `CHECK` constraint | a named string type | `'priority:enum:low\|high'` |
 
-Put `?` after a type to make the field nullable.
-A `ref:<model>` field adds a `<name>_id` column with a foreign key and an index.
-The referenced table must exist in a migration.
+A `ref:<model>` field adds a `<name>_id` column.
+The referenced table must already exist in a migration.
+Use [`spinup g model`](#add-only-a-table) to create it first.
 
-The generator writes these files:
+## What it writes
 
 | File | Class | Contents |
 | --- | --- | --- |
-| `api/db/migrations/NNNNN_create_<plural>.sql` | seed | The table with `id`, the fields, `created_at`, and `updated_at`. Enum fields get a `CHECK` constraint. |
-| `api/db/queries/<plural>.sql` | scaffold | The sqlc queries `List`, `Count`, `Get`, `Create`, `Update` (full replace), and `Delete`. |
-| `api/openapi/paths/<plural>.yaml` | scaffold | `GET` and `POST` on `/api/<plural>`, and `GET`, `PUT`, and `DELETE` on `/api/<plural>/{id}`. |
-| `api/openapi/schemas/<singular>.yaml` | scaffold | The `<Singular>`, `<Singular>Input`, and `<Singular>List` schemas. |
-| `api/internal/handlers/<plural>.go` | scaffold | The strict-server methods and the conversions between the store and API types. |
+| `api/db/migrations/NNNNN_create_<plural>.sql` | seed | The table with `id`, your fields, `created_at`, and `updated_at`. |
+| `api/db/queries/<plural>.sql` | scaffold | The sqlc queries to list, count, get, create, update, and delete. |
+| `api/openapi/paths/<plural>.yaml` | scaffold | The five routes. |
+| `api/openapi/schemas/<singular>.yaml` | scaffold | The `Todo`, `TodoInput`, and `TodoList` schemas. |
+| `api/internal/handlers/<plural>.go` | scaffold | The handlers. They convert between database types and API types. |
 | `api/internal/handlers/<plural>_test.go` | scaffold | A create, get, list, update, and delete round trip, and the error cases. |
 | `api/internal/handlers/server.go` | scaffold | The `Server` type and the error mapping. Only the first resource writes it. |
-| `api/internal/handlers/validation.go` | scaffold | The check that rejects a create or update body with a missing or null required field (422 with one field error per key). Only the first resource writes it. |
-| `api/internal/routes/routes_gen.go` | managed | The OpenAPI router. Its content is the same for every resource. |
+| `api/internal/handlers/validation.go` | scaffold | Rejects a create or update body with a missing or null required field (422, one error for each field). Only the first resource writes it. |
+| `api/internal/routes/routes_gen.go` | managed | The router. It is the same for every resource. |
 
-After the write, the generator bundles the OpenAPI files and runs oapi-codegen, then sqlc, then gofmt.
+After the write, the generator bundles the OpenAPI files and runs `oapi-codegen`, `sqlc`, and `gofmt`.
+The [generate](generate.md) page explains these steps and the file classes.
 
-The list operation takes `limit` (1 to 200, default 50) and `offset` (default 0).
-It returns the items in id order and the total count.
+## Use the API
 
-Errors are problem details (RFC 9457) with the type `application/problem+json`:
+The list route takes `limit` (1 to 200, default 50) and `offset` (default 0).
+It returns the items in `id` order and the total count.
+
+```sh
+curl 'http://localhost:8080/api/todos?limit=10&offset=0'
+```
+
+Errors use the problem details format (RFC 9457, `application/problem+json`):
 
 | Cause | Status |
 | --- | --- |
 | A bad parameter, or a body that is not JSON | 400 |
 | A row that does not exist | 404 |
-| A unique value that exists, or a delete of a row that other rows refer to | 409 |
-| A value of the wrong type or format, a bad enum value, or a broken database rule | 422 |
+| A unique value that already exists, or a delete of a row that other rows refer to | 409 |
+| A value of the wrong type, a bad enum value, a missing required field, or a broken database rule | 422 |
 
-The application owns the scaffold files after the first write.
+## Change the resource later
+
+You own the scaffold files after the first write.
 Edit the queries, the OpenAPI files, and the handlers as you need.
-Then run `spinup db sqlc` and `spinup g openapi` again.
+Then regenerate the code that depends on them:
+
+<!-- doctest: skip -->
+```console
+$ spinup db sqlc
+$ spinup g openapi
+```
+
+To add a column, write a new migration with [`spinup g migration`](#add-an-empty-migration).
+Do not run `g resource` again for the same table.
 
 If a migration already creates the table, the generator stops.
-Pass `--force` to write the files again.
-With `--force`, the generator writes the `NNNNN_create_<plural>.sql` migration again in place.
-If you applied that migration, run `spinup db redo --i-know` after the change.
+It does not touch your files.
 
 ```console
 $ spinup g resource todo title:string
@@ -103,55 +127,30 @@ Error: generator "resource" failed: the table todos already exists in api/db/mig
 [exit 1]
 ```
 
-Other packs can add files to each resource, such as web pages.
-The web list page shows each row with a submit button for the first non-null `bool` field (it works without JavaScript) and one shared actions menu.
-The page needs `web/src/lib/components/app/row-menu.svelte`.
-Run `spinup upgrade` to add this file to an older app.
-Use `--api-only` to write only the API files.
-Use `--no-tests` to leave out the handler test.
+{: .warning }
+`--force` writes the create migration again in place. If you already applied it, run `spinup db redo --i-know` to apply the new version. This deletes the rows of the table.
 
-## Ownership and authentication
+## Skip the test or the web pages
 
-When `spinup.lock` lists `auth`, each new resource belongs to its signed-in user.
-The table has a `user_id` foreign key and an index on `(user_id, id)`.
-Every query uses the signed-in user ID.
-The API schemas do not expose `user_id`.
-
-Every resource route requires a signed-in user, including resources with `--shared`.
-A request without a user receives a 401 problem response.
-A request for another user's row receives 404, including update and delete requests.
-The list includes only the signed-in user's rows and their total count.
-The generated tests verify these rules with two users.
-
-Use `--shared` for a global table that all signed-in users can access.
-The shared table has no owner column.
-Without `auth`, resource output stays the same, and `--shared` fails.
+Use `--no-tests` to leave out the handler test file.
+Use `--api-only` to write only the API files when the app has a web app.
 
 ```console
-$ spinup g resource announcement title:string --shared --api-only
-Error: generator "resource" failed: cannot generate a shared resource without the auth module
-  Try: drop --shared
-[exit 1]
+$ spinup g resource note body:text --no-tests --dry-run
+create api/db/migrations/00003_create_notes.sql (seed)
+create api/db/queries/notes.sql (scaffold)
+create api/internal/handlers/notes.go (scaffold)
+unchanged api/internal/routes/routes_gen.go (managed)
+create api/openapi/paths/notes.yaml (scaffold)
+create api/openapi/schemas/note.yaml (scaffold)
 ```
 
-The names `doc`, `docs`, `openapi`, and `openapis` are reserved for the API reference.
-Both `g resource` and `g model` refuse these names.
-Use `document` for application documents.
+The web pages are described in [generate page](generate-page.md#pages-for-a-resource).
+If the generator says the app lacks a web file or package, run `spinup upgrade` and run the generator again.
 
-```console
-$ spinup g resource doc title:string
-Error: generator "resource" failed: resource name "doc" is reserved for the API reference
-  Try: choose another name, for example document
-[exit 1]
-$ spinup g model openapi title:string
-Error: generator "model" failed: resource name "openapi" is reserved for the API reference
-  Try: choose another name, for example document
-[exit 1]
-```
+## Add only a table
 
-## Model
-
-`spinup g model` writes the migration, the queries, and the OpenAPI schemas, but no API paths or handlers.
+`spinup g model` writes the migration, the queries, and the OpenAPI schemas, but no routes or handlers.
 Use it for a table that other resources refer to.
 
 ```console
@@ -161,10 +160,10 @@ Next: spinup db migrate up
 Next: cd api && go build ./...
 ```
 
-## Handler
+## Add a plain handler
 
-`spinup g handler` writes a plain `http.HandlerFunc` and its test.
-Generators do not edit `routes.go`, so the generator shows the line to add.
+`spinup g handler` writes one `http.HandlerFunc` and its test.
+It does not edit `routes.go`, so add the line from the `Next:` output yourself.
 
 ```console
 $ spinup g handler ping
@@ -173,10 +172,11 @@ Next: add mux.HandleFunc("GET /api/ping", handlers.Ping) to Register in api/inte
 Next: cd api && go test ./internal/handlers/...
 ```
 
-## Migration
+## Add an empty migration
 
 `spinup g migration` writes an empty goose migration.
-The number is the highest number in `api/db/migrations` plus one.
+Its number is the highest number in `api/db/migrations` plus one.
+The name must be in snake case.
 
 ```console
 $ spinup g migration add_index
@@ -185,106 +185,135 @@ Next: edit api/db/migrations/00004_add_index.sql
 Next: spinup db migrate up
 ```
 
+## Own your data with auth
+
+If the app has the `auth` module, each new resource belongs to the signed-in user.
+The `auth` module needs the web app, so this example app has no `--api-only`.
+The flag `--api-only` on the resource skips the web pages.
+
+```console
+$ spinup new crm --module example.com/crm --modules ci,auth,audit --no-git --non-interactive
+...
+$ cd crm
+$ spinup g resource contact name:string --api-only --dry-run | head -n 3
+create api/db/migrations/00007_create_contacts.sql (seed)
+create api/db/queries/contacts.sql (scaffold)
+create api/internal/handlers/contacts.go (scaffold)
+```
+
+What changes with `auth`:
+
+- The table gets a `user_id` column, and the API does not show it.
+- Every route needs a signed-in user. A request without one gets 401.
+- A user sees only their own rows. A request for another user's row gets 404, also for update and delete.
+- The generated tests check these rules with two users.
+
+Use `--shared` for a table that every signed-in user can read and write.
+A shared table has no owner column, but its routes still need a signed-in user.
+
+```console
+$ spinup g resource announcement title:string --shared --api-only --dry-run --diff | grep -A5 'CREATE TABLE'
++CREATE TABLE announcements (
++    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
++    title text NOT NULL,
++    created_at timestamptz NOT NULL DEFAULT now(),
++    updated_at timestamptz NOT NULL DEFAULT now()
++);
+```
+
+Without the `auth` module, `--shared` fails with `Try: drop --shared`.
+Without `auth`, the output of the resource does not change.
+
+## Limit a resource to roles
+
+Use `--role` to let only some roles use the resource.
+The flag takes a comma list of role names from the `[auth]` table of `spinup.toml`.
+The default roles are `manager` and `staff`.
+The guard covers all five routes.
+
+```console
+$ spinup g resource report title:string --role manager --api-only --dry-run --diff | grep -m 1 HasRole
++	if !user.HasRole(roles.Manager) {
+```
+
+Each handler checks the role after it checks the user.
+A caller with another role gets a 403 problem response.
+The OpenAPI files list the 403 answer, and the generated tests send a request from a role outside the list.
+
+Two rules matter:
+
+- A role does not change the owner filter. With `--role` and without `--shared`, each user still sees only their own rows. The generator prints a `Next:` line to remind you. Add `--shared` to share rows between the allowed roles.
+- A caller with the wrong role who sends bad input gets 400 or 422 before 403. The caller learns only the shape of the schema.
+
+If a role is not declared, the generator stops and lists the roles that exist.
+Add the role to `[auth]` and run [`spinup g roles`](generate-roles.md).
+If the app has no `auth` module, add it with `spinup module add auth`.
+If `api/internal/roles/roles.gen.go` is missing or differs from `[auth]`, run `spinup g roles`.
+If the resource has web pages, they call `requireRole` in each `load` function and form action.
+
+## Add an audit trail
+
+If the app has the `audit` module, each new resource gets an audit trail by default.
+The migration attaches triggers that record every insert, update, delete, and truncate.
+The resource also gets a history route and a history page.
+
+| Flag | What it does | Example |
+| --- | --- | --- |
+| `--audit` | Require the audit trail. Fails when the module is missing. | `spinup g resource note body:text --audit` |
+| `--no-audit` | Leave the audit trail out of this resource. | `spinup g resource note body:text --no-audit` |
+| `--audit-redact a,b` | Hide the values of more columns. | `spinup g resource note body:text --audit-redact body` |
+| `--history-role a,b` | Let only these roles read the history. | `spinup g resource note body:text --role manager --history-role manager` |
+
+The trail already hides columns whose names contain `password`, `passwd`, `secret`, `token`, `api_key`, `apikey`, `hash`, or `credential`.
+
+```console
+$ spinup g resource note body:text --audit-redact body --role manager --api-only --dry-run --diff | grep 'CREATE TRIGGER notes_audit '
++CREATE TRIGGER notes_audit AFTER INSERT OR UPDATE OR DELETE ON notes FOR EACH ROW EXECUTE FUNCTION audit_row_change('user_id', 'id', 'body');
+```
+
+The history roles default to the resource roles.
+The create, update, and delete handlers use `audit.InTx`, so the trail records who made each change.
+The history route has the limits and the paging that [generate audit](generate-audit.md#read-the-history) describes.
+For a table that already exists, use [`spinup g audit`](generate-audit.md).
+
+## Reserved names
+
+The names `doc`, `docs`, `openapi`, and `openapis` belong to the API reference page.
+`g resource` and `g model` refuse them.
+Use `document` for documents of your app.
+
+```console
+$ spinup g resource doc title:string
+Error: generator "resource" failed: resource name "doc" is reserved for the API reference
+  Try: choose another name, for example document
+[exit 1]
+```
+
 ## Run the tests
 
 The handler tests need PostgreSQL.
 They use the server in `DATABASE_URL` when it is set.
-Run `spinup db migrate up`, then `cd api && go test ./...`.
 
-## Roles
-
-Use `--role` to limit a resource to some roles of the app.
-The flag takes a comma list of names from the `[auth]` table of `spinup.toml`.
-It applies to all five operations.
-Without `--role`, the resource only needs a signed-in user.
-See [Accounts and sessions](../auth.md#roles).
-
+<!-- doctest: skip -->
 ```console
-$ spinup new roleapp --module example.com/roleapp --modules ci,auth --no-git --non-interactive
-...
-$ cd roleapp
-$ spinup g resource todo title:string --role manager,staff --dry-run
-create api/db/migrations/00006_create_todos.sql (seed)
-create api/db/queries/todos.sql (scaffold)
-create api/internal/handlers/server.go (scaffold)
-create api/internal/handlers/todos.go (scaffold)
-create api/internal/handlers/todos_test.go (scaffold)
-create api/internal/handlers/validation.go (scaffold)
-update api/internal/routes/routes_gen.go (managed)
-create api/openapi/paths/todos.yaml (scaffold)
-create api/openapi/schemas/todo.yaml (scaffold)
-update web/src/lib/nav.gen.ts (managed)
-create web/src/routes/todos/+page.server.ts (scaffold)
-create web/src/routes/todos/+page.svelte (scaffold)
-create web/src/routes/todos/[id]/+page.server.ts (scaffold)
-create web/src/routes/todos/[id]/+page.svelte (scaffold)
-create web/src/routes/todos/[id]/edit/+page.server.ts (scaffold)
-create web/src/routes/todos/[id]/edit/+page.svelte (scaffold)
-create web/src/routes/todos/fields.svelte (scaffold)
-create web/src/routes/todos/new/+page.server.ts (scaffold)
-create web/src/routes/todos/new/+page.svelte (scaffold)
-create web/src/routes/todos/schema.ts (scaffold)
-$ spinup g resource todo title:string --role manager --api-only
-Created 8, updated 1 files
-Next: spinup db migrate up
-Next: cd api && go test ./...
-Next: a role guard does not share owned rows. Try: add --shared to share rows between users.
+$ spinup db migrate up
+$ cd api && go test ./...
 ```
 
-Each handler checks `user.HasRole(roles.Manager)` after it checks the user.
-A caller with another role gets a 403 problem response.
-The OpenAPI file lists a `403` response for each operation.
-The generated tests run as an allowed role, and a new test sends a request from a role outside the list to each operation.
+## Troubleshooting
 
-The generator stops in these cases:
+| Symptom | Cause and fix |
+| --- | --- |
+| `the table todos already exists` | A migration creates the table. Choose another name, or see [Change the resource later](#change-the-resource-later). |
+| `resource name "doc" is reserved` | The name belongs to the API reference. Use another name. |
+| `cannot generate a shared resource without the auth module` | Drop `--shared`, or add the `auth` module. |
+| `cannot audit the resource because the audit module is missing` | Run `spinup module add audit`, or drop `--audit`. |
+| `role "x" is not declared` | Add the role to `[auth]` and run `spinup g roles`. |
 
-```console
-$ spinup g resource note body:text --role admin
-Error: generator "resource" failed: cannot generate a role-guarded resource because role "admin" is not declared
-  Try: use one of: manager, staff, or add the role to [auth] and run spinup g roles
-[exit 1]
-```
+## See also
 
-- The app has no `auth` module. Run `spinup add auth`.
-- A role is not in `[auth]`.
-- `api/internal/roles/roles.gen.go` is missing or differs from `[auth]`. Run `spinup g roles`.
-
-Two rules matter:
-
-- A role does not change the owner filter. A resource with `--role` and without `--shared` still shows each user only the rows of that user. Add `--shared` to share the rows between the allowed roles.
-- A caller with the wrong role, who sends bad input, gets 400 or 422 before 403. The caller learns only the shape of the schema.
-
-If the resource has web pages, they call `requireRole` in the `load` function and in each form action.
-
-## Audit
-
-When the app has the audit module, new resources include audit by default.
-Use `--no-audit` to disable audit for one resource.
-Use `--audit` to require audit explicitly.
-Without the module, this flag fails with `Try: spinup module add audit`.
-
-Use `--audit-redact column_a,column_b` to hide more values.
-The generator also hides columns whose names match a sensitive pattern.
-The pattern is `(?i)(password|passwd|secret|token|api_?key|hash|credential)`.
-Use `--history-role manager,staff` to limit history to declared roles.
-The history roles default to the resource roles.
-The generator requires the audit migration to precede the new create migration.
-
-An audited resource includes row and truncate triggers in its create migration.
-Create, Update, and Delete use `audit.InTx` and `s.Queries.WithTx(tx)`.
-Get and List keep their existing queries.
-The History button opens a separate page that renders on the server.
-A failed history request does not affect the detail page.
-
-The history endpoint uses the history roles and the owner filter of Get.
-It returns an empty list when no events match.
-It sets `Cache-Control: no-store`.
-The default limit is 50 events.
-The maximum limit is 200 events.
-The maximum offset is 10000 events.
-Use `before_id` to request older events.
-An invalid limit or offset receives a 422 problem response with a `Try:` line.
-
-For an existing resource, use [generate audit](generate-audit.md).
-This command adds a migration and separate history files.
-It preserves the existing handlers and pages.
+- [generate](generate.md): preview, overwrite rules, and post-steps
+- [generate page](generate-page.md): the pages of a resource
+- [generate audit](generate-audit.md) and [generate roles](generate-roles.md)
+- [Accounts and sign-in](../auth.md) and [Audit trail](../audit.md)
+- Flag reference: [`generate resource`](../site/commands/generate-resource.md), [`generate model`](../site/commands/generate-model.md), [`generate handler`](../site/commands/generate-handler.md), [`generate migration`](../site/commands/generate-migration.md)

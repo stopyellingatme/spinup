@@ -1,4 +1,19 @@
+---
+title: Script test isolation
+parent: Contributing
+nav_order: 12
+---
+
 # Script test isolation
+
+Each testscript gets its own `HOME`, so scripts cannot change each other's files or caches.
+This page explains how the pnpm and Bun caches work in scripts, and what to record when a script fails under load.
+
+```sh
+make script RUN=pnpm_cache_isolated
+```
+
+## HOME and the Go caches
 
 Each script has its own `HOME` under `$WORK`.
 This keeps generated files and configuration separate between scripts.
@@ -11,7 +26,7 @@ The harness preserves the real Go caches for offline builds.
 The wrapper at `scripts/bin/pnpm` uses this home to find corepack and pnpm data.
 Without this path, offline installs would use an empty home.
 
-The U43-A seed gives each script its own `npm_config_cache_dir` at `$WORK/pnpm-cache`.
+The harness gives each script its own `npm_config_cache_dir` at `$WORK/pnpm-cache`.
 The harness selects the real cache in this order:
 
 1. Use the caller's `npm_config_cache_dir`, when present.
@@ -25,9 +40,16 @@ When the real `metadata` directory exists, the harness links it into the script 
 Offline installs read this metadata through the link.
 The caller's cache override selects the seed source, never the writable destination.
 
-`SPINUP_PNPM_STORE` keeps its existing selection rules.
-An explicit value takes priority over `npm_config_store_dir`.
-Otherwise, the harness uses the default store for the platform.
+To use another cache or store for one run, set the variable before the command:
+
+```sh
+npm_config_cache_dir=/data/pnpm-cache SPINUP_PNPM_STORE=/data/pnpm-store make script RUN=pnpm_cache_isolated
+```
+
+The store has its own selection rules.
+An explicit `SPINUP_PNPM_STORE` takes priority over `npm_config_store_dir`.
+Otherwise, the harness uses the default store of the platform:
+`<home>/Library/pnpm/store` on macOS, and `${XDG_DATA_HOME:-<home>/.local/share}/pnpm/store` on other platforms.
 Treat this shared store as read-only during script tests.
 Use offline installs with dependencies that already exist in the store.
 Do not warm or repair the shared store from a script.
@@ -48,6 +70,17 @@ Record the names and number of scripts that ran in parallel.
 Include the command, operating system, pnpm version, and cache overrides.
 Preserve the complete failure log before a repeat run replaces it.
 
+Use this template in the issue:
+
+```text
+Script:       <SPINUP_SCRIPT_RUN name or glob>
+Parallel:     <names and number of scripts that ran together>
+Command:      <the exact command>
+System:       <operating system, pnpm version>
+Overrides:    <npm_config_cache_dir, SPINUP_PNPM_STORE, BUN_INSTALL_CACHE_DIR>
+pnpm stderr:  <the full output>
+```
+
 The following commands are manual examples.
 The documentation test does not execute this block.
 
@@ -65,6 +98,8 @@ Use `lockScriptTimeout` for each lock script timeout.
 This bound allows extra time when the machine has a heavy load.
 Do not reduce it to shorten a test run.
 
-Keep issue #43 part 2 open during the observation period.
-Close it only after CI and the gates remain green for several weeks.
-A single successful local run does not complete this requirement.
+## See also
+
+- [Contributing](index.md)
+- [Docker-in-Docker deploy suite](dind.md)
+- [Browser end-to-end suite](e2e.md)

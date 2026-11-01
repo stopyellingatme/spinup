@@ -1,30 +1,73 @@
-# Backup schedule
+---
+title: backup schedule — back up on a timer
+parent: Command guides
+---
 
-`spinup backup schedule` installs three systemd timers on the VM.
-The services run as the deploy user from the selected environment.
-The VM needs Docker Compose, Python 3, `flock`, and systemd as PID 1.
-It does not need the spinup binary.
+# backup schedule: back up on a timer
 
-```console
-$ spinup new scheduled --api-only --module example.com/scheduled --modules ci,deploy,backups --no-git --non-interactive
-...
-$ cd scheduled
-$ ls deploy/backups
-run.sh
-$ ls deploy/systemd
-spinup-scheduled-backup-diff.service
-spinup-scheduled-backup-diff.timer
-spinup-scheduled-backup-full.service
-spinup-scheduled-backup-full.timer
-spinup-scheduled-backup-verify.service
-spinup-scheduled-backup-verify.timer
-$ spinup backup schedule
-Error: select backup environment: --env is missing
-  Try: pass --env <environment>
-[exit 1]
+`spinup backup schedule` installs three systemd timers on the VM: a full backup, a differential backup, and a verification.
+Run it once after your first deploy, and the VM backs itself up without your help.
+
+```sh
+spinup backup schedule --env production
 ```
 
-Set the calendars in `spinup.toml`:
+Check what the command installs before you connect to the VM.
+`--plan` prints the rendered unit files and changes nothing:
+
+```console
+$ spinup new todo --api-only --module example.com/todo --modules ci,deploy,backups --no-git --non-interactive
+...
+$ cd todo
+$ printf '\n[env.production]\nhost = "app.example.com"\nuser = "deploy"\n' >> spinup.toml
+$ spinup backup schedule --env production --plan
+# deploy/systemd/spinup-todo-backup-full.service
+# Managed by spinup.
+...
+OnCalendar=Sun *-*-* 03:00:00
+...
+```
+
+## Before you start
+
+The VM needs these items. The spinup binary is not one of them.
+
+- Docker Compose and Python 3
+- `flock`
+- systemd as PID 1
+- The app deployed once, because the timers use the Compose files of the current release
+- For pgBackRest and WAL-G, the storage secrets pushed (see [backup](backup.md#set-up-pgbackrest-backups))
+- A VM set up by `spinup server bootstrap`, which grants the sudo rights that the timers need
+
+If the VM has no systemd, the command fails with a `Try:` line.
+Run `/opt/<app>/backups/run.sh` from another scheduler instead.
+
+## Install the schedule
+
+```console
+$ spinup backup schedule --env production --plan
+...
+```
+
+<!-- doctest: skip -->
+```console
+$ spinup backup schedule --env production
+...
+```
+
+The command checks each calendar on the VM with `systemd-analyze calendar`, then uploads the script and the units, enables the timers, and prints their schedule.
+Run it again after you change a calendar, the backend, the retention, or the deploy user.
+
+Check the timers on the VM:
+
+```sh
+spinup server ssh --env production   # opens a shell on the VM
+systemctl list-timers 'spinup-*'     # run this on the VM
+```
+
+## Change the times
+
+Set systemd calendar values in `spinup.toml`. These are the defaults:
 
 ```toml
 [backups]
@@ -35,67 +78,75 @@ schedule_diff = "Mon..Sat *-*-* 03:00:00"
 schedule_verify = "Sat *-*-* 04:00:00"
 ```
 
-These values are the defaults. Systemd uses the VM timezone unless the calendar includes a timezone.
-The default differential schedule excludes Sunday, when the full backup runs.
-Each timer persists missed runs and adds a random delay of up to five minutes.
-Each service uses `Nice=10` and idle I/O scheduling.
+| Key | Default | Example |
+| --- | --- | --- |
+| `schedule_full` | `Sun *-*-* 03:00:00` | `schedule_full = "Sun *-*-* 01:30:00"` |
+| `schedule_diff` | `Mon..Sat *-*-* 03:00:00` | `schedule_diff = "*-*-* 12,23:00:00"` |
+| `schedule_verify` | `Sat *-*-* 04:00:00` | `schedule_verify = "Sat *-*-* 05:00:00 UTC"` |
 
-Inspect the rendered schedule before installation:
+systemd uses the VM timezone unless the calendar names one.
+The default differential schedule skips Sunday, when the full backup runs.
+After you edit a value, run `spinup backup schedule --env production --plan`, then run the command again to install it.
+
+Each timer runs a missed backup when the VM starts again, and it adds a random delay of up to five minutes.
+Each service runs with `Nice=10` and idle I/O, so a backup does not slow the app.
+
+## Remove the schedule
+
+`--remove` disables the timers and deletes the services and units.
+It keeps your backups, the metrics, and the script. You can run it again with no harm.
+`--remove --plan` shows the steps first.
+
+```console
+$ spinup backup schedule --env production --remove --plan
+sudo -n systemctl disable --now spinup-todo-backup-full.timer spinup-todo-backup-diff.timer spinup-todo-backup-verify.timer
+remove /etc/systemd/system/spinup-todo-backup-{full,diff,verify}.{service,timer}
+sudo -n systemctl daemon-reload
+```
 
 <!-- doctest: skip -->
 ```console
-$ spinup backup schedule --env production --plan
-...
-$ spinup backup schedule --env production
-...
 $ spinup backup schedule --env production --remove
 ```
 
-`--plan` renders the files without connecting to the VM.
-`--remove --plan` prints the removal plan.
+## Where the files go
 
-`--remove` disables the timers and deletes their services and units.
-Removal tolerates missing timers and repeated requests.
-It preserves the backups, the metrics, and the executable script.
+`spinup backup schedule` renders the unit files from `deploy/systemd/` and the script `deploy/backups/run.sh` in your project. The VM gets these files:
 
-Removal also needs permission to delete exactly these six unit files.
-The sudoers file of `spinup server bootstrap` and of the cloud-init template grants this permission and nothing wider.
+| File on the VM | Purpose |
+| --- | --- |
+| `/etc/systemd/system/spinup-<app>-backup-{full,diff,verify}.{service,timer}` | The three timers and their services. They run as the `user` of the environment (default `deploy`). |
+| `/opt/<app>/backups/run.sh` | The script that each timer runs. It does not need the spinup binary. |
+| `/opt/<app>/backups/backend` | The backend name that the script reads. |
 
-Before installation, the command validates each calendar with `systemd-analyze calendar` on the VM.
-It checks access for each required sudo command before the first upload.
-If access fails, repeat `spinup server bootstrap` for this environment.
-Bootstrap grants access only to the backup units of this app.
+## What the timers do
 
-Installation uploads `/opt/<app>/backups/run.sh` with mode `0755`.
-It writes the backend selection to `/opt/<app>/backups/backend`.
-For pgBackRest, it also uploads the repository configuration with the selected retention.
-It installs the units in `/etc/systemd/system` with passwordless sudo.
-It reloads systemd, enables the timers, and prints their schedule.
-Repeat the command after changing the calendars, backend, retention, or deploy user.
+| Timer | Does | Default time |
+| --- | --- | --- |
+| `full` | A full backup | Sunday 03:00 |
+| `diff` | A differential backup (pgBackRest and WAL-G). With `pgdump`, every run is a full dump. | Monday to Saturday 03:00 |
+| `verify` | pgBackRest: `pgbackrest verify` of the repository. `pgdump`: lists the contents of the newest dump with `pg_restore`. WAL-G: restores the newest backup into a throwaway container. | Saturday 04:00 |
 
-Scheduled runs share `/opt/<app>/backups/run.lock` through `flock`.
-A concurrent scheduled run waits until the active run finishes.
+With pgBackRest and `pgdump`, the scheduled verify finds repository and dump errors but does not restore a database.
+For a full restore test with a measured restore time, run [`backup verify`](backup-restore.md#verify-a-backup).
 
-The script uses the Compose files of `/opt/<app>/current`.
-Deploy the app before the first scheduled run.
-For pgBackRest, configure the repository secrets before installation.
-The script loads the secrets inside the Postgres container.
-It does not print their values.
+Two runs never overlap. A second run waits until the first one ends.
+The default retention is four full backups for pgBackRest and seven dumps for `pgdump`.
+The `pgdump` backend keeps its dumps in `/opt/<app>/backups/pgdump`.
+The script writes backup metrics for each run. See [Monitoring](../monitoring.md#backup-metrics).
 
-The `pgdump` backend stores custom-format dumps in `/opt/<app>/backups/pgdump` with mode `0600`.
-Every scheduled dump is a full backup. The script keeps the selected number of dumps.
-The default retention is seven dumps for pgdump and four full backups for pgBackRest.
-A VM without systemd gets an error with a `Try:` line.
-Use another scheduler to execute the script on such a VM.
+## Troubleshooting
 
-Scheduled verification runs `pgbackrest verify` or `pg_restore --list` on the newest dump.
-This check detects repository or dump errors. It does not restore a running database.
-Use `spinup backup verify` for a full restore test and a measured restore time.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `--env is missing` | The command needs an environment. | Pass `--env production`. |
+| A sudo check fails before the upload | The deploy user lacks the sudo rights for the backup units. | Run `spinup server bootstrap --env production` again. |
+| A calendar is rejected | `systemd-analyze calendar` cannot parse it. | Test the value on the VM with `systemd-analyze calendar '<value>'`. |
+| The first scheduled run fails | The app is not deployed, or a storage secret is missing. | Run `spinup deploy`, and push the secrets. |
 
-The script and CLI share `/opt/<app>/backups/metrics/.lock` through `flock`.
-Each writer holds this lock while it reads, merges, and replaces the metrics.
-The script and CLI write `/opt/<app>/backups/metrics/backup.prom` with an atomic rename.
-Successful backups update the success timestamp and size for their kind.
-Verification updates its timestamp, result, and duration, including when verification fails.
-A failed metrics update prints a warning. It does not fail a successful backup.
-See [Backup metrics](../monitoring.md#backup-metrics) for the metrics and alerts.
+## See also
+
+- [backup](backup.md): take and list backups
+- [backup restore](backup-restore.md): verify and restore
+- [Monitoring](../monitoring.md#backup-metrics): metrics and alerts for backups
+- Flag reference: [backup schedule](../site/commands/backup-schedule.md)

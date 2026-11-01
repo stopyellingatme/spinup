@@ -1,8 +1,47 @@
+---
+title: Disaster-recovery drill
+parent: Contributing
+nav_order: 7
+---
+
 # Disaster-recovery drill
 
-The drill proves the backup promise of milestone M7.
-It replaces a destroyed VM and restores the database from object storage inside a time budget, the recovery time objective (RTO).
-The test storage is described in ADR 0011 §8. The test VM is described in ADR 0009 §7.
+The drill proves that a backup can replace a lost server.
+It destroys a VM, starts a new one, and restores the database from object storage inside a time budget, the recovery time objective (RTO).
+It uses the test VM of the [Docker-in-Docker suite](dind.md).
+
+```sh
+bash testdata/dind/dr/run.sh
+```
+
+## Run the drill
+
+Docker must run. The VM must have network access to pull images and build the Postgres image with pgBackRest.
+The command at the top of this page runs the drill. To use a shorter budget of 10 minutes:
+
+```sh
+DR_RTO_BUDGET=600 bash testdata/dind/dr/run.sh
+```
+
+The script prints the time of each step. A passing run ends with the RTO and a PASS line:
+
+```text
+RTO: 412s (6m52s) from the destruction of VM 1 to a verified restore; budget 900s
+run.sh: PASS (release <release>, RTO 412s)
+```
+
+The times above are an example, not a measurement.
+
+| Option | Effect |
+| --- | --- |
+| `DR_RTO_BUDGET=<seconds>` | The RTO budget. The default is 900 (15 minutes). |
+| `DR_KEEP=1` | Keep the work directory and its logs. The trap still removes the containers. |
+| `GO=<path>` | Use this `go` binary. |
+
+The script also needs `git`, `ssh`, `ssh-keygen`, `sops`, `age-keygen`, `curl`, and `python3`.
+Run `spinup tools install` to get `sops` and `age`.
+
+The RTO includes the start of VM 2, the build of the Postgres image in VM 2, the image transport, the deploy, and the restore.
 
 ## What the drill does
 
@@ -18,7 +57,6 @@ It runs SeaweedFS as the S3 repository of pgBackRest. MinIO is archived.
 | 4 | Start VM 2 with new SSH host keys. Remove the old key from `known_hosts`. Prepare `/opt/<app>`, run `secrets push`, and deploy the same release. Run `spinup backup restore --into in-place`. | SSH refuses the changed key until the old key is removed. The new database is empty before the restore. |
 | 5 | Read the rows and `/readyz`. Stop the RTO clock. | The row count and digest match step 2. `/readyz` answers 200. The RTO is not more than `DR_RTO_BUDGET`. |
 
-The script prints the time of each step and the RTO at the end.
 
 ### The S3 repository
 
@@ -70,25 +108,6 @@ The command explains that the repository does not know the new cluster and sugge
 It stops before any service shutdown.
 If a pgBackRest command fails, spinup includes its redacted `ERROR` and `WARN` lines from stdout and stderr.
 
-## Run the drill
-
-Docker must run. The VM must have network access to pull images and build the Postgres image with pgBackRest.
-
-```
-bash testdata/dind/dr/run.sh
-```
-
-| Option | Effect |
-| --- | --- |
-| `DR_RTO_BUDGET=<seconds>` | The RTO budget. The default is 900 (15 minutes). |
-| `DR_KEEP=1` | Keep the work directory and its logs. The trap still removes the containers. |
-| `GO=<path>` | Use this `go` binary. |
-
-The script also needs `git`, `ssh`, `ssh-keygen`, `sops`, `age-keygen`, `curl`, and `python3`.
-Run `spinup tools install` to get `sops` and `age`.
-
-The RTO includes the start of VM 2, the build of the Postgres image in VM 2, the image transport, the deploy, and the restore.
-
 ## Clean up
 
 Every container, network, volume, and image of a run has a name that starts with `spinup-dr-`.
@@ -102,3 +121,9 @@ If a run fails, read the logs in the work directory that the script prints.
 
 `.github/workflows/dr.yml` runs the drill each week and on manual dispatch.
 A manual run can set the RTO budget in seconds.
+
+## See also
+
+- [Docker-in-Docker deploy suite](dind.md)
+- [backup — back up the database](../commands/backup.md)
+- [backup restore — verify, restore, and prune backups](../commands/backup-restore.md)

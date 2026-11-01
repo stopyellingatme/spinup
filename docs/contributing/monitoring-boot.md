@@ -1,9 +1,41 @@
+---
+title: Monitoring stack boot test
+parent: Contributing
+nav_order: 9
+---
+
 # Monitoring stack boot test
 
 The boot test keeps the promise of the monitoring pack: the `lite` profile runs on a VM with 2 GiB of RAM.
 It boots each profile next to a stand-in app.
 It fails when a service is unhealthy, when the data does not arrive, or when the stack uses more memory than its budget.
-The contracts are in ADR 0010 §2 and in critic resolution 13 of the plan.
+The [monitoring guide](../monitoring.md) lists the services of each profile.
+
+## Run the test
+
+Docker must run, and the pinned images must be on the machine or available to pull.
+
+```sh
+bash testdata/e2e/monitoring/run.sh lite
+bash testdata/e2e/monitoring/run.sh full
+```
+
+The script prints one `==>` line for each step. A passing run ends with this line:
+
+```text
+PASS: monitoring profile lite
+```
+
+| Option | Effect |
+| --- | --- |
+| `BOOT_GRAFANA_PORT=<port>` | Publish Grafana on this port of `127.0.0.1`. The default is 3000. |
+| `BOOT_BUDGET_MIB=<MiB>` | Use this memory budget. |
+| `BOOT_TIMEOUT=<seconds>` | Wait this long for each check. The default is 180. |
+| `BOOT_LOG_DIR=<dir>` | Copy the logs of a failed run to this directory. |
+
+If port 3000 is in use and `BOOT_GRAFANA_PORT` is not set, the script picks a free port and prints it.
+The script also needs Go, `curl`, and `python3`.
+A run takes 1 to 2 minutes on a laptop (lite 73 s, full 104 s).
 
 ## What the test does
 
@@ -44,13 +76,13 @@ The component `prometheus.exporter.self` labels its target `job="integrations/se
 
 ## The memory budget
 
-| Profile | Budget | Measured (idle, 2026-10-15) |
+| Profile | Budget | Measured at idle (October 2026) |
 | --- | --- | --- |
 | `lite` | 1024 MiB | 477 to 515 MiB |
 | `full` | 2560 MiB | 579 to 601 MiB |
 
-The budgets are the defaults of the plan.
-The measurements in `docs/monitoring.md` and in this test are far below them, so the test keeps the defaults.
+The budgets are the defaults of the monitoring pack.
+The measurements in the [monitoring guide](../monitoring.md) and in this test are far below them, so the test keeps the defaults.
 Grafana uses more than half of the memory.
 The `lite` budget leaves 1 GiB of a 2 GiB VM for the app, Postgres, Caddy, and the system.
 
@@ -58,26 +90,6 @@ The test reads `docker stats --no-stream` three times, 5 seconds apart, after th
 It compares the highest total with the budget.
 `docker stats` reports the memory of the cgroup without the inactive file cache.
 The stand-in Caddy and Postgres containers are not part of the total.
-
-## Run the test
-
-Docker must run, and the pinned images must be on the machine or available to pull.
-
-```
-bash testdata/e2e/monitoring/run.sh lite
-bash testdata/e2e/monitoring/run.sh full
-```
-
-| Option | Effect |
-| --- | --- |
-| `BOOT_GRAFANA_PORT=<port>` | Publish Grafana on this port of `127.0.0.1`. The default is 3000. |
-| `BOOT_BUDGET_MIB=<MiB>` | Use this memory budget. |
-| `BOOT_TIMEOUT=<seconds>` | Wait this long for each check. The default is 180. |
-| `BOOT_LOG_DIR=<dir>` | Copy the logs of a failed run to this directory. |
-
-If port 3000 is in use and `BOOT_GRAFANA_PORT` is not set, the script picks a free port and prints it.
-The script also needs Go, `curl`, and `python3`.
-A run takes 1 to 2 minutes on a laptop (lite 73 s, full 104 s).
 
 ## Changes to the rendered files
 
@@ -103,3 +115,9 @@ The workflow `.github/workflows/monitoring.yml` runs the test every night.
 It also runs on a pull request or a push to `main` that changes the monitoring pack, the deploy `Caddyfile`, the stack versions, or the test.
 The matrix has the profiles `lite` and `full`.
 When a run fails, the workflow uploads the logs as the artifact `monitoring-boot-<profile>`.
+
+## See also
+
+- [Monitoring](../monitoring.md)
+- [Browser end-to-end suite](e2e.md)
+- [Docker-in-Docker deploy suite](dind.md)

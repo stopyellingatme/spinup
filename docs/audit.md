@@ -1,74 +1,18 @@
+---
+title: Audit trail
+parent: Build your app
+nav_order: 11
+---
+
 # Audit trail
 
-The `audit` module records changes to audited tables.
-Each database trigger writes one event for each row that changes.
-An event records the time, the actor, and the field changes.
-The module requires `auth` and the web frontend.
-It is off by default.
+The audit trail answers "who changed this, and when?".
+A database trigger writes one event for each row that changes.
+Each event records the time, the actor, and the changed fields.
+You get a History page for each audited record, an HTTP endpoint, and an `audit` command.
+The module needs `auth` and the web app. It is off by default.
 
-## Enable the module
-
-For an existing app, run `spinup upgrade` first.
-Then run `spinup module add audit --yes --non-interactive`.
-Inspect the branch before you merge it.
-The command adds the required `auth` module if necessary.
-Use `--dry-run` to inspect the plan without a branch.
-
-```console
-$ spinup new ledger --module example.com/ledger --modules auth --no-git --non-interactive
-...
-$ cd ledger
-$ spinup module add audit --dry-run --yes --non-interactive
-...
-```
-
-The module adds `00006_audit_events.sql` and `history-list.svelte`.
-The migration creates the event table and the trigger functions.
-It attaches triggers to `users` and, when present, `user_identities`.
-It redacts `password_hash`.
-It does not audit `sessions`, `login_attempts`, or `password_resets`.
-
-Check each warning about migration versions.
-If an app migration has the same version, rename it to the next free number before application.
-If that migration is already applied, keep its version.
-Rename the new pack migration instead.
-Never rename an applied migration.
-
-The API main file has the class `scaffold`.
-For an existing app, add these imports and options by hand.
-The `Next:` output lists these steps.
-
-```go
-import (
-    "github.com/stopyellingatme/spinup/kit/audit"
-    "github.com/stopyellingatme/spinup/kit/audit/authsink"
-)
-
-// Options for auth.New(pool, ...):
-auth.WithEvents(authsink.New(pool)),
-auth.WithActorContext(authsink.ActorContext),
-
-// Option for app.New(...):
-app.WithCommand("audit", audit.Command(pool)),
-```
-
-Run `spinup db migrate up` before starting the new binary.
-Run `spinup doctor` to inspect `audit-wired`.
-The check inspects the files and needs no database connection.
-The audit migration and the OIDC migration `00004_oidc_identities.sql` both attach the `user_identities` triggers.
-So both orders attach the triggers.
-An app whose 00004 file came from a spinup version before this change can lack them.
-For that app, `audit-wired` warns.
-Run `spinup g audit user_identities` to attach the triggers.
-
-## New resources and existing tables
-
-With the module enabled, new resources have audit triggers by default.
-Use `--no-audit` to exclude one resource.
-Use `--audit-redact` to redact additional columns.
-The generator also redacts names that match password, passwd, secret, token, api_key, apikey, hash, or credential.
-The match ignores case.
-A later change to redaction requires a new migration.
+Turn it on for a new app:
 
 ```console
 $ spinup new audited --module example.com/audited --modules auth,audit --no-git --non-interactive
@@ -80,16 +24,91 @@ $ grep -F 'auth.WithEvents(authsink.New(pool))' api/cmd/api/main.go
 		auth.WithEvents(authsink.New(pool)),
 ```
 
-For an existing resource, use `spinup g audit <resource>`.
-The generator adds a migration, a History endpoint, and a History page.
-It does not change existing handlers or detail pages.
-Add a History link to `/<plural-kebab>/{id}/history` on the detail page.
-Use `audit.InTx` for existing writes.
-Never use `spinup g resource <name> --force` to add audit to an existing resource.
-That command rewrites the create migration, which may already be applied.
+Every new resource now has audit triggers.
+Read the events from the command line:
 
-The following example needs an empty database in `DATABASE_URL`.
-The resource starts without audit so the retrofit can attach its triggers.
+<!-- doctest: skip -->
+```console
+$ cd api && go run ./cmd/api audit list --resource users
+2026-11-01 18:23  unattributed     update #1  email: ada@example.com -> ada@example.org
+2026-11-01 18:23  operator:you     create #1  email: ada@example.com, password_hash: changed (value hidden), role: manager
+```
+
+## What the trail records
+
+- Every insert, update, and delete on an audited table, with the old and new values of each changed field.
+- The actor: a signed-in user, an operator who ran a command, or a job. A change with no known actor is `unattributed`.
+- Sign-in events, such as sign-in, sign-out, and password reset. See [Accounts and sign-in](auth.md).
+
+It audits `users`, and `user_identities` when present. It redacts `password_hash`.
+It does not audit `sessions`, `login_attempts`, or `password_resets`.
+It records no reads and no schema changes. Keep your migration files in Git as the record of schema changes.
+
+## Turn it on
+
+### In a new app
+
+Add `audit` to `--modules`, as the example above shows. Nothing else is needed.
+
+### In an existing app
+
+1. Run `spinup upgrade` so the app is current.
+2. Run `spinup module add audit --yes --non-interactive`. The command adds `auth` too, if the app lacks it.
+   It makes a branch, so inspect the branch before you merge it. Use `--dry-run` to see the plan first.
+3. Read each warning about migration versions. See [Migration numbers](#migration-numbers).
+4. Edit `api/cmd/api/main.go` by hand. This file is yours, so the module cannot change it. The command prints these steps after `Next:`.
+
+   ```go
+   import (
+       "github.com/stopyellingatme/spinup/kit/audit"
+       "github.com/stopyellingatme/spinup/kit/audit/authsink"
+   )
+
+   // Add to the options of auth.New(pool, ...):
+   auth.WithEvents(authsink.New(pool)),
+   auth.WithActorContext(authsink.ActorContext),
+
+   // Add to the options of app.New(...):
+   app.WithCommand("audit", audit.Command(pool)),
+   ```
+
+5. Run `spinup db migrate up`, then restart the app.
+6. Run `spinup doctor`. The `audit-wired` check confirms the wiring. It reads files only and needs no database.
+
+The module adds the migration `00006_audit_events.sql` and the component `history-list.svelte`.
+
+{: .note }
+If `audit-wired` warns that `user_identities` has no triggers, run `spinup g audit user_identities`. This happens only in an app whose OIDC migration came from an older spinup version.
+
+### Migration numbers
+
+The audit migration is number 6.
+If one of your own migrations already has number 6, rename it to the next free number before you apply anything.
+If your migration is already applied, keep its number and rename the new audit migration instead.
+Never rename an applied migration.
+
+## Audit a resource
+
+With the module on, `spinup g resource` adds audit triggers, a History endpoint, and a History page.
+
+| Flag | Effect | Example |
+| --- | --- | --- |
+| `--no-audit` | Leave this resource out of the trail. | `spinup g resource note body:text --no-audit` |
+| `--audit-redact` | Hide more columns. Event rows show `changed (value hidden)`. | `spinup g resource client ssn:string --audit-redact ssn` |
+| `--history-role` | Give the History endpoint its own roles. | `spinup g resource work_order title:string --role staff --history-role manager` |
+
+The generator also hides any column whose name contains `password`, `passwd`, `secret`, `token`, `api_key`, `apikey`, `hash`, or `credential`, in any case.
+A later change to the hidden columns needs a new migration.
+
+To audit a table that already exists, run `spinup g audit <resource>`.
+It adds a migration, a History endpoint, and a History page.
+It does not change your handlers or your detail page, so add a link to `/<plural-kebab>/{id}/history` on the detail page yourself.
+Write changes with `audit.InTx` (see [Write audited changes](#write-audited-changes)).
+
+{: .warning }
+Never run `spinup g resource <name> --force` to add audit to an existing resource. It rewrites the create migration, and you may have applied that migration already.
+
+This example needs an empty database in `DATABASE_URL`:
 
 <!-- doctest: requires-env DATABASE_URL -->
 ```console
@@ -104,51 +123,55 @@ $ go run ./cmd/api audit list --resource legacy_orders --json
 ...
 ```
 
-The History page renders on the server and works without JavaScript.
-It shows the time, the action, the actor email and role, and the field changes.
-A redacted field shows `changed (value hidden)`.
-An empty result shows `No history yet.`
-A deleted record has no detail page.
-Use the API or the operator command to read its history.
+## See history on a page
 
-## Access and filters
+The History page works without JavaScript.
+It lists the time, the action, the actor email and role, and the field changes.
+A hidden field shows `changed (value hidden)`. An empty record shows `No history yet.`
+A deleted record has no detail page, so read its history with the API or the command line.
 
-History uses the same access rules as Get for the resource.
-History roles replace resource roles in the role check.
-Use `--history-role` to select declared roles.
-By default, history uses the resource roles.
+The same data is available as JSON:
 
-| Resource | Sign-in | Role check | Owner filter on Get | Owner filter on history |
-| --- | --- | --- | --- | --- |
-| Owned, no `--role` | yes | none | `WHERE id = $1 AND user_id = $2` | `owner_id = user.ID` |
-| Owned, `--role R` | yes | `user.HasRole(R...)`, else 403 | the same `user_id` filter for every role | `owner_id = user.ID` for every role |
-| `--shared`, no `--role` | yes | none | none | none |
-| `--shared --role R` | yes | `user.HasRole(R...)`, else 403 | none | none |
-| No auth module | none | none | none | unavailable because audit requires auth |
+<!-- doctest: skip -->
+```console
+$ curl -s -b cookies.txt 'http://localhost:8080/api/work_orders/7/history?limit=2'
+```
 
-No role bypasses the owner filter, including the admin role.
-History uses the stored owner ID, so deletion does not remove access to past events.
-A request with no matching events returns 200 with an empty list.
-The response sets `Cache-Control: no-store`.
+```json
+{
+  "items": [
+    {
+      "id": 41,
+      "occurred_at": "2026-11-01T18:23:56Z",
+      "action": "update",
+      "changes": {"status": {"old": "open", "new": "closed"}},
+      "actor": {"kind": "user", "email": "ada@example.com", "role": "manager"}
+    }
+  ]
+}
+```
 
-`GET /api/<plural>/{id}/history` accepts `limit` and `offset`.
-The default limit is 50, and the maximum is 200.
-The maximum offset is 10,000.
-A value above a maximum returns 422 with a `Try:` line.
-Use a cursor or a narrower range in `audit.List` for larger queries.
-Only resource history has an HTTP endpoint.
-Use the operator command for auth events and other tables.
+`limit` defaults to 50 with a maximum of 200. `offset` has a maximum of 10,000.
+`before_id` pages by event number, which is better for long histories.
+A larger value gives 422 with a `Try:` line. For larger queries, call `audit.List` with a cursor or a narrower range.
+If you write a History route by hand, copy the generated role guard, owner filter, and limits before you call `audit.List`.
+Only resources have an HTTP endpoint. Use the command line for auth events and other tables.
 
-## Operator command
+## Read events from the command line
 
 The app binary reads `DATABASE_URL` and needs no web server.
-The command never prompts.
-A missing flag produces an error with a `Try:` line.
+It never prompts. A missing flag gives an error with a `Try:` line.
 
-Use `audit list --resource TABLE` to read recent events.
-Optional filters are `--id`, `--actor`, `--action`, `--since`, `--until`, and `--unattributed`.
-Use `--json` for structured output.
-The default limit is 100, and the maximum is 1000.
+| Flag | Meaning | Example |
+| --- | --- | --- |
+| `--resource` | The table to read (required). | `--resource users` |
+| `--id` | One record. | `--id 7` |
+| `--actor` | The actor email. | `--actor ada@example.com` |
+| `--action` | `create`, `update`, or `delete`. | `--action delete` |
+| `--since`, `--until` | A date range. | `--since 2026-10-01` |
+| `--unattributed` | Only changes with no actor. | `--unattributed` |
+| `--limit` | Default 100, maximum 1000. | `--limit 20` |
+| `--json` | One JSON object per line. | `--json` |
 
 <!-- doctest: requires-env DATABASE_URL -->
 ```console
@@ -156,21 +179,19 @@ $ go run ./cmd/api audit list --resource users --limit 100 --json
 ...
 $ go run ./cmd/api audit list --resource users --unattributed
 ...
-$ go run ./cmd/api audit export --since 2000-01-01 --until 2100-01-01 --format jsonl --out audit.jsonl
-...
-$ test -f audit.jsonl
 ```
 
-Export accepts `jsonl` or `csv`.
-It reads pages of 1000 events and writes each page immediately.
-It prints a SHA-256 digest for verification.
-The trail does not record command reads.
+An event in `--json` looks like this:
 
-## Handler recipe
+```json
+{"id":2,"occurred_at":"2026-11-01T18:23:56.870977Z","action":"update","table_name":"users","record_id":"1","changes":{"email":{"new":"ada@example.org","old":"ada@example.com"}},"actor":{"kind":"unattributed","source":"sql"}}
+```
 
-For each write, use `audit.InTx` and `s.Queries.WithTx(tx)`.
-The auth middleware supplies the signed-in actor through `authsink.ActorContext`.
-The transaction binds that actor before the data statement runs.
+## Write audited changes
+
+Wrap each write in `audit.InTx` and use `s.Queries.WithTx(tx)`.
+The auth middleware puts the signed-in user in the context.
+The transaction binds that user as the actor before the data statement runs.
 
 ```go
 err := audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {
@@ -179,8 +200,8 @@ err := audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {
 })
 ```
 
-For a job, bind a system actor in the context before the transaction.
-Use a reason that explains the batch.
+A [background job](build/jobs.md) already runs with the actor `job` and the job kind.
+Use `audit.WithActor` when you want a clearer reason for a batch:
 
 ```go
 ctx = audit.WithActor(ctx, audit.System(audit.SourceJob, "close expired orders"))
@@ -190,25 +211,58 @@ err := audit.InTx(ctx, pool, func(tx pgx.Tx) error {
 })
 ```
 
-Call `audit.Record` for an event that is not a row change.
-For a handwritten history route, copy the generated guard, owner filter, and limits before calling `audit.List`.
-A write without a bound actor still records the change as `unattributed`.
-If a row event fails, the data statement fails and the transaction rolls back.
-If a sign-in event fails, auth logs the error and the user continues.
+- A write with no bound actor still records the change, as `unattributed`.
+- Call `audit.Record` for an event that is not a row change, such as a download.
+- If a row event fails, the data statement fails too, and the transaction rolls back.
+- If a sign-in event fails, auth logs the error and the user continues.
+- An update of N rows creates N events, so batch large updates and give a reason.
 
-## Retention and size
+## Who can see history
 
-The default retention is forever.
-The trail never prunes automatically.
-Keep row history unless your retention policy requires deletion.
-Consider an age limit for sign-in events.
-The prune command deletes all events before its cutoff, including row history.
-It has no action filter.
-Export and review the affected range before pruning it.
+History follows the same rules as reading one record of the resource.
+An owned resource shows history only to its owner, whatever role the viewer has. No role bypasses this, including `admin`.
+A `--shared` resource shows history to every signed-in user.
+If the resource has `--role`, the viewer also needs one of those roles, or the answer is 403.
+`--history-role` replaces the resource roles for the History endpoint only. By default, history uses the resource roles.
+
+| Resource | Who sees history |
+| --- | --- |
+| Owned | The owner only. |
+| Owned, with `--role R` | The owner, if the owner has role R. |
+| `--shared` | Every signed-in user. |
+| `--shared --role R` | Users with role R. |
+
+The trail keeps the owner of each record, so deleting the record does not remove access to its past events.
+A request with no matching events gives 200 with an empty list.
+The response sets `Cache-Control: no-store`.
+
+## Export and prune
+
+The trail keeps events forever and never prunes by itself.
+Export a range to a file with a SHA-256 digest you can keep:
+
+<!-- doctest: requires-env DATABASE_URL -->
+```console
+$ go run ./cmd/api audit export --since 2000-01-01 --until 2100-01-01 --format jsonl --out audit.jsonl
+...
+$ test -f audit.jsonl
+```
+
+`--format` is `jsonl` or `csv`. The command prints the number of events and the SHA-256 digest of the file:
+
+```text
+exported 128 events
+9f2c...e41a  audit.jsonl
+```
+
+The export reads pages of 1000 events and writes each page at once.
+The trail does not record command reads.
+
+{: .warning }
+`audit prune` deletes every event before its cutoff, including row history. It has no filter by action. Export and review the range first.
 
 Prune refuses a cutoff less than one day old.
-It requires a reason and `--yes`.
-It writes an `audit.prune` event with the range, count, and reason.
+It needs a reason and `--yes`. It writes an `audit.prune` event with the range, the count, and the reason.
 
 <!-- doctest: requires-env DATABASE_URL -->
 ```console
@@ -216,30 +270,39 @@ $ go run ./cmd/api audit prune --before 2000-01-01 --reason 'retention policy re
 ...
 ```
 
-Allow approximately 1 KB per event, including indexes.
-At 10,000 events per day, allow approximately 3.6 GB per year.
-Batch large updates and supply a reason.
-An update of N rows creates N events.
-Backups include the trail because it uses the app database.
+Plan for about 1 KB per event, with indexes. At 10,000 events a day, that is about 3.6 GB a year.
+Backups include the trail, because it lives in the app database.
+Keep row history unless your retention policy requires deletion. Sign-in events are a good candidate for an age limit.
 
 ## Limits and hardening
 
-The guard trigger prevents accidental updates, deletes, and truncates on `audit_events`.
-It does not prevent tampering by application code or the database owner.
-The default application user owns the tables.
-That user can enable the prune setting, call `audit_prune`, disable triggers, or edit events.
-The trail is not tamper-proof.
-It has no hash chain or external anchor.
+{: .important }
+The trail is not tamper-proof. The default app database user owns the tables, so it can disable the triggers, call the prune function, or edit events.
 
-For stronger protection, use a separate migration role that owns the tables and functions.
+The guard trigger stops accidental updates, deletes, and truncates of `audit_events`.
+It does not stop code that runs as the table owner.
+There is no hash chain and no external anchor.
+Events keep actor emails after an account is deleted, and this version has no command to erase a person.
+Decide the legal basis for keeping personal data before you turn the module on.
+
+For stronger protection, run migrations as a separate database role that owns the tables and functions.
 Give the app role only `INSERT` and `SELECT` on `audit_events`.
-Make prune and the trigger functions `SECURITY DEFINER` under the owner role.
-Make the guard permit deletion only inside `audit_prune`.
-This role separation requires a separate deployment change.
-The default module does not implement it.
+Make the prune and trigger functions `SECURITY DEFINER` under the owner role.
+This needs a change to your deploy. The default module does not do it.
 
-The trail records no reads or DDL changes.
-Keep migration files in Git as the record of schema changes.
-Events retain actor emails after an account is deleted.
-This version has no command to pseudonymize or erase a person.
-The owner must decide the legal basis for retaining personal data.
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `audit list: no events match` | No event fits the filters, or the table has no triggers. | Remove a filter. Run `spinup doctor`. |
+| Events show `unattributed` | The write did not go through `audit.InTx`, or `auth.WithActorContext` is missing. | Wrap the write in `audit.InTx`. Check `main.go`. |
+| `audit-wired` warns | A piece of the wiring in `main.go` is missing. | Add the lines from [In an existing app](#in-an-existing-app). |
+| History gives 403 | The user lacks a required role or does not own the record. | Check `--role` and `--history-role`. |
+
+## See also
+
+- [Generate audit history](commands/generate-audit.md) and the [flag reference](site/commands/generate-audit.md)
+- [Accounts and sign-in](auth.md) for the auth events
+- [Roles](build/roles.md)
+- [Background jobs](build/jobs.md)
+- Design record: [ADR 0025](https://github.com/stopyellingatme/spinup/blob/main/docs/adr/0025-audit-trail.md)

@@ -1,11 +1,13 @@
+---
+title: Generated CI
+parent: Deploy
+nav_order: 6
+---
+
 # Generated CI
 
-The `ci` pack creates managed GitHub workflows and a local action that installs spinup.
-The web pack adds `e2e.yml` when the `ci` module is selected.
-An upgrade merges these files through the normal three-way merge.
-Add custom jobs in separate workflow files.
-
-Preview an API-only app with CI:
+The `ci` module writes GitHub Actions workflows that build and test your app, deploy it, and propose spinup upgrades.
+Most of them work with no setup. The deploy and backup workflows need three secrets and one variable.
 
 ```console
 $ spinup new preview --api-only --modules ci --module example.com/preview --no-git --non-interactive --dry-run
@@ -18,59 +20,74 @@ $ spinup new preview --api-only --modules ci --module example.com/preview --no-g
 ...
 ```
 
-| File | Trigger | Purpose |
+The files are managed, so `spinup upgrade` updates them with a three-way merge.
+Add your own jobs in separate workflow files.
+
+| File | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | Push to `main`, pull requests | Build, vet, and test the API with PostgreSQL. Check the app with spinup. Build and test each sidecar service. |
-| `e2e.yml` | Pull requests, with `web` | Migrate PostgreSQL, start both apps, and run Playwright. |
-| `deploy.yml` | Manual, with `deploy` | Deploy to the selected GitHub environment. |
-| `backup-verify.yml` | Weekly or manual, with `backups` | Verify the latest backup of the default environment. |
-| `upgrade-check.yml` | Weekly or manual | Install the newest release and propose an upgrade PR. |
+| `ci.yml` | Push to `main`, pull requests | Builds, vets, and tests the API with PostgreSQL. Checks the app with spinup. Builds and tests each sidecar service. |
+| `e2e.yml` | Pull requests, with `web` | Migrates PostgreSQL, starts both apps, and runs Playwright. |
+| `deploy.yml` | Manual, with `deploy`. Also on push to `main` with `--ci-deploy-on-push`. | Deploys to the selected GitHub environment. |
+| `backup-verify.yml` | Weekly or manual, with `backups` | Verifies the latest backup of the default environment. |
+| `upgrade-check.yml` | Weekly or manual | Installs the newest release and opens an upgrade PR. |
 
-## Service jobs
+## Set up deploy from CI
 
-The `spinup` job of `ci.yml` runs `spinup ci services --json` and saves the matrix as a job output.
-The `services` job uses that matrix.
-It does not run when the app declares no service.
-For each service, the job runs these commands:
+Skip this section if you only want tests.
 
-<!-- doctest: skip -->
-```console
-$ spinup build --image --target ocr
-$ spinup ci test-service ocr
-```
+1. **Make a CI key for the secrets.** Add its public key as a recipient and encrypt the environment secrets to it:
 
-`spinup ci test-service` builds a temporary test Dockerfile from the pinned images.
-It runs the tests of the service in Docker, so the runner needs only Docker.
+   ```sh
+   age-keygen -o ci.agekey
+   spinup secrets init --env staging --recovery-recipient age1... --ci-recipient age1...
+   ```
 
-| Language | Test commands |
-| --- | --- |
-| `rust` | `cargo test --locked` |
-| `python` | `uv sync --locked`, then `pytest` |
-| `node` | `pnpm install --frozen-lockfile`, then `pnpm test`, then `pnpm run typecheck` if the script exists |
+   For an existing file, add the public key to `.sops.yaml` and run `spinup secrets rekey --env staging`.
+   See [Secrets](deploy/secrets.md).
+2. **Create the secrets** in the GitHub environment that has the name of your spinup environment. Make the GitHub environment first, and make an SSH key for CI:
 
-The language comes from the files in `services/<name>/`.
-A service with no known language is only built.
-`spinup g service` needs no edit of the workflow.
-An existing app gets the job through the three-way merge of the managed file `ci.yml`.
-See [Generate and verify CI files](commands/ci.md) for the commands.
+   ```sh
+   gh api --method PUT repos/{owner}/{repo}/environments/staging
+   ssh-keygen -t ed25519 -N "" -f ~/.ssh/spinup_ci
+   ssh-copy-id -i ~/.ssh/spinup_ci.pub deploy@staging.example.com
+   ```
 
-The web job runs `pnpm check` and `pnpm test`.
-An app without unit tests can pass the web job.
-The Vite configuration excludes `e2e/` from Vitest and keeps the default exclusions.
-Local `pnpm test` uses the same configuration.
-A failed Playwright run uploads `web/playwright-report/` for seven days.
-The Go version comes from `api/go.mod`.
-Every workflow pins the Node major from the spinup stack manifest.
-This major matches the Node image.
-The `packageManager` field selects pnpm.
+   The three secrets are:
 
-Set the repository variable `SPINUP_ENVIRONMENT` to the default environment from `spinup.toml`.
-Backup verification and deployment on pushes use `${{ vars.SPINUP_ENVIRONMENT || 'staging' }}`.
-Without this variable, both workflows use `staging`.
-The manual deploy input takes precedence over this variable.
-The workflows share a concurrency group for each environment.
+   | Secret | Value | How to get it |
+   | --- | --- | --- |
+   | `SPINUP_AGE_KEY` | The private age key of the CI recipient. | The file `ci.agekey`. |
+   | `SPINUP_SSH_KEY` | The private SSH key of the deploy user. | The key pair `spinup_ci` that you made above. The server has its public key. |
+   | `SPINUP_SSH_KNOWN_HOSTS` | The trusted host keys of the server. | `ssh-keyscan -t ed25519 staging.example.com` |
 
-Enable deployment on pushes to `main` during generation:
+   ```sh
+   gh secret set SPINUP_AGE_KEY --env staging < ci.agekey
+   gh secret set SPINUP_SSH_KEY --env staging < ~/.ssh/spinup_ci
+   ssh-keyscan -t ed25519 staging.example.com | gh secret set SPINUP_SSH_KNOWN_HOSTS --env staging
+   ```
+
+3. **Set the default environment** as a repository variable:
+
+   ```sh
+   gh variable set SPINUP_ENVIRONMENT --body staging
+   ```
+
+   Without it, the workflows use `staging`.
+4. **Run the workflow:**
+
+   ```sh
+   gh workflow run deploy.yml -f environment=staging
+   ```
+
+The workflows install the age key at `~/.config/spinup/keys/<app>-<env>.agekey` with mode 0600.
+They require strict SSH host checking and remove the keys when the job ends.
+Only the deploy and backup workflows read these secrets.
+The workflows share a concurrency group for each environment, so two deploys never overlap.
+The manual `environment` input beats the variable.
+
+## Deploy on every push
+
+Pass `--ci-deploy-on-push` when you generate the app:
 
 ```console
 $ spinup new preview --api-only --modules ci,deploy --module example.com/preview --ci-deploy-on-push --no-git --non-interactive --dry-run
@@ -79,44 +96,93 @@ $ spinup new preview --api-only --modules ci,deploy --module example.com/preview
 ...
 ```
 
-The `--ci-deploy-on-push` flag defaults to false.
-A push deploys to the environment selected by `SPINUP_ENVIRONMENT`, with `staging` as the fallback.
-Configure the target host and public URL in `spinup.toml` before deployment.
-Configure the matching GitHub environment with these secrets:
+The flag is off by default.
+To turn it on for an existing app, set `"ci_deploy_on_push": true` in the `answers` of `spinup.lock`, then run `spinup ci generate`.
+A push to `main` then deploys to the environment in `SPINUP_ENVIRONMENT`.
+Set the host and the public URL of that environment in `spinup.toml` first.
 
-| Secret | Value |
+## Check the workflows
+
+`spinup ci verify` checks the workflows for unsafe settings and runs `actionlint` when it is installed.
+`spinup ci generate` renders the locked `ci` pack again.
+See the [ci command guide](commands/ci.md).
+
+<!-- doctest: skip -->
+```console
+$ spinup ci verify
+```
+
+## Service jobs
+
+The `spinup` job of `ci.yml` runs `spinup ci services --json` and uses the result as a matrix.
+The `services` job does not run when the app has no [sidecar service](services.md).
+For each service, it runs:
+
+<!-- doctest: skip -->
+```console
+$ spinup build --image --target ocr
+$ spinup ci test-service ocr
+```
+
+`test-service` runs the tests in Docker with the pinned images, so the runner needs only Docker.
+The language comes from the files in `services/<name>/`:
+
+| Language | Test commands |
 | --- | --- |
-| `SPINUP_AGE_KEY` | Private age key for the CI recipient in `.sops.yaml`. |
-| `SPINUP_SSH_KEY` | Private SSH key for the deploy user. |
-| `SPINUP_SSH_KNOWN_HOSTS` | Trusted SSH host entries for the target server. |
+| `rust` | `cargo test --locked` |
+| `python` | `uv sync --locked`, then `pytest` |
+| `node` | `pnpm install --frozen-lockfile`, then `pnpm test`, then `pnpm run typecheck` if the script exists |
 
-Encrypt the environment secrets to the CI recipient before deployment.
-The workflows install the age key with mode `0600` at `~/.config/spinup/keys/<app>-<env>.agekey`.
-They require strict SSH host verification and remove the keys after the operation.
-Only the deploy and backup workflows read these three secrets.
-Both workflows read them within their GitHub environment.
+A service with no known language is only built.
+A new service needs no workflow edit.
+An existing app gets the job through the three-way merge of `ci.yml`.
 
-The local `setup-spinup` action reads `cli_version` from `spinup.lock` by default.
-Its optional `version` input accepts a published version or `latest`.
-The action downloads the Linux amd64 archive and checks its SHA-256 before installation.
-It installs spinup at `$RUNNER_TEMP/spinup/bin` and adds that directory to `GITHUB_PATH`.
-The `latest` input resolves the newest release through the GitHub API with `GITHUB_TOKEN`.
-The default path needs no token for downloads.
-Development versions fail because they have no published archive.
-Generate or upgrade the app with a published release before GitHub runs its workflows.
+## Web jobs
 
-The upgrade workflow removes `SPINUP_KIT_REPLACE` before it runs spinup.
-It opens the PR from the separate worktree created by the upgrade engine.
-If the upgrade returns exit code 3, the PR contains the conflicts and lists their paths.
-Resolve the markers and complete the upgrade before merging that PR.
+The web job runs `pnpm check` and `pnpm test`.
+An app with no unit tests passes.
+A failed Playwright run uploads `web/playwright-report/` for seven days.
+The workflows take the Go version from `api/go.mod` and the Node major from the spinup stack.
 
-Enable the repository setting "Allow GitHub Actions to create and approve pull requests".
-Create the repository secret `SPINUP_UPGRADE_TOKEN` for upgrades that change workflows and for PRs that must trigger CI.
-Use a fine-grained token or a GitHub App token with contents, pull-requests, and workflows write permissions.
-Both checkout and PR creation use `${{ secrets.SPINUP_UPGRADE_TOKEN || github.token }}`.
+## The upgrade workflow
+
+`upgrade-check.yml` runs weekly. It installs the newest spinup release and opens a pull request with the upgrade.
+If the upgrade has conflicts (exit code 3), the PR holds the conflict markers and lists the files. Resolve them before you merge.
+
+To let the workflow work fully:
+
+1. Turn on the repository setting "Allow GitHub Actions to create and approve pull requests".
+2. Create the repository secret `SPINUP_UPGRADE_TOKEN`. Use a fine-grained token or a GitHub App token with write access to contents, pull requests, and workflows.
+
+   ```sh
+   gh secret set SPINUP_UPGRADE_TOKEN
+   ```
 
 Without the secret, the workflow uses `GITHUB_TOKEN`.
-This fallback cannot push changes under `.github/workflows/`, and its PRs do not trigger CI.
-The PR body explains these limits when the workflow uses the fallback.
-Only the upgrade job grants `GITHUB_TOKEN` write permissions for contents and pull requests.
-All workflows declare read access to contents at the top level.
+That token cannot change files under `.github/workflows/`, and its PRs do not start CI.
+The PR text says so when this happens.
+
+## Versions and permissions
+
+The local action `setup-spinup` installs spinup at `$RUNNER_TEMP/spinup/bin`.
+It reads `cli_version` from `spinup.lock`. Its optional `version` input takes a published version or `latest`.
+It checks the SHA-256 of the Linux amd64 archive before it installs.
+A development version fails, because it has no published archive.
+Every workflow reads contents at the top level. Only the upgrade job writes contents and pull requests.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `Cannot deploy: a required environment secret is missing` | One of the three secrets is not set in that GitHub environment. | Set `SPINUP_AGE_KEY`, `SPINUP_SSH_KEY`, and `SPINUP_SSH_KNOWN_HOSTS`. |
+| The deploy uses `staging` | `SPINUP_ENVIRONMENT` is not set. | Set the variable, or pass the `environment` input. |
+| Host key verification fails | `SPINUP_SSH_KNOWN_HOSTS` is stale. | Run `ssh-keyscan` again and update the secret. |
+| The upgrade PR does not run CI | The workflow used `GITHUB_TOKEN`. | Create `SPINUP_UPGRADE_TOKEN`. |
+| `setup-spinup` fails | `spinup.lock` names a development version. | Upgrade to a published release. |
+
+## See also
+
+- [Deploy overview](deploy/index.md)
+- [Secrets](deploy/secrets.md) and [Environments](deploy/environments.md)
+- [The `ci` command guide](commands/ci.md)
+- [Flag reference of `spinup ci`](site/commands/ci.md)

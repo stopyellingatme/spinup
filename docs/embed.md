@@ -1,10 +1,14 @@
+---
+title: Embed mode
+parent: Build your app
+nav_order: 14
+---
+
 # Embed mode
 
-Embed mode serves the API and a static SvelteKit app from one Go binary.
-The browser uses one origin for the API and the app.
-
-Create an app with `--frontend-mode embed`.
-The default mode remains `node`.
+In embed mode, the Go binary serves the API and the web app together.
+You ship one binary and one container, and the browser uses one origin.
+The default mode is `node`, where a separate SvelteKit server renders the pages.
 
 ```console
 $ spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
@@ -13,41 +17,72 @@ $ cd embedded
 $ spinup g page about
 Created 1, updated 0 files
 Next: cd web && pnpm check
+```
+
+## Embed or node
+
+| | `node` (default) | `embed` |
+| --- | --- | --- |
+| What runs | Go API and a Node server | One Go binary |
+| Pages | Rendered on the server or in the browser | Static files, rendered in the browser |
+| Sign-in (`auth` module) | Yes | No |
+| Server pages (`g page --server`) | Yes | No |
+| Compose services | `api`, `web`, and more | `api` only |
+
+Choose `embed` for a dashboard or a tool that needs no sign-in pages.
+Choose `node` when the app needs the `auth` module or server-side loading.
+
+## What embed cannot do
+
+The auth pages use SvelteKit form actions, which need a server.
+So embed mode refuses these commands:
+
+```console
 $ spinup g page settings --server
-...
+Error: generator "page" failed: cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server
+  Try: omit --server, or use an app with --frontend-mode node
+[exit 1]
+$ spinup module add auth
+Error: cannot use auth in embed mode: its pages require SvelteKit form actions
+  Try: use --frontend-mode node, or remove auth from --modules
 [exit 1]
 ```
 
-The static adapter uses `fallback: 'index.html'`.
-The root layout disables SSR with `ssr = false`.
-SvelteKit 3 configures the adapter in `web/vite.config.js`.
-The layout fetches `/api/session` from the browser.
-An absent session endpoint means that no user has signed in.
+`spinup g resource` also stops, because it writes server pages.
+Pass `--api-only` to write only the API files.
+The app reads `/api/session` from the browser, and a missing session endpoint means that nobody is signed in.
 
-Run `spinup build` to build the embedded application.
-The command installs dependencies with the selected package manager and a frozen lockfile.
-The command builds the web app and replaces `api/internal/webdist/dist/` with `web/build/`.
-It then builds `api/bin/api` with `-tags embedweb`.
-The generated `.gitignore` excludes the static assets.
+## Build and run
+
+`spinup build` installs the web packages with a frozen lockfile and builds the web app.
+It copies the result into `api/internal/webdist/dist/` and builds the Go binary with those files inside.
+Use `--dry-run` to see the steps:
+
+```console
+$ spinup build --dry-run
+pnpm --dir web install --frozen-lockfile
+pnpm --dir web build
+Copy web/build to api/internal/webdist/dist, replacing old assets
+go build -tags embedweb -trimpath -ldflags '-X main.version=dev' -o bin/api ./cmd/api
+```
+
+Run the build, then start the binary.
+The binary needs a database, so start PostgreSQL first and apply the migrations.
 
 <!-- doctest: skip -->
 ```console
+$ docker compose -f deploy/compose.dev.yml up -d postgres
 $ spinup build
-...
-$ ./api/bin/api
-...
+$ spinup db migrate
+$ SPINUP_ENV=dev ./api/bin/api
 ```
 
-For bun apps, the command uses `bun install --frozen-lockfile` and `bun run build`.
-An untagged Go build uses a stub without static assets.
-Development continues to use Vite and its API proxy through `spinup dev`.
+Open `http://localhost:8080`.
+`SPINUP_ENV=dev` makes the binary read `.env`, as `spinup dev` does.
+The `dist/` folder is in `.gitignore`, so do not commit it.
+During development, use `spinup dev`. It runs Vite with the API proxy as before.
 
-Run `spinup build --image` to build only the API image.
-The command supplies `--build-context web=web` to Docker buildx.
-The Docker template builds the static app with the selected package manager.
-It embeds the static app in the API image.
-Deploy uses the same API image build.
-A local kit replace is passed to the image build as the build context `kit`.
+## Build only the image
 
 <!-- doctest: skip -->
 ```console
@@ -55,33 +90,38 @@ $ spinup build --image
 ...
 ```
 
-The generated Compose file has no `web` service.
-Caddy sends every path to the API service.
-Deploy settings contain only API replicas and resources for the app.
+The Docker build compiles the web app and embeds it in the API image.
+If your app uses a local kit replace, spinup passes it to the build as the build context `kit`.
+`spinup deploy` uses the same image, so a deploy needs no extra step:
 
-The handler serves assets for `GET` and `HEAD` requests.
-It serves `index.html` for client routes, including deep links.
-It never shows a directory listing.
-Files under `/_app/immutable/` use `Cache-Control: public, max-age=31536000, immutable`.
-The index uses `Cache-Control: no-cache`.
-The handler permits inline bootstrap scripts in the CSP for the index.
+<!-- doctest: skip -->
+```console
+$ spinup deploy --env staging
+```
 
-The API prefix, health endpoints, metrics, version, and internal endpoints never use the SPA fallback.
-The health endpoint is `/healthz`.
-Unknown reserved paths return 404 for every HTTP method.
-Missing assets under `/_app/` return 404.
+The generated Compose file has no `web` service, and Caddy sends every path to the API.
+Deploy settings hold only the replicas and resources of the API.
 
-Embed mode refuses the auth module because its pages require SvelteKit form actions.
-This restriction applies to `spinup new` and `spinup module add auth`.
-It also refuses `g page --server` and the pages from `g resource`.
-Use `--api-only` with the resource generator to generate its API files.
-Use node mode when the app needs server pages or auth.
+## How the binary serves files
 
-Run `make script RUN=embed` to verify an offline build and the embedded HTTP handler.
-Set `SPINUP_EMBED_LIVE=1` to test the generated binary through a listening socket.
-The live check does not need PostgreSQL.
+- A `GET` or `HEAD` request for a file returns the file. Any other path returns `index.html`, so deep links work.
+- The API paths, `/healthz`, metrics, and `/version` never fall back to `index.html`. An unknown path there returns 404 for every method.
+- A missing file under `/_app/` returns 404.
+- Files under `/_app/immutable/` are cached for a year. `index.html` is never cached.
 
-Image previews and the fake Docker check run without a Docker engine.
-Set `SPINUP_EMBED_DOCKER=1` for the optional Docker check.
-The check skips the image build if Docker is absent.
-The Docker cache must contain the images and published dependencies before this check.
+A Go build without the `embedweb` tag contains only a stub.
+Use `spinup build` and not `go build` to get the web files.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| The binary serves no web pages | You built it with `go build` | Run `spinup build` |
+| A new page returns 404 after deploy | The image has an old build | Run `spinup build --image`, then deploy again |
+
+## See also
+
+- [The web app](web.md)
+- [Package manager and API client](web-variants.md)
+- [Deploy to your own server](deploy.md)
+- [build](commands/build.md)

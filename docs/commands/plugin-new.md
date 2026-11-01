@@ -1,74 +1,160 @@
-# Create a plugin
+---
+title: plugin new — scaffold a plugin
+parent: Command guides
+---
 
-Run `spinup plugin new <name>` to create a declarative plugin.
-The default destination is `./<name>`.
-Use `--out <directory>` to select another destination.
-The command accepts an empty directory and refuses a non-empty directory.
-Use `--dry-run` to validate the scaffold without writing files.
+# plugin new — scaffold a plugin
+
+`spinup plugin new <name>` creates a ready-to-edit plugin directory.
+Use it when you want to share your own generator or template files across apps.
 
 ```console
 $ spinup plugin new paper
 ...
+```
+
+The new directory `./paper` is a working pack plugin with one generator, `paper-note <Name>`.
+To install it in an app, see [plugin add](plugin.md).
+
+## Create a pack plugin
+
+A pack plugin holds templates and declarative generators.
+It has no program, so spinup runs none of its code.
+
+```console
+$ cd paper
+$ ls -A
+README.md
+files
+pack.toml
+plugin.toml
+$ cd ..
+```
+
+| File | What it holds |
+| --- | --- |
+| `plugin.toml` | The name, version, and generators |
+| `pack.toml` | The file classes of the template files |
+| `files/` | The templates, such as `files/note.txt.tmpl` |
+| `README.md` | Notes for the plugin author |
+
+The generator `paper-note <Name>` writes `notes/<Name>.txt` into an app.
+
+The default destination is `./<name>`.
+The command accepts an empty directory and refuses a directory with files.
+Use `--out <directory>` to choose another place.
+Use `--dry-run` to check the plan without writing files.
+
+Run it twice and the second run fails, because `./paper` has files now.
+The dry run shows the plan for another directory and writes nothing.
+
+```console
 $ spinup plugin new paper
 ...
 [exit 1]
-$ spinup plugin new greetings --kind exec --dry-run
+$ spinup plugin new notes --out plugins/notes --dry-run
 ...
-$ spinup plugin new greetings --kind exec
-...
-$ spinup plugin new invalid --kind unknown
-...
-[exit 1]
 ```
 
-Each scaffold contains `plugin.toml`, `pack.toml`, `files/`, a declarative generator, and a README.
-The declarative generator is `<name>-note <Name>`.
-It creates `notes/<Name>.txt`.
+## Create an executable plugin
 
-Use `--kind exec` to include a Go module, an executable generator, a check, and a conformance test.
-The executable generator is `<name>-hello <Name>`.
-It creates `greetings/<Name>.txt`.
-The check is `<name>-ready`.
-The module requires Go 1.26 or later.
+Use `--kind exec` when you need code, such as a check or a generator that makes decisions.
+The scaffold adds a Go module with `main.go`, `main_test.go`, a `Makefile`, and a `.gitignore`.
 
-For a local checkout, supply `--sdk-path /path/to/spinup/plugin-sdk`.
-This adds a local SDK replacement to the generated module.
-Otherwise, replace the SDK placeholder version with a published version before building.
-Run `make build` in the scaffold to build the declared binary.
-Run `make test` to build a temporary binary and run the conformance kit.
-The Makefile disables workspace mode for the separate module.
+```console
+$ spinup plugin new greetings --kind exec --dry-run
+...
+```
 
-The default executable target matches the current platform.
-Use `--platform linux-amd64` to select a different target.
-Each binary resides at `bin/<name>_<os>_<arch>`.
-Every binary declared in `plugin.toml` must exist before installation.
-The complete plugin tree must fit within 5 MiB.
-Do not commit binaries.
-Include binaries in the archive that you distribute.
+The executable plugin has these parts:
 
-Executable plugins run with your full user privileges.
-Review the source and binaries before you grant trust.
-In a generated app, run `spinup plugin add path:/path/to/plugin --trust-exec <name>`.
-For a declarative plugin, use `--trust`.
-Run `spinup g <name>-hello sample` for the executable example.
-Run `spinup g <name>-note sample` for the declarative example.
+| Part | Name |
+| --- | --- |
+| Declarative generator | `greetings-note <Name>`, writes `notes/<Name>.txt` |
+| Executable generator | `greetings-hello <Name>`, writes `greetings/<Name>.txt` |
+| Check | `greetings-ready` |
 
-The SDK exports `conformance.Run(t, binary)`.
-It checks the handshake, descriptions, findings, error responses, response limits, and cancellation.
-It compares the bytes from two identical plan calls.
-It rejects unsafe output paths, invalid classes, invalid modes, and duplicate paths.
-It compares tree hashes around each protocol call.
-The tree includes the working directory and its temporary parent.
+{: .warning }
+An executable plugin runs with your full user privileges. Read the code before you trust a plugin, including your own.
 
-The probes replace each positional argument with traversal strings and a one MiB string.
+The module needs Go 1.26 or later.
+Two flags change how the module is set up:
+
+| Flag | What it does | Example |
+| --- | --- | --- |
+| `--sdk-path <dir>` | Use a local checkout of `plugin-sdk` instead of a published version. | `spinup plugin new greetings --kind exec --sdk-path ~/code/spinup/plugin-sdk` |
+| `--platform <os-arch>` | Name the target in `plugin.toml`. The default is your platform. | `spinup plugin new greetings --kind exec --platform linux-amd64` |
+
+Without `--sdk-path`, edit `go.mod` and replace the placeholder SDK version with a published one before you build.
+
+## Build and test
+
+Run these in the plugin directory:
+
+<!-- doctest: skip -->
+```console
+$ make build
+$ make test
+```
+
+`make build` writes the program to `bin/<name>_<os>_<arch>`.
+`make test` builds a temporary program and runs the conformance kit from the SDK.
+The kit checks that the plugin answers the protocol correctly and returns safe, repeatable plans.
+It cannot prove that a plugin is safe, and it does not restrict what the program can do.
+
+### Test with your own arguments
+
+The kit calls each generator with the argument `sample`, and it also sends traversal strings and a 1 MiB string.
 A plugin can reject these arguments or return a safe plan.
-Use `conformance.TraversalArguments()` and `conformance.HugeArgument()` in additional tests.
-Use `conformance.RunWithOptions` to supply valid arguments or project answers for a specific generator.
-The default argument is `sample`.
-The default process timeout is five seconds.
-The cancellation probe stops a process that waits for a complete request.
+If a generator needs valid arguments, pass them in `main_test.go`.
+Use the `Answers` field of `conformance.Options` for project answers.
 
-The kit detects failures in its probes.
-It cannot prove that a plugin is safe for every input.
-It does not restrict the privileges of the plugin process.
-Run untrusted binaries only in an isolated environment that you control.
+```go
+conformance.RunWithOptions(t, binary, conformance.Options{
+	Args:    map[string][]string{"greetings-hello": {"world"}},
+	Timeout: 10 * time.Second, // the default is 5 seconds
+})
+```
+
+Each probe also checks the handshake, error responses, response limits, and cancellation.
+It compares two identical plan calls byte for byte.
+It rejects unsafe output paths, invalid classes, invalid modes, and duplicate paths.
+
+## Install in an app
+
+In an app, add the plugin from its directory.
+A pack plugin needs `--trust`.
+An executable plugin needs `--trust-exec <name>`.
+
+<!-- doctest: skip -->
+```console
+$ spinup plugin add path:../paper --trust
+$ spinup plugin add path:../greetings --trust-exec greetings
+$ spinup g greetings-hello sample
+```
+
+## Share a plugin
+
+1. Build the program for each platform that you support.
+2. Put the source files and the built binaries in one archive. Every binary in `plugin.toml` must exist.
+3. Keep the whole plugin tree under 5 MiB.
+
+Do not commit the binaries to Git, because they are build output.
+The `.gitignore` in the scaffold keeps `bin/` out.
+Add the built binaries only to the archive that you distribute.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+| --- | --- |
+| The command refuses the directory | The directory is not empty. Use another `--out`. |
+| `go build` cannot find the SDK | Pass `--sdk-path`, or set a published SDK version in `go.mod`. |
+| `plugin add` says a binary is missing | Run `make build`, or build for the platform in `plugin.toml`. |
+| The plugin is over the size limit | Remove files and keep the tree under 5 MiB. |
+
+## See also
+
+- [plugin — add and manage plugins](plugin.md)
+- [Plugins](../plugins.md)
+- [Executable plugins](../plugins-exec.md)
+- [Flag reference: plugin new](../site/commands/plugin-new.md)

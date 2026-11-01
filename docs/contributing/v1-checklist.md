@@ -1,47 +1,61 @@
+---
+title: v1.0 checklist
+parent: Contributing
+nav_order: 3
+---
+
 # v1.0 checklist
 
-The v1.0 gate is in `docs/design/architecture.md` section 21.
-This page lists each item, how to check it, and its status on 2026-10-15.
-Update the status column in the same pull request that changes a status.
+This page lists what must be true before spinup v1.0, and how to check each item.
+The status was last verified on 2026-11-01.
+Update the status in the same pull request that changes it. To re-check the release items, run `git tag -l`.
 
-## The four gate items
+```sh
+git tag -l 'v0.*'
+git tag -l 'kit/v0.*'
+```
 
-| Gate item | How to check it | Status |
-| --- | --- | --- |
-| Two minors with no breaking kit change | The kit API guard (`internal/apicompat`, `docs/policy/kit-compat.md`) compares each kit release with the one before. `.github/workflows/kit-compat.yml` builds the previous frozen app against the new kit. The "Breaking" section of `CHANGELOG.md` for each release must be empty for the kit. | Remains. The guard is in place. No release exists yet, so no minor has passed. Tag v0.2 and v0.3 (below), and keep the kit change list clean. |
-| All doc commands tested | `go test ./internal/cli -run TestEveryCommandIsDocumented` fails when a visible command has no mention in `docs/commands/`, or when a page there has no runnable block. `make doctest` runs the blocks. | Met. The test is in the repository, and every visible command is documented. |
-| A published support policy | `docs/policy/support.md` and `docs/policy/behavior-version.md`. `docs/site/` publishes them with the Pages workflow. | Met in the repository. The site is live only after the GitHub repository is public (below). |
-| A dogfood app upgraded across two or more minors | Create the app with v0.1 or v0.2. Add local edits. Run `spinup upgrade` to v0.3 and then to the newest minor. Run `spinup doctor`, the app tests, and `spinup deploy` to a test VM. | Remains. The dogfood app `todo` exists, but no real minor release exists to upgrade across. |
+## Gate items
 
-## Release work for a maintainer
+The v1.0 gate has four items.
 
-A maintainer must do these steps. No agent can do them.
+- [ ] **Two minors with no breaking kit change.** The kit API guard compares each kit release with the one before. The "Breaking" section of `CHANGELOG.md` must be empty for the kit in both releases. See [Kit compatibility](../policy/kit-compat.md). No v0.x release exists yet, so no minor has passed.
+- [x] **All documented commands are tested.** `go test ./internal/cli -run TestEveryCommandIsDocumented` fails when a visible command has no page in `docs/commands/`, or when a page has no runnable block. `make doctest` runs the blocks.
+- [x] **A published support policy.** [Support policy](../policy/support.md) and [Behavior versions](../policy/behavior-version.md) are pages of the docs site. The repository is public, and the Pages workflow publishes the site.
+- [ ] **A dogfood app upgraded across two or more minors.** Create the app with v0.1 or v0.2, and add local edits. Run `spinup upgrade` to v0.3 and then to the newest minor. Run `spinup doctor`, the app tests, and `spinup deploy` to a test VM. The dogfood app `todo` exists, but no real minor release exists to upgrade across.
 
-| Item | How to check it | Status |
-| --- | --- | --- |
-| Tag v0.2 and v0.3 | `git tag -l 'v0.*'` and `git tag -l 'kit/v0.*'` list both tags. `scripts/release/check.sh <version>` passes. The release workflow publishes the assets of `docs/contributing/release.md`. | Remains. No tag exists. |
-| Freeze the corpus | `testdata/corpus/<version>/` holds the real output of each release (`testdata/corpus/README.md`). The upgrade matrix runs it. | Remains. Only the synthetic `0.0.0-dev` corpus exists. Release corpora start at v0.3. |
-| Create the signing key | `go run ./scripts/release/keygen`. Store the private key in the secret `SPINUP_TEMPLATES_SIGNING_KEY`. Add the public key to `store.TrustedKeys`. `scripts/release/check.sh` passes without `--snapshot`. | Remains. `store.TrustedKeys` is empty. |
-| Add a LICENSE file | The file `LICENSE` exists at the repository root. GoReleaser archives include it. | Remains. The file does not exist. The owner must choose the license. |
-| Create the GitHub repository | The repository `stopyellingatme/spinup` is public, with private vulnerability reporting on. The Pages workflow publishes `docs/site/`. | Remains. |
-| Create the Homebrew tap | The repository `stopyellingatme/homebrew-tap` exists. The secret `HOMEBREW_TAP_TOKEN` has write access. A stable release updates `Casks/spinup`. | Remains. |
-| Name a second owner | `MAINTAINERS.md` lists two owners and the release rota. | Remains. One owner is listed. |
-| Run the end-to-end suites | `make e2e`, `make dind`, `make app-gate`, and `make vuln` pass on the release commit. | Remains. Run them at the release gate. They need Docker and network access. |
+## Maintainer to-do list
 
-## Checks that are already met
+A maintainer must do these steps. They need accounts, secrets, or decisions that only the owner has.
 
-| Item | How to check it | Status |
-| --- | --- | --- |
-| Behavior version reaches the app | `go test ./internal/devloop ./internal/deploy ./internal/project`. `docs/policy/behavior-version.md` describes the rule. | Met. |
-| Deprecation window of one minor | `docs/policy/support.md`. The kit deprecation tests of the API guard. | Met. `TestKitAPI` and `TestKitDeprecations` in `internal/apicompat` enforce the window. |
-| Upgrade matrix | `go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'` | Met for the synthetic corpus. Real corpora follow the releases. |
-| `pnpm test` passes in a new app with no test files | The web `vite.config.js` sets `passWithNoTests: true`. | Met. |
+- [ ] **Tag v0.2 and v0.3.** `git tag -l 'v0.*'` and `git tag -l 'kit/v0.*'` list both tags, and `scripts/release/check.sh <version>` passes. See [Release spinup](release.md). Today only the pre-release tag `kit/v0.1.0-alpha.418` and the tag `go-freeze-r0` exist.
+- [ ] **Freeze the corpus.** `testdata/corpus/<version>/` holds the real output of each release. The upgrade matrix runs it. Release corpora start at v0.3.
+- [ ] **Create the signing key.** Run `go run ./scripts/release/keygen`. Store the private key in the secret `SPINUP_TEMPLATES_SIGNING_KEY`, and add the public key to `store.TrustedKeys`. Today `store.TrustedKeys` is empty.
+- [ ] **Add a LICENSE file.** The file `LICENSE` must exist at the repository root. Today it does not exist. The owner must choose the license.
+- [ ] **Turn on private vulnerability reporting.** The repository is public and the Pages workflow publishes the docs. In the repository settings, turn on private vulnerability reporting. Today it is off.
+- [ ] **Create the Homebrew tap.** The repository `stopyellingatme/homebrew-tap` exists, and the secret `HOMEBREW_TAP_TOKEN` has write access.
+- [ ] **Name a second owner.** `MAINTAINERS.md` lists two owners and the release rota. Today it lists one owner.
+- [ ] **Run the end-to-end suites.** `make e2e`, `make dind`, `make app-gate`, and `make vuln` pass on the release commit. They need Docker and network access.
+
+## Already met
+
+- [x] **The behavior version reaches the app.** `go test ./internal/devloop ./internal/deploy ./internal/project`. See [Behavior versions](../policy/behavior-version.md).
+- [x] **A deprecation window of one minor.** `TestKitAPI` and `TestKitDeprecations` in `internal/apicompat` enforce it.
+- [x] **The upgrade matrix passes.** `go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'` passes for the synthetic corpus. See [Upgrade matrix](upgrade-matrix.md).
+- [x] **`pnpm test` passes in a new app with no test files.** The web `vite.config.js` sets `passWithNoTests: true`.
 
 ## Order of work
 
 1. Add `LICENSE`, the second owner, and the signing key. Commit them.
-2. Create the GitHub and tap repositories.
+2. Create the tap repository. Turn on private vulnerability reporting.
 3. Tag v0.2. Freeze its corpus. Install it on the dogfood app.
 4. Tag v0.3 a month later. Upgrade the dogfood app from v0.2 to v0.3 with local edits.
 5. Check that the kit has no breaking change across both minors.
 6. Run the end-to-end suites. Tag v1.0.
+
+## See also
+
+- [Release spinup](release.md)
+- [Upgrade matrix](upgrade-matrix.md)
+- [Support policy](../policy/support.md)
+- [Kit compatibility](../policy/kit-compat.md)

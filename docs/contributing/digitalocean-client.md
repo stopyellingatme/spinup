@@ -1,18 +1,42 @@
+---
+title: DigitalOcean OAuth client
+parent: Contributing
+nav_order: 11
+---
+
 # DigitalOcean OAuth client
 
-`spinup deploy digital-ocean login` uses an OAuth public client (ADR 0017 §2).
-The maintainers register the client once. A normal user does nothing.
+`spinup deploy digital-ocean login` signs in with an OAuth public client that the maintainers registered once.
+A normal user does nothing.
+The registered client ID is already in the code, so register a new client only if you lose control of the old one.
+This page shows how to register the client and how the fake DigitalOcean API (`dofake`) stays faithful to the real API.
 
 ## Register the client
 
-1. Run `scripts/do-register-client.sh`. The script needs `curl` and `jq`.
+1. Run the script. It needs `curl` and `jq`.
 2. The script sends `POST /v1/oauth/register` with `token_endpoint_auth_method: none`.
 3. The script prints the client ID on stdout.
 4. Put the client ID in `digitalocean.DefaultClientID` in `internal/cloud/digitalocean/env.go`.
 5. Run `make test` for the root module, and commit the change.
 
+<!-- doctest: skip -->
+```console
+$ scripts/do-register-client.sh
+2dfe39adee98fc5e3eaf5266e1b554daf47e2ef1b96dc47983fafe04e7637ce1
+registration_access_token: <token>
+Keep the registration access token in a password manager. Never commit it.
+```
+
+The script prints the client ID on stdout. It prints the last two lines on stderr.
+The client ID above is the one that spinup uses today.
+
 The client ID is not a secret.
-`SPINUP_DO_CLIENT_ID` overrides the constant. `SPINUP_DO_OAUTH_BASE` overrides the endpoint for tests.
+To try another client without a code change, set `SPINUP_DO_CLIENT_ID` for one command.
+`SPINUP_DO_OAUTH_BASE` overrides the OAuth endpoint, and the tests use it to reach the fake.
+
+```sh
+SPINUP_DO_CLIENT_ID=<client-id> spinup deploy digital-ocean login
+```
 
 ## Keep the registration access token safe
 
@@ -35,16 +59,15 @@ The live test confirms the exact scope strings.
 
 ## Fake API fidelity
 
-`dofake` is the fake DigitalOcean API (ADR 0018, decision 5).
+`dofake` is the fake DigitalOcean API.
 It models each rule that can change the result of a spinup call.
 It does not model a rule that spinup can never meet.
 Each modeled rule has a test in `internal/cloud/digitalocean/fidelity_test.go` or in the `dofake` tests.
 
 Source for the rules: the DigitalOcean OpenAPI specification, `https://github.com/digitalocean/openapi/tree/main/specification/resources`, and the API reference, `https://docs.digitalocean.com/reference/api/digitalocean/`.
-We checked these files on 2026-10-23.
 The specification does not give some rules (error bodies, the TTL minimum).
 A row says "not documented" for such a rule.
-The live test (`scripts/do-live-test.sh`) is the final check.
+The [live test](do-live-test.md) is the final check.
 
 | Endpoint | Rule | Modeled | Source |
 |---|---|---|---|
@@ -87,6 +110,10 @@ The live test (`scripts/do-live-test.sh`) is the final check.
 | `POST /v1/oauth/token` | A refresh gives a new refresh token, and the old one stops working (`invalid_grant`). A bad request gives `invalid_request`. | yes | OAuth reference |
 | `POST /v1/oauth/revoke` | Revoke drops the access and the refresh token. An unknown token still answers 200. | yes | RFC 7009 |
 
-We did not read the OAuth reference page again in this pass.
 The OAuth rows rest on the first live test and on the RFCs.
 
+## See also
+
+- [Run the DigitalOcean live test](do-live-test.md)
+- [Docker-in-Docker deploy suite](dind.md), which runs the deploy flow against `dofake`
+- [Deploy to DigitalOcean](../deploy-digitalocean.md)

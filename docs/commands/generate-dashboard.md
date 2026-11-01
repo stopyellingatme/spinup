@@ -1,13 +1,13 @@
-# Generate dashboards and alerts
+---
+title: generate dashboard — add a Grafana dashboard
+parent: Command guides
+---
 
-Use `spinup g dashboard` to create Grafana dashboards.
-Use `spinup g alert` to add Prometheus alert rules.
-The app must include the monitoring pack.
+# generate dashboard — add a Grafana dashboard
 
-The generators write only user-owned files.
-`spinup upgrade` does not change these files.
-
-## Dashboard
+`spinup g dashboard <name>` adds a Grafana dashboard with time-series panels to your app.
+Use it for the numbers that matter to your app, such as the request rate or the queue size.
+The app needs the `monitoring` module.
 
 ```console
 $ spinup new demo --module example.com/demo --modules deploy,monitoring --no-git --non-interactive
@@ -16,41 +16,86 @@ $ cd demo
 $ spinup g dashboard service-health --panel 'Request rate=sum(rate(http_server_request_duration_seconds_count[5m]))'
 Created 1, updated 0 files
 Next: spinup monitor dashboards sync
+```
+
+The command writes `monitoring/grafana/dashboards/custom/service-health.json`.
+This is your file: `spinup upgrade` never changes it.
+Review the file and commit it.
+
+## Add panels
+
+Each panel is a title and a PromQL expression, joined with `=`.
+Pass `--panel` once for each panel.
+The panels sit side by side, two in each row.
+
+```console
+$ spinup g dashboard errors --panel 'Server errors=sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))' --panel 'All requests=sum(rate(http_server_request_duration_seconds_count[5m]))' --dry-run
+create monitoring/grafana/dashboards/custom/errors.json (seed)
+```
+
+Without `--panel`, the dashboard gets one panel, "Request rate", for the API.
+
+```console
+$ spinup g dashboard overview
+Created 1, updated 0 files
+Next: spinup monitor dashboards sync
+$ grep '"title"' monitoring/grafana/dashboards/custom/overview.json
+      "title": "Request rate",
+  "title": "overview",
+```
+
+## What the file contains
+
+The JSON is a standard Grafana dashboard:
+
+- The dashboard `uid` is stable and starts with `spinup-`, such as `spinup-service-health`. Grafana updates the same dashboard when you deploy again.
+- Each panel reads from the data source with the UID `prometheus`.
+- The tags are `spinup` and `custom`.
+- The time range is the last 6 hours.
+
+## Name the dashboard
+
+Use lower-case letters, digits, and hyphens.
+
+```console
 $ spinup g dashboard Traffic
 Error: generator "dashboard" failed: invalid dashboard name "Traffic": use lower-case letters, digits, and hyphens
   Try: spinup g dashboard service-health
 [exit 1]
 ```
 
-The generator writes `monitoring/grafana/dashboards/custom/<name>.json`.
-The dashboard UID is stable and starts with `spinup-`.
-It uses the fixed `prometheus` datasource UID.
+If the file exists with different content, the command stops.
+Pass `--force` to replace it, and `--diff` to see the change first.
 
-Pass `--panel "title=expr"` more than once to add time-series panels.
-Without a panel, the generator adds an app request-rate panel.
+## Load the dashboard
 
-## Alert
+Grafana loads the files in `custom/` when you deploy.
 
+<!-- doctest: skip -->
 ```console
-$ spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) > 0' --for 5m --severity critical --summary 'Too many server errors'
-...
-Created 0, updated 1 files
-Next: spinup monitor alerts
-...
-$ spinup g alert HighErrors --expr 'up == 0'
-Error: generator "alert" failed: alert "HighErrors" already exists
-  Try: choose another alert name
-[exit 1]
+$ spinup deploy --env production
 ```
 
-The generator adds a rule to `monitoring/alerts/custom.yml`.
-It keeps comments and existing rules.
-Use `--severity warning` or `--severity critical`.
-The default duration is `5m`.
-The generator always validates `--for` as a Prometheus duration.
-Use integer units in descending order, such as `1h30m`.
+To go the other way, build a dashboard in the Grafana editor and save it into `custom/`:
 
-When `promtool` is on `PATH`, the generator validates a temporary copy before it returns the plan.
-If validation fails, the generator leaves the alert file unchanged.
-After writing, the generator repeats `promtool check rules` and prints its output.
-When `promtool` is unavailable, the generator skips the PromQL check and prints a note.
+<!-- doctest: skip -->
+```console
+$ spinup monitor dashboards sync --env production
+```
+
+See [Monitoring](../monitoring.md) for the stack dashboards and the profiles.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+| --- | --- |
+| `invalid panel "x": use title=expr` | Write the panel as `title=expression`, in quotes. |
+| `the app has no monitoring pack` | Create the app with `--modules ...,monitoring`. |
+| A panel shows "No data" | Run the expression in Grafana Explore. Check the metric name. |
+
+## See also
+
+- [generate alert](generate-alert.md): add a Prometheus alert rule
+- [Monitoring](../monitoring.md)
+- [monitor](monitor.md): `spinup monitor dashboards sync`
+- Flag reference: [`generate dashboard`](../site/commands/generate-dashboard.md)

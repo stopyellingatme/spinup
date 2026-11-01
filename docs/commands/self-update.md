@@ -1,16 +1,38 @@
-# Update spinup
+---
+title: self-update — update spinup
+parent: Command guides
+---
 
-Run `spinup self-update` to install the newest stable release.
-Use `--channel next` to include prereleases.
-Use `--version 0.10.0` to select a specific release.
-Development builds require `--version`.
-This includes `dev` builds and versions with `-alpha.`.
+# self-update — update spinup
 
-Use `spinup self-update --check` to check without installing.
-Use `spinup version --check` to check for a newer stable release.
-The checks work with Homebrew and development binaries.
-Use `--json` for a structured result.
-Use `--dry-run` to check without installing.
+`spinup self-update` downloads the newest stable release of spinup, checks it, and replaces the binary you run.
+Use it to get new commands and fixes.
+To move an app to new templates, use [upgrade](upgrade.md) after you update.
+
+<!-- doctest: skip -->
+```console
+$ spinup self-update
+Updated spinup to 0.10.0
+```
+
+## Check without installing
+
+`--check` asks whether a newer release exists and installs nothing.
+It also works for Homebrew and development binaries.
+`spinup version --check` gives the same answer for stable releases.
+
+<!-- doctest: skip -->
+```console
+$ spinup self-update --check
+spinup 0.10.0 is available (current 0.9.0)
+$ spinup self-update --check
+spinup 0.10.0 is up to date
+$ spinup self-update --check --json
+{"current":"0.9.0","version":"0.10.0","available":true,"updated":false}
+```
+
+Add `--json` for a structured result, as shown above.
+Add `--dry-run` to see what the command would do.
 
 ```console
 $ spinup self-update --check --offline
@@ -18,37 +40,57 @@ Error: Cannot check spinup releases
   offline mode disables downloads
   Try: remove --offline and unset SPINUP_OFFLINE
 [exit 2]
-$ spinup version --check --offline
-Error: Cannot check spinup releases
-  offline mode disables downloads
-  Try: remove --offline and unset SPINUP_OFFLINE
-[exit 2]
 ```
 
-The updater downloads the archive and `checksums.txt` from the GitHub release.
-It verifies the archive with SHA-256 before it extracts the binary.
-If `cosign` is available, it verifies `checksums.txt.sigstore.json` against the release workflow identity and the GitHub Actions issuer.
-A failed verification stops the update.
-If `cosign` is absent, the updater prints a warning.
-Use `--require-signature` to require `cosign`.
+## Choose a version or channel
 
-The updater writes the new binary beside the current binary with mode `0755`.
-It synchronizes the file before it renames the file over the current binary.
-On Windows, it first renames the current binary to `.old`.
-If replacement fails, it restores the old binary.
-If the directory is not writable, use permissions that permit replacement or reinstall spinup.
+| Flag | What it does | Example |
+| --- | --- | --- |
+| `--version <version>` | Install one release. | `spinup self-update --version 0.10.0` |
+| `--channel next` | Include prereleases. The default channel is `stable`. | `spinup self-update --channel next` |
+| `--require-signature` | Fail unless `cosign` can verify the release. | `spinup self-update --require-signature` |
 
-If Homebrew manages the binary, the updater prints `brew upgrade --cask spinup`.
-Run that command to update the cask.
-The updater does not replace Homebrew or development binaries.
+A development build (`dev`, or a version with `-alpha.`) must pass `--version`.
 
-The CLI checks for releases at most once per 24 hours during terminal use.
-It stores the timestamp at `<user-cache>/spinup/update-check`.
-The check uses one anonymous request to the GitHub releases API.
-It sends no telemetry.
-The notice appears on stderr.
-The check stops after two seconds, and failures remain silent.
+## Homebrew and development builds
 
-The notice is disabled without a terminal, with `CI` set, with `--json`, or with `--offline`.
-Set `SPINUP_NO_UPDATE_CHECK=1` to disable the notice.
-Explicit checks still work when this variable is set.
+If Homebrew installed spinup, the command does not replace the binary.
+It prints `brew upgrade --cask spinup`.
+Run that command instead.
+
+## How the download is verified
+
+1. The command downloads the archive and `checksums.txt` from the GitHub release.
+2. It checks the archive against the SHA-256 checksum before it unpacks the binary.
+3. If `cosign` is installed, it verifies the signature of `checksums.txt` against the release workflow.
+4. If `cosign` is missing, it prints a warning. `--require-signature` turns the warning into an error.
+
+A failed check stops the update and leaves your binary as it was.
+The new binary is written next to the old one, then renamed over it.
+If the rename fails, the command restores the old binary.
+If the directory is not writable, change its permissions or reinstall spinup.
+
+## Update notices
+
+During normal terminal use, spinup checks for a new release at most once every 24 hours.
+It sends one anonymous request to the GitHub releases API and no telemetry.
+The notice appears on stderr, and a failed check stays silent.
+
+There is no notice without a terminal, with `CI` set, with `--json`, or with `--offline`.
+To turn the notice off, set `SPINUP_NO_UPDATE_CHECK=1`.
+An explicit `--check` still works.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+| --- | --- |
+| `offline mode disables downloads` | Remove `--offline` and unset `SPINUP_OFFLINE`. |
+| A development build asks for a version | Pass `--version <version>`. |
+| `cosign` warning | Install `cosign`, or pass `--require-signature` to make it an error. |
+| Permission denied on replace | Reinstall spinup in a directory you can write to. |
+
+## See also
+
+- [upgrade — move an app to a new version](upgrade.md)
+- [Install spinup](../get-started/install.md)
+- [Flag reference: self-update](../site/commands/self-update.md)

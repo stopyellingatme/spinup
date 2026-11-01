@@ -1,3 +1,9 @@
+---
+title: Release spinup
+parent: Contributing
+nav_order: 2
+---
+
 # Release spinup
 
 A CLI release and its kit tag identify the same commit.
@@ -5,54 +11,18 @@ Their major and minor versions must match when the kit changes.
 Patch versions can differ for independent releases.
 The tag workflow publishes matching versions for both modules.
 
-## The kit pin
+## Release checklist
 
-Generated apps require one kit version.
-`internal/stackversions/stackversions.yaml` holds it in `go_modules`, under `github.com/stopyellingatme/spinup/kit`.
-The `api` pack renders the require line from this pin with `[[ gomod "github.com/stopyellingatme/spinup/kit" ]]`.
-`scripts/bump-stack.sh` reads the same pin and keeps the template expression in `go.mod.tmpl`.
+For every release, do these steps in order:
 
-After you push a kit tag, do these steps in the main loop:
-1. Set the kit pin to the new version.
-2. Run `scripts/bump-stack.sh`, so the pack `go.sum` gets the hash lines of the new kit version.
-3. Run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/templates -run PacksDigest` and review the digest.
+1. If the kit changed, [bump the kit minor](#bump-the-kit-minor).
+2. Move the release notes from `Unreleased` in `CHANGELOG.md` to a new version section. Commit them.
+3. [Check the candidate](#check-a-candidate): `scripts/release/check.sh <version>`.
+4. [Publish the candidate](#publish-the-candidate): push the CLI tag. The workflow pushes the kit tag.
+5. Check the assets of the release on GitHub.
+6. [Update the kit pin](#the-kit-pin) so that new apps use the new kit.
 
-A pre-release kit tag has the form `kit/v0.1.0-alpha.<n>`.
-The number `<n>` is the commit count, as `make install` uses.
-The release check fails when the major or minor version of the kit pin differs from the CLI candidate.
-
-## Prepare the signing key
-
-Create the key pair once:
-
-```sh
-go run ./scripts/release/keygen
-```
-
-The command writes the private key to stdout.
-It writes the public key to stderr.
-Both values use base64 encoding.
-The command does not create files.
-
-Store the private key in the GitHub secret `SPINUP_TEMPLATES_SIGNING_KEY`.
-Decode the public key and add its 32 bytes to `store.TrustedKeys`.
-Commit this manual change before the release.
-Never commit the private key.
-
-Create the secret `HOMEBREW_TAP_TOKEN` with write access to `stopyellingatme/homebrew-tap`.
-The workflow uses `GITHUB_TOKEN` for releases, attestations, the kit tag, and GHCR.
-Stable releases update the Homebrew cask `spinup` under `Casks/`.
-Snapshots and prereleases generate the cask without updating the tap.
-
-## Bump the kit minor
-
-The file `kit/api/minor.txt` holds the kit minor in development, for example `0.1`.
-The kit API guard reads this file to decide if a deprecated API can go.
-See `docs/policy/kit-compat.md`.
-
-When you release a new minor, set the file to the next minor in the same commit.
-Do not change the file for a patch release.
-Then run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/apicompat` and commit the result.
+Do the one-time setup before the first release: [prepare the signing key](#prepare-the-signing-key).
 
 ## Check a candidate
 
@@ -73,6 +43,8 @@ shellcheck install.sh scripts/release/*.sh
 sh -n install.sh
 ```
 
+A passing check ends with a line like `Release checks passed for v0.8.0-rc.1`. A failing check prints what is wrong and a `Try:` line.
+
 The release check requires a clean tree, release notes, absent tags, and a trusted signing key.
 Use `--snapshot` to omit the checks for the key.
 Use `--kit-version X.Y.Z` to check an independent kit candidate.
@@ -92,7 +64,7 @@ The other skip options make the snapshot policy explicit.
 GoReleaser also disables signing and publication for snapshots.
 Snapshots never create a template signature, even when the secret exists.
 
-GoReleaser 2.18.3 uses `homebrew_casks` for the tap and `dockers_v2` for the image.
+GoReleaser publishes the tap as `homebrew_casks` and the image as `dockers_v2`.
 The image contains both Linux architectures under one version tag.
 Snapshots disable the image build and push.
 Run `goreleaser check` to validate the configuration without deprecated sections.
@@ -125,10 +97,26 @@ It then pushes `kit/v0.8.0-rc.1` on the same commit.
 A failure before the final step leaves the kit tag unpublished.
 Correct the failure before another attempt.
 
-The repository currently has no root `LICENSE` file.
+The repository has no root `LICENSE` file yet (see the [v1.0 checklist](v1-checklist.md)).
 The archive uses the optional `LICENSE*` glob and tolerates its absence.
-The maintainer decides which license to add.
 The archives use `scripts/release/README.md` as their README.
+
+A file `kit/MIGRATION.json` lists the steps that an app owner must do when the kit changes. Here is a short example:
+
+```json
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "steps": [
+    {
+      "id": "auth-roles-schema",
+      "desc": "Run spinup db migrate before you start the new binary. Try: run spinup db migrate up.",
+      "kind": "manual"
+    }
+  ],
+  "behaviors": []
+}
+```
 
 The release includes `templates-v<version>.tar.zst` and its raw ed25519 `.sig` file.
 The helper uses `store.WriteArchive` and validates the result with `store.ReadArchive`.
@@ -144,7 +132,59 @@ It checks the checksums for sops and age before installation.
 It runs as a user without root privileges.
 Review the image pins when the stack manifest changes.
 
-## Install a release
+## Prepare the signing key
+
+Create the key pair once:
+
+```sh
+go run ./scripts/release/keygen
+```
+
+The command writes the private key to stdout.
+It writes the public key to stderr.
+Both values use base64 encoding.
+The command does not create files.
+
+Store the private key in the GitHub secret `SPINUP_TEMPLATES_SIGNING_KEY`.
+Decode the public key and add its 32 bytes to `store.TrustedKeys`.
+Commit this manual change before the release.
+Never commit the private key.
+
+Create the secret `HOMEBREW_TAP_TOKEN` with write access to `stopyellingatme/homebrew-tap`.
+The workflow uses `GITHUB_TOKEN` for releases, attestations, the kit tag, and GHCR.
+Stable releases update the Homebrew cask `spinup` under `Casks/`.
+Snapshots and prereleases generate the cask without updating the tap.
+
+## The kit pin
+
+Generated apps require one kit version.
+`internal/stackversions/stackversions.yaml` holds it in `go_modules`, under `github.com/stopyellingatme/spinup/kit`.
+The `api` pack renders the require line from this pin with `[[ gomod "github.com/stopyellingatme/spinup/kit" ]]`.
+`scripts/bump-stack.sh` reads the same pin and keeps the template expression in `go.mod.tmpl`.
+
+After you push a kit tag, do these steps:
+
+1. Set the kit pin to the new version.
+2. Run `scripts/bump-stack.sh`, so the pack `go.sum` gets the hash lines of the new kit version.
+3. Run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/templates -run PacksDigest` and review the digest.
+
+A pre-release kit tag has the form `kit/v0.1.0-alpha.<n>`.
+The number `<n>` is the commit count, as `make install` uses.
+The release check fails when the major or minor version of the kit pin differs from the CLI candidate.
+
+## Bump the kit minor
+
+The file `kit/api/minor.txt` holds the kit minor in development, for example `0.1`.
+The kit API guard reads this file to decide if a deprecated API can go.
+See [Kit compatibility](../policy/kit-compat.md).
+
+When you release a new minor, set the file to the next minor in the same commit.
+Do not change the file for a patch release.
+Then run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/apicompat` and commit the result.
+
+## Install a release (for users)
+
+This section is for users. The [install guide](../get-started/install.md) is the main page for it.
 
 Download the installer from a trusted release before execution.
 Run the installer with an explicit version and destination:
@@ -158,3 +198,10 @@ It verifies the archive checksum before extraction.
 When cosign is available, it verifies the checksum bundle against this repository's release workflow.
 It requires HTTPS for downloads and redirects.
 It replaces the installed binary only after verification succeeds.
+
+## See also
+
+- [v1.0 checklist](v1-checklist.md)
+- [Kit compatibility](../policy/kit-compat.md)
+- [Install spinup](../get-started/install.md)
+- [Upgrade matrix](upgrade-matrix.md)

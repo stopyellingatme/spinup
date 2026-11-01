@@ -1,4 +1,18 @@
+---
+title: Upgrade matrix
+parent: Contributing
+nav_order: 4
+---
+
 # Upgrade matrix
+
+This page has two jobs. It shows how to run the upgrade tests, and it shows how to review a template change.
+If you change a template pack, go to [Review template changes](#review-template-changes) first.
+For the user steps of an upgrade, read [Upgrade](../upgrading.md).
+
+```sh
+go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'
+```
 
 Each pull request tests upgrades from the frozen apps in `testdata/corpus/`.
 The matrix uses a temporary Git repository and the real upgrade runner.
@@ -80,13 +94,16 @@ Refresh the schema fixtures only when their intended inputs change.
 
 ## Upgrade an app to roles
 
+This section is a test reference with the user steps inside it.
+App owners find the same steps in [Roles](../build/roles.md).
+
 The roles cases are in `testdata/corpus/roles/`.
 They use a small synthetic tree and the real Git merger.
 They check existing users, an app migration at version 5, a `main.go` conflict, and custom roles.
 The upgrade creates `00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
 It preserves app files and `spinup.toml`.
 
-Run the roles checks:
+Run the roles checks. `AuthUpgradeWarnings` tests the plan warnings, and `RolesUpgradeCorpus` runs the roles corpus:
 
 ```sh
 go test -race ./internal/upgrade/... -run 'AuthUpgradeWarnings|RolesUpgradeCorpus'
@@ -98,7 +115,7 @@ With `DATABASE_URL`, it applies version 5 after version 4.
 It also applies a new version 4 after version 5.
 It checks that existing sessions read the default role.
 It uses a recorder and needs no HTTP listener.
-Run the database checks after all roles units are integrated.
+Set `DATABASE_URL` to run the database checks.
 
 If another `00005_*.sql` exists, the plan warns about the duplicate version.
 Rename the app migration to the next free number before you migrate.
@@ -107,8 +124,7 @@ The kit accepts a pending migration below the highest applied version.
 
 The plan stores each warning in the reason for the new file.
 The JSON report also includes this reason.
-The preview currently copies only tracked and rendered paths.
-An app migration outside those paths needs integration work in `internal/upgrade/run_plan.go`.
+The preview copies only tracked and rendered paths, so it can miss an app migration outside those paths.
 The applied plan reads the complete worktree and reports the collision.
 
 If `[auth]` exists without `roles.gen.go`, the plan creates the default file and prints a note.
@@ -167,6 +183,8 @@ In that case, an empty role grants no role.
 
 ## Upgrade an app to the audit module
 
+App owners find the user guide in [Audit trail](../audit.md).
+
 The audit cases are in `testdata/corpus/audit/`.
 They use the same small synthetic tree and the real Git merger as the roles cases.
 The new template adds `00005_users_role.sql`, `00006_audit_events.sql`, and the audit wiring in `main.go`.
@@ -183,7 +201,7 @@ A test also runs `module add audit` on an app with a clash.
 It checks the clash warning in the preview and the `Next:` lines for `main.go`.
 The `Next:` lines come from `modules.AuditNextSteps`.
 
-Run the audit checks:
+Run the audit checks. `AuditUpgradeCorpus` runs the cases above, `AuditModuleAddNextSteps` tests the `Next:` lines, and `MigrationClashWarnings` tests the clash warning:
 
 ```sh
 go test -race ./internal/upgrade/... -run 'AuditUpgradeCorpus|AuditModuleAddNextSteps|MigrationClashWarnings'
@@ -198,3 +216,10 @@ Rename the app migration to the next free number before you migrate.
 If the app migration is already applied, keep its version and rename the new pack migration.
 The audit pack and the `api` pack need no codemod.
 They add new files, and the 3-way merge handles the `main.go` change.
+
+## See also
+
+- [Upgrade](../upgrading.md), the user steps of an upgrade
+- [Roles](../build/roles.md) and [Audit trail](../audit.md)
+- [Release spinup](release.md)
+- [Behavior versions](../policy/behavior-version.md)

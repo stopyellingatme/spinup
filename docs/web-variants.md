@@ -1,59 +1,111 @@
-# Select the web tools
+---
+title: Package manager and API client
+parent: Build your app
+nav_order: 2
+---
 
-Select the package manager and the API client when you create the app.
-The lock records both answers.
-The defaults remain `pnpm` and `openapi-fetch`.
-Both options support local builds and container builds with `--frontend-mode node` and `--frontend-mode embed`.
-Embed mode retains its restrictions on auth and server pages.
+# Package manager and API client
+
+You choose two tools for the web app when you create it.
+The package manager (`pnpm` or `bun`) installs the packages and runs the scripts in `web/`.
+The API client (`openapi-fetch` or `heyapi`) is the code that your pages use to call the Go API.
+The defaults are `pnpm` and `openapi-fetch`. Pick `bun` or `heyapi` if your team prefers them.
 
 ```console
-$ spinup new variants --module example.com/variants --package-manager bun --api-client heyapi --no-git --non-interactive
+$ spinup new todo --module example.com/todo --package-manager bun --api-client heyapi --no-git --non-interactive
 ...
-$ cd variants
-$ test -f web/bun.lock
-$ test ! -f web/pnpm-lock.yaml
-$ grep '"packageManager": "bun@' web/package.json
-...
-$ grep 'openapi-ts --input' web/package.json
-...
-$ spinup g client --dry-run
-$ spinup g component dialog --dry-run
-...
-$ test ! -d web/node_modules
+$ cd todo
+$ ls web/bun.lock
+web/bun.lock
 ```
 
-Use the Bun version from `stackversions.yaml` (`npm.bun`).
-CI and Docker install that exact version with `npm install --global bun@<version>`.
-The repository does not pin `oven-sh/setup-bun`.
-The npm installation avoids an unverified shell script from the network.
-The application server still uses Node 24 in node mode.
+## The choices
 
-Run `bun install --frozen-lockfile` in `web/`.
-Use a populated Bun cache when the environment has no network access.
-Bun 1.3 has no `--offline` option.
-The variant tests copy cached packages into a writable cache selected with `BUN_INSTALL_CACHE_DIR`.
-A cache miss requires the missing package before the install can complete.
-For pnpm, run `pnpm install --frozen-lockfile --offline`.
+| Flag | Values | Default | What changes |
+| --- | --- | --- | --- |
+| `--package-manager` | `pnpm`, `bun` | `pnpm` | The lockfile (`pnpm-lock.yaml` or `bun.lock`) and the commands in `web/` |
+| `--api-client` | `openapi-fetch`, `heyapi` | `openapi-fetch` | How `spinup g client` makes the typed client |
 
-Run `bun run check` to check a Bun app.
-Run `bun run build` to build it.
-`spinup dev` uses `bun run dev` for Vite.
-The generator commands use `bunx --no-install` for installed binaries.
-The component generator uses `bunx` for the selected shadcn registry.
-The upgrade step refreshes `bun.lock` with `bun install --lockfile-only`.
-The quick doctor check tests the selected package manager.
-Its stable check ID remains `pnpm` for compatibility.
+Both flags work with `--frontend-mode node` and `--frontend-mode embed`.
+The lock records your answers, so `spinup dev`, `spinup build`, and `spinup upgrade` use the same tools.
 
-Run `spinup g client` after an OpenAPI change.
-For heyapi, this command runs `openapi-ts` and writes `web/src/lib/api/client/`.
-It also generates `web/src/lib/api/schema.d.ts` with `openapi-typescript`.
-These shared types preserve compatibility with the resource pages.
-Commit both outputs with the OpenAPI bundle.
-The full doctor check compares every generated file and the shared types.
-It detects changed, missing, and obsolete files without changing the app.
+{: .note }
+Choose before you create the app. spinup has no command to switch an existing app.
+To change tools, make a new app and copy your `web/src` files into it.
 
-The scaffold at `web/src/lib/api/client.ts` imports the generated heyapi client.
-Its `api` export preserves the typed `GET`, `POST`, and other methods used by resource pages.
-These methods use heyapi for requests and retain SvelteKit's `fetch` for cookies and server calls.
-Use the `client` export or the generated SDK for native heyapi calls.
-The pack includes generated seeds, so a new app can pass its checks before client generation.
+## Daily commands
+
+Run these in `web/`.
+
+| Task | pnpm | bun |
+| --- | --- | --- |
+| Install | `pnpm install` | `bun install` |
+| Dev server | `pnpm dev` | `bun run dev` |
+| Type check | `pnpm check` | `bun run check` |
+| Unit tests | `pnpm test` | `bun run test` |
+| Build | `pnpm build` | `bun run build` |
+| Install in CI | `pnpm install --frozen-lockfile` | `bun install --frozen-lockfile` |
+
+`spinup dev` and `spinup build` pick the right tool for you.
+The server in node mode still runs on Node 24, also with bun.
+
+## Regenerate the client
+
+After you change the API, run:
+
+<!-- doctest: skip -->
+```console
+$ spinup g openapi
+$ spinup g client
+```
+
+With `openapi-fetch`, this writes `web/src/lib/api/schema.d.ts`.
+With `heyapi`, it writes the client in `web/src/lib/api/client/` and the same `schema.d.ts`.
+While `spinup dev` runs, saving a file in `api/openapi/` runs both commands for you.
+Commit the generated files with the OpenAPI bundle.
+A new app already holds generated files, so its checks pass before you run `spinup g client`.
+
+## Call the API from code
+
+The `api` export in `web/src/lib/api/client.ts` has the same shape for both clients, so resource pages work with either.
+In server code, pass the `fetch` of the load function and `__PUBLIC_ORIGIN__`, as in [The web app](web.md#call-the-api-from-a-page):
+
+```ts
+import { api } from '#lib/api/client';
+
+const { data } = await api.GET('/api/todos', { fetch, baseUrl: __PUBLIC_ORIGIN__ });
+```
+
+For the native heyapi functions, import the generated SDK or the `client` object:
+
+```ts
+import { client } from '#lib/api/client';
+import { listTodos } from '#lib/api/client/sdk.gen';
+
+// In server code, add fetch and baseUrl as above.
+const { data } = await listTodos({ client });
+```
+
+The function names come from the `operationId` values in your OpenAPI files.
+
+## Offline and CI notes
+
+- With pnpm, install without the network by using `pnpm install --frozen-lockfile --offline`. The package store must hold the packages.
+- Bun has no `--offline` option. Fill the Bun cache first, or use the network.
+- The generated CI and Dockerfiles install the Bun version that spinup pins.
+- `spinup doctor` checks that the chosen package manager is installed.
+- The full `spinup doctor` also finds a client that is out of date. It compares the generated files with a fresh run and changes nothing.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `bun: command not found` | Bun is not installed | Install Bun, then run `spinup doctor` |
+| The `api` calls fail to type check after an API change | The client is old | Run `spinup g openapi`, then `spinup g client` |
+
+## See also
+
+- [The web app](web.md)
+- [Embed mode](embed.md)
+- [generate client](commands/generate-client.md)
+- [new](commands/new.md)

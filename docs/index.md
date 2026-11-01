@@ -1,67 +1,83 @@
 ---
-layout: default
-title: spinup
+title: Home
+nav_order: 1
+permalink: /
 ---
 
 # spinup
 
-spinup creates and operates a full-stack application: a Go API, a SvelteKit web app, PostgreSQL, a Docker Compose deploy to a VM, and OpenTelemetry monitoring.
+spinup creates a full-stack app and runs it for you. You get a Go API, a SvelteKit web app, PostgreSQL, a deploy to a VM, and monitoring.
+Generated files stay easy to read and easy to upgrade, because spinup knows which files you own.
 
 ## Quick start
 
-Install spinup with the script `install.sh` of the release, or with the Homebrew cask `spinup`.
-The script takes `--version X.Y.Z` and `--dir DIR`. The default directory is `~/.local/bin`.
-Then create an app and start it.
-
-<!-- doctest: skip -->
-```console
-$ spinup new todo
-$ cd todo
-$ spinup doctor
-$ spinup dev
+```sh
+curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/install.sh | sh
+spinup new todo --module example.com/todo
+cd todo
+spinup dev
 ```
 
-`spinup doctor` checks your tools and your files.
-`spinup dev` starts PostgreSQL, the API, the web app, and Mailpit.
-Open `http://localhost:5173` for the app and `http://localhost:8080` for the API.
+`spinup dev` installs the web packages, starts PostgreSQL and Mailpit in Docker, runs the migrations, and starts the API and the web app.
+It prints the addresses:
 
-## Next
+```text
+App      http://localhost:5173
+API      http://localhost:8080
+Mailpit  http://localhost:8025
+```
 
-- Generate a resource: run `spinup g resource` (see the [command reference](site/commands/index.md)).
-- Add a service: run `spinup g service <name> --lang rust|python|node`. See [Sidecar services](services.md).
-- Deploy: run `spinup deploy digital-ocean` for a new droplet, or see [Production deploy files](deploy.md) for your own VM.
+The first command installs spinup. You can also use Homebrew, and you need Go, Node, and Docker. Read [Install spinup](get-started/install.md).
+You want every step with its output? Read [Your first app](get-started/first-app.md).
 
-## Reference
+## What you get
 
-- [Reference home](site/index.md)
-- [Command reference](site/commands/index.md)
-- [Compatibility matrix](site/compat.md)
-- [Pinned stack](site/stack.md)
+| Part | What it is |
+| --- | --- |
+| API | Go with `net/http`, PostgreSQL through `sqlc`, migrations with `goose`, and an OpenAPI contract |
+| Web app | SvelteKit with Tailwind and shadcn-svelte, and a typed client generated from the OpenAPI contract |
+| Database | PostgreSQL, in Docker for development |
+| Deploy | Docker Compose on a VM, Caddy for HTTPS, and a zero-downtime switch between two copies of the app |
+| Monitoring | OpenTelemetry in the app, with Grafana for logs, metrics, and traces |
+| Modules | Sign-in, roles, mail, jobs, audit trail, backups, secrets, and OpenTofu, each added when you need it |
+| Upgrades | `spinup upgrade` brings new template versions into your app and keeps your edits |
 
-## Build
+## I want to ...
 
-- [The web app](web.md)
-- [Select the web tools](web-variants.md)
-- [Embed mode](embed.md)
-- [API reference](api-docs.md)
-- [Accounts and sessions](auth.md)
-- [Mail and password reset](mail.md)
-- [Sidecar services](services.md)
-- [PDF reports](pdf-reports.md)
-- [Audit trail](audit.md)
-- [Plugin packs and generators](plugins.md)
-- [Executable plugins](plugins-exec.md)
+| I want to ... | Read |
+| --- | --- |
+| Install spinup | [Install spinup](get-started/install.md) |
+| Build and run a first app | [Your first app](get-started/first-app.md) |
+| Find a file in my app | [Project layout](get-started/project-layout.md) |
+| Learn the words that the docs use | [Concepts](concepts.md) |
+| Copy a solution for a common job | [Recipes](recipes.md) |
+| Add a CRUD API and its pages | [generate resource](commands/generate-resource.md) |
+| Add a page | [generate page](commands/generate-page.md) |
+| Add sign-in | [Accounts and sign-in](auth.md) |
+| Limit a page to some users | [Roles](build/roles.md) |
+| Send an email | [Mail](mail.md) |
+| Run a background job | [Background jobs](build/jobs.md) |
+| Make a PDF report | [PDF reports](pdf-reports.md) |
+| Add a service in Rust, Python, or Node | [Sidecar services](services.md) |
+| Deploy to a new DigitalOcean droplet | [Deploy to DigitalOcean](deploy-digitalocean.md) |
+| Deploy to my own server | [Deploy to your own server](deploy.md) |
+| See logs, metrics, and traces | [Monitoring](monitoring.md) |
+| Back up the database | [Backups with pg_dump](backups-pgdump.md) or [Backups with WAL-G](backups-walg.md) |
+| Upgrade my app to a new template | [Upgrade](upgrading.md) |
+| Look up a flag of a command | [CLI reference](site/commands/index.md) |
+| Fix an error | [Troubleshooting](troubleshooting.md) |
+| See which versions of the tools and the kit fit together | [Compatibility matrix](site/compat.md) and [Pinned stack](site/stack.md) |
 
-## Deploy
+## The sections
 
-- [Production deploy files](deploy.md)
-- [Deploy to DigitalOcean](deploy-digitalocean.md)
-- [Hetzner Cloud infrastructure](infra.md)
-- [Generated CI](ci.md)
-
-## Operate
-
-- [Production monitoring files](monitoring.md)
-- [Logical backups with pgdump](backups-pgdump.md)
-- [WAL-G backups](backups-walg.md)
-- [Application telemetry and data handling](data-handling.md)
+| Section | What it covers |
+| --- | --- |
+| [Get started](get-started/index.md) | Install spinup, make an app, and learn the layout |
+| [Build your app](build/index.md) | The web app, sign-in, mail, jobs, services, reports, and plugins |
+| [Deploy](deploy/index.md) | DigitalOcean, your own server, environments, secrets, and CI |
+| [Operate](operate/index.md) | Monitoring, backups, and data handling |
+| [Upgrade](upgrading.md) | Bring new template versions into your app |
+| [Command guides](commands/index.md) | One page with examples for each command |
+| [CLI reference](site/commands/index.md) | Every command and flag, generated from the code |
+| [Reference](reference/index.md) | The `spinup.toml` file, global flags, doctor checks, and policies |
+| [Contributing](contributing/index.md) | How to work on spinup itself |

@@ -1,94 +1,173 @@
-# Modules
+---
+title: module — add optional features
+parent: Command guides
+---
 
-A module is an optional built-in pack.
-The registry reads each pack's description and requirements.
-The `base`, `api`, and `web` packs are core packs.
+# module — add optional features
 
-Run `spinup module list` inside an app.
-The table shows each module's name, state, requirements, and description.
-Use `--json` for structured output.
-The `enabled` field reads the `modules` setting in `spinup.toml`.
+A module is an optional feature of your app, such as `auth`, `jobs`, `mail`, or `monitoring`.
+`spinup module add` turns one on in an existing app.
+It does the work on a new Git branch, so your current files stay as they are.
 
 ```console
-$ spinup module add --continue --abort
-Error: Invalid module arguments
-  supply module names, --continue, or --abort
-  Try: spinup module add --help
-[exit 2]
+$ spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+...
+$ cd todo
+$ spinup module list
+NAME        STATE  REQUIRES  DESCRIPTION
+...
+$ spinup module add jobs --dry-run --yes --non-interactive
+...
 ```
 
-Run `spinup module add monitoring --monitoring-profile lite --yes --non-interactive` to enable monitoring.
-Supply multiple names to add multiple modules.
-The command adds required modules and prints their names.
-An API-only app cannot add a module that requires the web pack.
+To add a module for real, run it without `--dry-run`:
 
-Each question has a flag, such as `--monitoring-profile` or `--ci-deploy-on-push`.
-Explicit flags take precedence over the answers and defaults.
-In a terminal, the command asks unanswered questions for the new packs.
-Without a terminal, the command uses defaults or reports the missing flag.
-Use `--non-interactive` to prevent prompts and `--yes` to confirm the change.
+<!-- doctest: skip -->
+```console
+$ spinup module add monitoring --monitoring-profile lite --yes --non-interactive
+...
+Next: git merge spinup/module-monitoring
+```
 
-| Flag | Purpose |
+## See what is available
+
+`spinup module list` shows every module with its state (`on` or `off`), the modules it requires, and a description.
+The state comes from the `modules` list in `spinup.toml`.
+Add `--json` for a structured list.
+
+| Module | What it gives you | Read more |
+| --- | --- | --- |
+| `auth` | Accounts, sessions, and sign-in pages | [Accounts and sign-in](../auth.md) |
+| `audit` | A history of who changed which record | [Audit trail](../audit.md) |
+| `jobs` | Background jobs with a worker process | [Background jobs](../build/jobs.md) |
+| `mail` | Email templates and SMTP delivery | [Mail](../mail.md) |
+| `secrets` | Encrypted secrets for each environment | [Secrets](../deploy/secrets.md) |
+| `monitoring` | Grafana, Prometheus, and Loki next to the app | [Monitoring](../monitoring.md) |
+| `backups` | Scheduled PostgreSQL backups (pg_dump, WAL-G, or pgBackRest) | [Backups with pg_dump](../backups-pgdump.md) |
+| `tofu` | A Hetzner Cloud VM with OpenTofu | [Hetzner Cloud with OpenTofu](../infra.md) |
+| `ci`, `deploy` | GitHub Actions and production Compose (on by default) | [Generated CI](../ci.md) |
+
+`base`, `api`, and `web` are core parts of the app, not modules.
+To add several modules, list the names: `spinup module add jobs mail`.
+If a module needs another module, the command adds that one too and prints its name.
+An API-only app cannot add a module that needs the web app.
+
+## Answer the questions with flags
+
+Each module can ask questions.
+In a terminal, `module add` asks the ones you did not answer.
+Without a terminal, it uses the default or tells you which flag is missing.
+Pass `--non-interactive` to never prompt, and `--yes` to confirm the change.
+
+```console
+$ spinup module add mail --dry-run --yes --non-interactive
+...
+```
+
+| Flag | What it sets | Example |
+| --- | --- | --- |
+| `--monitoring-profile lite\|full\|none` | The monitoring stack (default `lite`) | `spinup module add monitoring --monitoring-profile full` |
+| `--ci-deploy-on-push` | Deploy the default environment on each push to `main` | `spinup module add ci --ci-deploy-on-push` |
+| `--auth-oidc` | Sign-in with an identity provider | `spinup module add auth --auth-oidc` |
+| `--frontend-mode node\|embed` | A SvelteKit server or a static app in the Go binary (default `node`) | `spinup module add auth --frontend-mode embed` |
+| `--package-manager pnpm\|bun` | The web package manager (default `pnpm`) | `--package-manager bun` |
+| `--api-client openapi-fetch\|heyapi` | The generated web API client (default `openapi-fetch`) | `--api-client heyapi` |
+| `--shadcn-registry <version>` | The shadcn-svelte registry version (default `1.7.0`) | `--shadcn-registry 1.7.0` |
+| `--db-version <major>` | The PostgreSQL major version (default `18`) | `--db-version 17` |
+| `--module <path>` | The Go module path | `--module example.com/todo` |
+
+An explicit flag wins over the lock answers and the defaults.
+The web flags matter only when the module adds the web app.
+
+## Preview the change
+
+`--dry-run` prints the plan and creates no branch.
+The plan lists the files to create, merge, and overwrite.
+
+```console
+$ spinup module add monitoring --dry-run --yes --non-interactive
+Upgrade 0.0.0-dev -> 0.0.0-dev
+merge: 1
+  spinup.toml (module configuration)
+...
+create: 17
+...
+```
+
+## Review and merge the branch
+
+`module add` needs a clean Git repository and Git 2.44 or later.
+It renders the template version in `spinup.lock`, even when a newer one exists.
+It works in a separate worktree at `.spinup/upgrade/<locked-version>` on the branch `spinup/module-<names>`.
+Then it adds the module to `spinup.toml`, keeps your comments, and checks that the app builds.
+
+When it ends, it prints the next step:
+
+<!-- doctest: skip -->
+```console
+$ git merge spinup/module-monitoring
+$ git worktree remove .spinup/upgrade/0.1.0
+```
+
+Read the branch first if you want to review the files.
+The branch stays after you remove the worktree.
+
+| Flag | What it does | Example |
+| --- | --- | --- |
+| `--no-verify` | Skip the build and tests in the worktree | `spinup module add jobs --no-verify` |
+| `--commit-conflicts` | Commit conflict markers and resolve them later | `spinup module add jobs --commit-conflicts` |
+| `--offline` | Never download template versions | `spinup module add jobs --offline` |
+
+## If files conflict
+
+If a file you edited changed in the module, the command exits with code 3 and lists the files.
+Fix the markers in the worktree, then continue from the main checkout.
+To give up, remove the worktree and branch.
+
+<!-- doctest: skip -->
+```console
+$ spinup module add --continue --yes
+$ spinup module add --abort --yes
+```
+
+The steps are the same as for an app upgrade.
+Read [upgrade](upgrade.md) for the full flow.
+
+## Remove a module
+
+There is no `module remove` command.
+Module files can hold your own code and data, so remove them by hand.
+Delete the files and take the name out of `modules` in `spinup.toml`.
+
+## Add the audit module to an existing app
+
+`audit` needs `auth` and the web app.
+Upgrade the app first, then add the module.
+
+<!-- doctest: skip -->
+```console
+$ spinup upgrade --yes
+$ spinup module add audit --yes --non-interactive
+```
+
+The command prints `Next:` lines with the exact code to paste into `api/cmd/api/main.go`.
+That file belongs to you, so spinup does not edit it.
+If the plan warns about duplicate migration versions, fix them before you run the migrations.
+Then run `spinup db migrate` and `spinup g audit <resource>` for each table you want to track.
+[Audit trail](../audit.md) explains the wiring, the access rules, and the limits.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
 | --- | --- |
-| `--frontend-mode node\|embed` | Select a SvelteKit server or a static web app in the Go API. |
-| `--package-manager pnpm\|bun` | Select the web package manager. |
-| `--api-client openapi-fetch\|heyapi` | Select the generated web API client. |
-| `--auth-oidc` | Enable OpenID Connect sign-in with the `auth` module. |
+| `unknown module` | Check the name in `spinup module list`. |
+| `module add` says the Git tree has uncommitted changes | Commit your changes first. |
+| `a requested module requires web, but this app is API-only` | An API-only app has no web app. Pick a module without that need. |
+| Exit code 3 | A file conflicts. Resolve it, then run `spinup module add --continue --yes`. |
+| The locked template is missing offline | Run `spinup cache warm` online, or remove `--offline`. |
 
-The command requires a clean Git repository and Git 2.44.0 or later.
-It prints a plan before confirmation.
-Use `--dry-run` to inspect the plan without creating a branch.
-The command renders the locked template version, even when a newer version exists.
+## See also
 
-The branch uses `spinup/module-<names>` with sorted names separated by hyphens.
-The worktree uses `.spinup/upgrade/<locked-version>`.
-The upgrade flow applies the plan, updates dependencies, commits changes, and verifies the app.
-The lock records the new packs and answers.
-The command edits `spinup.toml` through the TOML editor and preserves comments.
-The main checkout keeps its files and branch.
-
-If files conflict, the command exits with code 3.
-Resolve the markers in the worktree.
-Then run `spinup module add --continue --yes` from the main checkout.
-Use `spinup module add --abort --yes` to remove an interrupted run and its branch.
-The corresponding `spinup upgrade --continue` and `--abort` commands also work.
-
-Use `--no-verify` to skip verification.
-Use `--commit-conflicts` to commit conflict markers for later resolution.
-Use `--offline` to prevent template downloads.
-The command reports an error if the locked templates are unavailable.
-
-After success, inspect the branch and run the printed `git merge` command.
-Then remove the worktree with `git worktree remove <worktree>`.
-The branch remains available for inspection.
-Module removal is outside this command's scope because files can contain user data.
-
-```console
-$ spinup module add --help
-Enable modules on a branch at the locked template version
-...
-```
-
-## Audit
-
-Run `spinup upgrade` before adding audit to an existing app.
-Then run `spinup module add audit --yes --non-interactive`.
-The module requires `auth` and the web frontend.
-It has no questions or additional flags.
-
-```console
-$ spinup new audit-plan --module example.com/audit-plan --modules auth --no-git --non-interactive
-...
-$ cd audit-plan
-$ spinup module add audit --dry-run --yes --non-interactive
-...
-```
-
-Inspect warnings about duplicate migration versions before applying migrations.
-The API main file has the class `scaffold`.
-Add the audit imports, the two auth options, and the audit command to that file.
-The `Next:` output lists the exact lines.
-Run `spinup db migrate up` before starting the new binary.
-Use `spinup g audit <resource>` for each existing table.
-Wrap existing writes in `audit.InTx` and use `s.Queries.WithTx(tx)`.
-Read [Audit trail](../audit.md) for the wiring, access rules, retention, and limits.
+- [upgrade — move an app to a new version](upgrade.md)
+- [cache — manage template versions](cache.md)
+- [Flag reference: module add](../site/commands/module-add.md), [module list](../site/commands/module-list.md)

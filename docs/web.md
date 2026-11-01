@@ -1,122 +1,133 @@
+---
+title: The web app
+parent: Build your app
+nav_order: 1
+---
+
 # The web app
 
-`spinup new` creates a SvelteKit 3 app in `web/` unless you pass `--api-only`.
-This page shows the layout of the app and how it talks to the Go API.
-
-## Layout
-
-| Path | Class | Purpose |
-| --- | --- | --- |
-| `web/vite.config.js` | managed | The Vite and SvelteKit options: adapter-node, `paths.origin`, the CSRF origins, Tailwind CSS, and the dev proxy. SvelteKit 3 has no `svelte.config.js`. |
-| `web/tsconfig.json` | managed | Extends `$app/tsconfig`. |
-| `web/package.json` | scaffold | The npm dependencies. spinup pins every version. |
-| `web/pnpm-lock.yaml` | seed | The pnpm lockfile. Upgrades reinstall the dependencies and do not merge this file. |
-| `web/pnpm-workspace.yaml` | managed | The pnpm settings, with the list of allowed build scripts. |
-| `web/components.json` | scaffold | The shadcn-svelte settings. The aliases use `#lib`. |
-| `web/src/app.html`, `app.css`, `app.d.ts` | scaffold | The page template, the Tailwind CSS entry with the theme, and the app types. |
-| `web/src/env.ts` | scaffold | The server environment variables (`API_URL`). |
-| `web/src/hooks.server.ts` | scaffold | Loads the user from the API and sends API requests to Go, with the cookie and the client address. |
-| `web/src/lib/utils.ts` | scaffold | `cn()` and the helper types of the shadcn-svelte components. |
-| `web/src/lib/api/client.ts` | scaffold | The typed `openapi-fetch` client. |
-| `web/src/lib/api/schema.d.ts` | seed | The API types. `spinup g client` writes this file. |
-| `web/src/lib/components/ui/` | seed | The shadcn-svelte components. |
-| `web/src/lib/components/app/` | scaffold | The app shell parts and the form field component. |
-| `web/src/lib/nav.gen.ts` | managed | The sidebar links and the home route. The resource generator owns it. |
-| `web/src/routes/` | scaffold | The layout, the home page, the error page, and the managed `healthz` route. |
-| `deploy/Dockerfile.web` | managed | The production image. |
+`spinup new` creates a SvelteKit 3 app in `web/`, unless you pass `--api-only`.
+The app has a sidebar, a form component, toasts, and a typed client for your Go API.
+You change the app like any SvelteKit app.
 
 ```console
 $ spinup new todo --module example.com/todo --no-git --non-interactive
 ...
 $ cd todo
-$ ls web/src/routes
-+error.svelte
-+layout.server.ts
-+layout.svelte
-+page.svelte
-healthz
-$ ls web/src/lib/components/app
-app-sidebar.svelte
-field.svelte
-page-header.svelte
-row-menu.svelte
-top-bar.svelte
+$ spinup g page about
+Created 1, updated 0 files
+Next: cd web && pnpm check
 ```
 
-## The app shell
+<!-- doctest: skip -->
+```console
+$ spinup dev
+App      http://localhost:5173
+API      http://localhost:8080
+Mailpit  http://localhost:8025
+```
 
-`web/src/routes/+layout.svelte` gives every page the same frame:
+Open `http://localhost:5173`. Edit a file in `web/src` and the browser reloads.
+If a port is busy, `spinup dev` picks a free port and prints it.
 
-- A top bar with the app name. With the `auth` module, it also shows the user menu (Account, Sign out) or a "Sign in" link.
-- A left sidebar with the links from `nav.gen.ts`. The link of the current page has `aria-current="page"`. The link is current on its own path and on every path below it.
-- An "API docs" link at the bottom of the sidebar. It opens `/api/docs` with a full page load.
-- On small screens, a menu button opens the sidebar in a sheet.
-- A "Skip to content" link for keyboard users, and one `<main id="main">` region.
-- One `<Toaster />` for the whole app.
+## What is where
 
-With the `auth` module, a visitor who is not signed in gets no sidebar.
-The page content is centered, so the sign-in pages look the same as before.
-Without the `auth` module, the shell has no user menu and no sign-in link.
+You work in four places:
 
-The shell parts are in `web/src/lib/components/app/`:
-
-| File | Purpose |
+| Path | What you do there |
 | --- | --- |
-| `top-bar.svelte` | The top bar and the mobile sheet. The `actions` snippet fills the right end. |
-| `app-sidebar.svelte` | The sidebar links and the "API docs" link. |
-| `user-menu.svelte` | The user menu. Only apps with the `auth` module have it. |
-| `page-header.svelte` | The page heading, with `title`, an optional `description`, and an `actions` snippet. |
-| `field.svelte` | A form field: the label, the control, the description, and the errors. |
-| `row-menu.svelte` | The actions menu of a list. A list renders one menu for all rows, and each row has a plain button that opens it. |
+| `web/src/routes/` | Add pages. A folder is a URL. |
+| `web/src/lib/components/app/` | Change the sidebar, the top bar, and the form field. |
+| `web/src/lib/api/` | Call the Go API with types. |
+| `web/src/app.css` | Change the theme colors. |
 
-The resource list page (`spinup g resource`) keeps the server render cheap.
-Each row has a plain button for the actions menu and a submit button for the checkbox, with inline icons.
-The list renders one `RowMenu` outside the rows, and the menu opens at the button that the user chose.
-The checkbox button posts its form, so it works without JavaScript.
+Files in `web/src/lib/components/ui/` come from shadcn-svelte.
+Add a component with `spinup g component <name>`. This command needs the network.
 
-The shadcn-svelte components use the variants `data-open:`, `data-closed:`, `data-checked:`, `data-unchecked:`, `data-disabled:`, `data-active:`, `data-horizontal:`, and `data-vertical:`.
-`app.css` defines them with `@custom-variant`, as the `shadcn-svelte/tailwind.css` file of shadcn-svelte 1.7.0 does.
+Most files are `scaffold` files.
+You own them, and `spinup upgrade` merges your changes with new template versions.
+A few are `managed` (spinup owns them) or `seed` (spinup writes them once).
+The [project layout page](get-started/project-layout.md) explains the three classes.
 
-These files are scaffold files. Change them to fit your app. `spinup upgrade` merges your changes with new template versions.
+Do not edit these files. `spinup upgrade` writes them again.
 
-`+error.svelte` shows the status, a short title, and a link to `home`.
-It shows the error message only when the message adds information.
+| File | What it holds |
+| --- | --- |
+| `web/vite.config.js` | The Vite and SvelteKit options: adapter, public origin, CSRF origins, Tailwind CSS, and the `/api` dev proxy |
+| `web/tsconfig.json` | The TypeScript settings |
+| `web/pnpm-workspace.yaml` | The pnpm settings and the list of allowed build scripts |
+| `web/src/lib/nav.gen.ts` | The sidebar links ([details below](#the-sidebar-and-the-home-page)) |
+| `web/src/routes/healthz/+server.ts` | The health check of the web container |
+| `web/playwright.config.ts` | The browser test settings |
+| `deploy/Dockerfile.web` | The production image |
+
+{: .note }
+SvelteKit 3 has no `svelte.config.js`. The SvelteKit options are in `web/vite.config.js`.
+
+The lockfile (`pnpm-lock.yaml` or `bun.lock`) and `web/src/lib/api/schema.d.ts` are seed files.
+`pnpm install` and `spinup g client` update them, and an upgrade does not merge them.
+
+## Add a page
+
+Run `spinup g page` with a URL path.
+The [guide](commands/generate-page.md) lists the route rules.
 
 ```console
-$ grep -c 'Toaster richColors closeButton' web/src/routes/+layout.svelte
-1
-$ grep -c '/login' web/src/routes/+layout.svelte
-0
-[exit 1]
+$ spinup g page settings/profile --server --dry-run
+create web/src/routes/settings/profile/+page.server.ts (scaffold)
+create web/src/routes/settings/profile/+page.svelte (scaffold)
 ```
 
-## Navigation and the home route
+`--server` adds a `+page.server.ts` file with a `load` function.
+[Embed mode](embed.md) cannot use server pages.
 
-`web/src/lib/nav.gen.ts` holds the sidebar links and the home route:
+## Add a resource with pages
+
+`spinup g resource` writes the API, the database migration, and four pages: list, detail, new, and edit.
+It also adds a link to the sidebar.
 
 ```console
-$ cat web/src/lib/nav.gen.ts
-// Code generated by spinup. DO NOT EDIT.
-export type NavItem = { href: string; label: string };
-export const nav: NavItem[] = [];
-export const home: string = '/';
+$ spinup g resource todo title:string done:bool --dry-run
+...
+update web/src/lib/nav.gen.ts (managed)
+create web/src/routes/todos/+page.server.ts (scaffold)
+...
 ```
 
-Do not edit this file. `spinup g resource` with pages, and `spinup destroy resource`, write it again from the page folders under `web/src/routes/`.
-The links are sorted by path. `home` is the first link, or `/` when the app has no resource pages.
+See [generate resource](commands/generate-resource.md) for the field types and the options.
 
-When `nav` is empty, the sidebar tells you to run `spinup g resource`.
-Without the `auth` module, the home page lists the `nav` links.
-With the `auth` module, `web/src/routes/+page.server.ts` sends a signed-in user from `/` to `home` (status 303), when `home` is not `/`.
+## Call the API from a page
 
-To add a link that the generator does not know, edit `app-sidebar.svelte`.
+In server code, pass the `fetch` of the load function and `__PUBLIC_ORIGIN__` to the client.
+Then the request carries the cookie of the signed-in user.
+Node needs an absolute URL, and `__PUBLIC_ORIGIN__` supplies it.
+
+```ts
+import { api } from '#lib/api/client';
+
+export const load = async ({ fetch }) => {
+	const { data } = await api.GET('/api/todos', { fetch, baseUrl: __PUBLIC_ORIGIN__ });
+	return { todos: data ?? [] };
+};
+```
+
+In the browser, the client uses the current origin, so you pass neither `fetch` nor `baseUrl`.
+After you change the API, run `spinup g openapi` and then `spinup g client` to update the types.
+While `spinup dev` runs, saving a file in `api/openapi/` does both steps for you.
+If you use heyapi, see [Package manager and API client](web-variants.md).
+
+## The signed-in user
+
+For each request, the app asks the API who the user is (`GET /api/session`).
+The result is `data.user` in every page, or `null` for a visitor.
+Without the `auth` module, `data.user` is always `null`.
+See [Accounts and sign-in](auth.md) to add sign-in.
 
 ## Forms: the field component
 
-`field.svelte` connects a label, a control, a description, and the errors.
-It gives the control an `id` (`field-<name>` by default) and sets `aria-describedby` and `aria-invalid`.
-The `children` snippet gets `{ id, describedBy, invalid, props }`.
-Spread `props` on the control, or use the other values one by one:
+`field.svelte` joins a label, a control, a hint, and the error messages.
+It sets `id`, `aria-describedby`, and `aria-invalid` for you.
+Spread `props` on the control:
 
 ```svelte
 <script lang="ts">
@@ -133,11 +144,11 @@ Spread `props` on the control, or use the other values one by one:
 </Field>
 ```
 
-The `errors` prop takes an array of messages, such as `$errors.title` of `sveltekit-superforms`.
+The `errors` prop takes a list of messages, such as `$errors.title` from `sveltekit-superforms`.
 
 ## Toasts
 
-The layout renders the `svelte-sonner` toaster once, with rich colors and a close button.
+The layout shows one toaster for the whole app.
 Call `toast` from any component:
 
 ```ts
@@ -146,108 +157,119 @@ import { toast } from 'svelte-sonner';
 toast.success('Todo saved');
 ```
 
-The toasts use the theme tokens of `app.css`, so they work in light and dark mode.
+## The sidebar and the home page
 
-## One origin
+The sidebar links come from `web/src/lib/nav.gen.ts`.
 
-The browser talks only to the web origin.
-Requests to `/api/*` go to the Go API on the same origin.
-Thus the session cookie of the API is a first-party cookie, and the CSRF checks of SvelteKit and Go agree.
-
-- In development, the Vite dev server sends `/api` to `API_URL`.
-- In production, Caddy sends `/api/*` to Go and all other paths to Node.
-- On the server, `handleFetch` in `hooks.server.ts` sends `${PUBLIC_ORIGIN}/api/*` requests to `API_URL`. It adds the `cookie` header of the browser request only to these requests.
-- `handleFetch` also adds the client address to these requests, as the `X-Forwarded-For` header. The Go API uses it to limit the auth routes for each client.
-  It deletes any `X-Forwarded-For` header from the browser first.
-  It adds the address only when the `ADDRESS_HEADER` variable is set.
-  If `getClientAddress()` fails, it sends no header and logs one warning for each process.
-
-```console
-$ grep -o "'/api': { target: apiURL, xfwd: true }" web/vite.config.js
-'/api': { target: apiURL, xfwd: true }
-$ grep -o 'ADDRESS_HEADER: .*' deploy/compose.yml
-ADDRESS_HEADER: X-Forwarded-For
+```ts
+export const nav: NavItem[] = [{ href: '/todos', label: 'Todos' }];
+export const home: string = '/todos';
 ```
 
-## The signed-in user
+`spinup g resource` and `spinup destroy resource` write this file again.
+Do not edit it, because your change is lost.
+`home` is the first link, or `/` when the app has no resource pages.
+With the `auth` module, a signed-in user who opens `/` goes to `home`.
+A visitor who is not signed in sees no sidebar.
 
-For each request, `handle` in `hooks.server.ts` calls `GET ${API_URL}/api/session` with the browser cookie.
-It sets `event.locals.user` to the user, or to `null`.
-A 401 or a 404 response gives `null`. Without the `auth` module, the route does not exist.
-If the API is not available, `handle` logs the error and continues with no user.
-`+layout.server.ts` gives `locals.user` to every page as `data.user`.
+To add a link by hand, edit `web/src/lib/components/app/app-sidebar.svelte`.
+Add a list item inside the `<ul>`, after the `{#each}` block.
+The list shows only when `nav` has at least one link.
 
-## Environment
+```svelte
+<li><a href="/about" class={link}>About</a></li>
+```
 
-| Variable | Read at | Default | Purpose |
+The bottom of the sidebar has an "API docs" link to [the API reference](api-docs.md).
+The other shell parts are in `web/src/lib/components/app/`:
+
+| File | What it does |
+| --- | --- |
+| `top-bar.svelte` | The top bar, the app name, and the menu button for small screens |
+| `user-menu.svelte` | The Account and Sign out menu (only with the `auth` module) |
+| `page-header.svelte` | A page heading with `title`, an optional `description`, and an `actions` snippet |
+| `row-menu.svelte` | The actions menu of a list row |
+
+`+error.svelte` shows the status of an error and a link to the home route.
+
+## Change the look
+
+Edit the theme tokens in `web/src/app.css`.
+Change the app name in `web/src/routes/+layout.svelte`. It sets the top bar and the page title.
+
+```css
+:root {
+	--primary: oklch(0.55 0.2 260);
+}
+```
+
+The `.dark` block in the same file holds the dark mode colors.
+
+## How requests reach Go
+
+The browser talks to one origin.
+Requests to `/api/*` go to the Go API, and all other requests go to SvelteKit.
+So the session cookie is a first-party cookie and the CSRF checks agree.
+
+| Where | What sends `/api` to Go |
+| --- | --- |
+| `spinup dev` | The Vite dev server, to `API_URL` |
+| Production | Caddy |
+| Server code in SvelteKit | `handleFetch` in `web/src/hooks.server.ts` |
+
+`handleFetch` adds the `cookie` of the browser request, and only to these `/api` requests.
+It also passes the client address to the API as `X-Forwarded-For`, when `ADDRESS_HEADER` is set.
+The API uses the address for [rate limits](build/auth-security.md).
+
+## Environment variables
+
+| Variable | When | Default | Use |
 | --- | --- | --- | --- |
-| `PUBLIC_ORIGIN` | build time | `http://localhost:5173` | The public URL. It sets `paths.origin`, `csrf.trustedOrigins`, and the `handleFetch` prefix. |
-| `API_URL` | run time | `http://localhost:8080` | The address where server-side code and the dev proxy reach Go. |
-| `PORT`, `HOST` | run time | `3000`, `0.0.0.0` | The listen address of `node build`. |
-| `BODY_SIZE_LIMIT`, `SHUTDOWN_TIMEOUT` | run time | `1M`, `20` | The request body limit and the graceful shutdown time in seconds. |
-| `ADDRESS_HEADER`, `XFF_DEPTH` | run time | unset, `1` | The header with the client address and the number of proxies that wrote it. `deploy/compose.yml` sets them for the `web` service. In development, leave `ADDRESS_HEADER` unset. |
+| `PUBLIC_ORIGIN` | build | `http://localhost:5173` | The public URL of the app |
+| `API_URL` | run | `http://localhost:8080` | Where server code reaches Go |
+| `PORT`, `HOST` | run | `3000`, `0.0.0.0` | Where `node build` listens |
+| `BODY_SIZE_LIMIT` | run | `1M` | The largest request body |
+| `SHUTDOWN_TIMEOUT` | run | `20` | Seconds to wait on shutdown |
+| `ADDRESS_HEADER`, `XFF_DEPTH` | run | unset, `1` | The client address header. `deploy/compose.yml` sets them. |
 
-adapter-node does not read `ORIGIN` at run time.
+{: .important }
+SvelteKit reads `PUBLIC_ORIGIN` at build time.
 If the public URL changes, build the image again with `--build-arg PUBLIC_ORIGIN=<url>`.
 
 ## Commands
 
-Run these commands in `web/`:
+Run these in `web/`. With bun, replace `pnpm` with `bun`.
 
 <!-- doctest: skip -->
 ```console
 $ pnpm install
 $ pnpm dev
 $ pnpm check
+$ pnpm test
 $ pnpm build
 $ PORT=3000 API_URL=http://localhost:8080 node build
 ```
 
-## Browser tests
-
-The web pack includes Playwright with a home-page smoke test.
-The `auth` module also tests registration, login, session reload, and logout.
-The smoke test scopes session controls to the header banner.
-It scopes registration and login controls to the main region.
-These scopes prevent duplicate links and buttons from causing strict locator errors.
-The Vite configuration excludes `e2e/**` from Vitest and keeps the default exclusions.
-Run `pnpm test` for unit tests and `pnpm test:e2e` for browser tests.
-CI starts the API and web services before it runs the tests.
-For local tests, start `spinup dev` in another terminal.
-
-<!-- doctest: skip -->
-```console
-$ pnpm test:e2e
-```
-
-Set `PUBLIC_ORIGIN` when the web service uses a different URL.
-The default URL is `http://localhost:5173`.
-
-Build the image from the app root:
-
-<!-- doctest: skip -->
-```console
-$ docker build -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=https://app.example.com web
-```
-
-The image build downloads pnpm and the npm packages, so it needs network access.
-
-## Call the API
-
-Pass the `fetch` of a load function or an action to the client.
-Then `handleFetch` sends the request to Go with the cookie of the user:
-
-```ts
-import { api } from '#lib/api/client';
-
-export const load = async ({ fetch }) => {
-	const { data } = await api.GET('/api/todos', { fetch });
-	return { todos: data ?? [] };
-};
-```
-
-In the browser, the client uses the current origin.
+For `pnpm test` and the browser tests (`pnpm test:e2e`), see [Test your app](build/testing.md).
 
 ## Upgrades
 
-When a spinup upgrade moves `@sveltejs/kit` to a new major version, the codemod `0001_web_svmigrate` runs `pnpm dlx sv@<pin> migrate sveltekit-<major>` in `web/`.
+`spinup upgrade` merges new template versions into your scaffold files.
+When an upgrade moves `@sveltejs/kit` to a new major version, it also runs the official `sv migrate` tool in `web/`.
+Review the changes with `git diff` before you commit them.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| A form post fails with "Cross-site POST form submissions are forbidden" | `PUBLIC_ORIGIN` does not match the URL in the browser | Build again with the right `PUBLIC_ORIGIN` |
+| The sidebar says to run `spinup g resource` | `nav` is empty | Add a resource, or add a link by hand |
+| `data.user` is `null` after sign-in | The API did not answer `/api/session` | Check that the API runs and `API_URL` is right |
+
+## See also
+
+- [Package manager and API client](web-variants.md)
+- [Accounts and sign-in](auth.md)
+- [Embed mode](embed.md)
+- [API reference page](api-docs.md)
+- [generate page](commands/generate-page.md)

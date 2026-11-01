@@ -1,107 +1,123 @@
-# PostgreSQL upgrades
+---
+title: maintenance pg-minor-upgrade and pg-major-upgrade — upgrade PostgreSQL
+parent: Command guides
+---
 
-These commands upgrade the production database through SSH.
-Both commands require `--env` and the deploy lock.
-A held lock returns exit status 5.
+# maintenance pg-minor-upgrade and pg-major-upgrade: upgrade PostgreSQL
 
-```console
-$ spinup maintenance pg-minor-upgrade --help
-...
-$ spinup maintenance pg-major-upgrade --help
-...
+These two commands upgrade the production database through SSH.
+`pg-minor-upgrade` moves to the newest minor version that spinup pins. `pg-major-upgrade` moves to a new major by dump and restore.
+Both take a backup first and save a recovery script before they change the server.
+
+```sh
+spinup maintenance pg-minor-upgrade --env production --plan
 ```
 
-Use `--plan` to print the steps without VM access or changes.
-The plan lists the confirmation and window checks.
-Execution requires the configured UTC maintenance window.
-Use `--now` to override the window.
-Protected environments require the shared confirmation.
-In CI, supply `--yes` to confirm a protected environment.
+Print the steps of an upgrade with `--plan`. It needs no VM access and changes nothing:
+
+```console
+$ spinup new todo --api-only --module example.com/todo --modules ci,deploy,backups --no-git --non-interactive
+...
+$ cd todo
+$ printf '\n[env.production]\nhost = "app.example.com"\nuser = "deploy"\n' >> spinup.toml
+$ spinup maintenance pg-minor-upgrade --env production --plan
+Plan: Check the maintenance window and protected confirmation
+Plan: Take the deploy lock
+Plan: Read SHOW server_version and the pinned image
+Plan: Exit successfully if the pinned version is already running
+Plan: Take a backup with the configured backend
+Plan: Save the old image and recovery command
+Plan: Build postgres from the release Dockerfile.postgres
+Plan: Recreate only postgres (restart downtime)
+Plan: Wait for health and print SHOW server_version
+```
+
+## Which upgrade do I need?
+
+| I want ... | Use | Downtime | Undo |
+| --- | --- | --- | --- |
+| The newest minor of my major (17.4 to 17.6) | `pg-minor-upgrade` | A database restart | The recovery script |
+| A new major (17 to 18). The safest path. | `pg-major-upgrade` | The app stops during the dump, restore, and checks | The recovery script. The old volume stays. |
+| A new major (17 to 18) with the shortest downtime | [`pg-upgrade-in-place`](maintenance-pgupgrade.md) | Short | Restore the safety backup into a new database |
+
+Every upgrade needs these items:
+
+- `--env`, and the deploy lock. If a deploy holds the lock, the command exits with code 5.
+- The maintenance window to be open. Add `--now` to override it. See [maintenance](maintenance.md#the-maintenance-window).
+- A confirmation for a protected environment. Type the name when asked, or pass `--confirm-env production`. In CI, set `CI` and add `--yes`.
+
+## Minor upgrade
+
+A minor upgrade replaces the PostgreSQL image with the version that spinup pins for your major.
+Nothing changes in your data files, and the downtime is one restart.
 
 <!-- doctest: skip -->
 ```console
-$ spinup maintenance pg-minor-upgrade --env production --plan
-...
 $ spinup maintenance pg-minor-upgrade --env production
 ...
+```
+
+The command works in this order:
+
+1. It compares `SHOW server_version` with the pin. If the versions are equal, it stops with no change. If the server is newer than the pin, it refuses.
+2. It takes a full backup with your configured backend.
+3. It updates the Dockerfile on the VM and rebuilds the `postgres` image.
+4. It recreates only `postgres`, waits for it to be healthy, and checks the new version.
+
+Before each attempt, the command removes a helper container that an earlier attempt left. A failed attempt is therefore safe to run again.
+Recovery files are in `/opt/<app>/pg-minor-upgrade`.
+Before the next deploy, update the pins in the repository with `spinup upgrade`.
+
+## Major upgrade (dump and restore)
+
+A major upgrade dumps the database, restores it into a new volume on the target version, compares the two, and then swaps them.
+The old volume stays until you ask to remove it.
+
+{: .warning }
+The app is down from the moment the command stops it until the smoke checks pass. Pass `--i-know` to accept this downtime.
+
+`--to` selects the target: 16, 17, or 18.
+The target must be higher than the running major, so a target of 16 needs a running major below 16.
+The target must also be a major that `spinup db doctor` accepts.
+
+<!-- doctest: skip -->
+```console
 $ spinup maintenance pg-major-upgrade --env production --to 18 --plan
 ...
 $ spinup maintenance pg-major-upgrade --env production --to 18 --i-know
 ...
-$ spinup maintenance pg-major-upgrade --env production --cleanup --i-know
-...
 ```
 
-The minor upgrade compares `SHOW server_version` with the pin for the running major.
-An equal version needs no upgrade.
-A newer running minor causes a refusal.
-The command takes a full backup through the configured backend.
-It updates the VM Dockerfile to the pin and rebuilds the postgres image.
-It recreates only `postgres`, waits for health, and checks the new version.
-Downtime is the restart only.
+The command works in this order:
 
-The major upgrade accepts `--to 16`, `--to 17`, or `--to 18`.
-The target must exceed the running major and pass the checks from `db doctor`.
-The command announces downtime before confirmation.
-Supply `--i-know` to accept downtime.
+1. It stops `api` and `web` of both colors.
+2. It takes a `pgdump` backup, also when your backend is pgBackRest.
+3. It starts the target image on a new volume `<app>_pgdata_<major>`. If that volume exists, the command refuses.
+4. It restores the dump and runs `ANALYZE`.
+5. It compares the migration table and the exact row count of every user table. A mismatch stops the command before the swap.
+6. It swaps the image and the volume, and starts the new server. With pgBackRest, it also runs `stanza-upgrade`, which tells the repository about the new major.
+7. It runs the migrations, starts the live color, and runs the deploy smoke checks.
 
-The command stops `api` and `web` of both colors.
-The app remains unavailable during the dump, restore, comparison, and swap.
-The command always takes a pgdump backup, including when the configured backend is pgBackRest.
-It creates `<app>_pgdata_<major>` and an isolated container from the target pin.
-An existing target volume causes a refusal.
+The command keeps the old volume and image after it succeeds.
+Recovery files are in `/opt/<app>/pg-upgrade`. The command refuses another major upgrade while this directory exists.
 
-The command restores the dump and runs `ANALYZE`.
-It compares all records in `goose_db_version` and exact counts for every user table.
-A mismatch stops the command before the swap.
-The command then stops the old server and changes the VM Compose image and volume.
-It builds the postgres image with pgBackRest and starts the new server.
+| Flag | Meaning | Example |
+| --- | --- | --- |
+| `--to` | The target major: 16, 17, or 18 | `--to 18` |
+| `--i-know` | Accept the downtime | `--to 18 --i-know` |
+| `--plan` | Print the steps and the repository changes | `--to 18 --plan` |
+| `--now` | Run outside the window | `--to 18 --i-know --now` |
+| `--cleanup` | Remove the old volume after a finished upgrade | `--cleanup --i-know` |
 
-If the backups module uses pgBackRest, the command updates the VM configuration for the new data path.
-It loads the `PGBACKREST_*` secrets and runs `pgbackrest --stanza=<app> stanza-upgrade` inside the new server.
-An empty backend setting selects pgBackRest.
-If the stanza upgrade fails, the command fails with a `Try:` line.
-It does not report completion while the stanza requires repair.
-It then runs the release migrations and starts the live color.
+## After the upgrade: update the repository
 
-The smoke check uses the deploy paths: `/healthz`, the configured smoke URLs, and `/version`.
-The version must contain the release commit.
-For a web app, the command reads the API version through the Caddy container.
-The command keeps the old volume and image after success.
+The VM now runs the new major. Your repository does not know that yet.
+Without these changes, the next `spinup deploy` brings back the old volume.
+The command prints them. Do these steps in order:
 
-Each upgrade saves a recovery script before it changes the server.
-Each failure after this save prints the exact SSH command to run that script.
-The script takes the deploy lock and restores the saved Compose files, environment file, Dockerfile, and old image.
-For a major upgrade, the script also starts the previous live color.
-A major recovery discards database writes made after the swap.
-The dump and the new volume remain available for inspection.
-
-The major command stores recovery files in `/opt/<app>/pg-upgrade`.
-It refuses another major upgrade while that directory exists.
-Use `--cleanup --i-know` after you verify the upgraded app.
-Cleanup requires the new volume to be active and the upgrade to be complete.
-
-It also requires `answers.db_version` in `spinup.lock` to match the active major.
-In `deploy/compose.edge.yml`, `volumes.postgres_data` must have `external: true` and the new volume name.
-If these repository changes are missing, cleanup refuses and lists the required changes.
-
-It removes the anchor container and the old volume.
-It then removes the recovery files.
-Cleanup permanently removes this recovery path.
-
-The minor command stores its recovery files in `/opt/<app>/pg-minor-upgrade`.
-Before each attempt, it removes an existing anchor with the same name without removing any volume.
-A failed attempt therefore permits a retry.
-
-Commit the repository changes before the next deploy.
-The VM swap survives the next `spinup deploy` only after these changes.
-The command prints these manual steps with the selected major and volume name:
-
-1. Set `answers.db_version` in `spinup.lock` to the target major as a JSON string, such as `"18"`.
-2. Review local changes before you render the files with the commands below.
-3. Set `volumes.postgres_data.external` to `true` in `deploy/compose.edge.yml`.
-4. Set `volumes.postgres_data.name` to `<app>_pgdata_<major>` in that file.
-5. Commit `spinup.lock` and the rendered deploy files.
+1. Set `answers.db_version` in `spinup.lock` to the target major as a string, for example `"18"`. No command does this for you, and `spinup.toml` has no such key.
+2. Review your local changes to the deploy files. The next step overwrites them.
+3. Render the deploy files again from the new answer:
 
 <!-- doctest: skip -->
 ```console
@@ -113,16 +129,21 @@ $ spinup restore deploy/compose.dev.yml --force
 ...
 ```
 
-`spinup.toml` has no `db_version` setting.
-No command directly changes this lock answer.
-The restore commands render from the changed answer and update the hashes in the lock.
-Keep the named volume mapping when you review future template merges.
-For a minor upgrade, update the repository pins with `spinup upgrade` before the next deploy.
+4. In `deploy/compose.edge.yml`, point the data volume at the new volume:
 
-If you use pgBackRest, render and commit its configuration after you change the lock answer.
-Then take a new full backup immediately.
-The upgrade prints this requirement as a warning.
-The backup command uploads the repository configuration, so render that configuration before the backup.
+```yaml
+volumes:
+  postgres_data:
+    external: true
+    name: todo_pgdata_18
+```
+
+5. Commit `spinup.lock` and the rendered deploy files.
+
+When you merge template changes later, keep the `external: true` volume mapping in `deploy/compose.edge.yml`.
+
+If you use pgBackRest, render its configuration and take a full backup at once.
+The old physical backups still exist, but they belong to the old major.
 
 <!-- doctest: skip -->
 ```console
@@ -132,4 +153,50 @@ $ spinup backup now --env production --type full
 ...
 ```
 
-The upgrade retains the original physical backups and takes a logical dump for the upgrade.
+## If an upgrade fails
+
+Every failure after the recovery script was saved prints the exact SSH command that runs it (`rollback.sh` in the recovery directory, `/opt/<app>/pg-upgrade` or `/opt/<app>/pg-minor-upgrade`).
+The script takes the deploy lock and restores the saved Compose files, environment file, Dockerfile, and old image.
+After a major upgrade, it also starts the previous live color.
+
+{: .warning }
+A major recovery discards every database write made after the swap. The dump and the new volume stay on the VM so you can inspect them.
+
+<!-- doctest: skip -->
+```console
+$ ssh -- deploy@app.example.com 'sh /opt/todo/pg-upgrade/rollback.sh'
+```
+
+## Clean up
+
+When the upgraded app works, remove the old volume.
+Cleanup needs a finished upgrade, `answers.db_version` in `spinup.lock` set to the active major, and `external: true` with the new name in `deploy/compose.edge.yml`.
+If one is missing, cleanup refuses and lists what to fix.
+
+{: .warning }
+Cleanup removes the old volume and the recovery files for good. You cannot undo the upgrade after that.
+
+<!-- doctest: skip -->
+```console
+$ spinup maintenance pg-major-upgrade --env production --cleanup --i-know
+...
+```
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| The command refuses to run | It is outside the maintenance window. | Wait, or add `--now`. |
+| Exit code 5 | The deploy lock is held. | Wait for the other command. |
+| The target volume exists | An earlier attempt left `<app>_pgdata_<major>`. | Inspect it. Remove it only when you do not need it. |
+| A major upgrade is refused | `/opt/<app>/pg-upgrade` exists. | Run `--cleanup` after you verify the last upgrade. |
+| The row counts differ | The restore did not match the dump. | The command stops before the swap. Run the recovery command that the error prints, then try again. |
+| The next deploy goes back to the old major | The repository changes are missing. | Do the steps in [After the upgrade](#after-the-upgrade-update-the-repository). |
+
+## See also
+
+- [In-place PostgreSQL upgrades](maintenance-pgupgrade.md)
+- [maintenance](maintenance.md): patching, pruning, and the window
+- [backup](backup.md) and [backup restore](backup-restore.md)
+- [restore](restore.md): render a template file again
+- Flag reference: [pg-minor-upgrade](../site/commands/maintenance-pg-minor-upgrade.md), [pg-major-upgrade](../site/commands/maintenance-pg-major-upgrade.md)

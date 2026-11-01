@@ -1,23 +1,43 @@
+---
+title: Docker-in-Docker deploy suite
+parent: Contributing
+nav_order: 6
+---
+
 # Docker-in-Docker deploy suite
 
-The suite proves the promise of milestone M5 on a containerized VM.
-`spinup deploy` ships a generated app over SSH with zero downtime, and `spinup rollback` returns to an earlier release.
-The test VM is described in ADR 0009 §7.
+The suite checks `spinup deploy` and `spinup rollback` against a generated app on a containerized VM.
+It ships the app over SSH with zero downtime, and it returns to an earlier release.
+Run it before you change the deploy code.
 
-## The test VM
+## Run the suite
 
-The VM is the pinned `docker:dind` image with `openssh-server`, `sudo`, `bash`, `curl`, and `python3`.
-The files are in `testdata/dind/vm/`.
+Docker must run, and the machine must have network access to pull images and build the Postgres image.
 
-- `Dockerfile` starts `FROM [[ image "docker-dind" ]]`. The script replaces this marker with the pin from `internal/stackversions/stackversions.yaml`.
-- The `deploy` user has UID 1000, passwordless sudo, and membership of the `docker` group.
-- SSH permits only key login for `deploy`. Each run makes a new key pair.
-- `entrypoint.sh` starts `sshd` and then `dockerd`.
-- `cloud-init` is a stub in `/usr/bin`. It prints `status: done` and exits 0.
-- `systemctl` is a shim in `/usr/bin`. It turns `reload ssh.service` and `restart ssh.service` into a HUP of `sshd`.
+```sh
+make dind
+```
 
-The script builds the image once for each run. The build needs the network for `apk`.
-The VM runs privileged. It publishes SSH and HTTP on free ports of `127.0.0.1`.
+`make dind` runs `bash testdata/dind/run.sh`. The script prints one `==>` line for each step. A passing run ends with the release IDs:
+
+```text
+run.sh: PASS (releases <rel1>, <rel2>, <rel3>, <rel4>, <rel5>, <rel6>)
+```
+
+To test a full app with the web image, set `DIND_WEB=1`:
+
+```sh
+DIND_WEB=1 bash testdata/dind/run.sh
+```
+
+| Option | Effect |
+| --- | --- |
+| `DIND_WEB=1` | Generate a full app (`api` and `web`). The web image build needs the network. |
+| `DIND_KEEP=1` | Keep the work directory and its logs. The trap still removes the VM. |
+| `GO=<path>` | Use this `go` binary. |
+
+The script also needs `git`, `ssh`, `ssh-keygen`, `ssh-keyscan`, `sops`, `age-keygen`, `curl`, and `python3`.
+Run `spinup tools install` to get `sops` and `age`.
 
 ## What the suite does
 
@@ -45,42 +65,38 @@ Step 7 builds a small Go service from `testdata/dind/fixtures/service/` on the p
 
 The app of the suite has the jobs module. After each deploy and rollback of step 7, the suite checks the jobs worker. Only the live color runs the worker. The worker has `SERVICE_ECHO_URL` and runs the image of the release. The worker does not restart during a short wait. The worker follows the color switch and the rollback.
 
-Step 8 tests `spinup deploy digital-ocean` (ADR 0017). The VM plays the part of a new droplet:
+Step 8 tests `spinup deploy digital-ocean`. The [live test](do-live-test.md) repeats this flow on a real account, and the [fake API](digitalocean-client.md) page lists the rules that the fake models. The VM plays the part of a new droplet:
 
 1. The suite builds `testdata/dind/dofake` and starts it. This program serves the DigitalOcean API fake of `internal/cloud/digitalocean/dofake`. It accepts one static token. It also serves `GET /debug/state` with the number of droplets. The `dofake` package does not have this route.
 2. The suite adds a `Host 127.0.0.1` block to the `ssh_config`, with the port of the VM and the operator key. The droplet address is `127.0.0.1`, and the new environment has no port.
 3. The suite copies `deploy/environments/staging.toml` to `do.toml`. It gives `do` the database secrets of staging, because the postgres volume on the VM holds the staging password. Then it commits.
 4. The suite runs `spinup deploy digital-ocean --env do --public-url http://localhost:<port> --no-recovery --yes --ssh-key <key> --skip-deploy`. The environment holds `SPINUP_DO_API_BASE` and `SPINUP_DO_OAUTH_BASE` (the fake), `DIGITALOCEAN_ACCESS_TOKEN` (the static token), and `SPINUP_CREDENTIALS_DIR`. No browser sign-in runs.
-5. When the fake creates a droplet, it parses the user data and runs `testdata/dind/on-create.sh`. The script streams the files into the VM. It installs the injected host key, `/usr/local/sbin/spinup-host-key`, and its sudoers rule, and it makes `sshd` use only the ed25519 key. It removes the blanket sudo rule of the dind image, so the rotation must use the installed rule.
+5. When the fake creates a droplet, it runs `testdata/dind/on-create.sh` with the user data. The script copies the files into the VM and installs the injected host key and the helper `/usr/local/sbin/spinup-host-key`. It makes `sshd` use only the ed25519 key, and it removes the blanket sudo rule of the dind image. So the key rotation must use the helper.
 6. The suite checks that the tree is clean and that `[env.do]` in `spinup.toml` pins exactly one host key. This key is the key that the VM serves now, and it is not the injected key.
 7. The suite builds a new release for the new HEAD. The first run committed `spinup.toml`, and a release ID must end with the HEAD SHA. A second run with `--skip-build --tag <release>` must create no droplet and must deploy the release. `/version` must report it.
 8. `spinup deploy digital-ocean destroy --env do --i-know --yes` (with `CI=1`) must remove the droplet from the fake.
 
 The `systemctl` shim of the VM sends a HUP to `sshd` and waits until `sshd` serves the new key.
 
-The step needs `ssh-keyscan` and the `go` toolchain, in addition to the tools of the other steps. The trap stops the fake, because the script keeps its process ID in `pids`.
+This step needs `ssh-keyscan` and the `go` toolchain. The trap stops the fake when the script ends.
 
 Step 3 makes its release with an `awk` insert in `api/cmd/api/main.go`, after the `db` readiness check. The suite does not use a patch file, because the modules change the lines around that check.
 It adds a readiness check that always fails. `/healthz` still answers, so only the readiness check of the deploy stops the release.
 
-## Run the suite
+## The test VM
 
-Docker must run, and the VM must have network access to pull images and build the Postgres image.
+The VM is the pinned `docker:dind` image with `openssh-server`, `sudo`, `bash`, `curl`, and `python3`.
+The files are in `testdata/dind/vm/`.
 
-```
-bash testdata/dind/run.sh
-```
+- `Dockerfile` starts `FROM [[ image "docker-dind" ]]`. The script replaces this marker with the pin from `internal/stackversions/stackversions.yaml`.
+- The `deploy` user has UID 1000, passwordless sudo, and membership of the `docker` group.
+- SSH permits only key login for `deploy`. Each run makes a new key pair.
+- `entrypoint.sh` starts `sshd` and then `dockerd`.
+- `cloud-init` is a stub in `/usr/bin`. It prints `status: done` and exits 0.
+- `systemctl` is a shim in `/usr/bin`. It turns `reload ssh.service` and `restart ssh.service` into a HUP of `sshd`.
 
-`make dind` runs the same script.
-
-| Option | Effect |
-| --- | --- |
-| `DIND_WEB=1` | Generate a full app (`api` and `web`). The web image build needs the network. |
-| `DIND_KEEP=1` | Keep the work directory and its logs. The trap still removes the VM. |
-| `GO=<path>` | Use this `go` binary. |
-
-The script also needs `git`, `ssh`, `ssh-keygen`, `ssh-keyscan`, `sops`, `age-keygen`, `curl`, and `python3`.
-Run `spinup tools install` to get `sops` and `age`.
+The script builds the image once for each run. The build needs the network for `apk`.
+The VM runs privileged. It publishes SSH and HTTP on free ports of `127.0.0.1`.
 
 ## Public service route
 
@@ -115,3 +131,10 @@ If a run fails, read the logs in the work directory that the script prints.
 
 `.github/workflows/dind.yml` runs the suite on each push to `main` and each night.
 It runs the API-only app and the full app as two jobs.
+
+## See also
+
+- [Disaster-recovery drill](dr-drill.md), which reuses the test VM
+- [Run the DigitalOcean live test](do-live-test.md)
+- [DigitalOcean OAuth client](digitalocean-client.md)
+- [Deploy to your own server](../deploy.md)
