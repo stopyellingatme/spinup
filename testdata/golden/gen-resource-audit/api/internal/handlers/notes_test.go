@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -145,6 +146,9 @@ func TestNotesCRUD(t *testing.T) {
 		t.Fatalf("events = %+v, want actions %v", events, actions)
 	}
 	for i, event := range events {
+		if event.Table != "notes" || event.RecordID != strconv.FormatInt(created.Id, 10) {
+			t.Fatalf("event subject = %q %q, want %q %d", event.Table, event.RecordID, "notes", created.Id)
+		}
 		if event.Action != actions[i] || event.Actor.Kind != audit.KindUser || event.Actor.ID != userA || event.Actor.Email != "owner-a@example.com" || event.Actor.Role != "manager" || event.Actor.Source != audit.SourceAPI {
 			t.Fatalf("event = %+v", event)
 		}

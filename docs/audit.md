@@ -55,7 +55,11 @@ app.WithCommand("audit", audit.Command(pool)),
 Run `spinup db migrate up` before starting the new binary.
 Run `spinup doctor` to inspect `audit-wired`.
 The check inspects the files and needs no database connection.
-If OIDC was added after audit, run `spinup g audit user_identities` to attach its triggers.
+The audit migration and the OIDC migration `00004_oidc_identities.sql` both attach the `user_identities` triggers.
+So both orders attach the triggers.
+An app whose 00004 file came from a spinup version before this change can lack them.
+For that app, `audit-wired` warns.
+Run `spinup g audit user_identities` to attach the triggers.
 
 ## New resources and existing tables
 

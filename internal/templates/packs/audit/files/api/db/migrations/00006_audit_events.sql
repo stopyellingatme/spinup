@@ -267,25 +267,39 @@ $$;
 DO $$
 BEGIN
     IF to_regclass('public.users') IS NOT NULL THEN
-        CREATE TRIGGER users_audit AFTER INSERT OR UPDATE OR DELETE ON public.users
-            FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'id', 'password_hash');
-        CREATE TRIGGER users_audit_truncate AFTER TRUNCATE ON public.users
-            FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                WHERE tgrelid = to_regclass('public.users') AND tgname = 'users_audit') THEN
+            CREATE TRIGGER users_audit AFTER INSERT OR UPDATE OR DELETE ON public.users
+                FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'id', 'password_hash');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                WHERE tgrelid = to_regclass('public.users') AND tgname = 'users_audit_truncate') THEN
+            CREATE TRIGGER users_audit_truncate AFTER TRUNCATE ON public.users
+                FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+        END IF;
     END IF;
 END
 $$;
 -- +goose StatementEnd
 
 -- user_identities exists only with OIDC (auth 00004). Its key is (provider, subject).
--- If OIDC comes later, run: spinup g audit user_identities
+-- Both orders attach the triggers: this block when 00004 ran first, and 00004 itself
+-- when it runs after this migration. spinup g audit user_identities is needed only
+-- for an app whose 00004 file came from a spinup version before this change.
 -- +goose StatementBegin
 DO $$
 BEGIN
     IF to_regclass('public.user_identities') IS NOT NULL THEN
-        CREATE TRIGGER user_identities_audit AFTER INSERT OR UPDATE OR DELETE ON public.user_identities
-            FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'provider,subject');
-        CREATE TRIGGER user_identities_audit_truncate AFTER TRUNCATE ON public.user_identities
-            FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                WHERE tgrelid = to_regclass('public.user_identities') AND tgname = 'user_identities_audit') THEN
+            CREATE TRIGGER user_identities_audit AFTER INSERT OR UPDATE OR DELETE ON public.user_identities
+                FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'provider,subject');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                WHERE tgrelid = to_regclass('public.user_identities') AND tgname = 'user_identities_audit_truncate') THEN
+            CREATE TRIGGER user_identities_audit_truncate AFTER TRUNCATE ON public.user_identities
+                FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+        END IF;
     END IF;
 END
 $$;

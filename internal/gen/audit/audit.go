@@ -81,6 +81,7 @@ func planMigration(spec resource.Spec, table, keys string) (vfs.File, error) {
 	// Match only an Up statement. A Down DROP or a comment does not attach a trigger.
 	trigger := regexp.MustCompile(`(?is)\bCREATE\s+(?:CONSTRAINT\s+)?TRIGGER\s+\S+\s+[^;]*?\bON\s+(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s+[^;]*?\bEXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?:public\.)?audit_(?:row_change|truncate)\s*\(`)
 	tableVersion := ""
+	uncertain := false
 	createTable := regexp.MustCompile(`(?is)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s*\(`)
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
@@ -107,9 +108,12 @@ func planMigration(spec resource.Spec, table, keys string) (vfs.File, error) {
 		up := migrationUp(string(data))
 		if trigger.MatchString(up) {
 			version := strings.SplitN(entry.Name(), "_", 2)[0]
-			// The audit pack skips identities when OIDC creates the table later.
+			// The audit pack attaches users and user_identities in a DO block only
+			// when the table exists. That attach depends on the order in which the
+			// migrations ran. An attach in any other migration is certain.
 			conditional := strings.Contains(up, "to_regclass('public."+table+"')")
-			if conditional && olderVersion(version, tableVersion) {
+			if conditional && (olderVersion(version, tableVersion) || orderDependent(table)) {
+				uncertain = true
 				continue
 			}
 
@@ -135,8 +139,20 @@ func planMigration(spec resource.Spec, table, keys string) (vfs.File, error) {
 		owner = ""
 	}
 	up, down := resource.AuditTriggerSQL(table, owner, keys, spec.Audit.Redact)
+	if uncertain {
+		// The conditional attach can have run already. Replace its triggers.
+		up = down + up
+	}
 	sql := "-- +goose Up\n" + up + "\n-- +goose Down\n" + down
 	return vfs.File{Path: ops.MigrationsDir + "/" + name, Data: []byte(sql), Class: string(manifest.Seed)}, nil
+}
+
+// orderDependent reports whether a pack migration with a lower version than the
+// audit migration can create the table after the audit migration ran. Auth 00004
+// creates user_identities when OIDC comes later. A copy of 00004 from a spinup
+// version before ADR 0025 decision 3.9 has no attach block of its own.
+func orderDependent(table string) bool {
+	return table == "user_identities"
 }
 
 func olderVersion(schema, next string) bool {

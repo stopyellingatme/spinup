@@ -1,6 +1,7 @@
 package auditwired
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/stopyellingatme/spinup/internal/doctor"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/templates"
 )
 
 func TestCheck(t *testing.T) {
@@ -48,13 +50,94 @@ func main() { auth.WithEvents(authsink.New(pool)); auth.WithActorContext(authsin
 			if tc.main != "" {
 				write(t, root, "api/cmd/api/main.go", tc.main)
 			}
-			write(t, root, "api/db/migrations/00004_oidc.sql", tc.migration)
+			write(t, root, "api/db/migrations/00004_oidc_identities.sql", tc.migration)
 			got := runCheck(t.Context(), &doctor.Context{Root: root})
 			if got.Status != tc.status || !strings.Contains(got.Message, tc.want) {
 				t.Fatalf("result = %+v", got)
 			}
 			if got.Status == doctor.Warn && got.Try == "" {
 				t.Fatal("warning has no Try line")
+			}
+		})
+	}
+}
+
+// oldIdentities is auth 00004 as spinup wrote it before the migration attached
+// the audit triggers itself (ADR 0025 decision 3.9).
+const oldIdentities = `-- +goose Up
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+CREATE TABLE user_identities (
+    provider text NOT NULL,
+    subject text NOT NULL,
+    user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email text NOT NULL,
+    PRIMARY KEY (provider, subject)
+);
+
+-- +goose Down
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+DROP TABLE user_identities;
+`
+
+// retrofit is the attach migration of spinup g audit user_identities.
+const retrofit = `-- +goose Up
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+CREATE TRIGGER user_identities_audit AFTER INSERT OR UPDATE OR DELETE ON user_identities FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'provider,subject');
+CREATE TRIGGER user_identities_audit_truncate AFTER TRUNCATE ON user_identities FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+
+-- +goose Down
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+`
+
+// TestIdentityOrder uses the real pack migrations 00004 and 00006. The kit
+// migrator can apply 00004 after 00006 when OIDC comes later.
+func TestIdentityOrder(t *testing.T) {
+	t.Parallel()
+	const wired = `package main
+func main() { auth.WithEvents(authsink.New(pool)); auth.WithActorContext(authsink.ActorContext); app.WithCommand("audit", audit.Command(pool)) }
+`
+	pack := func(path string) string {
+		data, err := fs.ReadFile(templates.Embedded(), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	audit := pack("audit/files/api/db/migrations/00006_audit_events.sql")
+	identities := pack("auth/files/api/db/migrations/00004_oidc_identities.sql")
+	for _, tc := range []struct {
+		name   string
+		files  map[string]string
+		status doctor.Status
+	}{
+		{name: "no oidc", files: map[string]string{"00006_audit_events.sql": audit}, status: doctor.OK},
+		{name: "oidc migration attaches", files: map[string]string{"00004_oidc_identities.sql": identities, "00006_audit_events.sql": audit}, status: doctor.OK},
+		{name: "old oidc migration", files: map[string]string{"00004_oidc_identities.sql": oldIdentities, "00006_audit_events.sql": audit}, status: doctor.Warn},
+		{name: "old oidc migration retrofitted", files: map[string]string{
+			"00004_oidc_identities.sql": oldIdentities, "00006_audit_events.sql": audit, "00009_audit_user_identities.sql": retrofit,
+		}, status: doctor.OK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			lock := manifest.New()
+			lock.Packs = []string{"api", "auth", "audit"}
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			write(t, root, "api/cmd/api/main.go", wired)
+			for name, data := range tc.files {
+				write(t, root, "api/db/migrations/"+name, data)
+			}
+			got := runCheck(t.Context(), &doctor.Context{Root: root})
+			if got.Status != tc.status {
+				t.Fatalf("result = %+v", got)
+			}
+			if got.Status == doctor.Warn && (!strings.Contains(got.Message, "user_identities") || !strings.Contains(got.Try, "spinup g audit user_identities")) {
+				t.Fatalf("warning = %+v", got)
 			}
 		})
 	}

@@ -170,7 +170,7 @@ func (rc resourceCode) historyGo() ([]byte, error) {
 
 const auditSchemas = `AuditEvent:
   type: object
-  required: [id, occurred_at, action, table, record_id, changes, actor]
+  required: [id, occurred_at, action, table_name, record_id, changes, actor]
   properties:
     id:
       type: integer
@@ -180,7 +180,7 @@ const auditSchemas = `AuditEvent:
       format: date-time
     action:
       type: string
-    table:
+    table_name:
       type: string
     record_id:
       type: string
