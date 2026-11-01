@@ -32,6 +32,7 @@ var legacyPageFiles = []string{"form.ts"}
 // pageDestroyPaths returns the current page paths plus the legacy ones.
 func pageDestroyPaths(name fields.Name) []string {
 	paths := pagePaths(name)
+	paths = append(paths, pagesDir(name)+"/[id]/history/+page.server.ts", pagesDir(name)+"/[id]/history/+page.svelte")
 	for _, f := range legacyPageFiles {
 		paths = append(paths, pagesDir(name)+"/"+f)
 	}
@@ -90,7 +91,7 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 	if lock.Answers["frontend_mode"] == "embed" {
 		return vfs.Plan{}, nil, fmt.Errorf("cannot generate resource pages in embed mode: the pages require SvelteKit form actions\nTry: pass --api-only, or use an app with --frontend-mode node")
 	}
-	if err := checkPageInputs(spec.Root); err != nil {
+	if err := checkPageInputs(spec.Root, spec.Audit.On); err != nil {
 		return vfs.Plan{}, nil, err
 	}
 	data := newPageData(spec)
@@ -102,6 +103,16 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 			return vfs.Plan{}, nil, err
 		}
 		if err := plan.Add(vfs.File{Path: pagesDir(spec.Name) + "/" + f.path, Data: out, Class: string(manifest.Scaffold)}); err != nil {
+			return vfs.Plan{}, nil, err
+		}
+	}
+	if spec.Audit.On {
+		history, err := planHistoryPages(spec)
+		if err != nil {
+			return vfs.Plan{}, nil, err
+		}
+		plan, err = plan.Merge(history)
+		if err != nil {
 			return vfs.Plan{}, nil, err
 		}
 	}
@@ -118,7 +129,7 @@ var (
 
 // checkPageInputs fails when the app lacks a file or an npm package that the
 // pages import, and names each one.
-func checkPageInputs(root string) error {
+func checkPageInputs(root string, audited ...bool) error {
 	var missing []string
 	exists := func(rel string) (bool, error) {
 		_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
@@ -134,7 +145,11 @@ func checkPageInputs(root string) error {
 	for _, name := range pageComponents {
 		paths = append(paths, "web/src/lib/components/ui/"+name+"/")
 	}
-	for _, rel := range append(paths, pageAppFiles...) {
+	paths = append(paths, pageAppFiles...)
+	if len(audited) > 0 && audited[0] {
+		paths = append(paths, "web/src/lib/components/app/history-list.svelte")
+	}
+	for _, rel := range paths {
 		ok, err := exists(rel)
 		if err != nil {
 			return err
@@ -199,6 +214,8 @@ func renderPage(name, source string, data pageData) ([]byte, error) {
 
 // pageData is the input of the page templates.
 type pageData struct {
+	// Audit enables the History button.
+	Audit bool
 	// Pascal is the schema name, such as LineItem.
 	Pascal string
 	// Words and PluralWords name the resource in text, such as "line item".
@@ -246,6 +263,7 @@ func capitalize(s string) string {
 
 func newPageData(spec Spec) pageData {
 	d := pageData{
+		Audit:       spec.Audit.On,
 		Pascal:      spec.Name.Pascal(),
 		Words:       words(spec.Name.Snake()),
 		PluralWords: words(spec.Name.PluralSnake()),
@@ -253,13 +271,7 @@ func newPageData(spec Spec) pageData {
 		APIPath:     "/api/" + spec.Name.PluralSnake(),
 		Roles:       slices.Clone(spec.Roles),
 	}
-	if len(d.Roles) > 0 {
-		quoted := make([]string, 0, len(d.Roles))
-		for _, role := range d.Roles {
-			quoted = append(quoted, fmt.Sprintf("'%s'", role))
-		}
-		d.RoleLiterals = strings.Join(quoted, ", ")
-	}
+	d.RoleLiterals = roleLiterals(d.Roles)
 	d.Name, d.Title = capitalize(d.Words), capitalize(d.PluralWords)
 	d.TitleLabel = d.Name
 	for _, f := range spec.Fields {
@@ -284,3 +296,11 @@ func newPageData(spec Spec) pageData {
 
 // indent adds prefix to every line after the first.
 func indent(s, prefix string) string { return strings.ReplaceAll(s, "\n", "\n"+prefix) }
+
+func roleLiterals(roles []string) string {
+	var quoted []string
+	for _, role := range roles {
+		quoted = append(quoted, fmt.Sprintf("'%s'", role))
+	}
+	return strings.Join(quoted, ", ")
+}

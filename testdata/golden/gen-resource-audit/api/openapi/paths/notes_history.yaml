@@ -1,0 +1,71 @@
+/api/notes/{id}/history:
+  get:
+    operationId: listNoteHistory
+    summary: Read the history of a note
+    tags: [notes]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+          default: 0
+      - name: before_id
+        in: query
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    responses:
+      "200":
+        description: The events, newest first.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditEventList"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "403":
+        description: The signed-in user does not have a required role.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"

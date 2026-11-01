@@ -1,0 +1,67 @@
+# Audited resources build offline. Their database assertions require DATABASE_URL.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new trail --modules auth,audit --module example.com/trail --no-git --non-interactive
+cd trail
+
+# Auditing follows the module. The API-only flag avoids the web post-step.
+exec spinup g resource note title:string api_token:string --role manager,staff --history-role manager --api-only
+exists api/db/migrations/00007_create_notes.sql
+grep 'audit_row_change.*user_id.*id.*api_token' api/db/migrations/00007_create_notes.sql
+grep 'audit.InTx' api/internal/handlers/notes.go
+exists api/internal/handlers/notes_history.go api/openapi/schemas/audit_event.yaml
+! exec spinup g audit note
+stderr 'already attaches its audit trigger'
+
+# A retrofit adds history in separate files and preserves the CRUD handler.
+exec spinup g resource entry title:string --no-audit --role manager --api-only
+cp api/internal/handlers/entries.go original.go
+exec spinup g audit entry --api-only --dry-run
+stdout 'entries_history.go'
+! exists api/internal/handlers/entries_history.go
+exec spinup g audit entry --api-only
+exists api/internal/handlers/entries_history.go
+stdout 'Next: wrap Create, Update, and Delete writes in audit.InTx'
+cmp api/internal/handlers/entries.go original.go
+rm original.go
+
+# Opting out does not generate history or transactions.
+! grep audit.InTx api/internal/handlers/entries.go
+
+# Shared resources use transactions without an owner filter.
+exec spinup g resource bulletin title:string --shared --api-only
+! grep 'filter.OwnerID' api/internal/handlers/bulletins_history.go
+
+# A late OIDC table needs only a trigger migration.
+cp $WORK/identities.sql api/db/migrations/00011_create_user_identities.sql
+exec spinup g audit user_identities
+exists api/db/migrations/00012_audit_user_identities.sql
+! exists api/internal/handlers/user_identities_history.go
+! exec spinup g audit user_identities
+stderr 'already attaches its audit trigger'
+
+cd api
+exec go build ./...
+exec go test -race ./internal/handlers -run 'HistoryGuards|RejectsBadInput|RequiresFields|RequiresUser|RejectsForbiddenRoles'
+[env:DATABASE_URL] exec go test -race ./internal/handlers
+cd ..
+
+# Explicit auditing without the module fails without a prompt.
+cd $WORK
+exec spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g resource note title:string --audit --api-only
+stderr 'Try: spinup module add audit'
+! exec spinup g audit
+stderr 'Try: spinup g audit <resource-or-table>'
+
+-- identities.sql --
+-- +goose Up
+CREATE TABLE user_identities (
+    provider text NOT NULL,
+    subject text NOT NULL,
+    user_id bigint NOT NULL REFERENCES users(id),
+    PRIMARY KEY (provider, subject)
+);
+
+-- +goose Down
+DROP TABLE user_identities;

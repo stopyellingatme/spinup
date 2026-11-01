@@ -67,7 +67,15 @@ func migrationSQL(spec Spec) []byte {
 			fmt.Fprintf(&b, "CREATE INDEX %s_%s_idx ON %s (%s);\n", table, f.Column(), table, f.Column())
 		}
 	}
+	if spec.Audit.On {
+		up, _ := resourceAuditTriggers(spec)
+		b.WriteString(up)
+	}
 	b.WriteString("\n-- +goose Down\n")
+	if spec.Audit.On {
+		_, down := resourceAuditTriggers(spec)
+		b.WriteString(down)
+	}
 	fmt.Fprintf(&b, "DROP TABLE %s;\n", table)
 	return []byte(b.String())
 }
@@ -174,6 +182,7 @@ func upSection(sql string) string {
 	if loc := gooseDown.FindStringIndex(sql); loc != nil {
 		sql = sql[:loc[0]]
 	}
+	sql = regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(sql, "")
 	lines := strings.Split(sql, "\n")
 	for i, line := range lines {
 		if j := strings.Index(line, "--"); j >= 0 && !strings.Contains(line[:j], "'") {
