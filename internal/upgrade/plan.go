@@ -229,7 +229,10 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		}
 		p.Files = append(p.Files, d)
 	}
-	return p, authUpgradeWarnings(root, p)
+	if err := authUpgradeWarnings(root, p); err != nil {
+		return p, err
+	}
+	return p, migrationClashWarnings(root, p)
 }
 
 // planClass preserves an ejected file unless the template changes it to seed.

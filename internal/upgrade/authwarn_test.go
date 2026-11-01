@@ -117,3 +117,37 @@ func TestAuthUpgradeWarningOrder(t *testing.T) {
 		t.Fatal(plan.Files[0].Reason)
 	}
 }
+
+func TestMigrationClashWarnings(t *testing.T) {
+	t.Parallel()
+	const auditMigration = "api/db/migrations/00006_audit_events.sql"
+	for _, tc := range []struct {
+		name, existing, reason, want string
+	}{
+		{name: "todo shape", existing: "00003_create_todos.sql"},
+		{name: "clash", existing: "00006_create_notes.sql", want: "also used by 00006_create_notes.sql"},
+		{name: "reason kept", existing: "00006_create_notes.sql", reason: "earlier reason", want: "earlier reason"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			writePlanFile(t, dir, "api/db/migrations/"+tc.existing, "-- app migration\n", 0o644)
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = root.Close() }()
+			plan := &Plan{Files: []FileDecision{{Path: auditMigration, Action: ActionCreate, Reason: tc.reason}}}
+			if err := migrationClashWarnings(root, plan); err != nil {
+				t.Fatal(err)
+			}
+			got := plan.Files[0].Reason
+			if tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
+				t.Fatalf("reason = %q, want %q", got, tc.want)
+			}
+			if tc.want != "" && tc.reason == "" && !strings.Contains(got, "Try:") {
+				t.Errorf("reason has no Try: line: %q", got)
+			}
+		})
+	}
+}

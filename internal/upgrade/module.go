@@ -120,6 +120,12 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 	if _, err := r.preview(ctx, lock, versions, o.Options, change); err != nil {
 		return err
 	}
+	if slices.Contains(selection.Added, "audit") {
+		// main.go is a scaffold file, so the owner wires the audit module by hand (ADR 0025).
+		if _, err := fmt.Fprint(r.Out, modules.AuditNextSteps()); err != nil {
+			return err
+		}
+	}
 	if o.Options.DryRun {
 		return nil
 	}
