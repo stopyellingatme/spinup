@@ -12,7 +12,14 @@ func init() { Register(GroupDevelop, newTest) }
 func newTest(app *App) *cobra.Command {
 	var o apptest.Options
 	var api bool
-	c := &cobra.Command{Use: "test", Short: "Run application tests", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "test", Example: `  # Run the API tests
+  spinup test
+
+  # Run matching tests with the race detector
+  spinup test --run TestTicket --race
+
+  # Report coverage
+  spinup test --cover`, Short: "Run application tests", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if !o.Web && !o.E2E && !o.Contract {
 			root, err := project.FindRoot(app.Flags.Dir)
 			if err != nil {

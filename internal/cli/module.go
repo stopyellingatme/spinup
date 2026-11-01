@@ -17,9 +17,15 @@ import (
 func init() { Register(GroupDevelop, newModule) }
 
 func newModule(app *App) *cobra.Command {
-	command := &cobra.Command{Use: "module", Short: "List and enable built-in modules"}
+	command := &cobra.Command{Use: "module", Example: `  # List the modules, then enable one
+  spinup module list
+  spinup module add mail`, Short: "List and enable built-in modules"}
 	command.AddCommand(&cobra.Command{
-		Use: "list", Short: "List modules and their enabled state", Args: cobra.NoArgs,
+		Use: "list", Example: `  # List the modules and which ones are enabled
+  spinup module list
+
+  # Print the list as JSON
+  spinup module list --json`, Short: "List modules and their enabled state", Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return modules.List(app.Flags.Dir, app.Flags.JSON, c.OutOrStdout())
 		},
@@ -34,7 +40,17 @@ func newModuleAdd(app *App) *cobra.Command {
 	packs, loadErr := newapp.Catalog()
 	questions, questionErr := newapp.Questions(packs)
 	command := &cobra.Command{
-		Use: "add <name>...", Short: "Enable modules on a branch at the locked template version",
+		Use: "add <name>...", Example: `  # Enable one module on a branch
+  spinup module add mail
+
+  # Enable two modules
+  spinup module add audit jobs
+
+  # Continue after you resolve conflicts
+  spinup module add --continue
+
+  # Remove the worktree and branch
+  spinup module add --abort`, Short: "Enable modules on a branch at the locked template version",
 		Args: func(_ *cobra.Command, args []string) error {
 			if (resume && abort) || ((resume || abort) && len(args) > 0) || (!resume && !abort && len(args) == 0) {
 				return &ui.Error{What: "Invalid module arguments", Why: "supply module names, --continue, or --abort", Try: "spinup module add --help", Code: ui.ExitUsage}

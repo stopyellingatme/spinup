@@ -15,7 +15,14 @@ func init() { Register(GroupMaintain, newSelfUpdate) }
 
 func newSelfUpdate(app *App) *cobra.Command {
 	var options selfupdate.Options
-	c := &cobra.Command{Use: "self-update", Short: "Verify and install a spinup release", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "self-update", Example: `  # Check for a new release
+  spinup self-update --check
+
+  # Install the newest stable release
+  spinup self-update
+
+  # Install a version and require a cosign signature
+  spinup self-update --version 1.4.0 --require-signature`, Short: "Verify and install a spinup release", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if err := updateOnline(app); err != nil {
 			return err
 		}

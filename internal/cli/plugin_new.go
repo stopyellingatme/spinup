@@ -13,7 +13,11 @@ func init() { registerPlugin(newPluginNew) }
 func newPluginNew(app *App) *cobra.Command {
 	var kind, out, sdkPath, platform string
 	command := &cobra.Command{
-		Use: "new <name>", Short: "Create a declarative or executable plugin project", Args: cobra.ExactArgs(1),
+		Use: "new <name>", Example: `  # Create a declarative pack plugin in ./my-pack
+  spinup plugin new my-pack
+
+  # Create an executable plugin in a chosen directory
+  spinup plugin new my-exec --kind exec --out ../plugins/my-exec`, Short: "Create a declarative or executable plugin project", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if platform == "" {
 				platform = runtime.GOOS + "-" + runtime.GOARCH

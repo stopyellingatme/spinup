@@ -14,10 +14,12 @@ func newMaintenancePGMajor(app *App) *cobra.Command { return newMaintenancePG(ap
 func newMaintenancePG(app *App, major bool) *cobra.Command {
 	o := pg.Options{Major: major}
 	use, short := "pg-minor-upgrade", "Upgrade PostgreSQL to the pinned minor after a backup"
+	example := "  # Print the steps first\n  spinup maintenance pg-minor-upgrade --plan --env production\n\n  # Upgrade now, even outside the maintenance window\n  spinup maintenance pg-minor-upgrade --now --env production"
 	if major {
 		use, short = "pg-major-upgrade", "Upgrade the PostgreSQL major with a verified dump and retained old volume"
+		example = "  # Print the steps first\n  spinup maintenance pg-major-upgrade --to 18 --plan --env production\n\n  # Upgrade (this causes downtime)\n  spinup maintenance pg-major-upgrade --to 18 --i-know --env production\n\n  # Remove the old volume after you verify the app\n  spinup maintenance pg-major-upgrade --cleanup --i-know --env production"
 	}
-	c := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: use, Short: short, Example: example, Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		opts := o
 		opts.Dir, opts.Env = app.Flags.Dir, app.Flags.Env
 		opts.Plan = opts.Plan || app.Flags.DryRun

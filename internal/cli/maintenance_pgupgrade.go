@@ -10,7 +10,14 @@ func init() { registerMaintenance(newMaintenancePGInPlace) }
 
 func newMaintenancePGInPlace(app *App) *cobra.Command {
 	var o pg.Options
-	c := &cobra.Command{Use: "pg-upgrade-in-place", Short: "Upgrade PostgreSQL with pg_upgrade --link and retain the old directory", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "pg-upgrade-in-place", Example: `  # Print the steps first
+  spinup maintenance pg-upgrade-in-place --to 18 --plan --env production
+
+  # Upgrade in place (this causes downtime)
+  spinup maintenance pg-upgrade-in-place --to 18 --i-know --env production
+
+  # Delete the old data directory after you verify the app
+  spinup maintenance pg-upgrade-in-place --cleanup --i-know --env production`, Short: "Upgrade PostgreSQL with pg_upgrade --link and retain the old directory", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		opts := o
 		opts.Dir, opts.Env = app.Flags.Dir, app.Flags.Env
 		opts.Plan = opts.Plan || app.Flags.DryRun
