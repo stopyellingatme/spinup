@@ -9,7 +9,11 @@ import (
 func init() { Register(GroupDevelop, newRoutes) }
 
 func newRoutes(app *App) *cobra.Command {
-	return &cobra.Command{Use: "routes", Short: "List application HTTP routes", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	return &cobra.Command{Use: "routes", Example: `  # List the HTTP routes of the API
+  spinup routes
+
+  # Print the routes as JSON
+  spinup routes --json`, Short: "List application HTTP routes", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err

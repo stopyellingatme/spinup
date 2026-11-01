@@ -9,10 +9,19 @@ import (
 func init() { Register(GroupMaintain, newTools) }
 
 func newTools(app *App) *cobra.Command {
-	command := &cobra.Command{Use: "tools", Short: "Install and inspect checksum-verified host tools"}
+	command := &cobra.Command{Use: "tools", Example: `  # List the tools, then install the missing ones
+  spinup tools list
+  spinup tools install`, Short: "Install and inspect checksum-verified host tools"}
 	var force bool
 	install := &cobra.Command{
-		Use: "install [sops|age...]", Short: "Download and verify pinned tool releases", Args: cobra.ArbitraryArgs,
+		Use: "install [sops|age...]", Example: `  # Install every pinned tool
+  spinup tools install
+
+  # Install two tools
+  spinup tools install sops age
+
+  # Reinstall a tool
+  spinup tools install age --force`, Short: "Download and verify pinned tool releases", Args: cobra.ArbitraryArgs,
 		RunE: func(c *cobra.Command, names []string) error {
 			installed, err := tools.Install(c.Context(), tools.Options{Names: names, Offline: app.Flags.Offline, Force: force})
 			if err != nil {
@@ -33,7 +42,8 @@ func newTools(app *App) *cobra.Command {
 	}
 	install.Flags().BoolVar(&force, "force", false, "reinstall tools that already report the pinned version")
 	list := &cobra.Command{
-		Use: "list", Short: "List pinned tools and installed versions", Args: cobra.NoArgs,
+		Use: "list", Example: `  # List the pinned tools and what is installed
+  spinup tools list`, Short: "List pinned tools and installed versions", Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			entries, err := tools.List(c.Context(), tools.Options{})
 			if err != nil {

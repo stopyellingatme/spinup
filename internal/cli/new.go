@@ -15,7 +15,17 @@ func newNew(app *App) *cobra.Command {
 	var o newapp.Options
 	packs, loadErr := newapp.Catalog()
 	questions, questionErr := newapp.Questions(packs)
-	c := &cobra.Command{Use: "new <name>", Short: "Create an application from template packs", Args: cobra.ExactArgs(1)}
+	c := &cobra.Command{Use: "new <name>", Example: `  # Create a full-stack app named todo
+  spinup new todo
+
+  # Create only the Go API, no git repository
+  spinup new todo --api-only --no-git
+
+  # Choose the options with flags (no prompts)
+  spinup new todo --module github.com/acme/todo --modules ci,deploy,auth --non-interactive
+
+  # Add a trusted plugin pack
+  spinup new todo --plugin github.com/acme/spinup-pack@v1.2.0 --trust`, Short: "Create an application from template packs", Args: cobra.ExactArgs(1)}
 	c.Flags().StringArrayVar(&o.Plugins, "plugin", nil, "add a trusted pack source with optional @version (repeatable)")
 	c.Flags().BoolVar(&o.Trust, "trust", false, "trust plugin sources and hashes")
 	c.Flags().BoolVar(&o.APIOnly, "api-only", false, "create only the Go API")

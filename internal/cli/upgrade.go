@@ -18,7 +18,18 @@ func newUpgrade(app *App) *cobra.Command {
 	var options upgrade.Options
 	var plan, resume, abort bool
 	command := &cobra.Command{
-		Use: "upgrade", Short: "Upgrade app templates in a separate Git worktree",
+		Use: "upgrade", Example: `  # See the plan first
+  spinup upgrade --plan
+
+  # Upgrade to the newest template version in a new worktree
+  spinup upgrade
+
+  # Upgrade to a chosen version
+  spinup upgrade --to 0.9.0
+
+  # Continue after you fix conflicts, or give up
+  spinup upgrade --continue
+  spinup upgrade --abort`, Short: "Upgrade app templates in a separate Git worktree",
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return &ui.Error{What: "Invalid upgrade arguments", Why: "upgrade accepts flags only", Try: "spinup upgrade --help", Code: ui.ExitUsage}

@@ -54,7 +54,15 @@ func init() {
 	Register(GroupMaintain, func(app *App) *cobra.Command {
 		var check bool
 		command := &cobra.Command{
-			Use:   "version",
+			Use: "version",
+			Example: `  # Print the version
+  spinup version
+
+  # Check for a newer stable release
+  spinup version --check
+
+  # Print the version as JSON
+  spinup version --json`,
 			Short: "Print the spinup version",
 			Args:  cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {

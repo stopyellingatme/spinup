@@ -26,7 +26,9 @@ func registerPlugin(build func(app *App) *cobra.Command) {
 var _ = registerPlugin
 
 func newPlugin(app *App) *cobra.Command {
-	command := &cobra.Command{Use: "plugin", Short: "Manage trusted template pack plugins"}
+	command := &cobra.Command{Use: "plugin", Example: `  # List the plugins, then inspect one
+  spinup plugin list
+  spinup plugin info spinup-pack`, Short: "Manage trusted template pack plugins"}
 	manager := func(c *cobra.Command, trust bool) (*pack.Manager, error) {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
@@ -36,7 +38,11 @@ func newPlugin(app *App) *cobra.Command {
 	}
 	var addVersion, updateVersion, addTrustExec, updateTrustExec string
 	var addTrust, updateTrust bool
-	add := &cobra.Command{Use: "add <source>", Short: "Inspect and trust a plugin without rendering files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	add := &cobra.Command{Use: "add <source>", Example: `  # Inspect a plugin, then trust it
+  spinup plugin add github.com/acme/spinup-pack --version v1.2.0 --trust
+
+  # Trust a plugin that runs code on your machine
+  spinup plugin add github.com/acme/spinup-exec --version v0.3.0 --trust-exec spinup-exec`, Short: "Inspect and trust a plugin without rendering files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, addTrust)
 		if err != nil {
 			return err
@@ -47,7 +53,8 @@ func newPlugin(app *App) *cobra.Command {
 	add.Flags().StringVar(&addVersion, "version", "", "fixed git tag or path plugin version")
 	add.Flags().BoolVar(&addTrust, "trust", false, "trust the displayed plugin source and hash")
 	add.Flags().StringVar(&addTrustExec, "trust-exec", "", "trust execution of the named plugin with your user privileges")
-	update := &cobra.Command{Use: "update <name>", Short: "Inspect and trust a plugin version", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	update := &cobra.Command{Use: "update <name>", Example: `  # Move a plugin to a new version
+  spinup plugin update spinup-pack --version v1.3.0 --trust`, Short: "Inspect and trust a plugin version", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, updateTrust)
 		if err != nil {
 			return err
@@ -58,14 +65,16 @@ func newPlugin(app *App) *cobra.Command {
 	update.Flags().StringVar(&updateVersion, "version", "", "new fixed git tag or path plugin version")
 	update.Flags().BoolVar(&updateTrust, "trust", false, "trust the displayed plugin source and hash")
 	update.Flags().StringVar(&updateTrustExec, "trust-exec", "", "trust execution of the named plugin with your user privileges")
-	remove := &cobra.Command{Use: "remove <name>", Short: "Remove plugin records and retain rendered files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	remove := &cobra.Command{Use: "remove <name>", Example: `  # Remove the plugin record (rendered files stay)
+  spinup plugin remove spinup-pack`, Short: "Remove plugin records and retain rendered files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, false)
 		if err != nil {
 			return err
 		}
 		return m.Remove(c.Context(), args[0])
 	}}
-	list := &cobra.Command{Use: "list", Short: "List declared plugins and their locked hashes", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	list := &cobra.Command{Use: "list", Example: `  # List the plugins and their locked hashes
+  spinup plugin list`, Short: "List declared plugins and their locked hashes", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		m, err := manager(c, false)
 		if err != nil {
 			return err
@@ -82,14 +91,16 @@ func newPlugin(app *App) *cobra.Command {
 		}
 		return nil
 	}}
-	verify := &cobra.Command{Use: "verify", Short: "Re-fetch plugins and verify their trust records", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	verify := &cobra.Command{Use: "verify", Example: `  # Fetch the plugins again and check their hashes
+  spinup plugin verify`, Short: "Re-fetch plugins and verify their trust records", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		m, err := manager(c, false)
 		if err != nil {
 			return err
 		}
 		return m.Verify(c.Context())
 	}}
-	info := &cobra.Command{Use: "info <name>", Short: "Show verified plugin metadata, generators, and files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	info := &cobra.Command{Use: "info <name>", Example: `  # Show the metadata and generators of a plugin
+  spinup plugin info spinup-pack`, Short: "Show verified plugin metadata, generators, and files", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		m, err := manager(c, false)
 		if err != nil {
 			return err

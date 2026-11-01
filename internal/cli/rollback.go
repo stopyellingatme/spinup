@@ -9,7 +9,14 @@ func init() { Register(GroupShip, newRollback) }
 
 func newRollback(app *App) *cobra.Command {
 	var o deploy.RollbackOptions
-	c := &cobra.Command{Use: "rollback", Short: "Switch to a stored release without changing the database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "rollback", Example: `  # Go back to the previous release
+  spinup rollback --env production
+
+  # Go back to a chosen release
+  spinup rollback --to 20261101T093000Z-ab12cd3 --env production
+
+  # Print the steps to recover the database by hand
+  spinup rollback --with-db-plan --env production`, Short: "Switch to a stored release without changing the database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		o.Options = deployOptions(app, c)
 		return deploy.Rollback(c.Context(), o, deploy.DefaultDeps())
 	}}
