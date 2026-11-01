@@ -109,6 +109,7 @@ func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
 		a.internalError(w, r, "start a session", err)
 		return
 	}
+	a.notify(r.Context(), Event{Name: EventSignIn, User: user, Method: "password"})
 	_ = httpx.WriteJSON(w, http.StatusCreated, userResponse{User: user})
 }
 
@@ -142,7 +143,7 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	defer leave()
 	ctx := r.Context()
 	now := a.now()
-	until, attempt, err := a.reserveAttempt(ctx, email, now)
+	until, attempt, last, err := a.reserveAttempt(ctx, email, now)
 	if err != nil {
 		a.internalError(w, r, "reserve a login attempt", err)
 		return
@@ -178,6 +179,11 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !found || !match {
+		if found && last {
+			// This failure reached the threshold: the lockout of an existing
+			// account starts. An unknown email writes nothing.
+			a.notify(ctx, Event{Name: EventLockout, User: user})
+		}
 		noStore(w)
 		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusUnauthorized, Detail: "The email address or password is incorrect."})
 		return
@@ -193,15 +199,20 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		a.internalError(w, r, "start a session", err)
 		return
 	}
+	a.notify(ctx, Event{Name: EventSignIn, User: user, Method: "password"})
 	_ = httpx.WriteJSON(w, http.StatusOK, userResponse{User: user})
 }
 
 func (a *Auth) logout(w http.ResponseWriter, r *http.Request) {
 	// Destroy deletes the session row and expires the cookie, also for a session
 	// that has no user.
+	user, signedIn := UserFrom(r.Context())
 	if err := a.sessions.Destroy(r.Context()); err != nil {
 		a.internalError(w, r, "destroy a session", err)
 		return
+	}
+	if signedIn {
+		a.notify(r.Context(), Event{Name: EventSignOut, User: user})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -243,7 +254,7 @@ func (a *Auth) rehash(ctx context.Context, user User, old, password string) {
 	var hash string
 	err := a.slots.runAdmitted(ctx, func() { hash = hashPassword(a.params, password) })
 	if err == nil {
-		err = a.updatePasswordHash(ctx, user.ID, old, hash)
+		err = a.updatePasswordHash(ctx, user, old, hash)
 	}
 	if err != nil {
 		a.logger.WarnContext(ctx, "auth: cannot rehash a password with the current parameters", "error", err, "request_id", httpx.RequestIDFrom(ctx))

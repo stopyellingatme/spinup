@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+
+	"github.com/stopyellingatme/spinup/kit/audit"
 )
 
 // hardStopTimeout limits how long [Worker.Stop] waits for cancelled jobs
@@ -54,6 +56,10 @@ func NewWorker(pool *pgxpool.Pool, opts ...Option) (*Worker, error) {
 // Register adds fn as the function that works jobs of the kind T. Call it
 // before [Worker.Start]. It panics when the kind is already registered or
 // the worker has started, because both are programming errors.
+//
+// The context of fn holds the audit actor audit.System("job", <kind>) (ADR 0025
+// decision 4.9). A write through audit.InTx in the job gets this actor. A write
+// through the pool directly is unattributed.
 func Register[T Args](w *Worker, fn func(ctx context.Context, job Job[T]) error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -69,7 +75,7 @@ func Register[T Args](w *Worker, fn func(ctx context.Context, job Job[T]) error)
 	}
 	w.kinds = append(w.kinds, kind)
 	river.AddWorker(w.workers, river.WorkFunc(func(ctx context.Context, j *river.Job[T]) error {
-		return fn(ctx, Job[T]{ID: j.ID, Args: j.Args, Attempt: j.Attempt})
+		return fn(jobContext(ctx, kind), Job[T]{ID: j.ID, Args: j.Args, Attempt: j.Attempt})
 	}))
 }
 
@@ -170,4 +176,12 @@ func (w *Worker) Stop(ctx context.Context) error {
 		try:  "give Stop a longer timeout, or make long jobs check ctx.Done()",
 		err:  err,
 	}
+}
+
+// jobContext returns the context of a job of kind: it holds the system actor of
+// the audit trail. kit/audit does not import kit/jobs, so this import makes no
+// cycle. The actor is only a context value: a job without the audit module
+// does not use it.
+func jobContext(ctx context.Context, kind string) context.Context {
+	return audit.WithActor(ctx, audit.System(audit.SourceJob, kind))
 }

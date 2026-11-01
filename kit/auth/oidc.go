@@ -337,6 +337,7 @@ func (h *oidcHandler) callback(w http.ResponseWriter, r *http.Request) {
 		h.auth.internalError(w, r, "start the OIDC session", err)
 		return
 	}
+	h.auth.notify(r.Context(), Event{Name: EventSignIn, User: user, Method: "oidc"})
 	http.Redirect(w, r, flow.Next, http.StatusSeeOther)
 }
 
