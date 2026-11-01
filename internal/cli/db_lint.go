@@ -30,7 +30,11 @@ func init() {
 
 func newDBLint(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "lint [file...]",
+		Use: "lint [file...]", Example: `  # Check every migration for unsafe deploy changes
+  spinup db lint
+
+  # Check one migration file
+  spinup db lint api/db/migrations/00007_add_index.sql`,
 		Short: "Check migrations for unsafe deploy changes",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(c *cobra.Command, args []string) error {

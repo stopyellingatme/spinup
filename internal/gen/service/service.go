@@ -31,6 +31,14 @@ var templates embed.FS
 func init() {
 	registry.Register(gen.Generator{
 		Name: "service", Short: "Add a sidecar service",
+		Example: `  # Add a Rust sidecar service
+  spinup g service thumbs --lang rust
+
+  # Add a Python PDF report service
+  spinup g service reports --lang python --kind pdf
+
+  # Add a Node service with a public route behind sign-in
+  spinup g service hooks --lang node --public /svc/hooks --auth session`,
 		Usage: "<name> --lang rust|python|node|<plugin>/<template> [--kind service|pdf] [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi]",
 		Flags: flags, Run: plan,
 	})

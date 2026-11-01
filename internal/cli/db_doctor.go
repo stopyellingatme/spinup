@@ -9,7 +9,8 @@ import (
 func init() { registerDB(newDBDoctor) }
 
 func newDBDoctor(app *App) *cobra.Command {
-	return &cobra.Command{Use: "doctor", Short: "Check the PostgreSQL version and pending migrations", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "doctor", Example: `  # Check the PostgreSQL version and the pending migrations
+  spinup db doctor`, Short: "Check the PostgreSQL version and pending migrations", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
 		return ops.Doctor(c.Context(), dbOptions(app, c, false), exec.OSRunner{})
 	}}
 }

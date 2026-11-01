@@ -18,6 +18,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "migration",
 		Short: "Generate an empty SQL migration",
+		Example: `  # Add an empty migration, then edit the SQL
+  spinup g migration add_ticket_index`,
 		Usage: "<snake_name>",
 		Run:   run,
 	})

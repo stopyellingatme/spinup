@@ -15,7 +15,8 @@ import (
 )
 
 func init() {
-	registry.Register(gen.Generator{Name: "roles", Short: "Generate the app role set", Run: plan})
+	registry.Register(gen.Generator{Name: "roles", Short: "Generate the app role set", Example: `  # Rewrite api/internal/roles/roles.gen.go from the [auth] table of spinup.toml
+  spinup g roles`, Run: plan})
 }
 
 func plan(_ context.Context, in gen.Input) (*gen.Output, error) {

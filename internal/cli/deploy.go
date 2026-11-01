@@ -48,7 +48,14 @@ func newDeploy(app *App) *cobra.Command {
 	var o deploy.Options
 	var acceptNewHostKey bool
 	c := &cobra.Command{
-		Use:   "deploy",
+		Use: "deploy", Example: `  # See what a deploy would change
+  spinup deploy --plan --env production
+
+  # Deploy the current commit to production
+  spinup deploy --env production
+
+  # Continue a deploy that stopped
+  spinup deploy --env production --resume`,
 		Short: "Ship the current commit to an environment with zero downtime",
 		Long: "Build the images, ship them to the VM of the environment over SSH, run the migrations,\n" +
 			"and switch Caddy to the new blue/green color. Each step is journaled on the VM.",
@@ -77,7 +84,8 @@ func newDeploy(app *App) *cobra.Command {
 	c.PersistentFlags().BoolVar(&acceptNewHostKey, "accept-new-host-key", false, "accept the SSH host key of a new VM")
 
 	status := &cobra.Command{
-		Use:   "status",
+		Use: "status", Example: `  # Show the release that runs on the VM
+  spinup deploy status --env production`,
 		Short: "Show the current release, the deploy lock, and the last deploy journal",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -88,7 +96,8 @@ func newDeploy(app *App) *cobra.Command {
 	}
 	var force bool
 	unlock := &cobra.Command{
-		Use:   "unlock",
+		Use: "unlock", Example: `  # Remove a stale deploy lock
+  spinup deploy unlock --env production --force`,
 		Short: "Remove the deploy lock of an environment",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {

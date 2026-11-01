@@ -19,6 +19,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "handler",
 		Short: "Generate a plain HTTP handler and its test",
+		Example: `  # Add a plain HTTP handler named health_check, with a test
+  spinup g handler health_check`,
 		Usage: "<name>",
 		Run:   run,
 	})

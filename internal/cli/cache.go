@@ -15,7 +15,11 @@ func init() { Register(GroupMaintain, newCache) }
 func newCache(app *App) *cobra.Command {
 	command := &cobra.Command{Use: "cache", Short: "Manage cached template versions"}
 	warm := &cobra.Command{
-		Use: "warm [version...]", Short: "Download and verify missing template versions",
+		Use: "warm [version...]", Example: `  # Download the template version that the project locks
+  spinup cache warm
+
+  # Download two named versions
+  spinup cache warm v0.4.0 v0.5.0`, Short: "Download and verify missing template versions",
 		Args: func(_ *cobra.Command, _ []string) error {
 			if app.Flags.Offline || os.Getenv("SPINUP_OFFLINE") == "1" {
 				return &ui.Error{What: "Cannot warm templates", Why: "offline mode disables downloads", Try: "remove --offline and unset SPINUP_OFFLINE", Code: ui.ExitUsage}
@@ -44,7 +48,8 @@ func newCache(app *App) *cobra.Command {
 			return nil
 		},
 	}
-	list := &cobra.Command{Use: "list", Short: "List loadable template versions and their sources", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	list := &cobra.Command{Use: "list", Example: `  # List the template versions that spinup can load
+  spinup cache list`, Short: "List loadable template versions and their sources", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		source, err := store.Default(Version, app.Flags.Offline)
 		if err != nil {
 			return err
@@ -61,7 +66,8 @@ func newCache(app *App) *cobra.Command {
 		}
 		return nil
 	}}
-	clean := &cobra.Command{Use: "clean", Short: "Remove downloaded template archives and signatures", Args: cobra.NoArgs, RunE: func(_ *cobra.Command, _ []string) error {
+	clean := &cobra.Command{Use: "clean", Example: `  # Remove the downloaded template archives
+  spinup cache clean`, Short: "Remove downloaded template archives and signatures", Args: cobra.NoArgs, RunE: func(_ *cobra.Command, _ []string) error {
 		source, err := store.Default(Version, app.Flags.Offline)
 		if err != nil {
 			return err

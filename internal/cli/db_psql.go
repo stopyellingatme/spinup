@@ -9,7 +9,8 @@ import (
 func init() { registerDB(newDBPsql) }
 
 func newDBPsql(app *App) *cobra.Command {
-	return &cobra.Command{Use: "psql", Short: "Open psql on the development database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "psql", Example: `  # Open psql on the development database
+  spinup db psql`, Short: "Open psql on the development database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
 		return ops.Psql(c.Context(), dbOptions(app, c, false), exec.OSRunner{})
 	}}
 }

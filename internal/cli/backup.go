@@ -27,7 +27,11 @@ func backupOptions(app *App, c *cobra.Command) backup.Options {
 func newBackup(app *App) *cobra.Command {
 	group := &cobra.Command{Use: "backup", Short: "Back up the production database with pgBackRest", Args: cobra.NoArgs}
 	var kind string
-	now := &cobra.Command{Use: "now", Short: "Take a backup now and print its label, size, and duration", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	now := &cobra.Command{Use: "now", Example: `  # Take a differential backup now
+  spinup backup now
+
+  # Take a full backup of production
+  spinup backup now --type full --env production`, Short: "Take a backup now and print its label, size, and duration", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		k, err := backup.ParseKind(kind)
 		if err != nil {
 			return err
@@ -39,11 +43,13 @@ func newBackup(app *App) *cobra.Command {
 	}}
 	now.Flags().StringVar(&kind, "type", "diff", "backup type: full, diff, or incr")
 	group.AddCommand(now)
-	group.AddCommand(&cobra.Command{Use: "list", Short: "List the backups in the repository", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	group.AddCommand(&cobra.Command{Use: "list", Example: `  # List the backups in the repository
+  spinup backup list`, Short: "List the backups in the repository", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		_, err := backup.List(c.Context(), backupOptions(app, c))
 		return err
 	}})
-	group.AddCommand(&cobra.Command{Use: "status", Short: "Show the repository status and the last backup", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	group.AddCommand(&cobra.Command{Use: "status", Example: `  # Show the repository status and the last backup
+  spinup backup status`, Short: "Show the repository status and the last backup", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		_, err := backup.ShowStatus(c.Context(), backupOptions(app, c))
 		return err
 	}})

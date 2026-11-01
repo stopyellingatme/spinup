@@ -10,7 +10,14 @@ import (
 
 func newDBMigrate(app *App) *cobra.Command {
 	var know bool
-	c := &cobra.Command{Use: "migrate [up|down|status]", Short: "Run migrations through the application API", Args: cobra.MaximumNArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	c := &cobra.Command{Use: "migrate [up|down|status]", Example: `  # Apply every pending migration
+  spinup db migrate up
+
+  # Roll back the last migration (asks you to confirm data loss)
+  spinup db migrate down --i-know
+
+  # List applied and pending migrations
+  spinup db migrate status`, Short: "Run migrations through the application API", Args: cobra.MaximumNArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		sub := "up"
 		if len(args) > 0 {
 			sub = args[0]

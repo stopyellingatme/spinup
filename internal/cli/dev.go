@@ -16,7 +16,14 @@ var notifyContext func(context.Context, ...os.Signal) (context.Context, context.
 func init() { Register(GroupDevelop, newDev) }
 func newDev(app *App) *cobra.Command {
 	var options devloop.Options
-	command := &cobra.Command{Use: "dev", Short: "Run the local development stack", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	command := &cobra.Command{Use: "dev", Example: `  # Start the API, the web app, and the database
+  spinup dev
+
+  # Start with Grafana LGTM monitoring
+  spinup dev --lgtm
+
+  # Run only the API and its database
+  spinup dev --no-web --no-services`, Short: "Run the local development stack", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		options.Dir = app.Flags.Dir
 		options.NoColor = app.Flags.NoColor
 		options.Out = c.OutOrStdout()

@@ -22,7 +22,8 @@ import (
 const dir = "api/internal/mail"
 
 func init() {
-	registry.Register(gen.Generator{Name: "mailer", Short: "Add a typed mailer and email templates", Usage: "<name> [field:type...]", Run: plan})
+	registry.Register(gen.Generator{Name: "mailer", Short: "Add a typed mailer and email templates", Usage: "<name> [field:type...]", Example: `  # Add a mailer with two typed fields
+  spinup g mailer welcome name:string url:string`, Run: plan})
 }
 
 func plan(_ context.Context, in gen.Input) (*gen.Output, error) {

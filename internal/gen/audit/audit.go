@@ -23,6 +23,11 @@ import (
 func init() {
 	registry.Register(gen.Generator{
 		Name: "audit", Short: "Attach audit triggers and add resource history", Usage: "<resource-or-table>",
+		Example: `  # Add audit triggers and a history page to a resource
+  spinup g audit ticket
+
+  # Add the trail only, and hide a column
+  spinup g audit users --api-only --audit-redact phone`,
 		Flags: func(fs *pflag.FlagSet) {
 			fs.Bool("api-only", false, "skip history web pages")
 			fs.String("audit-redact", "", "additional columns to redact from the trail")

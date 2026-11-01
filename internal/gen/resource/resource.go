@@ -27,6 +27,14 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "resource",
 		Short: "Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests",
+		Example: `  # Add a ticket resource with typed fields
+  spinup g resource ticket title:string body:text status:enum:open|closed
+
+  # Add a resource that all signed-in users share, for staff only
+  spinup g resource note body:text --shared --role staff
+
+  # Add a resource without web pages
+  spinup g resource invoice total:decimal due:date --api-only`,
 		Usage: "<name> <field:type>...",
 		Flags: func(fs *pflag.FlagSet) {
 			fs.Bool("api-only", false, "skip the parts that other packs register, such as web pages")

@@ -18,7 +18,11 @@ func init() { Register(GroupMaintain, newCI) }
 func newCI(app *App) *cobra.Command {
 	command := &cobra.Command{Use: "ci", Short: "Generate and verify GitHub Actions files"}
 	var diff, force bool
-	generate := &cobra.Command{Use: "generate", Short: "Render the locked ci pack", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	generate := &cobra.Command{Use: "generate", Example: `  # Write the GitHub Actions workflows
+  spinup ci generate
+
+  # Show the changes without writing
+  spinup ci generate --diff`, Short: "Render the locked ci pack", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err
@@ -32,7 +36,8 @@ func newCI(app *App) *cobra.Command {
 	}}
 	generate.Flags().BoolVar(&diff, "diff", false, "show unified diffs without writing")
 	generate.Flags().BoolVar(&force, "force", false, "overwrite workflows with user changes")
-	verify := &cobra.Command{Use: "verify", Short: "Check workflow safety and run optional actionlint", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	verify := &cobra.Command{Use: "verify", Example: `  # Check the workflows for unsafe patterns
+  spinup ci verify`, Short: "Check workflow safety and run optional actionlint", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err
@@ -49,7 +54,8 @@ func newCI(app *App) *cobra.Command {
 		}
 		return nil
 	}}
-	services := &cobra.Command{Use: "services", Short: "List services for a GitHub Actions matrix", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	services := &cobra.Command{Use: "services", Example: `  # Print the services as a GitHub Actions matrix
+  spinup ci services --json`, Short: "List services for a GitHub Actions matrix", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err
@@ -78,7 +84,8 @@ func newCI(app *App) *cobra.Command {
 		}
 		return nil
 	}}
-	testService := &cobra.Command{Use: "test-service <name>", Short: "Run tests for one service", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	testService := &cobra.Command{Use: "test-service <name>", Example: `  # Run the tests of the service thumbs
+  spinup ci test-service thumbs`, Short: "Run tests for one service", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err

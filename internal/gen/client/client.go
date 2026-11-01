@@ -17,7 +17,8 @@ import (
 )
 
 func init() {
-	registry.Register(gen.Generator{Name: "client", Short: "Generate TypeScript types from OpenAPI", Run: plan})
+	registry.Register(gen.Generator{Name: "client", Short: "Generate TypeScript types from OpenAPI", Example: `  # Regenerate the TypeScript API types after an OpenAPI change
+  spinup g client`, Run: plan})
 	run.RegisterPostStep(gen.PostClient, postStep)
 }
 

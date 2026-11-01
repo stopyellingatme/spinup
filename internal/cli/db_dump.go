@@ -9,7 +9,11 @@ import (
 func init() { registerDB(newDBDump) }
 
 func newDBDump(app *App) *cobra.Command {
-	return &cobra.Command{Use: "dump [file]", Short: "Dump the development database (default " + ops.DefaultDumpFile + ")", Args: cobra.MaximumNArgs(1), RunE: func(c *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "dump [file]", Example: `  # Dump the development database to the default file
+  spinup db dump
+
+  # Dump to a named file
+  spinup db dump backup.sql`, Short: "Dump the development database (default " + ops.DefaultDumpFile + ")", Args: cobra.MaximumNArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		file := ""
 		if len(args) > 0 {
 			file = args[0]
