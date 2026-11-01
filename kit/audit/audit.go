@@ -10,11 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// errNotImplemented is the result of the contract stubs. Unit K replaces them.
-var errNotImplemented = errors.New("audit: not implemented")
 
 // Execer runs a statement. A *pgxpool.Pool, a *pgx.Conn, and a pgx.Tx satisfy it.
 type Execer interface {
@@ -179,41 +175,4 @@ func Operator() Actor {
 // System returns an actor of the kind system, such as System("job", "send_mail").
 func System(source, reason string) Actor {
 	return Actor{Kind: KindSystem, Source: source, Reason: reason}
-}
-
-// Bind sets the actor of ctx as the transaction-local setting spinup.audit, so
-// the triggers of the transaction read it. It returns ErrNotInTx when tx is a
-// *pgxpool.Pool or a *pgx.Conn.
-func Bind(ctx context.Context, tx Execer) error {
-	return errNotImplemented
-}
-
-// InTx runs fn in a transaction (db.InTx) after Bind with the actor of ctx.
-func InTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
-	return errNotImplemented
-}
-
-// Record writes an event that is not a row change, such as auth.sign_in. It
-// takes the actor from e.Actor, or from ActorFrom(ctx) when e.Actor.Kind is
-// empty, and passes it to audit_append. It reads no setting, so q can be a pool.
-func Record(ctx context.Context, q Execer, e Event) error {
-	return errNotImplemented
-}
-
-// List returns the events that match f, newest first. It returns an error that
-// wraps ErrFilterLimit when f.Validate fails.
-func List(ctx context.Context, q Querier, f Filter) ([]Event, error) {
-	return nil, errNotImplemented
-}
-
-// Prune deletes the events before the time before through audit_prune and
-// returns the count. It refuses an age below 1 day and needs a reason.
-func Prune(ctx context.Context, pool *pgxpool.Pool, before time.Time, reason string) (int64, error) {
-	return 0, errNotImplemented
-}
-
-// Command returns the operator command "audit" of the app binary: list, export,
-// and prune. Register it with app.WithCommand("audit", audit.Command(pool)).
-func Command(pool *pgxpool.Pool) func(ctx context.Context, args []string) error {
-	return func(context.Context, []string) error { return errNotImplemented }
 }

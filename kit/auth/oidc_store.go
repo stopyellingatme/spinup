@@ -42,6 +42,9 @@ func (a *Auth) oidcUser(ctx context.Context, provider, subject, email string, ve
 		if roleErr != nil {
 			return User{}, roleErr
 		}
+		if err := a.rowEvent(ctx, tx, Event{Name: EventRegister, User: User{Email: email, Role: role}, Method: "oidc"}); err != nil {
+			return User{}, err
+		}
 		err = tx.QueryRow(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, NULL, $2) ON CONFLICT (email) DO NOTHING RETURNING id, email, role`, email, role).Scan(&user.ID, &user.Email, &user.Role)
 		existing = errors.Is(err, pgx.ErrNoRows)
 		if existing {
@@ -52,6 +55,10 @@ func (a *Auth) oidcUser(ctx context.Context, provider, subject, email string, ve
 		return User{}, err
 	}
 	if existing {
+		// The existing account links the identity. It acts on its own account.
+		if err := a.rowEvent(ctx, tx, Event{Name: EventRegister, User: User{ID: user.ID, Email: user.Email, Role: a.effectiveRole(user.Role)}, Method: "oidc"}); err != nil {
+			return User{}, err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = NULL WHERE id = $1`, user.ID); err != nil {
 			return User{}, err
 		}
