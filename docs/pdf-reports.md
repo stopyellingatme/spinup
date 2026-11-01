@@ -110,7 +110,23 @@ The client is in `api/internal/services/reports`.
 `client.Render` returns the raw `*http.Response`.
 `pdf.Serve` from the kit checks the response and writes the attachment.
 
-Add the handler in `routes.go`. Use the roles of the resource:
+The generated `routes.Deps` holds only `DB`. Add the two values that the handler needs:
+
+```go
+// api/internal/routes/routes.go
+type Deps struct {
+	DB      *pgxpool.Pool
+	Auth    *auth.Auth                   // for RequireRole
+	Reports *reports.ClientWithResponses // the PDF service client
+}
+```
+
+Create the client once in `api/cmd/api/main.go`, the same way as any service client (see [Call the service from a handler](services.md#call-the-service-from-a-handler)), and set both fields where `main.go` builds `routes.Deps`.
+The client reads `SERVICE_REPORTS_URL`. `spinup dev` and the deploy set it for the API, the worker, and the migrate step.
+If `main.go` loads the client configuration before it runs a command, every app command needs the variable, including `api user create` and `api audit list`.
+Load the configuration inside the server path, or set the variable when you run an operator command.
+
+Then add the handler in `routes.go`, with `authn` as `d.Auth` and `reportsClient` as `d.Reports`. Use the roles of the resource:
 
 ```go
 mux.Handle("GET /api/work_orders/{id}/report.pdf", authn.RequireRole(roles.Manager)(http.HandlerFunc(

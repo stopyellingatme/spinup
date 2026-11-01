@@ -8,7 +8,8 @@
 		occurred_at: string;
 		action: string;
 		actor: { email?: string; role?: string; kind?: string };
-		changes: Record<string, AuditChange>;
+		/** A row change maps each field to an AuditChange. A custom event may hold any value. */
+		changes: Record<string, unknown>;
 	};
 </script>
 
@@ -27,6 +28,12 @@
 		/** A server link to the next page. */
 		nextHref?: string;
 	} = $props();
+
+	/** asChange reads one entry of changes. A value that is not an object is shown as new. */
+	function asChange(input: unknown): AuditChange {
+		if (typeof input === 'object' && input !== null && !Array.isArray(input)) return input as AuditChange;
+		return { new: input };
+	}
 
 	function value(input: unknown): string {
 		if (input === undefined) return '—';
@@ -49,8 +56,9 @@
 				</div>
 				<ul class="space-y-1 font-mono text-sm">
 					{#each Object.entries(event.changes).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) as [field, change] (field)}
+						{@const c = asChange(change)}
 						<li>
-							{field}: {#if change.redacted}changed (value hidden){:else}{value(change.old)} -&gt; {value(change.new)}{/if}
+							{field}: {#if c.redacted}changed (value hidden){:else}{value(c.old)} -&gt; {value(c.new)}{/if}
 						</li>
 					{/each}
 				</ul>
