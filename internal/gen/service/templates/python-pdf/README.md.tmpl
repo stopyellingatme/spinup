@@ -1,0 +1,71 @@
+# {{ .Name }}
+
+This Python service renders PDF reports for {{ .App }}.
+It uses FastAPI, sandboxed Jinja2 templates, and WeasyPrint.
+
+Run the service from the application root with `spinup dev`.
+Generate the Go client with `spinup g client`.
+Run the tests in a container with `spinup ci test-service {{ .Name }}`.
+The tests need the Pango libraries of the Dockerfile.
+
+Run these commands in this directory for local development:
+
+```sh
+uv sync --locked
+uv run --locked python -m pytest
+uv run --locked uvicorn service.main:app --host 0.0.0.0 --port {{ .Port }}
+```
+
+## The API
+
+`GET /healthz` returns `ok`.
+`POST /v1/render` accepts `{"template": "sample", "data": {"title": "March report"}}` and returns `application/pdf`.
+The template name selects `service/templates/<template>.html.j2`.
+The template reads the object `data`.
+
+| Status | Cause |
+|---|---|
+| 404 | The template does not exist. |
+| 413 | The body is larger than the limit. |
+| 422 | The body is not valid, or the template needs a key that `data` does not have. |
+| 500 | The render failed, the template loads a URL that is not allowed, or the PDF is larger than 20 MiB. |
+| 503 | The render queue is full. The answer has `Retry-After: 5`. |
+| 504 | The render took too long. |
+
+Each error is `application/problem+json`.
+The service sets no `Content-Disposition`. The Go API sets it with `pdf.Serve`.
+
+## Templates
+
+Add a template as `service/templates/<name>.html.j2`.
+The name must match `^[a-z][a-z0-9_]{0,63}$`.
+Jinja2 runs in a sandbox with autoescape and `StrictUndefined`.
+Do not use the `safe` filter. A test fails when a template uses it.
+
+Put stylesheets, images, and fonts in `service/assets/`.
+Load them with a relative URL, such as `<link rel="stylesheet" href="report.css">`.
+Load a brand font with `@font-face` from `service/assets/fonts/`.
+The renderer loads only `data:` URLs and files in `service/assets/`.
+Any other URL makes the render fail.
+
+## Limits
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RENDER_MAX_BODY_BYTES` | 1048576 | The largest request body. |
+| `RENDER_TIMEOUT_SECONDS` | 20 | The time for the wait in the queue and the render. |
+| `RENDER_MAX_MEMORY_BYTES` | 2147483648 | `RLIMIT_AS` of each render process. |
+| `RENDER_CONCURRENCY` | 2 | The renders that run at once. |
+| `RENDER_QUEUE_MAX` | 4 | The requests that wait for a render. |
+
+Each render runs in a child process (`python -m service.render_job`).
+The service kills the child at the timeout and when its output passes 20 MiB.
+The logs hold the template name, the status, and the time. They never hold `data`.
+
+## Tracing
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to export traces with OTLP over HTTP.
+The span `pdf.render` has the attributes `pdf.template`, `pdf.bytes`, and `pdf.render_ms`.
+The FastAPI instrumentation accepts the incoming W3C `traceparent` header.
+
+Keep the project name `service` to preserve the lockfile.

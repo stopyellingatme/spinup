@@ -1,0 +1,90 @@
+# The PDF variant renders the Python tree with the PDF overlay (ADR 0026).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+cp spinup.toml original.toml
+
+# --kind pdf needs --lang python, and --kind accepts service and pdf.
+! exec spinup g service reports --lang rust --kind pdf
+stderr '--kind pdf needs --lang python'
+stderr 'Try:'
+! exec spinup g service reports --lang python --kind word
+stderr '--kind must be service or pdf'
+stderr 'Try:'
+! exists services/reports
+cmp spinup.toml original.toml
+
+exec spinup g service reports --lang python --kind pdf
+stdout 'Next: spinup g client'
+exists services/reports/Dockerfile services/reports/.dockerignore services/reports/openapi.yaml services/reports/README.md
+exists services/reports/service/main.py services/reports/service/render.py services/reports/service/render_job.py
+exists services/reports/service/fetcher.py services/reports/service/limits.py services/reports/service/telemetry.py
+exists services/reports/service/healthcheck.py services/reports/service/assets/report.css
+exists services/reports/service/templates/sample.html.j2
+exists services/reports/tests/test_main.py services/reports/tests/test_render.py services/reports/tests/test_telemetry.py
+exists services/reports/tests/nosocket/sitecustomize.py
+! exists services/reports/.gitkeep
+cmp services/reports/pyproject.toml $SPINUP_REPO/internal/gen/service/templates/python-pdf/pyproject.toml
+cmp services/reports/uv.lock $SPINUP_REPO/internal/gen/service/templates/python-pdf/uv.lock
+cmp services/reports/service/main.py $SPINUP_REPO/internal/gen/service/templates/python-pdf/service/main.py
+cmp services/reports/service/telemetry.py $SPINUP_REPO/internal/gen/service/templates/python/service/telemetry.py
+grep 'fail_on_errors=True' services/reports/service/fetcher.py
+grep 'FatalURLFetchingError' services/reports/service/fetcher.py
+grep 'SandboxedEnvironment' services/reports/service/render.py
+grep 'RLIMIT_AS' services/reports/service/render_job.py
+grep 'operationId: render' services/reports/openapi.yaml
+! grep 'operationId: sum' services/reports/openapi.yaml
+grep 'uv sync --locked --no-dev --no-build' services/reports/Dockerfile
+grep 'libpango-1.0-0' services/reports/Dockerfile
+grep '^name = "reports"$' spinup.toml
+grep '^memory = "3g"$' spinup.toml
+grep '^tmp_size = "256m"$' spinup.toml
+grep '^healthcheck = \["/app/.venv/bin/python", "-m", "service.healthcheck"\]$' spinup.toml
+! grep '^public' spinup.toml
+
+# A plain Python service keeps its files and has no deploy limits.
+exec spinup g service plain --lang python --kind service
+cmp services/plain/service/main.py $SPINUP_REPO/internal/gen/service/templates/python/service/main.py
+! exists services/plain/service/render.py
+
+# spinup ci sees a Python service and adds the Pango packages to the test image.
+exec spinup ci services --json
+stdout '\{"name":"reports","lang":"python"\}'
+exec spinup ci test-service reports --dry-run
+stdout 'apt-get install -y --no-install-recommends libpango-1.0-0'
+stdout 'RUN uv run python -m pytest'
+exec spinup ci test-service plain --dry-run
+! stdout 'apt-get'
+
+# The OpenAPI file gives a client with Render, and the recipe of docs/pdf-reports.md compiles.
+exec spinup g client
+exists api/internal/services/reports/client.gen.go api/internal/services/reports/reports.go
+grep 'func \(c \*Client\) Render\(' api/internal/services/reports/client.gen.go
+mkdir api/internal/reportcheck
+cp ../report.go api/internal/reportcheck/report.go
+cd api
+exec go build ./...
+
+-- report.go --
+package reportcheck
+
+import (
+	"net/http"
+
+	"github.com/stopyellingatme/spinup/kit/pdf"
+
+	"example.com/todo/api/internal/services/reports"
+)
+
+// Handler is the shape of the report handler in docs/pdf-reports.md.
+func Handler(client *reports.ClientWithResponses) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data := map[string]interface{}{"title": "Work order 42"}
+		resp, err := client.Render(r.Context(), reports.RenderJSONRequestBody{Template: "sample", Data: data})
+		if err != nil {
+			http.Error(w, "the report service is not available", http.StatusServiceUnavailable)
+			return
+		}
+		_ = pdf.Serve(w, resp, "work-order-42.pdf")
+	}
+}

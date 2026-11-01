@@ -31,6 +31,13 @@ The value `session` needs the `auth` module, and the command fails with a `Try:`
 The flag `--auth` without `--public` is an error.
 The prefix rules are in [Sidecar services](../services.md#public-routes).
 
+Use `--kind service|pdf` to select the template variant.
+The default is `service`.
+The value `pdf` is valid only with `--lang python`. Any other language fails with a `Try:` line.
+It renders the Python template, then the PDF files over it: a WeasyPrint report renderer with `POST /v1/render`.
+It writes `memory = "3g"` and `tmp_size = "256m"` to the `[[services]]` table.
+See [PDF reports](../pdf-reports.md).
+
 Use `--no-openapi` to omit the OpenAPI file and its declaration.
 Use `--dry-run` or `--diff` to preview the changes.
 Run `spinup g client` after a change to an OpenAPI file.
@@ -66,6 +73,15 @@ $ grep '^public = "/svc/files"$' spinup.toml
 public = "/svc/files"
 $ grep '^auth = "none"$' spinup.toml
 auth = "none"
+$ spinup g service reports --lang python --kind pdf
+...
+$ test -s services/reports/service/render.py
+$ grep '^tmp_size = "256m"$' spinup.toml
+tmp_size = "256m"
+$ spinup g service broken --lang rust --kind pdf
+...
+[exit 1]
+$ test ! -e services/broken
 ```
 
 Read the generated README for the commands that run the service tests.
