@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -122,7 +123,7 @@ func TestServe(t *testing.T) {
 			body := &trackBody{ReadCloser: resp.Body}
 			resp.Body = body
 			rec := httptest.NewRecorder()
-			err = pdf.Serve(rec, resp, "report \"42\"\r\n.pdf")
+			err = pdf.Serve(rec, resp, nil, "report \"42\"\r\n.pdf")
 			if !body.closed {
 				t.Error("Serve did not close the body")
 			}
@@ -167,7 +168,7 @@ func TestServe(t *testing.T) {
 func TestServeNoResponse(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	err := pdf.Serve(rec, nil, "x.pdf")
+	err := pdf.Serve(rec, nil, nil, "x.pdf")
 	if err == nil || rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("status %d, Retry-After %q, error %v", rec.Code, rec.Header().Get("Retry-After"), err)
 	}
@@ -191,8 +192,33 @@ func TestServeContextDeadline(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	rec := httptest.NewRecorder()
-	err = pdf.Serve(rec, resp, "x.pdf")
+	err = pdf.Serve(rec, resp, nil, "x.pdf")
 	if rec.Code != http.StatusGatewayTimeout || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("status %d, error %v; want 504 and a deadline", rec.Code, err)
+	}
+}
+
+func TestServeCallError(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"deadline", fmt.Errorf("post: %w", context.DeadlineExceeded), http.StatusGatewayTimeout},
+		{"connection", errors.New("dial tcp: connection refused"), http.StatusServiceUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rec := httptest.NewRecorder()
+			err := pdf.Serve(rec, nil, tt.err, "x.pdf")
+			if rec.Code != tt.want || err == nil || !strings.Contains(err.Error(), "\nTry:") {
+				t.Fatalf("status %d, error %v; want %d and a Try: line", rec.Code, err, tt.want)
+			}
+			if strings.Contains(rec.Body.String(), "connection refused") {
+				t.Errorf("the answer leaks the call error: %s", rec.Body.String())
+			}
+		})
 	}
 }

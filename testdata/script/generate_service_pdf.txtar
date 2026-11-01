@@ -81,10 +81,6 @@ func Handler(client *reports.ClientWithResponses) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]interface{}{"title": "Work order 42"}
 		resp, err := client.Render(r.Context(), reports.RenderJSONRequestBody{Template: "sample", Data: data})
-		if err != nil {
-			http.Error(w, "the report service is not available", http.StatusServiceUnavailable)
-			return
-		}
-		_ = pdf.Serve(w, resp, "work-order-42.pdf")
+		_ = pdf.Serve(w, resp, err, "work-order-42.pdf")
 	}
 }

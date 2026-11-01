@@ -129,7 +129,7 @@ This ADR adds a variant of the Python template and two small kit helpers. It add
    - It sets `Content-Type`, `Content-Length`, `Cache-Control: private, no-store`, and `X-Content-Type-Options: nosniff`.
    - It sets `Content-Disposition: attachment` with an ASCII `filename` and an RFC 5987 `filename*`.
    - It removes quotes, slashes, control characters, and line breaks from the file name. An empty result becomes `download`.
-2. The new package `kit/pdf` stays small. It has one function: `Serve(w http.ResponseWriter, resp *http.Response, filename string) error`.
+2. The new package `kit/pdf` stays small. It has one function: `Serve(w http.ResponseWriter, resp *http.Response, callErr error, filename string) error`. The handler passes the response and the error of the `Render` call unchanged. A call error answers 504 for a deadline and 503 for any other error.
    - It closes the body.
    - It accepts only status 200 and the type `application/pdf`.
    - It reads at most 20 MiB plus one byte and checks that the body starts with `%PDF-`.
@@ -145,7 +145,7 @@ This ADR adds a variant of the Python template and two small kit helpers. It add
            // 1. Read the id. Load the row with the ownership filter of the resource.
            // 2. Build data from the row. Never forward a request body.
            // 3. resp, err := reportsClient.Render(r.Context(), reports.RenderJSONRequestBody{Template: "work_order", Data: data})
-           // 4. pdf.Serve(w, resp, "work-order-42.pdf")
+           // 4. pdf.Serve(w, resp, err, "work-order-42.pdf")
        })))
    ```
 5. The handler is plain `net/http` in `routes.go`. `RequireRole` is the guard (ADR 0024). The handler uses the same roles as the resource.

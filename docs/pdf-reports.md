@@ -119,18 +119,14 @@ mux.Handle("GET /api/work_orders/{id}/report.pdf", authn.RequireRole(roles.Manag
 		// 2. Build data from the row. Never forward a request body.
 		data := map[string]interface{}{"number": row.Number, "title": row.Title}
 		resp, err := reportsClient.Render(r.Context(), reports.RenderJSONRequestBody{Template: "work_order", Data: data})
-		if err != nil {
-			http.Error(w, "The report service is not available. Try again later.", http.StatusServiceUnavailable)
-			return
-		}
-		if err := pdf.Serve(w, resp, fmt.Sprintf("work-order-%d.pdf", row.Number)); err != nil {
+		if err := pdf.Serve(w, resp, err, fmt.Sprintf("work-order-%d.pdf", row.Number)); err != nil {
 			slog.ErrorContext(r.Context(), "render work order report", "err", err)
 		}
 	})))
 ```
 
 The handler passes `r.Context()` to the client. The client sends `traceparent`, so one trace crosses both processes.
-`pdf.Serve` maps the errors. A sidecar 504 gives 504. A sidecar 503 or a connection error gives 503. Any other failure gives 502.
+`pdf.Serve` takes the response and the error of `Render` and maps the errors. A sidecar 504 or a deadline gives 504. A sidecar 503 or a connection error gives 503. Any other failure gives 502.
 The user sees no sidecar text. The log holds it.
 
 If the audit module is on, you can record the download with `audit.Record` and the action `report.render`.

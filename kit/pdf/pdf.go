@@ -43,11 +43,21 @@ const (
 // 504, a sidecar 503 or a connection error answers 503, and any other failure
 // answers 502. The answer holds no sidecar text. The returned error does: log it.
 //
-// When the Render call of the client fails, it returns no response. Pass the nil
-// response to Serve: it answers 503 (connection error). Check the error of Render
-// for a context deadline first, and answer 504 for it, if a handler must
-// tell the two apart.
-func Serve(w http.ResponseWriter, resp *http.Response, filename string) error {
+// Pass the response and the error of the Render call of the client unchanged.
+// When callErr is not nil, Serve closes any response body and answers 504 for a
+// deadline or 503 for any other error (a connection error).
+func Serve(w http.ResponseWriter, resp *http.Response, callErr error, filename string) error {
+	if callErr != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		if isTimeout(callErr) {
+			writeProblem(w, nil, http.StatusGatewayTimeout)
+			return fmt.Errorf("pdf: the report service did not answer in time: %w\nTry: give the request more time, or render a smaller report", callErr)
+		}
+		writeProblem(w, nil, http.StatusServiceUnavailable)
+		return fmt.Errorf("pdf: call the report service: %w\nTry: check that the service runs (docker compose ps) and that its name in the client configuration is right", callErr)
+	}
 	if resp == nil {
 		writeProblem(w, nil, http.StatusServiceUnavailable)
 		return errors.New("pdf: the report service sent no response (a connection error)\nTry: check that the service runs (docker compose ps) and that its name in the client configuration is right")

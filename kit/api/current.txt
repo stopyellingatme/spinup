@@ -83,6 +83,8 @@ kit/audit type Filter struct
 kit/audit type Querier interface
 kit/audit var ErrFilterLimit = errors.New("audit: the page is out of range")
 kit/audit var ErrNotInTx = errors.New("audit: Bind needs a transaction, not a pool or a connection\nTry: use audit.InTx, or pass the pgx.Tx of db.InTx")
+kit/audit/authsink func ActorContext(context.Context, auth.User) context.Context
+kit/audit/authsink func New(*pgxpool.Pool) auth.EventSink
 kit/auth const CookieName = "session"
 kit/auth const DefaultCSP = "default-src 'none'; frame-ancestors 'none'"
 kit/auth const DefaultHashQueue = 4
@@ -346,7 +348,7 @@ kit/mail type Log struct
 kit/mail type Mailer interface
 kit/mail type Message struct
 kit/pdf const MaxBytes = 20 << 20
-kit/pdf func Serve(http.ResponseWriter, *http.Response, string) error
+kit/pdf func Serve(http.ResponseWriter, *http.Response, error, string) error
 kit/secrets func Load(string) (string, error)
 kit/secrets func Must(string) string
 kit/telemetry field Options.Environment string
