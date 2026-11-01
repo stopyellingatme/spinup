@@ -9,9 +9,7 @@ has_toc: false
 
 Read these pages in order if spinup is new to you. You end with a running app that you understand.
 
-```sh
-spinup new todo --module example.com/todo
-```
+Order: Install, Your first app, and Project layout. Then read Concepts, Recipes, and Troubleshooting when you need them.
 
 | I want to ... | Read |
 | --- | --- |

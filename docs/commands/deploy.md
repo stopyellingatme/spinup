@@ -48,19 +48,26 @@ The journal is a file on the VM that records each step, so a stopped deploy can 
 
 Do these steps once for each environment:
 
-1. Add the environment to `spinup.toml` with `host`, `user`, `public_url`, and `protected` under `[env.<name>]`.
-2. Prepare the VM with [`spinup server bootstrap --env <name>`](server.md).
-3. Create the secrets with [`spinup secrets init --env <name>`](secrets.md).
-4. Set `DATABASE_URL` and `POSTGRES_PASSWORD` with `spinup secrets set`. The deploy fails without them.
-5. Check `deploy/environments/<name>.toml` for the smoke URLs, the replicas, and the resource limits.
+1. Add the environment to `spinup.toml` with `host`, `user`, `public_url`, and `protected` under `[env.<name>]`. For the bootstrap, `user` is an account that has SSH access and passwordless sudo, such as `root` or `ubuntu`.
+2. Prepare the VM with [`spinup server bootstrap --env <name> --accept-new-host-key`](server.md). Bootstrap creates the `deploy` user, so the `deploy` user does not exist before this step.
+3. Change `user` to `"deploy"`. Every later command, including the deploy, connects as `deploy`.
+4. Create the secrets with [`spinup secrets init --env <name>`](secrets.md).
+5. Set `DATABASE_URL` and `POSTGRES_PASSWORD` with `spinup secrets set`. The deploy fails without them.
+6. Check `deploy/environments/<name>.toml` for the smoke URLs, the replicas, and the resource limits.
+
+This is the entry for the bootstrap:
 
 ```toml
 [env.staging]
 host = "203.0.113.10"
-user = "deploy"
+user = "root"
 public_url = "https://staging.example.com"
 protected = false
 ```
+
+The first connection to a new VM stops when SSH does not know its host key.
+Before you trust it, compare its fingerprint with the one in the console of your provider.
+To read the fingerprint, run `ssh-keyscan -t ed25519 203.0.113.10 | ssh-keygen -lf -`.
 
 ## Deploy a release
 
@@ -131,7 +138,9 @@ Resuming release 20261015T080000Z-0123456789ab at step migrate
 ```
 
 Add `--json` to `deploy status` for a report that a script can read.
-`--resume` needs the commit of the release at `HEAD`.
+`--resume` works only on the commit that built the stopped release.
+The last 12 characters of the release ID in the `Last deploy` line of `deploy status` are that commit.
+Before you resume, check out that commit.
 A new deploy without `--resume` replaces the stopped deploy and prints a warning.
 The deploy keeps the old journal as `deploy.state.prev` on the VM.
 
@@ -272,6 +281,8 @@ $ spinup deploy --env staging --accept-new-host-key
 
 ## The steps of a deploy
 
+This table is the full list. The [deploy overview](../deploy/index.md#how-a-deploy-works) has a short version.
+
 | Step | What it does |
 | --- | --- |
 | `preflight` | Checks the git tree, `spinup check`, `db lint`, the environment, and the secrets. |
@@ -316,25 +327,43 @@ See [Sidecar services](../services.md).
 
 ## Let the app report its release
 
+{: .note }
+This is optional. A new app does not mount the endpoint, and the deploy does not use it.
+
 Your API can report which release runs.
-Mount the endpoint `GET /_deploy/info` in `api/cmd/api/main.go`:
+Add the endpoint `GET /_deploy/info` to `app.New(...)` in `api/cmd/api/main.go`.
+Import `github.com/stopyellingatme/spinup/kit/deployx` and pass the current migration version:
 
 ```go
 app.WithDeployInfo(deployx.Options{
-    MigrationVersion: currentMigrationVersion,
-})
+    MigrationVersion: func(ctx context.Context) (string, error) {
+        var v string
+        err := pool.QueryRow(ctx,
+            "SELECT coalesce(max(version_id), 0)::text FROM goose_db_version WHERE is_applied").Scan(&v)
+        return v, err
+    },
+}),
 ```
 
+The `version` field comes from `app.WithVersion`.
 The response has `version`, `git_sha`, `migration_version`, and `started_at`.
 Requests from a private or loopback address need no token.
 Any other request, or any request that a proxy forwarded, must send `Authorization: Bearer <token>`.
-The token comes from the file that the environment variable `DEPLOYX_TOKEN_FILE` names.
+Caddy forwards requests, so a request through the public URL needs the token.
+
+To create the token, store it as a secret and point the API at the file:
+
+1. Run `openssl rand -hex 32 | spinup secrets set DEPLOY_INFO_TOKEN --env staging`.
+2. Add `DEPLOYX_TOKEN_FILE: /run/secrets/DEPLOY_INFO_TOKEN` to the `environment` of the `api` service in `deploy/compose.yml`.
+3. Deploy again.
 
 <!-- doctest: skip -->
 ```console
-$ curl -H "Authorization: Bearer $(cat token)" https://app.example.com/_deploy/info
-{"version":"...","git_sha":"0123456789ab...","migration_version":"00002","started_at":"2026-10-15T08:00:00Z"}
+$ curl -H "Authorization: Bearer $TOKEN" https://app.example.com/_deploy/info
+{"version":"...","git_sha":"0123456789ab...","migration_version":"2","started_at":"2026-10-15T08:00:00Z"}
 ```
+
+`$TOKEN` is the value that you stored in step 1.
 
 ## Reference
 

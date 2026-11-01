@@ -1,5 +1,5 @@
 ---
-title: backup restore — verify, restore, and prune backups
+title: backup restore — recover data
 parent: Command guides
 ---
 
@@ -16,7 +16,7 @@ spinup backup prune --env production                   # apply the retention now
 
 The `[backups] backend` key in `spinup.toml` selects the backend (`pgbackrest`, `walg`, or `pgdump`).
 All three commands need `--env` and the `backups` module.
-They also work on a replacement VM that has no earlier backup of its own.
+They also work on a replacement VM that has no earlier backup of its own. See [Recover after you lose the VM](#recover-after-you-lose-the-vm).
 
 ## Choose the backup
 
@@ -72,7 +72,7 @@ Follow these steps:
 
 1. Run with `--plan` and read the steps. This needs no VM access.
 2. Run with `--i-know` to accept the downtime. For a protected environment, type the environment name when prompted.
-3. Check the app, then remove any retained old database (see the `pgdump` note below).
+3. Check the app, then remove the retained old data. With `pgdump`, drop the `<db>_old_<label>` database. With `walg`, remove the `$PGDATA.spinup-before-restore` directory on the VM.
 
 Step 1 on a new project looks like this:
 
@@ -131,6 +131,53 @@ The previous database stays as `<db>_old_<label>` and uses disk space.
 After you check the app, run the printed `dropdb` command on the VM.
 Remove that database before you restore the same label again.
 
+## Recover after you lose the VM
+
+The backups of `pgbackrest` and `walg` live in S3-compatible storage, so they survive the VM.
+Dumps of the `pgdump` backend live on the VM disk. If you lose the VM, you lose those dumps.
+
+You need the same storage secrets and the same encryption key as before.
+That is `PGBACKREST_REPO1_CIPHER_PASS` for pgBackRest, or `WALG_LIBSODIUM_KEY` for WAL-G.
+The encrypted secrets file in your repository holds them, so the new VM gets them from `secrets push`.
+
+1. Create the new VM and prepare it:
+
+   <!-- doctest: skip -->
+   ```console
+   $ spinup server bootstrap --env production
+   ...
+   ```
+
+2. Put the new address in `host` of `[env.production]` in `spinup.toml`. If you list `host_keys`, replace them with the keys of the new VM.
+3. Write the secrets and deploy. The first deploy on the new VM skips the pre-deploy backup and starts an empty database.
+
+   <!-- doctest: skip -->
+   ```console
+   $ spinup secrets push --env production --accept-new-host-key
+   $ spinup deploy --env production --accept-new-host-key
+   ...
+   ```
+
+4. Check that the new VM sees the old backups:
+
+   <!-- doctest: skip -->
+   ```console
+   $ spinup backup list --env production
+   ...
+   ```
+
+5. Replace the empty database with the backup. With pgBackRest, the safety backup fails with error 051, because the repository does not know the new database cluster. Add `--no-safety-backup`. The empty database has nothing to undo.
+
+   <!-- doctest: skip -->
+   ```console
+   $ spinup backup restore --env production --into in-place --plan
+   ...
+   $ spinup backup restore --env production --into in-place --i-know --now --no-safety-backup
+   ...
+   ```
+
+Add `--label` or `--time` to restore an older state. Run `spinup backup verify --env production` afterward to prove the repository still restores.
+
 ## If a restore fails
 
 The error tells you the state of the app and the exact commands to run.
@@ -171,6 +218,8 @@ Backups remaining:
 | The command refuses to run | It is outside the maintenance window. | Wait for the window, or add `--now`. |
 | Exit code 5 | A deploy holds the deploy lock. | Wait for the deploy, then run again. |
 | pgBackRest error 051 on the safety backup | A replacement VM has a new database cluster that the repository does not know. | Inspect the live database. If you accept a restore without an undo point, add `--no-safety-backup`. spinup never skips the safety backup for you. |
+| `$PGDATA.spinup-before-restore` exists | An earlier WAL-G in-place restore kept the old data there. | Inspect it, then remove it on the VM. |
+| `<db>_old_<label>` exists | An earlier `pgdump` in-place restore of the same label kept the old database. | Inspect it, then drop it on the VM. |
 | `--time` fails with pgdump | A dump has no point-in-time data. | Use `--label` from `backup list`. |
 
 ## See also

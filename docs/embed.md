@@ -78,7 +78,7 @@ $ SPINUP_ENV=dev ./api/bin/api
 ```
 
 Open `http://localhost:8080`.
-`SPINUP_ENV=dev` makes the binary read `.env`, as `spinup dev` does.
+With `SPINUP_ENV` unset or set to `dev`, the binary reads `.env`, as `spinup dev` does.
 The `dist/` folder is in `.gitignore`, so do not commit it.
 During development, use `spinup dev`. It runs Vite with the API proxy as before.
 

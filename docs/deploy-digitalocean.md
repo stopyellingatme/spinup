@@ -215,7 +215,7 @@ $ spinup deploy digital-ocean destroy --env staging --i-know
 ```
 
 {: .warning }
-The database on the droplet is lost. Run `spinup backup` first.
+The database on the droplet is lost. Run `spinup backup now --env <env>` first.
 
 `destroy` asks you to type the environment name.
 Without a terminal, pass `--confirm-env staging` instead. In CI, `CI=true` with `--yes` also works.

@@ -150,7 +150,7 @@ deploy/infra/tofu/versions.tf (managed)
 ## Destroy
 
 {: .warning }
-`destroy` removes the server and the volume with its data. Run `spinup backup` first.
+`destroy` removes the server and the volume with its data. Run `spinup backup now --env <env>` first.
 
 <!-- doctest: skip -->
 ```console

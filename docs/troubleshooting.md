@@ -87,49 +87,13 @@ Every prompt has a flag. In a script or in CI, spinup never asks. It fails and n
 
 ## Doctor checks
 
-### kit-version
+Each entry gives the message and the fix in one line. The page [Doctor checks](reference/doctor-checks.md) explains every check.
 
-**Message:** `CLI 0.12.0 is incompatible with kit 0.11.2: major and minor versions must match`, with `Try: spinup upgrade or go get github.com/stopyellingatme/spinup/kit@v0.12.x`
-
-The CLI and the kit in `api/go.mod` must share the major and minor number.
-**Fix:** run `spinup upgrade`. It moves the templates and the kit together. See [Upgrade](upgrading.md).
-To change only the kit, run `go get` from the `Try:` line in `api/`.
-
-### roles-drift
-
-**Message:** `api/internal/roles/roles.gen.go does not match [auth] in spinup.toml.`, with `Try: spinup g roles`
-
-You changed `[auth]` and did not write the roles file again.
-**Fix:**
-
-```sh
-spinup g roles
-```
-
-The command needs the `auth` module. If the message says that `main.go` does not pass the role set, add the calls that [Roles](build/roles.md) shows.
-
-### audit-wired
-
-**Message:** `api/cmd/api/main.go lacks audit.Command( or authsink. wiring`
-
-An app that was made before the audit module needs a few lines in `api/cmd/api/main.go`.
-**Fix:** add `auth.WithEvents(authsink.New(pool))`, `auth.WithActorContext(authsink.ActorContext)`, and `app.WithCommand("audit", audit.Command(pool))`.
-See [Audit trail](audit.md).
-
-### plaintext-secrets
-
-**Message:** `tracked private file: .env`, `tracked plaintext secrets: secrets/staging.yaml`, or `tracked files could not be inspected`
-
-A private file or a plaintext secrets file is in git, or the folder is not a git repository.
-**Fix:** run `git rm --cached .env`, and add `.env`, `.env.*`, and `*.agekey` to `.gitignore`.
-For a plaintext secrets file, encrypt it with sops before you commit. In a scratch folder, run `git init`.
-
-### managed-missing
-
-**Message:** `managed files missing: deploy/compose.yml`, with `Try: spinup restore deploy/compose.yml`
-
-You deleted a file that spinup owns. An upgrade cannot merge a file that is gone.
-**Fix:** run `spinup restore <path>`.
+- **[kit-version](reference/doctor-checks.md#kit-version):** `CLI 0.12.0 is incompatible with kit 0.11.2: major and minor versions must match`. Run `spinup upgrade`, or run the `go get` command of the `Try:` line in `api/`.
+- **[roles-drift](reference/doctor-checks.md#roles-drift):** `api/internal/roles/roles.gen.go does not match [auth] in spinup.toml.` Run `spinup g roles`.
+- **[audit-wired](reference/doctor-checks.md#audit-wired):** `api/cmd/api/main.go lacks audit.Command( or authsink. wiring`. Add the audit wiring to `main.go`.
+- **[plaintext-secrets](reference/doctor-checks.md#plaintext-secrets):** `tracked private file: .env`. Run `git rm --cached .env`, and add `.env` to `.gitignore`.
+- **[managed-missing](reference/doctor-checks.md#managed-missing):** `managed files missing: deploy/compose.yml`. Run `spinup restore <path>`.
 
 ## Drift and generators
 
@@ -170,7 +134,7 @@ You own the file, and it differs from the new draft. The generator protects your
 **Error:** `the table tasks already exists in api/db/migrations/00002_create_tasks.sql`, with `Try: pass --force to generate the files again, or choose another name`
 
 A migration creates the table. `g resource` stops, so it does not touch your files.
-**Fix:** to add a column, write a migration with `spinup g migration <name>`. See [Recipes](recipes.md#add-a-field-to-a-resource).
+**Fix:** to add a column, write a migration with `spinup db new <name>`. See [Recipes](recipes.md#add-a-field-to-a-resource).
 
 {: .warning }
 `--force` writes the create migration again. If you applied it, `spinup db redo --i-know` deletes the rows of the table.

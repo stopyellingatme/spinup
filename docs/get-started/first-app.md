@@ -26,12 +26,11 @@ The steps below show each part in turn.
 | Flag | What it does |
 | --- | --- |
 | `--module example.com/todo` | Sets the Go module path of the API |
-| `--modules ci,deploy,auth` | Turns on these modules. The default is `ci,deploy`. `auth` adds sign-in. |
-| `--no-git` | Does not make a git repository. You make one in step 7. |
+| `--modules ci,deploy,auth` | Turns on these modules. The default is `ci,deploy`. `auth` adds sign-in. This flag is not the same as `--module`, which sets the Go path. |
 | `--non-interactive` | Does not ask questions |
 
 ```console
-$ spinup new todo --module example.com/todo --modules ci,deploy,auth --no-git --non-interactive
+$ spinup new todo --module example.com/todo --modules ci,deploy,auth --non-interactive
 ...
 App      http://localhost:5173
 API      http://localhost:8080
@@ -40,7 +39,7 @@ $ cd todo
 ```
 
 Without `--non-interactive`, spinup asks you a few questions, such as the PostgreSQL version.
-Without `--no-git`, it also makes a git repository with a first commit.
+spinup also makes a git repository with a first commit. Add `--no-git` to skip it.
 Read [Project layout](project-layout.md) for a tour of the files.
 
 {: .tip }
@@ -49,7 +48,8 @@ The module and the resource both write numbered migrations, and a resource that 
 
 ## 2. Run it
 
-`spinup dev` runs the whole stack. Run it in a second terminal and leave it open.
+`spinup dev` runs the whole stack. Open a second terminal, run `cd todo`, and start the stack. Leave it open.
+The steps after this one use your first terminal, which is also in the `todo` folder.
 
 <!-- doctest: skip -->
 ```console
@@ -78,7 +78,7 @@ The Docker services keep running. To stop them on exit too, start the stack with
 ## 3. Add a resource
 
 A resource is a table with a CRUD API and its pages. Name the fields as `name:type`.
-Run this in the first terminal while `spinup dev` runs. The API and the web app reload when the files appear.
+In your first terminal, run this while `spinup dev` runs. The API and the web app reload when the files appear.
 
 ```console
 $ spinup g resource task title:string done:bool
@@ -142,9 +142,10 @@ Make your account a manager with the `user` command of the API. It reads the dat
 $ cd api
 $ go run ./cmd/api user set-role --email you@example.com --role manager
 updated you@example.com	manager
+$ cd ..
 ```
 
-Reload `/reports`. The page opens, and you do not sign in again.
+The last line goes back to the `todo` folder. Reload `/reports`. The page opens, and you do not sign in again.
 To rename the roles, edit the `[auth]` table in `spinup.toml` and run `spinup g roles`.
 Read [Accounts and sign-in](../auth.md) and [Roles](../build/roles.md) for the details.
 
@@ -167,14 +168,13 @@ $ cd web && pnpm check
 
 ## 7. Commit
 
-Commit your work. `spinup.lock` records which files spinup made, so commit it with the rest.
-You used `--no-git`, so make the repository first.
+`spinup new` made a git repository and a first commit. Commit the tasks that you added.
+`spinup.lock` records which files spinup made, so commit it with the rest.
 
 <!-- doctest: skip -->
 ```console
-$ git init -b main
 $ git add -A
-$ git commit -m "First version of todo"
+$ git commit -m "Add tasks"
 ```
 
 ## Next steps
@@ -182,6 +182,8 @@ $ git commit -m "First version of todo"
 | I want to ... | Read |
 | --- | --- |
 | Know what each folder holds | [Project layout](project-layout.md) |
+| Change the tasks table later | [Add a field to a resource](../recipes.md#add-a-field-to-a-resource) |
+| Copy a solution for a common job | [Recipes](../recipes.md) |
 | Put the app on the internet | [Deploy to DigitalOcean](../deploy-digitalocean.md) |
 | See logs and traces | [Monitoring](../monitoring.md) |
 | Send mail or run jobs | [Mail](../mail.md) and [Background jobs](../build/jobs.md) |

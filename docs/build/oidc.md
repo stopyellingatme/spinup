@@ -10,6 +10,9 @@ OpenID Connect (OIDC) lets users sign in with Google, Keycloak, or another provi
 The sign-in page then shows one button for each provider.
 Turn it on with `--auth-oidc` when you create the app.
 
+To add it to an app that has no `auth` module yet, run `spinup module add auth --auth-oidc`. It writes the changes on the branch `spinup/module-auth`. Merge that branch.
+If the app already has the `auth` module without OIDC, `spinup module add auth --auth-oidc` fails with `answer module question "auth_oidc": it does not belong to a new pack`. Today, only a new `auth` module takes the OIDC answer, so choose it when you add `auth`.
+
 ```console
 $ spinup new todo --module example.com/todo --modules auth --auth-oidc --no-git --non-interactive
 ...
@@ -80,7 +83,7 @@ services:
 ```
 
 {: .note }
-Edit `deploy/compose.yml` itself. If you define the `api` service again in `deploy/compose.override.yml`, Compose stops with `services.api conflicts with imported resource`.
+Edit `deploy/compose.yml`, not `deploy/compose.override.yml`. Compose rejects a second `api` service. See [Deploy to your own server](../deploy.md).
 
 Register this callback URL with each provider. Use the provider name for `<provider>`:
 

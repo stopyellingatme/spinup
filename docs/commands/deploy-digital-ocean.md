@@ -168,7 +168,7 @@ $ spinup deploy digital-ocean --recreate --i-know
 `destroy` deletes the droplet, the firewall, and the DNS record of the environment.
 
 {: .warning }
-The database on the droplet is lost. Run `spinup backup` first.
+The database on the droplet is lost. Run `spinup backup now --env <env>` first.
 
 ```console
 $ spinup deploy digital-ocean destroy

@@ -8,7 +8,7 @@ nav_exclude: true
 Delete the droplet, the firewall, and the DNS record of the environment
 
 Delete only the resources that carry the environment tag and the IDs in spinup.toml.
-The database on the droplet is lost. Run spinup backup first. The account SSH key and the local secrets stay.
+The database on the droplet is lost. Run spinup backup now --env <env> first. The account SSH key and the local secrets stay.
 
 ## Use
 

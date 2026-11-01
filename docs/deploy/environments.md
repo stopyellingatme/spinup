@@ -77,7 +77,9 @@ Otherwise the command fails and lists the valid names.
 default_env = "staging"
 ```
 
-This is the error for an unknown name:
+This is the error for an unknown name.
+On a new app the list of valid names is empty, because no `[env.*]` table exists yet.
+The message shows `Try:` twice. Follow the second one.
 
 ```console
 $ spinup new todo --api-only --module example.com/todo --no-git --non-interactive

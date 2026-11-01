@@ -6,8 +6,8 @@ nav_order: 1
 
 # Install spinup
 
-Install the `spinup` binary, then check that your machine has the tools that a generated app needs.
-You need one command and about a minute.
+Install the `spinup` binary with one command. It takes about a minute.
+Then check that your machine has the tools that a generated app needs.
 
 ```sh
 curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/install.sh | sh
@@ -21,16 +21,16 @@ If `spinup version` says "command not found", add that folder to your `PATH`:
 export PATH="$HOME/.local/bin:$PATH"   # add this line to ~/.zshrc or ~/.bashrc
 ```
 
-## Install the tools first
+## Tools you need
 
-spinup runs these tools on your machine. `spinup doctor` checks them for you.
+spinup runs these tools on your machine. `spinup doctor` checks that they are present, as [Check the install](#check-the-install) shows.
 
 | Tool | Version | Why you need it |
 | --- | --- | --- |
 | Go | 1.26 or later | Builds and runs the API |
 | Node | 24 or later | Builds and runs the web app |
 | pnpm | 12, through corepack | Installs the web packages |
-| Docker | 27 or later | Runs PostgreSQL and Mailpit in development, and builds images for a deploy |
+| Docker | 27 or later. `spinup doctor` checks only that the daemon runs. | Runs PostgreSQL and Mailpit in development, and builds images for a deploy |
 | git | 2.44 or later | Tracks your app, and `spinup module add` and `spinup upgrade` need it |
 
 Node 24 includes corepack. Run `corepack enable` once, and `pnpm` works at the version that your app pins.
@@ -60,7 +60,6 @@ curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/in
 
 You prefer to read the script before you run it? Download `install.sh` from the [releases page](https://github.com/stopyellingatme/spinup/releases), read it, and run `sh install.sh`.
 The script needs `curl`, `tar`, and `sha256sum` or `shasum`.
-Find all releases and their `install.sh` on the [releases page](https://github.com/stopyellingatme/spinup/releases).
 
 ## Install with Homebrew
 

@@ -97,13 +97,13 @@ The helpers are in `kit/testkit` and `kit/auth/authtest`:
 | `testkit.Do(t, handler, method, path, body)` | Sends a request to a handler and returns the recorder |
 | `testkit.DecodeJSON[T](t, rec)` | Reads the JSON body of a response |
 | `authtest.As(handler, userID)` | Runs the handler as a signed-in user |
-| `authtest.AsRole(handler, userID, "admin")` | Runs the handler as a user with a role |
+| `authtest.AsRole(handler, userID, roles.Manager)` | Runs the handler as a user with a role. `roles` is the package `api/internal/roles` of your app. |
 
 To test a route that needs a signed-in user, wrap the handler with `authtest`.
 The wrapper skips the sign-in step, so you need no cookie:
 
 ```go
-handler = authtest.AsRole(handler, 1, "admin") // act as user 1 with the role admin
+handler = authtest.AsRole(handler, 1, roles.Manager) // act as user 1 with the role manager
 ```
 
 If the table of your resource refers to `users`, insert a user row first.

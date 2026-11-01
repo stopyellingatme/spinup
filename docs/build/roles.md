@@ -166,18 +166,13 @@ Run it from `api/`, or in the `api` container of a deployed app.
 
 <!-- doctest: skip -->
 ```console
-$ printf '%s' 'correct horse battery' | go run ./cmd/api user create --email ada@example.com --role manager --password-stdin
-created ada@example.com	manager
 $ go run ./cmd/api user set-role --email bob@example.com --role staff
 updated bob@example.com	staff
-$ go run ./cmd/api user create --email cy@example.com --password-stdin
-user create: --role is required. Declared roles: manager, staff.
-Try: user create --email a@b.c --role staff --password-stdin
 ```
 
-The cookie stores only the user ID. The API reads the role on each request.
+The cookie holds only a session token, and the session stores only the user ID. The API reads the role from the database on each request.
 A role change applies to the next request, and the user does not sign in again.
-The command also has `user list` and `user backfill`. See [the user command](../auth.md#create-accounts-and-change-roles) for all actions.
+The command also has `user list` and `user backfill`. See [the user command](../reference/app-commands.md#user) for all actions and for the run on a server.
 
 {: .warning }
 Before you rename or remove a role, run `user set-role` for each account that holds it. `user list` marks these accounts as `(undeclared)`. If you add the name back later, the old rows get power again, maybe with a new meaning.

@@ -46,7 +46,8 @@ The [CLI reference](../site/commands/index.md) lists every flag of every command
 | Set the roles of the app | [generate roles](generate-roles.md) |
 | Add an audit trail to a table | [generate audit](generate-audit.md) |
 | Add a sidecar service | [generate service](generate-service.md) |
-| Add a Grafana dashboard or an alert | [generate dashboard](generate-dashboard.md) |
+| Add a Grafana dashboard | [generate dashboard](generate-dashboard.md) |
+| Add a Prometheus alert | [generate alert](generate-alert.md) |
 | Remove what a generator made | [destroy](destroy.md) |
 
 ## Database

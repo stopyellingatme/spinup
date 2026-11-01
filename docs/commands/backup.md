@@ -107,6 +107,18 @@ Keep a copy of `PGBACKREST_REPO1_CIPHER_PASS` outside the VM and outside the rep
 Any other `PGBACKREST_*` secret becomes a pgBackRest option.
 For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests for storage that has no virtual-host buckets.
 
+Last, deploy. The files above reach the VM only through `spinup deploy`.
+The deploy starts PostgreSQL with WAL archiving on, and it gives the `postgres` service the storage secrets.
+Until you deploy, `backup now` fails with an S3 or stanza error.
+
+<!-- doctest: skip -->
+```console
+$ spinup deploy --env production
+...
+$ spinup backup now --env production --type full
+...
+```
+
 ## Take a backup
 
 `backup now` takes one backup and prints its label, size, stored size, and duration.
@@ -176,6 +188,9 @@ If the backup fails, the deploy stops, so a bad deploy never starts without a re
 - An app without the `backups` module skips the backup.
 - The first deploy skips the backup, because the database does not run yet.
 
+{: .warning }
+The pre-deploy backup always uses pgBackRest, whatever `[backups] backend` says. With `pgdump` or `walg`, the second deploy fails because the VM has no pgBackRest repository. Take a backup with `spinup backup now`, then deploy with `--skip-backup`.
+
 To skip the backup, run `spinup deploy --skip-backup`.
 This works only when every pending migration is safe.
 A pending migration is a file in `api/db/migrations` that is newer than the newest migration the VM applied.
@@ -190,24 +205,22 @@ ALTER TABLE todos ADD COLUMN note text;
 If a pending migration has no marker, the deploy fails with a `Try:` line.
 Deploy without `--skip-backup`, or add the marker to a migration that keeps all data.
 
-## Check the age of the last backup
+## Check that backups run
 
-The app serves the age of its newest backup at `/_deploy/backup`:
+The backup alerts do not call your app. They read a metrics file that `backup now`, the scheduled timers, and `backup verify` write on the VM.
+The Backups dashboard and the `BackupStale` alert show the age of the newest backup from that file.
+`BackupStale` fires when the newest backup is older than 26 hours.
+See [Monitoring](../monitoring.md#backup-metrics) for the metrics and alerts.
 
-```json
-{"last_backup_age_seconds":3600}
-```
-
-The value is `null` when no backup exists.
-The monitoring stack turns the value into a metric, and an alert fires when it grows too old.
-See [Monitoring](../monitoring.md) for the backup metrics and alerts.
+To see the age of the newest backup now, read the `last backup` line of `backup status`.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `select backup environment: --env is missing` | The command needs an environment. | Pass `--env production`. |
-| `backup now` fails with an S3 error | A storage secret is wrong or missing. | Reset it with `spinup secrets set`, then run `spinup secrets push`. |
+| `backup now` fails with an S3 or stanza error | A storage secret is wrong or missing, or you did not deploy after you added the `backups` module. | Fix the secret with `spinup secrets set` and `spinup secrets push`. Then run `spinup deploy --env production`. |
+| The second deploy fails in the backup step | The backend is `pgdump` or `walg`, and the pre-deploy backup uses pgBackRest. | Run `spinup backup now`, then `spinup deploy --skip-backup`. |
 | `/opt/<app>/backups` does not exist | The VM is not set up. | Run `spinup server bootstrap --env production`. |
 
 ## See also

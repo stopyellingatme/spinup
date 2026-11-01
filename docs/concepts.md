@@ -82,7 +82,7 @@ tofu        off    deploy    OpenTofu infrastructure for a Hetzner Cloud VM.
 | `ci` | GitHub Actions workflows | [Generated CI](ci.md) |
 | `deploy` | Production Compose files and environments | [Deploy to your own server](deploy.md) |
 | `secrets` | Encrypted secrets for each environment | [Secrets](deploy/secrets.md) |
-| `backups` | Database backups | [Backups with pg_dump](backups-pgdump.md) |
+| `backups` | Database backups. The default backend is pgBackRest. See [Which backup backend?](operate/index.md#which-backup-backend) | [Backups with pg_dump](backups-pgdump.md) or [Backups with WAL-G](backups-walg.md) |
 | `monitoring` | Grafana, Prometheus, Loki, and Alloy on the VM | [Monitoring](monitoring.md) |
 | `tofu` | OpenTofu files for a Hetzner Cloud VM | [Hetzner Cloud with OpenTofu](infra.md) |
 
@@ -131,12 +131,9 @@ Three commands help you when you edit a managed file:
 | `spinup eject <path>` | Makes a managed file yours (it becomes `scaffold`) | `spinup eject deploy/Dockerfile.api` |
 | `spinup restore <path>` | Writes the template version back | `spinup restore api/cmd/api/main.go --force` |
 
+To see drift, edit a managed file in the `todo` app. Then eject it:
+
 ```console
-$ cd ..
-$ rm -rf demo
-$ spinup new demo --api-only --module example.com/demo --no-git --non-interactive
-...
-$ cd demo
 $ echo "# mine" >> deploy/Dockerfile.api
 $ spinup check
 deploy/Dockerfile.api: managed file differs from its lock hash (drift)
@@ -144,7 +141,6 @@ deploy/Dockerfile.api: managed file differs from its lock hash (drift)
 [exit 4]
 $ spinup eject deploy/Dockerfile.api
 $ spinup check
-$ cd ../todo
 ```
 
 `spinup check` exits with code 4 when a managed file differs from the lock. This is "drift".
@@ -330,6 +326,7 @@ Each term below is the name the docs use for that thing.
 | age | The tool that makes the keys for secrets. sops uses these keys to encrypt. |
 | API client | The TypeScript code in `web/` that calls your API. `spinup g client` rebuilds it. |
 | app | One folder made by `spinup new`, with the API, the web app, and the deploy files |
+| app command | A command of the app program `api/cmd/api`, such as `migrate` or `user`. See [App binary commands](reference/app-commands.md). |
 | audit trail | A record of who changed each row of an audited table, written by database triggers |
 | behavior version | The number `behavior_version` in `spinup.toml`. It selects the defaults of the kit. |
 | blue, green | The two colors of a release. The old color serves until the new color is healthy. |

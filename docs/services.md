@@ -19,6 +19,9 @@ $ spinup new todo --api-only --module example.com/todo --no-git --non-interactiv
 $ cd todo
 $ spinup g service ocr --lang rust
 ...
+$ spinup g client
+...
+$ test -s api/internal/services/ocr/client.gen.go
 $ test -s services/ocr/Dockerfile
 $ test -s services/ocr/openapi.yaml
 $ test -s services/ocr/Cargo.lock
@@ -294,7 +297,7 @@ $ spinup rollback --env production
 ```
 
 `spinup rollback` restores the services of the previous release together with the API, and the public route of that release.
-`spinup backup restore` and `spinup maintenance pg upgrade` stop and start the worker and the services of the deployed release together with the API.
+`spinup backup restore`, `spinup maintenance pg-major-upgrade`, and `spinup maintenance pg-upgrade-in-place` stop and start the worker and the services of the deployed release together with the API. `pg-minor-upgrade` only restarts PostgreSQL.
 To build the images without a deploy, run `spinup build --image`. Each service builds from `services/<name>/`.
 Each service runs as a non-root user with a read-only root file system, a `/tmp` tmpfs, no capabilities, and `no-new-privileges`.
 Your Dockerfile must work with these rules.

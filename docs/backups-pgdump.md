@@ -72,7 +72,24 @@ $ spinup backup prune --env production
 ```
 
 Every dump is full. Asking for `--type diff` or `--type incr` still makes a full dump.
-`spinup deploy` takes a backup before each deploy. See [backup](commands/backup.md).
+
+## Deploy with pg_dump
+
+The pre-deploy backup of `spinup deploy` always uses pgBackRest, whatever the `backend` is.
+A `pgdump` app has no pgBackRest repository, so the second and later deploys fail in the backup step.
+The first deploy skips the backup, because the database does not run yet.
+
+Take a dump yourself, then skip the pre-deploy backup:
+
+<!-- doctest: skip -->
+```console
+$ spinup backup now --env production
+...
+$ spinup deploy --env production --skip-backup
+...
+```
+
+`--skip-backup` works only when every pending migration has a `-- spinup:safe` line. See [Back up before each deploy](commands/backup.md#back-up-before-each-deploy).
 
 ## Restore
 
@@ -166,6 +183,7 @@ Run this from cron or CI to get an off-site copy.
 | `select pgdump target: logical dumps do not support point-in-time recovery` | You passed `--time`. | Pass `--label` from `backup list`, or omit the flag for the newest dump. |
 | `backup restore` refuses an existing `<db>_old_<label>`. | An earlier in-place restore of the same label left it. | Inspect it, then drop it. |
 | `BackupStale` fires. | No dump in 26 hours. | Run `spinup backup schedule --env production` for automatic dumps. See [Backup metrics](monitoring.md#backup-metrics). |
+| The deploy fails in the backup step. | The pre-deploy backup uses pgBackRest, and a `pgdump` app has none. | Run `spinup backup now`, then `spinup deploy --skip-backup`. |
 | `retention must be a positive integer` | `retention` is not a whole number above zero. | Set `retention = "7"`. |
 
 ## See also

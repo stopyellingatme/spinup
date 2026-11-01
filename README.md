@@ -14,7 +14,7 @@ curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/in
 # or: brew install --cask stopyellingatme/tap/spinup
 ```
 
-Make an app and run it:
+Make an app and run it. `spinup new` asks a few questions. Add `--non-interactive` to skip them.
 
 ```sh
 spinup new todo --module example.com/todo
@@ -38,10 +38,10 @@ spinup deploy digital-ocean --recovery-recipient age1...
 
 - A Go API with `net/http`, `sqlc`, `goose` migrations, and an OpenAPI contract
 - A SvelteKit web app with a typed API client
-- Modules for sign-in, roles, mail, background jobs, an audit trail, secrets, and backups
+- Modules: sign-in with roles, mail, jobs, audit trail, secrets, backups, monitoring, and OpenTofu
 - Sidecar services in Rust, Python, or Node, and PDF reports
 - A zero-downtime deploy to your own VM or to a new DigitalOcean droplet
-- Monitoring with Grafana, and backups with pgBackRest or WAL-G
+- Monitoring with Grafana, and backups with pgBackRest, WAL-G, or pg_dump
 - Safe upgrades: `spinup upgrade` merges new templates with your edits in a separate git worktree
 
 ## Documentation
@@ -51,7 +51,10 @@ spinup deploy digital-ocean --recovery-recipient age1...
 | Install spinup | [Install](https://stopyellingatme.github.io/spinup/get-started/install.html) |
 | Build a first app | [Your first app](https://stopyellingatme.github.io/spinup/get-started/first-app.html) |
 | Look up a command | [CLI reference](https://stopyellingatme.github.io/spinup/site/commands/) |
+| Add sign-in, mail, jobs, or services | [Build your app](https://stopyellingatme.github.io/spinup/build/) |
 | Deploy | [Deploy](https://stopyellingatme.github.io/spinup/deploy/) |
+| Watch and back up my app | [Operate](https://stopyellingatme.github.io/spinup/operate/) |
+| Upgrade an app | [Upgrade](https://stopyellingatme.github.io/spinup/upgrading.html) |
 
 The source of the docs is in [`docs/`](docs/).
 

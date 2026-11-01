@@ -32,12 +32,15 @@ Do these steps once for each environment.
    ```
 
 2. **Point DNS at the server.** Create an A record for the host name of `public_url`. Caddy needs it to get a certificate.
-3. **Prepare the VM.** The command installs Docker, a firewall, and a `deploy` user with your SSH key (default `~/.ssh/id_ed25519.pub`):
+3. **Prepare the VM.** The command installs Docker, a firewall, and a `deploy` user with your SSH key (default `~/.ssh/id_ed25519.pub`).
+   The first connection to a new VM stops on an unknown SSH host key, so pass `--accept-new-host-key`:
 
    ```sh
-   spinup server bootstrap --env staging --ssh-key ~/.ssh/id_ed25519.pub
+   spinup server bootstrap --env staging --ssh-key ~/.ssh/id_ed25519.pub --accept-new-host-key
    ```
 
+   Before you trust the key, compare its fingerprint with the one in the console of your provider.
+   To read it, run `ssh-keyscan -t ed25519 203.0.113.10 | ssh-keygen -lf -`.
    Then change `user` to `"deploy"` in `spinup.toml`. Every later command, including the deploy, connects as `deploy`.
 
 4. **Create the secrets.** Make a recovery key with `age-keygen`, then:
@@ -56,7 +59,7 @@ Do these steps once for each environment.
    ```
 
 On the first connection to a new VM, spinup refuses an unknown SSH host key.
-Check the key, then pass `--accept-new-host-key`.
+Step 3 trusts the key once. A changed key always fails.
 
 ## Deploy again
 
@@ -70,13 +73,11 @@ Commit your work and run the same command. Each deploy builds a new release.
 | Go back to a stored release | `spinup rollback --env staging --to <release-id>` |
 | See the live release and the lock | `spinup deploy status --env staging` |
 | List stored releases | `spinup releases list --env staging` |
-| Deploy images that exist | `spinup deploy --env staging --skip-build --tag <release-id>` |
-| Deploy with uncommitted changes | `spinup deploy --env staging --allow-dirty` |
-| Skip the pre-deploy backup (safe migrations only) | `spinup deploy --env staging --skip-backup` |
 | Remove a stale deploy lock | `spinup deploy unlock --force --env staging` |
 
 A rollback switches traffic back. It does not undo database migrations.
-The commands are in the [deploy guide](commands/deploy.md) and the [rollback guide](commands/rollback.md).
+The [deploy guide](commands/deploy.md#reference) has the table of all flags, such as `--allow-dirty`, `--skip-build`, and `--skip-backup`.
+The [rollback guide](commands/rollback.md) covers the rollback.
 
 ## What the deploy pack generates
 
@@ -287,6 +288,7 @@ The `docker` group is equal to root access on the VM.
 ## How the blue/green switch works
 
 You do not need this to deploy. Read it when you debug a switch.
+The [deploy guide](commands/deploy.md#the-steps-of-a-deploy) lists every step of a deploy. This section covers only the switch.
 
 The app runs as the Compose project `<app>-blue` or `<app>-green`. These are the two colors.
 A third project, `<app>`, holds `caddy` and `postgres`, which never restart on a switch.

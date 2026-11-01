@@ -11,7 +11,7 @@ spinup keeps them encrypted in git, one file for each environment, so you can re
 
 <!-- doctest: skip -->
 ```console
-$ age-keygen -o ~/recovery.agekey
+$ age-keygen -o /safe/place/recovery.agekey # store this file on another machine or in a password manager
 $ spinup secrets init --env staging --recovery-recipient age1...
 $ printf '%s' 'postgres://app:pw@postgres:5432/app?sslmode=disable' | spinup secrets set --env staging DATABASE_URL
 ```

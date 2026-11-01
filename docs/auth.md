@@ -160,7 +160,7 @@ services:
 ```
 
 {: .note }
-Edit `deploy/compose.yml` itself. If you define the `api` service again in `deploy/compose.override.yml`, Compose stops with `services.api conflicts with imported resource`. The file `compose.yml` is managed, so `spinup upgrade` can show a conflict near your line. Keep your line when you resolve it.
+Edit `deploy/compose.yml`, not `deploy/compose.override.yml`. Compose rejects a second `api` service. See [Deploy to your own server](deploy.md).
 
 ### Secure a public site
 
@@ -188,27 +188,11 @@ The command never prompts. If a flag is missing, it fails and names the flag.
 $ cd api
 $ printf '%s' 'correct horse battery' | go run ./cmd/api user create --email ada@example.com --role manager --password-stdin
 created ada@example.com	manager
-$ go run ./cmd/api user set-role --email bob@example.com --role staff
-updated bob@example.com	staff
-$ go run ./cmd/api user list
-ada@example.com	manager
-bob@example.com	staff
 ```
 
-| Action | What it does |
-| --- | --- |
-| `user create --email E --role R --password-stdin` | Creates an account with the role `R`. The password comes from standard input. |
-| `user set-role --email E --role R` | Changes the role of the account. |
-| `user list` | Prints the email and the role of each account. |
-| `user backfill` | Writes `default_role` into each account that has an empty role. It prints the number of accounts. |
-
-`user create` and `user set-role` also take `--reason TEXT`. With the [audit trail](audit.md), the text goes in the event.
-
-In a deployed app, run the same command in the `api` container. Open a shell with `spinup server ssh --env production`, then run:
-
-```sh
-docker exec -i "$(docker ps --filter name=api --format '{{.Names}}' | head -n 1)" /api user list
-```
+The page [App binary commands](reference/app-commands.md#user) lists every action (`create`, `set-role`, `list`, and `backfill`) and the flag `--reason`.
+It also shows how to run the command in the `api` container of a deployed app.
+These rules apply to the command:
 
 - The command checks `--role` against the declared roles. An unknown role fails with the list of declared roles and a `Try:` line.
 - `user set-role` fails when the change removes the last account with `admin_role`. Give the role to another account first.

@@ -27,7 +27,7 @@ On your VM, add the module, deploy, and open Grafana through an SSH tunnel:
 $ spinup module add monitoring --yes --non-interactive
 ...
 $ git merge spinup/module-monitoring
-$ spinup secrets set --env production GRAFANA_ADMIN_PASSWORD
+$ printf '%s' 'a-long-password' | spinup secrets set --env production GRAFANA_ADMIN_PASSWORD
 $ spinup deploy --env production
 ...
 $ spinup monitor open --env production
@@ -109,11 +109,11 @@ The deploy fails early if this secret is missing.
 
 ### Change the Grafana password
 
-1. Set the new password. The command reads it from standard input.
+1. Set the new password. The command reads all of standard input, so pipe the value with `printf '%s'`. A typed value would keep a trailing newline and Grafana would reject it.
 
    <!-- doctest: skip -->
    ```console
-   $ spinup secrets set --env production GRAFANA_ADMIN_PASSWORD
+   $ printf '%s' 'a-new-long-password' | spinup secrets set --env production GRAFANA_ADMIN_PASSWORD
    ```
 
 2. Deploy: `spinup deploy --env production`.
@@ -172,8 +172,8 @@ Set the secrets for Slack and SMTP, then deploy:
 
 <!-- doctest: skip -->
 ```console
-$ spinup secrets set --env production SLACK_WEBHOOK_URL
-$ spinup secrets set --env production SMTP_PASSWORD
+$ printf '%s' 'https://hooks.slack.com/services/T000/B000/XXXX' | spinup secrets set --env production SLACK_WEBHOOK_URL
+$ printf '%s' 'your-smtp-password' | spinup secrets set --env production SMTP_PASSWORD
 $ spinup deploy --env production
 ```
 
@@ -330,7 +330,7 @@ Every backup backend writes the same metrics file on the VM. The Backups dashboa
 `BackupStale` fires when the newest success is older than 26 hours. `BackupVerifyFailed` fires when the last verification failed.
 A failed backup keeps the previous success metrics. A failed metrics update prints a warning and does not fail the backup.
 A scheduled verify checks the repository or the dump. It does not time a full restore, so use `spinup backup verify` for that.
-See [Backups with pg_dump](backups-pgdump.md) and [Backups with WAL-G](backups-walg.md).
+Backups need the `backups` module. See [backup](commands/backup.md#set-up-pgbackrest-backups) (the default pgBackRest backend), [Backups with pg_dump](backups-pgdump.md), and [Backups with WAL-G](backups-walg.md).
 
 ## Troubleshooting
 
@@ -339,7 +339,7 @@ See [Backups with pg_dump](backups-pgdump.md) and [Backups with WAL-G](backups-w
 | The deploy stops with a profile error. | `[monitoring] profile` differs from `monitoring_profile` in `spinup.lock`. | Restore the locked profile, or re-render the module. |
 | `monitor trace` finds nothing. | The profile is `lite`, which drops traces. | Use `full`. |
 | `APIRequestMetricsMissing` fires on a new app. | The API has had no request yet. | Send one request. |
-| The new Grafana password does not work. | Grafana still runs with the old secret. | Restart Grafana as shown in [Change the Grafana password](#change-the-grafana-password). |
+| The new Grafana password does not work. | Grafana still runs with the old secret, or the secret holds a trailing newline. | Set the secret again with `printf '%s'`, deploy, and restart Grafana as shown in [Change the Grafana password](#change-the-grafana-password). |
 | The deploy fails at the `monitoring` step. | The monitoring stack did not start. | Fix it, then run `spinup deploy --resume --env production`. |
 
 ## See also
@@ -347,4 +347,4 @@ See [Backups with pg_dump](backups-pgdump.md) and [Backups with WAL-G](backups-w
 - [Telemetry and data handling](data-handling.md) for what the app sends.
 - [monitor](commands/monitor.md) for every monitor command, and the flag reference for [monitor open](site/commands/monitor-open.md) and [monitor logs](site/commands/monitor-logs.md).
 - [Sidecar services](services.md) for traces that cross a service.
-- [Backups with pg_dump](backups-pgdump.md) and [Backups with WAL-G](backups-walg.md).
+- [backup](commands/backup.md#set-up-pgbackrest-backups) for the default pgBackRest backups, [Backups with pg_dump](backups-pgdump.md), and [Backups with WAL-G](backups-walg.md).

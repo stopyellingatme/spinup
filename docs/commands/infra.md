@@ -79,7 +79,7 @@ $ spinup infra output --env staging
 `destroy` deletes every resource of the environment: the server, the firewall, the SSH key, and the volume.
 
 {: .warning }
-The server, its volume, and the database on it are lost. Run `spinup backup` first.
+The server, its volume, and the database on it are lost. Run `spinup backup now --env <env>` first.
 
 The command refuses without `--i-know`:
 

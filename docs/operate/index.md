@@ -18,16 +18,24 @@ spinup maintenance vuln-scan --env production
 
 ## I want to ...
 
+Backups need the `backups` module and monitoring needs the `monitoring` module. A new app has neither by default. Add one with `spinup module add <name>`.
+
 | I want to ... | Read | Command |
 | --- | --- | --- |
 | See my logs | [Monitoring](../monitoring.md#see-logs-and-traces) | `spinup monitor logs --env production` |
 | See a trace | [Monitoring](../monitoring.md#see-logs-and-traces) | `spinup monitor trace --env production <trace-id>` |
 | Open Grafana | [Monitoring](../monitoring.md#open-grafana) | `spinup monitor open --env production` |
-| Get alerts in Slack, email, or ntfy | [Monitoring](../monitoring.md#send-alerts) | `spinup secrets set --env production SLACK_WEBHOOK_URL` |
-| Take a backup | [Backups with pg_dump](../backups-pgdump.md) or [Backups with WAL-G](../backups-walg.md) | `spinup backup now --env production` |
-| Restore a backup | [Backups with pg_dump](../backups-pgdump.md#restore) or [Backups with WAL-G](../backups-walg.md#restore-to-a-point-in-time) | `spinup backup restore --env production --into new` |
-| Prove a backup works | [Backups with WAL-G](../backups-walg.md#verify-backups) or [Backups with pg_dump](../backups-pgdump.md#verify-a-dump) | `spinup backup verify --env production` |
+| Get alerts in Slack, email, or ntfy | [Monitoring](../monitoring.md#send-alerts) | `spinup secrets set --env production SLACK_WEBHOOK_URL < webhook.txt` |
+| Take a backup | [Backups with pgBackRest](../commands/backup.md#set-up-pgbackrest-backups), [pg_dump](../backups-pgdump.md), or [WAL-G](../backups-walg.md) | `spinup backup now --env production` |
+| Restore a backup | [backup restore](../commands/backup-restore.md), [pg_dump](../backups-pgdump.md#restore), or [WAL-G](../backups-walg.md#restore-to-a-point-in-time) | `spinup backup restore --env production --into new` |
+| Recover after I lose the VM | [Recover after you lose the VM](../commands/backup-restore.md#recover-after-you-lose-the-vm) | `spinup backup list --env production` |
+| Prove a backup works | [backup restore](../commands/backup-restore.md#verify-a-backup), [WAL-G](../backups-walg.md#verify-backups), or [pg_dump](../backups-pgdump.md#verify-a-dump) | `spinup backup verify --env production` |
 | Run backups on a schedule | [Backup schedule](../commands/backup-schedule.md) | `spinup backup schedule --env production` |
+| Go back to the last release | [rollback](../commands/rollback.md) | `spinup rollback --env production` |
+| See the live release and the deploy lock | [deploy](../commands/deploy.md#if-a-deploy-stops) | `spinup deploy status --env production` |
+| Check the VM for unsafe settings | [server](../commands/server.md#audit-the-vm) | `spinup server audit --env production` |
+| Check the VM health | [Doctor checks](../reference/doctor-checks.md#remote-checks) | `spinup doctor --remote --env production` |
+| Check the certificate | [maintenance](../commands/maintenance.md#check-the-certificate) | `spinup maintenance certs --env production` |
 | Upgrade PostgreSQL | [Upgrade PostgreSQL](../upgrading.md#upgrade-postgresql) | `spinup maintenance pg-minor-upgrade --env production` |
 | Scan for vulnerabilities | [Maintenance](../commands/maintenance.md) | `spinup maintenance vuln-scan --env production` |
 | Patch the server | [Maintenance](../commands/maintenance.md) | `spinup maintenance patch --env production --plan` |
@@ -39,6 +47,8 @@ spinup maintenance vuln-scan --env production
 | Page | What it covers |
 | --- | --- |
 | [Monitoring](../monitoring.md) | Grafana, logs, traces, alerts, and dashboards. |
+| [backup](../commands/backup.md#set-up-pgbackrest-backups) | The default backend, pgBackRest. Set up, back up, and check. |
+| [backup restore](../commands/backup-restore.md) | Verify, restore, and recover after you lose the VM. |
 | [Backups with pg_dump](../backups-pgdump.md) | The simple backend. Dumps stay on the VM. |
 | [Backups with WAL-G](../backups-walg.md) | Point-in-time recovery to S3-compatible storage. |
 | [Telemetry and data handling](../data-handling.md) | What the app sends, what is redacted, and how to turn it off. |

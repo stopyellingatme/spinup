@@ -193,7 +193,7 @@ The schedules take effect when you run `spinup backup schedule`. Times are on th
 
 ## [maintenance]
 
-Limits risky database work to a time window. The work is an in-place restore and a PostgreSQL major upgrade.
+Limits risky database work to a time window. The window limits an in-place restore, every PostgreSQL upgrade, `vacuum --full`, and `patch --reboot`.
 
 | Key | Type | Default | What it does |
 | --- | --- | --- | --- |

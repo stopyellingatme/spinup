@@ -69,9 +69,9 @@ keep: 98
 | Action | Meaning |
 | --- | --- |
 | `overwrite` | A managed file that you did not edit gets the new version. |
-| `merge` | You edited the file, so spinup merges the old, your, and new versions. |
+| `merge` | You edited the file, so spinup merges the old, your, and new versions. Scaffold files such as `api/cmd/api/main.go` and `spinup.toml` use this action, and a merge can conflict. |
 | `create` | The new version adds the file. |
-| `keep` | The file is a seed or scaffold file, so your copy stays. |
+| `keep` | The file is a seed, you deleted it, or a generator owns it, so your copy stays. A scaffold file that you edited is merged (`merge`), not kept. |
 
 ## Choose the target version
 

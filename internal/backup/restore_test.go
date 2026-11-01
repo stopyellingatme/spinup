@@ -201,7 +201,7 @@ func TestRestoreNewNeedsNoConfirmation(t *testing.T) {
 	expectRestoreContainer(t, vm, false, false)
 	var out strings.Builder
 	err := Restore(context.Background(), RestoreOptions{Options: Options{Dir: newProject(t, true, "", nil), Env: "staging", Remote: vm, Out: &out}, Target: Target{Label: restoreLabel}, Into: "new"})
-	if err != nil || !strings.Contains(out.String(), "spinup server ssh --env staging -L 5433:127.0.0.1:5433") {
+	if err != nil || !strings.Contains(out.String(), "OpenSSH tunnel: ssh -N -L 5433:127.0.0.1:5433") {
 		t.Fatalf("new: %s %v", out.String(), err)
 	}
 	vm.AssertDone(t)

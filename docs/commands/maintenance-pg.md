@@ -1,5 +1,5 @@
 ---
-title: maintenance pg-minor-upgrade and pg-major-upgrade — upgrade PostgreSQL
+title: maintenance pg-upgrade — minor and major
 parent: Command guides
 ---
 

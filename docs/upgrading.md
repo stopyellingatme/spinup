@@ -114,13 +114,12 @@ If you changed a file that the new template also changed, spinup merges both. Wh
 $ spinup upgrade --yes
 ...
 [exit 3]
-$ cd .spinup/upgrade/0.12.0
-$ git diff --name-only --diff-filter=U
+$ git -C .spinup/upgrade/0.12.0 diff --name-only --diff-filter=U
 api/cmd/api/main.go
 ```
 
 1. Open each listed file in the worktree. Edit out the `<<<<<<<`, `=======`, and `>>>>>>>` lines. Keep the code you want.
-2. From the main checkout, run `spinup upgrade --continue --yes`.
+2. From the main checkout, not the worktree, run `spinup upgrade --continue --yes`.
 
 To give up, run `spinup upgrade --abort --yes`. It removes the worktree and the branch.
 
@@ -176,9 +175,12 @@ Each template file has a class. The class decides what an upgrade does with your
 
 | Class | Meaning | Upgrade | Your edits |
 | --- | --- | --- | --- |
-| `managed` | spinup owns it. | Replaced by the new template. | Flagged by `spinup check`. |
+| `managed` | spinup owns it. | Replaced if you did not edit it. Merged if you did. | `--force-managed` overwrites them. `spinup check` reports drift (exit 4). |
 | `scaffold` | Starts from a template, then you own it. | Merged with a three-way merge. | Kept. Conflicts may need you. |
 | `seed` | Created once. | Never touched. | Yours. |
+
+If you edited a managed file, such as `deploy/compose.yml` for a CDN or a trusted proxy, the merge can conflict.
+Resolve it like any other conflict. Use `eject` below to stop the merges for that file.
 
 Three commands let you change the class or undo an edit:
 
@@ -199,7 +201,7 @@ If you edit a managed file, `spinup check` fails and suggests `eject` or `restor
 Eject when you want to keep the edit. Restore when you do not.
 See [diff](commands/diff.md), [eject](commands/eject.md), [restore](commands/restore.md), and [check](commands/check.md).
 
-## Add or remove modules
+## Add modules
 
 A module is an optional feature, such as `jobs`, `mail`, or `monitoring`.
 
@@ -220,6 +222,10 @@ See [module](commands/module.md).
 ## Upgrade PostgreSQL
 
 A PostgreSQL upgrade is a separate operation on the VM. It is not part of `spinup upgrade`.
+
+The major upgrade examples assume that the VM runs PostgreSQL 17. A new app already runs 18 and needs no major upgrade.
+The target must be higher than the running major. To read the running major, print the plan of a minor upgrade.
+Its second step reads `SHOW server_version` on the VM.
 
 | Upgrade | Command | Downtime |
 | --- | --- | --- |
@@ -243,7 +249,7 @@ See [PostgreSQL upgrades](commands/maintenance-pg.md) and [In-place PostgreSQL u
 ## Checklist
 
 1. Read the release notes. Run `spinup version --check`.
-2. Take a backup: `spinup backup now --env production`.
+2. If the app has the `backups` module, take a backup: `spinup backup now --env production`.
 3. Update the CLI: `spinup self-update`.
 4. Commit your work, so `git status` is clean.
 5. Run `spinup upgrade --plan`.

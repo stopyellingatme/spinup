@@ -39,21 +39,22 @@ The DigitalOcean and Hetzner paths only create the server for you first.
 
 1. **Build.** It builds the `api` and `web` images. The image tag is the release ID, never `latest`.
 2. **Ship the images.** It copies the images to the VM over SSH and uploads the release files and the secrets.
-3. **Migrate.** It runs the database migrations while the old version still serves traffic.
+3. **Migrate.** It runs the database migrations while the old version still serves traffic. Write each migration so that the old code can use it. For example, add a column in one release and remove the old column in a later release.
 4. **Switch.** It starts the new version next to the old one. This is the blue/green switch. When the new version is healthy, Caddy sends traffic to it. Then spinup stops the old version.
 5. **Smoke check.** It requests `/healthz`, `/version`, and your smoke URLs through the public URL.
 
 A deploy starts with checks. It stops if the git tree has uncommitted changes. Commit first, or pass `--allow-dirty`.
 If the app has the `backups` module, a backup runs after the build and before the images ship. The first deploy skips it.
-Use `--skip-backup` only when every pending migration is safe. See [Backups](../commands/backup.md).
+Use `--skip-backup` only when every pending migration is safe. The `-- spinup:safe` marker is in the [backup guide](../commands/backup.md).
 
 If the new version is not healthy, the old version stays live and the deploy fails.
 If a deploy stops half way, run `spinup deploy --resume`.
 To go back to the last release, run `spinup rollback`.
 Both commands are in the [deploy guide](../commands/deploy.md) and the [rollback guide](../commands/rollback.md).
+The deploy guide also lists all twelve internal steps.
 
 {: .note }
-A rollback does not undo database migrations. Run `spinup backup` before a risky migration.
+A rollback does not undo database migrations. Run `spinup backup now --env production` before a risky migration.
 
 ## See also
 

@@ -325,7 +325,7 @@ func newDODestroy(app *App) *cobra.Command {
   spinup deploy digital-ocean destroy --env production --i-know`,
 		Short: "Delete the droplet, the firewall, and the DNS record of the environment",
 		Long: "Delete only the resources that carry the environment tag and the IDs in spinup.toml.\n" +
-			"The database on the droplet is lost. Run spinup backup first. The account SSH key and the local secrets stay.",
+			"The database on the droplet is lost. Run spinup backup now --env <env> first. The account SSH key and the local secrets stay.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if err := refuseDryRun(app, "destroy", "run spinup deploy digital-ocean status to see the resources"); err != nil {

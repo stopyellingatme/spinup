@@ -9,7 +9,8 @@ nav_order: 5
 Short answers for the tasks you do most. Each recipe has the commands to type and a link to the full guide.
 Find your task in the list, copy the commands, and change the names.
 
-The runnable recipes use one app. Create it once, with every module that the recipes need:
+Run these recipes in your own app. The outputs below come from a sample app with every module on, so the migration numbers and the file lists in your app can differ.
+To follow along exactly, create the sample app with this command in an empty folder:
 
 ```console
 $ spinup new todo --module example.com/todo --modules ci,deploy,auth,jobs,mail,secrets,audit,monitoring,backups --no-git --non-interactive
@@ -53,14 +54,15 @@ See [generate resource](commands/generate-resource.md).
 
 ### Add a field to a resource
 
-Do not run `g resource` again. Write a migration, then change the queries and the contract.
+Do not run `g resource` again. A new field touches the database, the queries, the API contract, the Go handlers, and the web form.
+The example adds `priority` to `task`. Start with a migration. See [Write and apply a migration](#write-and-apply-a-migration).
 
 ```console
-$ spinup g migration add_priority --dry-run
-create api/db/migrations/00007_add_priority.sql (seed)
+$ spinup db new add_priority --dry-run
+Would create api/db/migrations/00007_add_priority.sql
 ```
 
-Fill in the file, apply it, and regenerate the code:
+Fill in the new file:
 
 ```sql
 -- +goose Up
@@ -70,15 +72,16 @@ ALTER TABLE tasks ADD COLUMN priority integer NOT NULL DEFAULT 0;
 ALTER TABLE tasks DROP COLUMN priority;
 ```
 
-<!-- doctest: skip -->
-```console
-$ spinup db migrate up
-$ spinup db sqlc
-$ spinup g openapi
-$ spinup g client
-```
+Then change the code in this order:
 
-Add the field to `api/db/queries/tasks.sql` and to `api/openapi/schemas/task.yaml` before you run `sqlc` and `openapi`.
+1. Run `spinup db migrate up` to apply the migration.
+2. In `api/db/queries/tasks.sql`, add `priority` to every `SELECT` list and `RETURNING` list, to the `INSERT`, and to the `UPDATE`. Run `spinup db sqlc`.
+3. In `api/openapi/schemas/task.yaml`, add `priority` to the `Task` and `TaskInput` schemas. Run `spinup g openapi` and `spinup g client`.
+4. In `api/internal/handlers/tasks.go`, add the field to `taskFromStore`, `taskParams`, and the update call. Run `cd api && go build ./...`.
+5. In `web/src/routes/tasks/`, add the field to `schema.ts` (the zod schema, `fromItem`, and `toBody`). Add an input to `fields.svelte`. The new page and the edit page share both files.
+
+While `spinup dev` runs, saving a query file or an OpenAPI file runs sqlc and the generators for you.
+If you skip a step, the build or the type check fails and names the missing field.
 See [db](commands/db.md) and [generate resource](commands/generate-resource.md).
 
 ### Add a page
@@ -126,7 +129,7 @@ $ spinup test --dry-run
 go test ./...
 ```
 
-Remove `--dry-run` to run the Go tests. Add `--web` for the web tests. See [Test your app](build/testing.md).
+Remove `--dry-run` to run the Go tests. Run the web tests with `pnpm test` in `web/`. See [Test your app](build/testing.md).
 
 ## Database
 
@@ -138,6 +141,9 @@ Would create api/db/migrations/00007_add_notes.sql
 $ spinup db migrate up --dry-run
 go run ./cmd/api migrate up
 ```
+
+Edit the new file, then run `spinup db migrate up` without `--dry-run`.
+The command `spinup g migration <name>` does the same as `spinup db new <name>`.
 
 Check a migration for changes that are unsafe in a zero-downtime deploy:
 
@@ -202,10 +208,9 @@ Run the app command from `api/`. It reads `DATABASE_URL` from `.env`.
 ```console
 $ cd api
 $ printf '%s' 'correct horse battery' | go run ./cmd/api user create --email ada@example.com --role manager --password-stdin
-$ go run ./cmd/api user set-role --email bob@example.com --role staff
 ```
 
-See [Accounts and sign-in](auth.md) and [App binary commands](reference/app-commands.md).
+To change a role, use the action `user set-role`. The page [App binary commands](reference/app-commands.md#user) lists every action and shows how to run them on a server. See also [Accounts and sign-in](auth.md).
 
 ## Mail, jobs, services, and reports
 
@@ -236,7 +241,8 @@ create api/internal/jobs/send_digest.go (scaffold)
 create api/internal/jobs/send_digest_test.go (scaffold)
 ```
 
-Replace the body of the generated function with your work. Start the worker with `cd api && go run ./cmd/worker`.
+Replace the body of the generated function with your work.
+`spinup dev` starts the worker for you and restarts it when Go files change. In production, the worker runs as its own service in `deploy/compose.yml`.
 See [Background jobs](build/jobs.md).
 
 ### Add a sidecar service
@@ -292,7 +298,7 @@ Add the server to `spinup.toml`, then make its secrets and prepare the VM:
 ```toml
 [env.staging]
 host = "203.0.113.10"
-user = "deploy"
+user = "root"
 public_url = "https://staging.example.com"
 ```
 
@@ -302,7 +308,9 @@ $ spinup server bootstrap --env staging
 $ spinup secrets init --env staging --recovery-recipient age1...
 ```
 
-See [Environments](deploy/environments.md) and [server](commands/server.md).
+A fresh VM has no `deploy` user, so connect as `root` (or another user with passwordless sudo) for the bootstrap.
+The bootstrap creates the `deploy` user. After it, change `user` to `"deploy"` in `spinup.toml`.
+See [Deploy for the first time](deploy.md#deploy-for-the-first-time), [Environments](deploy/environments.md) and [server](commands/server.md).
 
 ### Deploy to a new server
 

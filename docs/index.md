@@ -18,6 +18,7 @@ cd todo
 spinup dev
 ```
 
+`spinup new` asks a few questions. Add `--non-interactive` to skip them.
 `spinup dev` installs the web packages, starts PostgreSQL and Mailpit in Docker, runs the migrations, and starts the API and the web app.
 It prints the addresses:
 
@@ -39,7 +40,8 @@ You want every step with its output? Read [Your first app](get-started/first-app
 | Database | PostgreSQL, in Docker for development |
 | Deploy | Docker Compose on a VM, Caddy for HTTPS, and a zero-downtime switch between two copies of the app |
 | Monitoring | OpenTelemetry in the app, with Grafana for logs, metrics, and traces |
-| Modules | Sign-in, roles, mail, jobs, audit trail, backups, secrets, and OpenTofu, each added when you need it |
+| Modules | Sign-in with roles, mail, jobs, audit trail, secrets, backups, monitoring, and OpenTofu, each added when you need it |
+| Sidecar services | Rust, Python, or Node next to the API, and PDF reports |
 | Upgrades | `spinup upgrade` brings new template versions into your app and keeps your edits |
 
 ## I want to ...
@@ -78,6 +80,6 @@ You want every step with its output? Read [Your first app](get-started/first-app
 | [Operate](operate/index.md) | Monitoring, backups, and data handling |
 | [Upgrade](upgrading.md) | Bring new template versions into your app |
 | [Command guides](commands/index.md) | One page with examples for each command |
-| [CLI reference](site/commands/index.md) | Every command and flag, generated from the code |
-| [Reference](reference/index.md) | The `spinup.toml` file, global flags, doctor checks, and policies |
+| [CLI reference](site/commands/index.md) | Every command and every flag of it, generated from the code |
+| [Reference](reference/index.md) | Settings and policies: the `spinup.toml` file, global flags, doctor checks, app commands, and the support policies |
 | [Contributing](contributing/index.md) | How to work on spinup itself |

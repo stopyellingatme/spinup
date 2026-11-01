@@ -66,18 +66,21 @@ $ spinup module add mail --dry-run --yes --non-interactive
 
 | Flag | What it sets | Example |
 | --- | --- | --- |
-| `--monitoring-profile lite\|full\|none` | The monitoring stack (default `lite`) | `spinup module add monitoring --monitoring-profile full` |
-| `--ci-deploy-on-push` | Deploy the default environment on each push to `main` | `spinup module add ci --ci-deploy-on-push` |
-| `--auth-oidc` | Sign-in with an identity provider | `spinup module add auth --auth-oidc` |
-| `--frontend-mode node\|embed` | A SvelteKit server or a static app in the Go binary (default `node`) | `spinup module add auth --frontend-mode embed` |
-| `--package-manager pnpm\|bun` | The web package manager (default `pnpm`) | `--package-manager bun` |
-| `--api-client openapi-fetch\|heyapi` | The generated web API client (default `openapi-fetch`) | `--api-client heyapi` |
-| `--shadcn-registry <version>` | The shadcn-svelte registry version (default `1.7.0`) | `--shadcn-registry 1.7.0` |
-| `--db-version <major>` | The PostgreSQL major version (default `18`) | `--db-version 17` |
-| `--module <path>` | The Go module path | `--module example.com/todo` |
+| `--monitoring-profile lite\|full\|none` | The monitoring stack when you add `monitoring` (default `lite`) | `spinup module add monitoring --monitoring-profile full` |
+| `--ci-deploy-on-push` | Deploy the default environment on each push to `main`, when you add `ci` | `spinup module add ci --ci-deploy-on-push` |
+| `--auth-oidc` | Sign-in with an identity provider, when you add `auth` | `spinup module add auth --auth-oidc` |
+| `--db-version <major>` | The PostgreSQL major version, when you add `ci` or `deploy` (default `18`) | `spinup module add deploy --db-version 17` |
 
 An explicit flag wins over the lock answers and the defaults.
-The web flags matter only when the module adds the web app.
+A flag works only for a module that you are adding now.
+If you pass a flag for a module that is already on, the command fails with `it does not belong to a new pack`.
+
+The web app and the Go module are core parts of every app, so they are never "added".
+These flags are listed in `module add --help`, but they only work in `spinup new`:
+`--frontend-mode`, `--package-manager`, `--api-client`, `--shadcn-registry`, and `--module`.
+The `auth` module needs `--frontend-mode node`, which is the default.
+If the app uses `--frontend-mode embed`, `module add auth` fails with `cannot use auth in embed mode`.
+See [Embed mode](../embed.md).
 
 ## Preview the change
 

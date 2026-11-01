@@ -73,9 +73,9 @@ func (r *run) checkRecreate(ctx context.Context) error {
 	exists, known := r.releaseExists(ctx)
 	switch {
 	case exists:
-		return fail("recreate the droplet", "a release runs on it, and the database is lost with the droplet", "run spinup backup first, then pass --i-know")
+		return fail("recreate the droplet", "a release runs on it, and the database is lost with the droplet", "run spinup backup now --env <env> first, then pass --i-know")
 	case !known:
-		return fail("recreate the droplet", "spinup cannot check whether a release runs on it, and a release may exist", "run spinup backup first, then pass --i-know")
+		return fail("recreate the droplet", "spinup cannot check whether a release runs on it, and a release may exist", "run spinup backup now --env <env> first, then pass --i-know")
 	}
 	return nil
 }
