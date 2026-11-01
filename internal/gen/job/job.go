@@ -61,6 +61,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "job",
 		Short: "Add a background job (River) to api/internal/jobs",
+		Example: `  # Add a background job
+  spinup g job send_digest`,
 		Usage: "<name>",
 		Run:   plan,
 	})

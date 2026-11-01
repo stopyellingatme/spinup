@@ -14,7 +14,11 @@ func backupTargetFlags(c *cobra.Command, label, at *string) {
 
 func newBackupVerify(app *App) *cobra.Command {
 	var label, at string
-	c := &cobra.Command{Use: "verify", Short: "Restore a backup in isolation and check the database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "verify", Example: `  # Restore the latest backup in isolation and check it
+  spinup backup verify
+
+  # Check the state at a point in time
+  spinup backup verify --time 2026-10-31T14:00:00Z`, Short: "Restore a backup in isolation and check the database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		target, err := backup.ParseTarget(label, at)
 		if err != nil {
 			return err

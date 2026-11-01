@@ -26,7 +26,11 @@ func newDocs(app *App) *cobra.Command {
 func newDocsCompat(app *App) *cobra.Command {
 	var markdown bool
 	command := &cobra.Command{
-		Use:   "compat",
+		Use: "compat", Example: `  # Print the compatible versions
+  spinup docs compat
+
+  # Print them as a Markdown table
+  spinup docs compat --markdown`,
 		Short: "Print compatible CLI, kit, template, and stack versions",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -51,7 +55,8 @@ func newDocsCompat(app *App) *cobra.Command {
 func newDocsReference() *cobra.Command {
 	var out string
 	command := &cobra.Command{
-		Use:   "reference",
+		Use: "reference", Example: `  # Write a Markdown page for every command
+  spinup docs reference --out docs/cli`,
 		Short: "Write a Markdown reference page for every command",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {

@@ -25,6 +25,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "dashboard",
 		Short: "Add a custom Grafana dashboard",
+		Example: `  # Add a dashboard with one panel (title=PromQL)
+  spinup g dashboard orders --panel 'Orders per second=sum(rate(orders_created_total[5m]))'`,
 		Usage: "<name>",
 		Flags: flags,
 		Run:   plan,

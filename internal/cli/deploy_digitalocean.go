@@ -104,7 +104,11 @@ func newDeployDigitalOcean(app *App) *cobra.Command {
 	var dopts deploy.Options
 	var noBrowser bool
 	c := &cobra.Command{
-		Use:     "digital-ocean",
+		Use: "digital-ocean", Example: `  # See what the command would create
+  spinup deploy digital-ocean --plan
+
+  # Create a droplet and deploy to it
+  spinup deploy digital-ocean --region nyc3 --domain app.example.com`,
 		Aliases: []string{"digitalocean", "do"},
 		Short:   "Create a DigitalOcean droplet for the app and deploy to it",
 		Long: "Sign in to DigitalOcean, create a droplet with a firewall and a DNS record, make the secrets,\n" +
@@ -173,7 +177,11 @@ func passDeployFlags(base, flags deploy.Options) deploy.Options {
 func newDOLogin(app *App) *cobra.Command {
 	var noBrowser bool
 	c := &cobra.Command{
-		Use:   "login",
+		Use: "login", Example: `  # Sign in to DigitalOcean in a browser
+  spinup deploy digital-ocean login
+
+  # Print the sign-in URL and open no browser
+  spinup deploy digital-ocean login --no-browser`,
 		Short: "Sign in to DigitalOcean in a browser and store the token",
 		Long: "Open the DigitalOcean sign-in page, wait for the answer on a loopback address of this machine,\n" +
 			"and store the token. The command needs a browser on this machine.\n" +
@@ -219,7 +227,8 @@ func newDOLogin(app *App) *cobra.Command {
 
 func newDOLogout(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "logout",
+		Use: "logout", Example: `  # Delete the stored DigitalOcean token
+  spinup deploy digital-ocean logout`,
 		Short: "Revoke the stored DigitalOcean token and delete it",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -255,7 +264,8 @@ func newDOLogout(app *App) *cobra.Command {
 
 func newDOStatus(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "status",
+		Use: "status", Example: `  # Show the DigitalOcean resources of the environment
+  spinup deploy digital-ocean status --env production`,
 		Short: "Show the token source, the account, and the resources of the environment",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -311,7 +321,8 @@ func newDOStatus(app *App) *cobra.Command {
 func newDODestroy(app *App) *cobra.Command {
 	var iKnow bool
 	c := &cobra.Command{
-		Use:   "destroy",
+		Use: "destroy", Example: `  # Delete the droplet, the firewall, and the DNS record
+  spinup deploy digital-ocean destroy --env production --i-know`,
 		Short: "Delete the droplet, the firewall, and the DNS record of the environment",
 		Long: "Delete only the resources that carry the environment tag and the IDs in spinup.toml.\n" +
 			"The database on the droplet is lost. Run spinup backup first. The account SSH key and the local secrets stay.",

@@ -30,7 +30,8 @@ func dbOptions(app *App, c *cobra.Command, know bool) ops.Options {
 func init() { registerDB(newDBStatus) }
 
 func newDBStatus(app *App) *cobra.Command {
-	return &cobra.Command{Use: "status", Short: "List applied and pending migrations", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	return &cobra.Command{Use: "status", Example: `  # List applied and pending migrations
+  spinup db status`, Short: "List applied and pending migrations", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		return ops.Status(c.Context(), dbOptions(app, c, false), exec.OSRunner{})
 	}}
 }

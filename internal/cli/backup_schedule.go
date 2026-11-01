@@ -9,7 +9,14 @@ func init() { registerBackup(newBackupSchedule) }
 
 func newBackupSchedule(app *App) *cobra.Command {
 	var plan, remove bool
-	command := &cobra.Command{Use: "schedule", Short: "Install or remove backup timers on the VM", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	command := &cobra.Command{Use: "schedule", Example: `  # Show the timers without changing the VM
+  spinup backup schedule --plan
+
+  # Install the backup timers on the VM
+  spinup backup schedule
+
+  # Remove the backup timers
+  spinup backup schedule --remove`, Short: "Install or remove backup timers on the VM", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		return backup.Schedule(c.Context(), backup.ScheduleOptions{Options: backupOptions(app, c), Plan: plan, Remove: remove})
 	}}
 	command.Flags().BoolVar(&plan, "plan", false, "print the schedule without changing the VM")

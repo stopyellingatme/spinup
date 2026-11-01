@@ -15,7 +15,8 @@ import (
 )
 
 func init() {
-	registry.Register(gen.Generator{Name: "openapi", Short: "Bundle OpenAPI files and generate Go types", Run: plan})
+	registry.Register(gen.Generator{Name: "openapi", Short: "Bundle OpenAPI files and generate Go types", Example: `  # Bundle the OpenAPI files and regenerate the Go types
+  spinup g openapi`, Run: plan})
 	run.RegisterPostStep(gen.PostOpenAPI, postStep)
 }
 

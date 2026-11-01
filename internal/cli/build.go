@@ -11,7 +11,14 @@ func init() { Register(GroupShip, newBuild) }
 
 func newBuild(app *App) *cobra.Command {
 	var o build.Options
-	c := &cobra.Command{Use: "build", Short: "Build the application API", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "build", Example: `  # Build the API binary
+  spinup build
+
+  # Build the container images for a release tag
+  spinup build --image --tag v1.2.0
+
+  # Build and push only the API image
+  spinup build --image --target api --push`, Short: "Build the application API", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if o.Image {
 			return buildImagesCommand(c.Context(), app, c, o)
 		}

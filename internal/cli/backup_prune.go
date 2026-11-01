@@ -9,7 +9,11 @@ func init() { registerBackup(newBackupPrune) }
 
 func newBackupPrune(app *App) *cobra.Command {
 	var plan bool
-	c := &cobra.Command{Use: "prune", Short: "Apply backup retention and list the remaining backups", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "prune", Example: `  # Preview which backups the retention rules remove
+  spinup backup prune --plan
+
+  # Apply the retention rules
+  spinup backup prune`, Short: "Apply backup retention and list the remaining backups", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		_, err := backup.Prune(c.Context(), backup.PruneOptions{Options: backupOptions(app, c), Plan: plan || app.Flags.DryRun})
 		return err
 	}}

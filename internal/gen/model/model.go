@@ -12,6 +12,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "model",
 		Short: "Generate a table: migration, sqlc queries, and OpenAPI schemas",
+		Example: `  # Add a table without handlers
+  spinup g model tag name:string color:string?`,
 		Usage: "<name> <field:type>...",
 		Run:   run,
 	})

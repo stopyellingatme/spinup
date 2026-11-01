@@ -13,7 +13,14 @@ func init() { Register(GroupMaintain, newDoctor) }
 func newDoctor(app *App) *cobra.Command {
 	var quick bool
 	var remote bool
-	c := &cobra.Command{Use: "doctor", Short: "Check local application health", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "doctor", Example: `  # Check the local app
+  spinup doctor
+
+  # Run only the quick checks
+  spinup doctor --quick
+
+  # Check the deployed VM
+  spinup doctor --remote --env production`, Short: "Check local application health", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if remote {
 			return remotecheck.Doctor(c.Context(), remotecheck.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, JSON: app.Flags.JSON, Out: c.OutOrStdout()})
 		}

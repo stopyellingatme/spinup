@@ -29,7 +29,11 @@ const customRulesPath = "monitoring/alerts/custom.yml"
 var alertName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
-	registry.Register(gen.Generator{Name: "alert", Short: "Add a custom Prometheus alert rule", Usage: "<name> --expr <PromQL>", Flags: flags, Run: plan})
+	registry.Register(gen.Generator{Name: "alert", Short: "Add a custom Prometheus alert rule", Usage: "<name> --expr <PromQL>", Example: `  # Alert when a target is down for 5 minutes
+  spinup g alert TargetDown --expr 'up == 0' --severity critical
+
+  # Alert on server errors, with a summary
+  spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) > 0' --for 10m --summary "API returns 5xx"`, Flags: flags, Run: plan})
 }
 
 func flags(fs *pflag.FlagSet) {

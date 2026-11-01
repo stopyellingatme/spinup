@@ -28,6 +28,11 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "page",
 		Short: "Generate a SvelteKit page in web/src/routes",
+		Example: `  # Add a page at /about
+  spinup g page about
+
+  # Add a page with a server load function, for admins only
+  spinup g page admin/reports --server --role admin`,
 		Usage: "<route>",
 		Flags: func(fs *pflag.FlagSet) {
 			fs.Bool("server", false, "also write +page.server.ts with a load function")

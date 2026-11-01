@@ -10,7 +10,14 @@ func init() { registerBackup(newBackupRestore) }
 func newBackupRestore(app *App) *cobra.Command {
 	var o backup.RestoreOptions
 	var label, at string
-	c := &cobra.Command{Use: "restore", Short: "Restore a backup into a new or live database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+	c := &cobra.Command{Use: "restore", Example: `  # Preview a restore into a new database
+  spinup backup restore --into new --plan
+
+  # Restore the latest backup into a new database
+  spinup backup restore --into new
+
+  # Replace the live database with the state at a point in time
+  spinup backup restore --into in-place --time 2026-10-31T14:00:00Z --i-know`, Short: "Restore a backup into a new or live database", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		target, err := backup.ParseTarget(label, at)
 		if err != nil {
 			return err

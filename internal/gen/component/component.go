@@ -20,6 +20,8 @@ func init() {
 	registry.Register(gen.Generator{
 		Name:  "component",
 		Short: "Add shadcn-svelte components to the web app (needs the network)",
+		Example: `  # Add two shadcn-svelte components
+  spinup g component button card`,
 		Usage: "<name>...",
 		Run:   plan,
 	})

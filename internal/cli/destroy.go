@@ -10,7 +10,11 @@ import (
 func init() { Register(GroupDevelop, newDestroy) }
 
 func newDestroy(app *App) *cobra.Command {
-	c := &cobra.Command{Use: "destroy <kind> <name>", Short: "Remove unchanged generated files", Args: cobra.ExactArgs(2)}
+	c := &cobra.Command{Use: "destroy <kind> <name>", Example: `  # Remove the files that spinup g resource ticket made
+  spinup destroy resource ticket
+
+  # Preview the removal
+  spinup destroy handler health_check --dry-run`, Short: "Remove unchanged generated files", Args: cobra.ExactArgs(2)}
 	c.RunE = func(c *cobra.Command, args []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {

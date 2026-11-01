@@ -10,7 +10,11 @@ func driftOptions(app *App) drift.Options {
 }
 func init() { Register(GroupMaintain, newDiff) }
 func newDiff(app *App) *cobra.Command {
-	return &cobra.Command{Use: "diff [path...]", Short: "Compare tracked files with their templates", RunE: func(c *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "diff [path...]", Example: `  # Compare every tracked file with its template
+  spinup diff
+
+  # Compare one file
+  spinup diff web/src/routes/+layout.svelte`, Short: "Compare tracked files with their templates", RunE: func(c *cobra.Command, args []string) error {
 		return drift.Diff(c.Context(), driftOptions(app), args, app.UI)
 	}}
 }
