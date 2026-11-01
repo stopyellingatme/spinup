@@ -8,6 +8,8 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,6 +19,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stopyellingatme/spinup/kit/audit"
 )
@@ -265,5 +268,28 @@ func TestCommandPrune(t *testing.T) {
 	err := audit.RunCommand(context.Background(), pool, []string{"prune", "--before", time.Now().UTC().Format("2006-01-02T15:04:05Z"), "--reason", "r", "--yes"}, &out, &errOut)
 	if err == nil || !strings.Contains(err.Error(), "younger than 1 day") || !strings.HasSuffix(err.Error(), "Try: pass a time at least 1 day in the past.") {
 		t.Errorf("prune of a recent time = %v", err)
+	}
+}
+
+// TestCommandExportFailureRemovesFile proves that a failed export leaves no
+// partial file behind. The pool points at a closed port, so the first query fails.
+func TestCommandExportFailureRemovesFile(t *testing.T) {
+	t.Parallel()
+	pool, err := pgxpool.New(t.Context(), "postgres://audit:audit@127.0.0.1:1/audit?connect_timeout=1&sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	file := filepath.Join(t.TempDir(), "events.jsonl")
+	var out, errOut bytes.Buffer
+	err = audit.RunCommand(t.Context(), pool, []string{"export", "--since", "2000-01-01", "--until", "2999-01-01", "--format", "jsonl", "--out", file}, &out, &errOut)
+	if err == nil {
+		t.Fatal("export against a closed port succeeded")
+	}
+	if _, statErr := os.Stat(file); !errors.Is(statErr, fs.ErrNotExist) {
+		t.Fatalf("the partial file stays after a failed export: %v", statErr)
+	}
+	if strings.Contains(out.String(), "exported") {
+		t.Errorf("a failed export printed a summary: %s", out.String())
 	}
 }

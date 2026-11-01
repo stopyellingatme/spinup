@@ -219,7 +219,13 @@ def create_app(
             return problem(503, "The render queue is full", headers={"Retry-After": str(limits.RETRY_AFTER_SECONDS)})
         try:
             deadline = asyncio.get_running_loop().time() + settings.timeout_seconds
-            body = await read_body(request, settings.max_body_bytes)
+            # The deadline covers the body read too, so a stalled client cannot hold
+            # a queue place forever.
+            try:
+                async with asyncio.timeout_at(deadline):
+                    body = await read_body(request, settings.max_body_bytes)
+            except TimeoutError:
+                raise RenderError(408, "The request body took too long to arrive") from None
             template, data = parse_request(body)
             payload = json.dumps({"template": template, "data": data}).encode()
             del body, data

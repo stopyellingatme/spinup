@@ -308,16 +308,20 @@ func exportCommand(ctx context.Context, pool *pgxpool.Pool, args []string, out, 
 	}
 
 	dest, name, summary := out, "-", errOut
+	var file *os.File
 	if *outPath != "" {
 		// The file holds personal data: only the owner reads it. An existing
 		// file is never replaced.
-		file, err := os.OpenFile(*outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-		if err != nil {
-			return cmdError(action, "cannot create the output file: "+err.Error(), "pass a new file path to --out, or remove the old file")
+		var openErr error
+		file, openErr = os.OpenFile(*outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if openErr != nil {
+			return cmdError(action, "cannot create the output file: "+openErr.Error(), "pass a new file path to --out, or remove the old file")
 		}
+		// A failed export never leaves a partial file behind. The defer reads the
+		// named result err.
 		defer func() {
-			if cerr := file.Close(); cerr != nil && err == nil {
-				err = cmdError(action, "cannot close the output file: "+cerr.Error(), "check the disk and run the export again")
+			if file != nil {
+				_ = file.Close()
 			}
 			if err != nil {
 				_ = os.Remove(*outPath)
@@ -329,6 +333,15 @@ func exportCommand(ctx context.Context, pool *pgxpool.Pool, args []string, out, 
 	count, err := export(ctx, pool, from, to, *format, io.MultiWriter(dest, sum))
 	if err != nil {
 		return err
+	}
+	if file != nil {
+		// Close before the summary: a close error (a full disk) must not print a
+		// checksum for a truncated file.
+		cerr := file.Close()
+		file = nil
+		if cerr != nil {
+			return cmdError(action, "cannot close the output file: "+cerr.Error(), "check the disk and run the export again")
+		}
 	}
 	_, err = fmt.Fprintf(summary, "exported %d events\n%s  %s\n", count, hex.EncodeToString(sum.Sum(nil)), name)
 	if err != nil {

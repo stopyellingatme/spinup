@@ -307,3 +307,34 @@ def test_render_span():
     assert span.attributes["pdf.template"] == "sample"
     assert span.attributes["pdf.bytes"] == len(response.content)
     assert span.attributes["pdf.render_ms"] >= 0
+
+
+def test_stalled_body_times_out_and_frees_the_queue():
+    """A client that never finishes its body gets 408 and gives its queue place back."""
+    app = create_app(Limits(concurrency=1, queue_max=0, timeout_seconds=0.5), command=fake_child("pass"))
+    sent: list[dict] = []
+
+    async def scenario() -> None:
+        chunks = [{"type": "http.request", "body": b'{"templ', "more_body": True}]
+
+        async def receive() -> dict:
+            if chunks:
+                return chunks.pop()
+            await asyncio.sleep(30)
+            return {"type": "http.disconnect"}
+
+        async def send(message: dict) -> None:
+            sent.append(message)
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
+            "scheme": "http", "path": "/v1/render", "raw_path": b"/v1/render", "query_string": b"",
+            "headers": [(b"content-type", b"application/json"), (b"content-length", b"100")],
+            "client": ("127.0.0.1", 1), "server": ("127.0.0.1", 80),
+        }
+        await asyncio.wait_for(app(scope, receive, send), timeout=10)
+
+    asyncio.run(scenario())
+    start = next(m for m in sent if m["type"] == "http.response.start")
+    assert start["status"] == 408
+    assert app.state.renderer.pending == 0
