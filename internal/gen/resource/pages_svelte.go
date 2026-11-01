@@ -338,6 +338,9 @@ const itemSvelte = `<script lang="ts">
 
 	<PageHeader {title}>
 		{#snippet actions()}
+[[- if .Audit ]]
+			<Button href="[[ .Route ]]/{item.id}/history" variant="outline">History</Button>
+[[- end ]]
 			<Button href="[[ .Route ]]/{item.id}/edit" variant="outline">
 				<PencilIcon aria-hidden="true" />
 				Edit

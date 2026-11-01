@@ -33,6 +33,10 @@ func init() {
 			fs.Bool("no-tests", false, "skip the handler test file")
 			fs.Bool("shared", false, "share rows between signed-in users (requires auth)")
 			fs.String("role", "", "comma-separated roles that can use the resource (requires auth)")
+			fs.Bool("audit", false, "enable audit (requires the audit module)")
+			fs.Bool("no-audit", false, "disable audit for this resource")
+			fs.String("audit-redact", "", "additional columns to redact from the trail")
+			fs.String("history-role", "", "comma-separated roles that can read history")
 		},
 		Run: run,
 	})
@@ -50,6 +54,8 @@ type Spec struct {
 	Owned bool
 	// Shared reports whether auth protects a table shared by all signed-in users.
 	Shared bool
+	// Audit describes the trail and its history guard.
+	Audit AuditSpec
 	// Roles are the declared roles that can use the resource.
 	Roles []string
 }
@@ -125,7 +131,7 @@ func handlersTestPath(name fields.Name) string {
 // without the files that all resources share (server.go and routes_gen.go).
 // The list includes the files of registered parts. It is sorted.
 func Paths(name fields.Name) []string {
-	paths := []string{QueriesPath(name), openapiPathsPath(name), SchemasPath(name), handlersPath(name), handlersTestPath(name)}
+	paths := []string{QueriesPath(name), openapiPathsPath(name), SchemasPath(name), handlersPath(name), handlersTestPath(name), historyHandlerPath(Spec{Name: name}), historyPathsPath(Spec{Name: name})}
 	for _, p := range registeredParts() {
 		if p.Paths != nil {
 			paths = append(paths, p.Paths(name)...)
@@ -187,6 +193,9 @@ func PlanModel(spec Spec, force bool) (vfs.Plan, error) {
 	if err != nil {
 		return vfs.Plan{}, err
 	}
+	if spec.Audit.On && ok {
+		return vfs.Plan{}, fmt.Errorf("cannot audit an existing resource through its create migration\nTry: spinup g audit %s", table)
+	}
 	migration := ""
 	switch {
 	case ok && !force:
@@ -197,6 +206,11 @@ func PlanModel(spec Spec, force bool) (vfs.Plan, error) {
 		migration, err = ops.NextMigrationName(migrationsDir(spec.Root), "create_"+table)
 		if err != nil {
 			return vfs.Plan{}, withTry(err)
+		}
+	}
+	if spec.Audit.On {
+		if err := CheckAuditMigration(spec.Root, migration); err != nil {
+			return vfs.Plan{}, err
 		}
 	}
 	files := []vfs.File{
@@ -276,6 +290,9 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 			}
 		}
 	}
+	if err := configureAudit(&spec, in.Flags, config, auditColumns(spec)); err != nil {
+		return nil, err
+	}
 	plan, err := PlanModel(spec, Bool(in.Flags, "force"))
 	if err != nil {
 		return nil, err
@@ -288,6 +305,16 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		return nil, fmt.Errorf("%w\nTry: report this generator bug", err)
 	}
 	steps := []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostGofmt}
+	if spec.Audit.On {
+		history, _, err := PlanHistory(spec, false)
+		if err != nil {
+			return nil, err
+		}
+		plan, err = plan.Merge(history)
+		if err != nil {
+			return nil, err
+		}
+	}
 	pagesRan := false
 	if !Bool(in.Flags, "api-only") {
 		for _, p := range parts {

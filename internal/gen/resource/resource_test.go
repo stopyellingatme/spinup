@@ -38,6 +38,10 @@ func flagSet(t *testing.T, args ...string) *pflag.FlagSet {
 	fs.Bool("force", false, "")
 	fs.Bool("shared", false, "")
 	fs.String("role", "", "")
+	fs.Bool("audit", false, "")
+	fs.Bool("no-audit", false, "")
+	fs.String("audit-redact", "", "")
+	fs.String("history-role", "", "")
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(err)
 	}
