@@ -255,3 +255,36 @@ Two rules matter:
 - A caller with the wrong role, who sends bad input, gets 400 or 422 before 403. The caller learns only the shape of the schema.
 
 If the resource has web pages, they call `requireRole` in the `load` function and in each form action.
+
+## Audit
+
+When the app has the audit module, new resources include audit by default.
+Use `--no-audit` to disable audit for one resource.
+Use `--audit` to require audit explicitly.
+Without the module, this flag fails with `Try: spinup module add audit`.
+
+Use `--audit-redact column_a,column_b` to hide more values.
+The generator also hides columns whose names match a sensitive pattern.
+The pattern is `(?i)(password|passwd|secret|token|api_?key|hash|credential)`.
+Use `--history-role manager,staff` to limit history to declared roles.
+The history roles default to the resource roles.
+The generator requires the audit migration to precede the new create migration.
+
+An audited resource includes row and truncate triggers in its create migration.
+Create, Update, and Delete use `audit.InTx` and `s.Queries.WithTx(tx)`.
+Get and List keep their existing queries.
+The History button opens a separate page that renders on the server.
+A failed history request does not affect the detail page.
+
+The history endpoint uses the history roles and the owner filter of Get.
+It returns an empty list when no events match.
+It sets `Cache-Control: no-store`.
+The default limit is 50 events.
+The maximum limit is 200 events.
+The maximum offset is 10000 events.
+Use `before_id` to request older events.
+An invalid limit or offset receives a 422 problem response with a `Try:` line.
+
+For an existing resource, use [generate audit](generate-audit.md).
+This command adds a migration and separate history files.
+It preserves the existing handlers and pages.

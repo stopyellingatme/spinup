@@ -1,0 +1,24 @@
+[project]
+name = "service"
+version = "0.1.0"
+requires-python = ">=3.15"
+dependencies = [
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+    "opentelemetry-instrumentation-fastapi==0.66b2",
+    "weasyprint==70.0",
+    "jinja2==3.1.6",
+]
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pytest==9.2.0",
+    "pypdf==6.21.1",
+]
+
+[tool.uv]
+package = false

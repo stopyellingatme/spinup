@@ -60,4 +60,8 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/gen/roles"
 	_ "github.com/stopyellingatme/spinup/internal/gen/service"
 	_ "github.com/stopyellingatme/spinup/internal/gen/serviceclient"
+
+	// Audit trail (ADR 0025)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/auditwired"
+	_ "github.com/stopyellingatme/spinup/internal/gen/audit"
 )

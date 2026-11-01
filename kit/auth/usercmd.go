@@ -9,10 +9,14 @@ import (
 	"strings"
 )
 
-const userCommandUsage = "user create --email E --role R --password-stdin | user set-role --email E --role R | user list | user backfill"
+const userCommandUsage = "user create --email E --role R --password-stdin [--reason TEXT] | user set-role --email E --role R [--reason TEXT] | user list | user backfill"
 
 // UserCommand returns the operator command for account and role management.
 // Register it with app.WithCommand("user", auth.UserCommand(a)).
+//
+// The command gives the operator to the event sink (auth.WithEvents) as
+// Event.Actor "operator:<login>", where the login is SUDO_USER, then USER, then
+// unknown. The --reason flag of create and set-role becomes Event.Reason.
 func UserCommand(a *Auth) func(ctx context.Context, args []string) error {
 	return func(ctx context.Context, args []string) error {
 		return runUserCommand(ctx, a, args, os.Stdin, os.Stdout)
@@ -42,6 +46,7 @@ func createUserCommand(ctx context.Context, a *Auth, args []string, in io.Reader
 	email := flags.String("email", "", "account email")
 	role := flags.String("role", "", "declared role")
 	passwordStdin := flags.Bool("password-stdin", false, "read the password from standard input")
+	reason := flags.String("reason", "", "why the account is created")
 	if err := parseUserFlags(flags, args); err != nil {
 		return userCommandError("user create", "invalid flags", "user create --email a@b.c --role staff --password-stdin")
 	}
@@ -64,7 +69,7 @@ func createUserCommand(ctx context.Context, a *Auth, args []string, in io.Reader
 	if err != nil {
 		return fmt.Errorf("user create: cannot read the password from standard input: %w\nTry: provide the password through --password-stdin", err)
 	}
-	user, err := a.CreateUser(ctx, *email, password, *role)
+	user, err := a.CreateUser(withOperator(ctx, operatorEmail(os.Getenv), *reason), *email, password, *role)
 	if err != nil {
 		return fmt.Errorf("user create: %w", err)
 	}
@@ -75,6 +80,7 @@ func setUserRoleCommand(ctx context.Context, a *Auth, args []string, out io.Writ
 	flags := newUserFlagSet("set-role")
 	email := flags.String("email", "", "account email")
 	role := flags.String("role", "", "declared role")
+	reason := flags.String("reason", "", "why the role changes")
 	if err := parseUserFlags(flags, args); err != nil {
 		return userCommandError("user set-role", "invalid flags", "user set-role --email a@b.c --role staff")
 	}
@@ -87,7 +93,7 @@ func setUserRoleCommand(ctx context.Context, a *Auth, args []string, out io.Writ
 	if *role == "" {
 		return userCommandError("user set-role", "--role is required. Declared roles: "+declaredRoles(a), "user set-role --email a@b.c --role "+a.Roles().Default)
 	}
-	if err := a.SetRole(ctx, *email, *role); err != nil {
+	if err := a.SetRole(withOperator(ctx, operatorEmail(os.Getenv), *reason), *email, *role); err != nil {
 		return fmt.Errorf("user set-role: %w", err)
 	}
 	return writeUserCommand(out, "user set-role", "updated "+*email+"\t"+*role+"\n")
@@ -114,7 +120,7 @@ func backfillRolesCommand(ctx context.Context, a *Auth, args []string, out io.Wr
 	if len(args) != 0 {
 		return userCommandError("user backfill", "unexpected arguments", "user backfill")
 	}
-	count, err := a.BackfillRoles(ctx)
+	count, err := a.BackfillRoles(withOperator(ctx, operatorEmail(os.Getenv), ""))
 	if err != nil {
 		return fmt.Errorf("user backfill: %w", err)
 	}

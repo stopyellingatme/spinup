@@ -51,6 +51,7 @@
 - [`spinup eject`](eject.md) — Take ownership of a managed file
 - [`spinup generate`](generate.md) — Generate application files
 - [`spinup generate alert`](generate-alert.md) — Add a custom Prometheus alert rule
+- [`spinup generate audit`](generate-audit.md) — Attach audit triggers and add resource history
 - [`spinup generate client`](generate-client.md) — Generate TypeScript types from OpenAPI
 - [`spinup generate component`](generate-component.md) — Add shadcn-svelte components to the web app (needs the network)
 - [`spinup generate dashboard`](generate-dashboard.md) — Add a custom Grafana dashboard

@@ -51,6 +51,10 @@ The `node` template uses Hono on Node 24 and pnpm.
 Each template has a Dockerfile, locked dependencies, a test, a README, and `openapi.yaml`.
 The `openapi.yaml` file is the contract that the Go client uses.
 
+For PDF reports, run `spinup g service reports --lang python --kind pdf`.
+This variant of the Python template renders HTML templates to PDF with WeasyPrint.
+See [PDF reports](pdf-reports.md).
+
 ## The Node template
 
 The `node` template is a TypeScript service on Hono (`hono` and `@hono/node-server`).
@@ -85,6 +89,8 @@ The directory `services/<name>/` is the Docker build context.
 | `gpus` | no | An empty value (none), `all`, or a count such as `1`. |
 | `public` | no | A public URL prefix such as `/svc/ocr`. See [Public routes](#public-routes). |
 | `auth` | no | The check on a public route: `none` (default) or `session`. It needs `public`. |
+| `memory` | no | The default memory limit in deploy, such as `3g`. The `memory` of `[resources.<name>]` wins. |
+| `tmp_size` | no | The size of the `/tmp` tmpfs, such as `256m`. An empty value keeps the Docker default. |
 
 The built-in templates have a healthcheck command in the image.
 The Rust command is `/service healthcheck`.
@@ -282,7 +288,8 @@ The service owns its own limits, so add them in the service code.
 
 ## Limits and GPUs
 
-A service with no `[resources.<name>]` entry in `deploy/environments/<env>.toml` has no CPU limit and no memory limit.
+A service with no `[resources.<name>]` entry in `deploy/environments/<env>.toml` has no CPU limit.
+It has no memory limit, unless its declaration sets `memory`.
 Set limits, and set the replica count, in that file:
 
 ```toml

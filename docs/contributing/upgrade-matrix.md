@@ -164,3 +164,37 @@ Then add the command registration and run `user backfill`.
 Before assignment, existing users have an empty stored role.
 They read as the default role unless it equals the administrator role.
 In that case, an empty role grants no role.
+
+## Upgrade an app to the audit module
+
+The audit cases are in `testdata/corpus/audit/`.
+They use the same small synthetic tree and the real Git merger as the roles cases.
+The new template adds `00005_users_role.sql`, `00006_audit_events.sql`, and the audit wiring in `main.go`.
+Each case checks the plan, the written files, and the doctor check `audit-wired`.
+
+| Case | App state | Expected result |
+| --- | --- | --- |
+| `main-conflict` | The app changed the `auth.New` line of `main.go` | The plan reports a conflict on `api/cmd/api/main.go`. After you keep the app version, `audit-wired` warns. After you add the wiring, it passes. |
+| `migration-clash` | The app owns `00006_create_notes.sql` | The reason of `00006_audit_events.sql` names the clash and has a `Try:` line. |
+| `resource-chain` | The app has resource migrations 00003 to 00006 | Both pack migrations get a clash warning. 00005 names `00005_create_orders.sql`. 00006 names `00006_create_bulletins.sql`. |
+| `todo-shape` | The app has migrations 00001 to 00003, with no mail and no OIDC | The plan creates 00005, then 00006. The plan has no warning. |
+
+A test also runs `module add audit` on an app with a clash.
+It checks the clash warning in the preview and the `Next:` lines for `main.go`.
+The `Next:` lines come from `modules.AuditNextSteps`.
+
+Run the audit checks:
+
+```sh
+go test -race ./internal/upgrade/... -run 'AuditUpgradeCorpus|AuditModuleAddNextSteps|MigrationClashWarnings'
+make script RUN=audit_module
+make script RUN=gen_audit
+SPINUP_APP_GATE=1 make script RUN=app_gate_audit
+SPINUP_APP_GATE=1 make script RUN=app_gate_pdf
+```
+
+The planner never renames a migration, because the app may have applied it.
+Rename the app migration to the next free number before you migrate.
+If the app migration is already applied, keep its version and rename the new pack migration.
+The audit pack and the `api` pack need no codemod.
+They add new files, and the 3-way merge handles the `main.go` change.

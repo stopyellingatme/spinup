@@ -13,13 +13,17 @@ spinup generate resource <name> <field:type>... [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--api-only` | `false` | skip the parts that other packs register, such as web pages |
+| `--audit` | `false` | enable audit (requires the audit module) |
+| `--audit-redact` | `` | additional columns to redact from the trail |
 | `--confirm-env` | `` | type the protected environment name without a terminal |
 | `--diff` | `false` | show unified diffs without writing |
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |
 | `--force` | `false` | overwrite files with different content |
+| `--history-role` | `` | comma-separated roles that can read history |
 | `--json` | `false` | write JSON output |
+| `--no-audit` | `false` | disable audit for this resource |
 | `--no-color` | `false` | turn off color |
 | `--no-tests` | `false` | skip the handler test file |
 | `--non-interactive` | `false` | never prompt |

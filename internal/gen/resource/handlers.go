@@ -60,7 +60,7 @@ func (rc resourceCode) imports() []string {
 		"github.com/stopyellingatme/spinup/kit/auth",
 		"github.com/stopyellingatme/spinup/kit/auth/authtest",
 	}
-	if len(rc.spec.Roles) > 0 {
+	if len(rc.spec.Roles) > 0 || len(rc.spec.Audit.HistoryRoles) > 0 {
 		imports = append(imports, rc.module+"/internal/roles")
 	}
 	return imports
@@ -401,7 +401,16 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	if rc.spec.Owned {
 		g.p("params.UserID = user.ID")
 	}
-	g.p("row, err := s.Queries.Create%s(ctx, params)", singular)
+	if rc.spec.Audit.On {
+		g.p("var row store.%s", rc.row)
+		g.p("err = audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("var err error")
+		g.p("row, err = s.Queries.WithTx(tx).Create%s(ctx, params)", singular)
+		g.p("return err")
+		g.p("})")
+	} else {
+		g.p("row, err := s.Queries.Create%s(ctx, params)", singular)
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
@@ -431,7 +440,14 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
-	g.p("row, err := s.Queries.Update%s(ctx, store.Update%sParams{", singular, singular)
+	if rc.spec.Audit.On {
+		g.p("var row store.%s", rc.row)
+		g.p("err = audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("var err error")
+		g.p("row, err = s.Queries.WithTx(tx).Update%s(ctx, store.Update%sParams{", singular, singular)
+	} else {
+		g.p("row, err := s.Queries.Update%s(ctx, store.Update%sParams{", singular, singular)
+	}
 	g.p("ID: req.Id,")
 	if rc.spec.Owned {
 		g.p("UserID: user.ID,")
@@ -444,6 +460,10 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 		}
 	}
 	g.p("})")
+	if rc.spec.Audit.On {
+		g.p("return err")
+		g.p("})")
+	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
@@ -454,14 +474,28 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("// Delete%s deletes a %s.", singular, words)
 	g.p("func (s *Server) Delete%s(ctx context.Context, req gen.Delete%sRequestObject) (gen.Delete%sResponseObject, error) {", singular, singular, singular)
 	guard("Delete" + singular)
+	query := "s.Queries"
+	assign := ":="
+	if rc.spec.Audit.On {
+		g.p("var deleted int64")
+		g.p("err := audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("var err error")
+		query = "s.Queries.WithTx(tx)"
+		assign = "="
+	}
 	if rc.spec.Owned {
-		g.p("deleted, err := s.Queries.Delete%s(ctx, store.Delete%sParams{ID: req.Id, UserID: user.ID})", singular, singular)
+		g.p("deleted, err %s %s.Delete%s(ctx, store.Delete%sParams{ID: req.Id, UserID: user.ID})", assign, query, singular, singular)
 	} else {
-		g.p("deleted, err := s.Queries.Delete%s(ctx, req.Id)", singular)
+		g.p("deleted, err %s %s.Delete%s(ctx, req.Id)", assign, query, singular)
+	}
+	if rc.spec.Audit.On {
+		g.p("return err")
+		g.p("})")
 	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
+
 	g.p("if deleted == 0 {")
 	g.p("return nil, errNotFound")
 	g.p("}")
@@ -571,10 +605,21 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 
 	g.p("func Test%sCRUD(t *testing.T) {", plural)
 	g.p("t.Parallel()")
+	if rc.spec.Audit.On {
+		g.p("if os.Getenv(\"DATABASE_URL\")==\"\" {t.Skip(\"DATABASE_URL is required for audit events\")}")
+	}
 	g.p("pool := testkit.DBWithMigrations(t, migrations.FS)")
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{DB: pool})")
 	g.p("})).Handler()")
+	if rc.spec.Audit.On {
+		g.p("historyBase := handler")
+		g.p("actorBase := handler")
+		g.p("handler = http.HandlerFunc(func(w http.ResponseWriter,r *http.Request) {")
+		g.p("u,_ := auth.UserFrom(r.Context())")
+		g.p("actorBase.ServeHTTP(w,r.WithContext(authsink.ActorContext(r.Context(),u)))")
+		g.p("})")
+	}
 	if rc.spec.Owned || rc.spec.Shared {
 		g.p("var userA int64")
 		g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-a@example.com', 'test-hash-a') RETURNING id`).Scan(&userA); err != nil {")
@@ -591,9 +636,12 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 				g.p("other := authtest.As(handler, userB)")
 			}
 		}
-		if len(rc.spec.Roles) > 0 {
+		switch {
+		case rc.spec.Audit.On:
+			g.p(`handler = authtest.AsUser(handler,auth.User{ID:userA,Email:"owner-a@example.com",Role:%q})`, rc.auditTestRole())
+		case len(rc.spec.Roles) > 0:
 			g.p("handler = authtest.AsRole(handler, userA, roles.%s)", project.RoleConst(rc.spec.Roles[0]))
-		} else {
+		default:
 			g.p("handler = authtest.As(handler, userA)")
 		}
 	}
@@ -618,6 +666,10 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("}")
 	g.p("created := testkit.DecodeJSON[gen.%s](t, rec)", rc.item)
 	g.p("path := fmt.Sprintf(\"%s/%%d\", created.Id)", base)
+	if rc.spec.Audit.On {
+		rc.auditSnapshot(g, "before")
+	}
+
 	if rc.spec.Owned {
 		g.p("for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {")
 		g.p("var body io.Reader")
@@ -654,6 +706,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("t.Fatalf(\"update: status %%d, want %%d\\n%%s\", rec.Code, http.StatusOK, rec.Body)")
 	g.p("}")
 	g.p("updated := testkit.DecodeJSON[gen.%s](t, rec)", rc.item)
+	if rc.spec.Audit.On {
+		rc.auditSnapshot(g, "after")
+	}
 	if changed != nil {
 		g.p("if updated.Id != created.Id || reflect.DeepEqual(updated.%s, created.%s) {", changed.api, changed.api)
 		g.p("t.Fatalf(\"update: got %%+v, want a new %s\", updated)", changed.col)
@@ -675,6 +730,16 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("if rec.Code != http.StatusNotFound {")
 	g.p("t.Fatalf(\"get after delete: status %%d, want %%d\\n%%s\", rec.Code, http.StatusNotFound, rec.Body)")
 	g.p("}")
+	if rc.spec.Audit.On {
+		updated := changed != nil
+		for _, f := range rc.fields {
+			if f.Type.Ref != "" && f.Nullable {
+				parent, _ := fields.ParseName(f.Type.Ref)
+				updated = updated || parentVars[parent.Table()] != ""
+			}
+		}
+		rc.auditCRUDAssertions(g, updated)
+	}
 	g.p("}")
 	g.p("")
 
@@ -716,6 +781,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("})")
 	g.p("}")
 	g.p("}")
+	if rc.spec.Audit.On {
+		rc.historyGuardTests(g, base)
+	}
 	rc.requiredFieldsTest(g, base)
 	if rc.spec.Owned || rc.spec.Shared {
 		rc.authenticationTest(g, base)

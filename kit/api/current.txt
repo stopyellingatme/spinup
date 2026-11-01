@@ -25,6 +25,66 @@ kit/app ptrmethod App.Handler() http.Handler
 kit/app ptrmethod App.Run(context.Context, []string) error
 kit/app type App struct
 kit/app type Option func(*App)
+kit/audit const DefaultLimit = 50
+kit/audit const KindOperator = "operator"
+kit/audit const KindSystem = "system"
+kit/audit const KindUnattributed = "unattributed"
+kit/audit const KindUser = "user"
+kit/audit const MaxLimit = 200
+kit/audit const MaxOffset = 10000
+kit/audit const SourceAPI = "api"
+kit/audit const SourceCLI = "cli"
+kit/audit const SourceJob = "job"
+kit/audit const SourceMigrate = "migrate"
+kit/audit const SourceSQL = "sql"
+kit/audit field Actor.Email string
+kit/audit field Actor.ID int64
+kit/audit field Actor.Kind string
+kit/audit field Actor.Reason string
+kit/audit field Actor.RequestID string
+kit/audit field Actor.Role string
+kit/audit field Actor.Source string
+kit/audit field Event.Action string
+kit/audit field Event.Actor Actor
+kit/audit field Event.Changes json.RawMessage
+kit/audit field Event.ID int64
+kit/audit field Event.OccurredAt time.Time
+kit/audit field Event.OwnerID int64
+kit/audit field Event.RecordID string
+kit/audit field Event.Table string
+kit/audit field Filter.Action string
+kit/audit field Filter.ActorEmail string
+kit/audit field Filter.BeforeID int64
+kit/audit field Filter.Limit int
+kit/audit field Filter.Offset int
+kit/audit field Filter.OwnerID int64
+kit/audit field Filter.RecordID string
+kit/audit field Filter.Since time.Time
+kit/audit field Filter.Table string
+kit/audit field Filter.Unattributed bool
+kit/audit field Filter.Until time.Time
+kit/audit func ActorFrom(context.Context) (Actor, bool)
+kit/audit func Bind(context.Context, Execer) error
+kit/audit func Command(*pgxpool.Pool) func(ctx context.Context, args []string) error
+kit/audit func InTx(context.Context, *pgxpool.Pool, func(pgx.Tx) error) error
+kit/audit func List(context.Context, Querier, Filter) ([]Event, error)
+kit/audit func Operator() Actor
+kit/audit func Prune(context.Context, *pgxpool.Pool, time.Time, string) (int64, error)
+kit/audit func Record(context.Context, Execer, Event) error
+kit/audit func System(string, string) Actor
+kit/audit func WithActor(context.Context, Actor) context.Context
+kit/audit imethod Execer.Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+kit/audit imethod Querier.Query(context.Context, string, ...any) (pgx.Rows, error)
+kit/audit method Filter.Validate() error
+kit/audit type Actor struct
+kit/audit type Event struct
+kit/audit type Execer interface
+kit/audit type Filter struct
+kit/audit type Querier interface
+kit/audit var ErrFilterLimit = errors.New("audit: the page is out of range")
+kit/audit var ErrNotInTx = errors.New("audit: Bind needs a transaction, not a pool or a connection\nTry: use audit.InTx, or pass the pgx.Tx of db.InTx")
+kit/audit/authsink func ActorContext(context.Context, auth.User) context.Context
+kit/audit/authsink func New(*pgxpool.Pool) auth.EventSink
 kit/auth const CookieName = "session"
 kit/auth const DefaultCSP = "default-src 'none'; frame-ancestors 'none'"
 kit/auth const DefaultHashQueue = 4
@@ -32,12 +92,25 @@ kit/auth const DefaultHashWait = 2 * time.Second
 kit/auth const DefaultLifetime = 7 * 24 * time.Hour
 kit/auth const DefaultLockoutThreshold = 5
 kit/auth const DefaultLockoutWindow = 15 * time.Minute
+kit/auth const EventLockout = "lockout"
+kit/auth const EventPasswordRehash = "password_rehash"
+kit/auth const EventPasswordReset = "password_reset"
+kit/auth const EventRegister = "register"
+kit/auth const EventRoleChange = "role_change"
+kit/auth const EventSignIn = "sign_in"
+kit/auth const EventSignOut = "sign_out"
+kit/auth const EventUserCreate = "user_create"
 kit/auth const MaxPasswordLength = 512
 kit/auth const MinPasswordLength = 12
 kit/auth const RegistrationClosed RegistrationMode = "closed"
 kit/auth const RegistrationFirstUser RegistrationMode = "first-user"
 kit/auth const RegistrationOpen RegistrationMode = "open"
 kit/auth const ResetLifetime = time.Hour
+kit/auth field Event.Actor string
+kit/auth field Event.Method string
+kit/auth field Event.Name string
+kit/auth field Event.Reason string
+kit/auth field Event.User User
 kit/auth field Limit.Burst int
 kit/auth field Limit.Every time.Duration
 kit/auth field Limit.Off bool
@@ -60,6 +133,8 @@ kit/auth func ParseRegistration(string) (RegistrationMode, error)
 kit/auth func Required(http.Handler) http.Handler
 kit/auth func UserCommand(*Auth) func(ctx context.Context, args []string) error
 kit/auth func UserFrom(context.Context) (User, bool)
+kit/auth func WithActorContext(func(ctx context.Context, u User) context.Context) Option
+kit/auth func WithEvents(EventSink) Option
 kit/auth func WithHashLimits(int, int, time.Duration) Option
 kit/auth func WithIdleTimeout(time.Duration) Option
 kit/auth func WithLifetime(time.Duration) Option
@@ -76,6 +151,7 @@ kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
 kit/auth func WithTrustedProxies(...string) Option
 kit/auth func WithUser(context.Context, User) context.Context
+kit/auth imethod Execer.Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 kit/auth method Roles.Valid(string) bool
 kit/auth method Roles.Validate() error
 kit/auth method User.HasRole(...string) bool
@@ -91,6 +167,9 @@ kit/auth ptrmethod Auth.Roles() Roles
 kit/auth ptrmethod Auth.Routes(*http.ServeMux)
 kit/auth ptrmethod Auth.SetRole(context.Context, string, string) error
 kit/auth type Auth struct
+kit/auth type Event struct
+kit/auth type EventSink func(ctx context.Context, q Execer, e Event) error
+kit/auth type Execer interface
 kit/auth type Limit struct
 kit/auth type Option func(*options)
 kit/auth type RateLimits struct
@@ -194,6 +273,7 @@ kit/httpx func RequestID() Middleware
 kit/httpx func RequestIDFrom(context.Context) string
 kit/httpx func RequireJSONFields(*http.Request, []string) error
 kit/httpx func SecurityHeaders() Middleware
+kit/httpx func WriteAttachment(http.ResponseWriter, string, string, []byte)
 kit/httpx func WriteJSON(http.ResponseWriter, int, any) error
 kit/httpx func WriteProblem(http.ResponseWriter, *http.Request, Problem)
 kit/httpx ptrmethod Error.Error() string
@@ -267,6 +347,8 @@ kit/mail type Config struct
 kit/mail type Log struct
 kit/mail type Mailer interface
 kit/mail type Message struct
+kit/pdf const MaxBytes = 20 << 20
+kit/pdf func Serve(http.ResponseWriter, *http.Response, error, string) error
 kit/secrets func Load(string) (string, error)
 kit/secrets func Must(string) string
 kit/telemetry field Options.Environment string

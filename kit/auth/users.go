@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/stopyellingatme/spinup/kit/db"
 )
 
 var (
@@ -68,6 +70,9 @@ func (a *Auth) CreateUser(ctx context.Context, email, password, role string) (Us
 			return User{}, fmt.Errorf("create user: cannot lock and count the accounts: %w\nTry: check the database connection and retry", err)
 		}
 	}
+	if err := a.rowEvent(ctx, tx, withOperatorOf(ctx, Event{Name: EventUserCreate, User: User{Email: email, Role: role}})); err != nil {
+		return User{}, fmt.Errorf("create user: %w", err)
+	}
 	var user User
 	err = tx.QueryRow(ctx, `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id, email, role`, email, hash, role).Scan(&user.ID, &user.Email, &user.Role)
 	if err != nil {
@@ -115,6 +120,9 @@ func (a *Auth) SetRole(ctx context.Context, email, role string) error {
 			return &userError{cause: ErrLastAdmin, message: fmt.Sprintf("the change would remove the last account with role %q.\nTry: give the role %q to another account first.", a.roles.Admin, a.roles.Admin)}
 		}
 	}
+	if err := a.rowEvent(ctx, tx, withOperatorOf(ctx, Event{Name: EventRoleChange, User: user})); err != nil {
+		return fmt.Errorf("set role: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `UPDATE users SET role = $2, updated_at = now() WHERE id = $1`, user.ID, role); err != nil {
 		return fmt.Errorf("set role: cannot update the account: %w\nTry: check the database schema and connection", err)
 	}
@@ -148,9 +156,18 @@ func (a *Auth) BackfillRoles(ctx context.Context) (int64, error) {
 	if a.roles.Default == a.roles.Admin {
 		return 0, &userError{message: "default_role equals admin_role, so empty roles cannot be filled safely.\nTry: run \"user set-role\" for each account."}
 	}
-	tag, err := a.pool.Exec(ctx, `UPDATE users SET role = $1, updated_at = now() WHERE role = ''`, a.roles.Default)
+	var count int64
+	err := db.InTx(ctx, a.pool, func(tx pgx.Tx) error {
+		// One role_change event binds the actor for every account of the backfill.
+		if err := a.rowEvent(ctx, tx, withOperatorOf(ctx, Event{Name: EventRoleChange, Reason: "backfill"})); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `UPDATE users SET role = $1, updated_at = now() WHERE role = ''`, a.roles.Default)
+		count = tag.RowsAffected()
+		return err
+	})
 	if err != nil {
 		return 0, fmt.Errorf("backfill roles: cannot update the accounts: %w\nTry: check the database schema and connection", err)
 	}
-	return tag.RowsAffected(), nil
+	return count, nil
 }

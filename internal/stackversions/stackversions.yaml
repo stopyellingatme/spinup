@@ -150,6 +150,11 @@ python_packages:   # the Python service template (ADR 0022); templates/python/py
   opentelemetry-exporter-otlp-proto-http: "1.45.2"  # HTTP only: never opentelemetry-exporter-otlp, which pulls grpcio
   opentelemetry-instrumentation-fastapi: "0.66b2"   # pairs with 1.45.x
 
+python_pdf_packages:   # the PDF variant of the Python service template (ADR 0026); templates/python-pdf/pyproject.toml pins these and python_packages with ==
+  weasyprint: "70.0"   # needs the Pango apt packages of ADR 0026 decision 4.2 in the image
+  jinja2: "3.1.6"
+  pypdf: "6.21.1"      # dev
+
 node_packages:   # the Node service template (ADR 0023); templates/node/package.json pins these exactly
   hono: "4.13.14"
   "@hono/node-server": "2.1.5"   # peer hono ^4

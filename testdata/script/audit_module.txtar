@@ -1,0 +1,50 @@
+# The pack and module flow need no network or database.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+# New audit apps include auth and the exact kit wiring.
+exec spinup new audited --modules auth,audit --module example.com/audited --non-interactive
+cd audited
+exists api/db/migrations/00002_create_auth.sql
+exists api/db/migrations/00005_users_role.sql
+exists api/db/migrations/00006_audit_events.sql
+exists web/src/lib/components/app/history-list.svelte
+grep 'auth.WithEvents\(authsink.New\(pool\)\)' api/cmd/api/main.go
+grep 'auth.WithActorContext\(authsink.ActorContext\)' api/cmd/api/main.go
+grep 'app.WithCommand\("audit", audit.Command\(pool\)\)' api/cmd/api/main.go
+grep 'changed \(value hidden\)' web/src/lib/components/app/history-list.svelte
+exec spinup module list --json
+stdout '"name":"audit"[^}]*"enabled":true'
+
+# Audit requires the web frontend, including through its auth dependency.
+cd $WORK
+! exec spinup new apionly --api-only --modules auth,audit --module example.com/apionly --non-interactive
+stderr 'needs the web frontend'
+stderr 'Try:'
+
+# The module workflow creates a review branch and leaves the main checkout intact.
+exec spinup new retrofit --modules ci --module example.com/retrofit --non-interactive
+cd retrofit
+exec spinup module add audit --yes --non-interactive
+stdout 'Adding required modules: auth'
+stdout 'git merge spinup/module-audit'
+exists .spinup/upgrade/0.0.0-dev/api/db/migrations/00006_audit_events.sql
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/components/app/history-list.svelte
+! exists api/db/migrations/00006_audit_events.sql
+! grep 'audit.Command' api/cmd/api/main.go
+grep '^modules = .*audit.*auth' .spinup/upgrade/0.0.0-dev/spinup.toml
+exec git status --porcelain
+! stdout .
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0

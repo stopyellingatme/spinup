@@ -1,0 +1,87 @@
+# App gate: the audit module (ADR 0025). An app with auth and audit gets an audited resource.
+# The API builds and its generated tests pass against the lane database. The operator command
+# lists the events that the triggers wrote. The gate needs a database and the psql client.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:psql] skip 'psql is required to write rows outside the API'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gateaudit --modules auth,audit --module example.com/gateaudit --no-git --non-interactive
+cd gateaudit
+exists api/db/migrations/00006_audit_events.sql
+
+# The resource has a trigger in its create migration, a History endpoint, and writes in audit.InTx.
+# api_token is redacted by name. The web pages need no post-step here, so the gate skips them.
+exec spinup g resource work_order title:string status:string api_token:string --role manager,staff --history-role manager --api-only
+exists api/db/migrations/00007_create_work_orders.sql
+grep 'audit_row_change' api/db/migrations/00007_create_work_orders.sql
+grep 'audit.InTx' api/internal/handlers/work_orders.go
+exists api/internal/handlers/work_orders_history.go
+
+# Build, vet, and test the API. The generated tests run against DATABASE_URL.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test -race ./...
+cd ..
+
+# Apply the migrations. The tests may have used the same database, so a second run is a no-op.
+exec spinup db migrate up
+exec spinup db migrate status
+stdout '00006_audit_events\.sql'
+stdout '00007_create_work_orders\.sql'
+! stdout '^pending'
+
+# The operator command of the app binary creates an account. The users trigger records it.
+cd api
+stdin $WORK/account-password.txt
+exec go run ./cmd/api user create --email ada@example.com --role manager --password-stdin --reason 'gate account'
+exec go run ./cmd/api audit list --resource users
+stdout 'create #1'
+stdout 'operator:'
+stdout 'email: ada@example\.com'
+stdout 'password_hash: changed \(value hidden\)'
+! stdout 'insert-only-password'
+cd ..
+
+# A write outside the API has no actor. The trigger still records it as unattributed.
+exec psql $DATABASE_URL -v ON_ERROR_STOP=1 -f $WORK/insert-work-order.sql
+cd api
+exec go run ./cmd/api audit list --resource work_orders --unattributed
+stdout 'unattributed'
+stdout 'title: Replace pump'
+stdout 'api_token: changed \(value hidden\)'
+! stdout 'secret-token-value'
+exec go run ./cmd/api audit list --resource work_orders --unattributed --json
+stdout '"action":"create"'
+stdout '"source":"sql"'
+! stdout 'secret-token-value'
+cd ..
+
+# A transaction that binds an actor gives an attributed update with the old and the new value.
+exec psql $DATABASE_URL -v ON_ERROR_STOP=1 -f $WORK/update-work-order.sql
+cd api
+exec go run ./cmd/api audit list --resource work_orders --action update
+stdout 'gate@example\.com'
+stdout 'status: open -> done'
+! stdout 'unattributed'
+
+# Filters and the no-flag error follow the contract: a missing flag fails and names the flag.
+! exec go run ./cmd/api audit list
+stderr 'audit list: --resource is required'
+stderr 'Try:'
+exec go run ./cmd/api audit list --resource work_orders --actor nobody@example.com
+stderr 'no events match'
+cd ..
+
+-- account-password.txt --
+insert-only-password-1
+
+-- insert-work-order.sql --
+INSERT INTO work_orders (user_id, title, status, api_token)
+SELECT id, 'Replace pump', 'open', 'secret-token-value' FROM users ORDER BY id LIMIT 1;
+
+-- update-work-order.sql --
+BEGIN;
+SELECT set_config('spinup.audit', '{"kind":"operator","email":"gate@example.com","source":"cli"}', true);
+UPDATE work_orders SET status = 'done' WHERE title = 'Replace pump';
+COMMIT;

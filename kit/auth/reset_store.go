@@ -12,14 +12,14 @@ var errResetNotFound = pgx.ErrNoRows
 // reserveResetRequest applies the email limit before reserving global capacity.
 // Repeated requests for one email cannot exhaust the global bucket.
 func (a *Auth) reserveResetRequest(ctx context.Context, email string, now time.Time) (bool, error) {
-	until, _, err := a.reserveAttempt(ctx, "reset-email:"+email, now)
+	until, _, _, err := a.reserveAttempt(ctx, "reset-email:"+email, now)
 	if err != nil || !until.IsZero() {
 		return false, err
 	}
 	// Reuse the database reservation with a separate threshold and the same window.
 	// Construct only the limiter fields. Do not copy Auth's synchronization state.
 	global := Auth{pool: a.pool, threshold: resetGlobalThreshold, window: a.window}
-	until, _, err = global.reserveAttempt(ctx, "reset-global", now)
+	until, _, _, err = global.reserveAttempt(ctx, "reset-global", now)
 	return err == nil && until.IsZero(), err
 }
 
@@ -32,11 +32,12 @@ func (a *Auth) consumeReset(ctx context.Context, digest []byte, hash string) (in
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	// Lock the user before the token. Different tokens of one user serialize here.
-	var id int64
-	var email string
-	if err := tx.QueryRow(ctx, `SELECT u.id,u.email FROM users u JOIN password_resets p ON p.user_id = u.id WHERE p.token_hash = $1 FOR UPDATE OF u`, digest).Scan(&id, &email); err != nil {
+	var user User
+	if err := tx.QueryRow(ctx, `SELECT u.id,u.email,u.role FROM users u JOIN password_resets p ON p.user_id = u.id WHERE p.token_hash = $1 FOR UPDATE OF u`, digest).Scan(&user.ID, &user.Email, &user.Role); err != nil {
 		return 0, err
 	}
+	id, email := user.ID, user.Email
+	user.Role = a.effectiveRole(user.Role)
 	var expires time.Time
 	var used *time.Time
 	if err := tx.QueryRow(ctx, `SELECT expires_at,used_at FROM password_resets WHERE token_hash = $1 FOR UPDATE`, digest).Scan(&expires, &used); err != nil {
@@ -45,6 +46,9 @@ func (a *Auth) consumeReset(ctx context.Context, digest []byte, hash string) (in
 	now := a.now()
 	if used != nil || !now.Before(expires) {
 		return 0, errResetNotFound
+	}
+	if err := a.rowEvent(ctx, tx, Event{Name: EventPasswordReset, User: user}); err != nil {
+		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2,updated_at = $3 WHERE id = $1`, id, hash, now); err != nil {
 		return 0, err

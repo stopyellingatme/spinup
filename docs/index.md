@@ -47,6 +47,8 @@ Open `http://localhost:5173` for the app and `http://localhost:8080` for the API
 - [Accounts and sessions](auth.md)
 - [Mail and password reset](mail.md)
 - [Sidecar services](services.md)
+- [PDF reports](pdf-reports.md)
+- [Audit trail](audit.md)
 - [Plugin packs and generators](plugins.md)
 - [Executable plugins](plugins-exec.md)
 

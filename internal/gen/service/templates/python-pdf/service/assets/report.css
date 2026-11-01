@@ -1,0 +1,55 @@
+/* Print styles of the sample report. Put fonts in service/assets/fonts/. */
+@page {
+  size: A4;
+  margin: 18mm 16mm;
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt;
+    color: #555;
+  }
+}
+
+body {
+  font-family: "DejaVu Sans", "Liberation Sans", sans-serif;
+  font-size: 10pt;
+  color: #111;
+}
+
+h1 {
+  font-size: 18pt;
+  margin: 0 0 4mm;
+}
+
+.subtitle {
+  color: #555;
+  margin: 0 0 6mm;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 0.5pt solid #ccc;
+  padding: 2mm 1mm;
+  text-align: left;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid;
+}
+
+.number {
+  text-align: right;
+}
+
+.notes {
+  margin-top: 6mm;
+  white-space: pre-wrap;
+}

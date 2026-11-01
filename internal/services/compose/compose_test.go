@@ -66,6 +66,15 @@ func TestDeployGolden(t *testing.T) {
 			Images:   images, Replicas: map[string]int{"tts": 3},
 			Resources: map[string]Resources{"tts": {Memory: "1g"}},
 		}},
+		// The memory key of spinup.toml is the default. The environment file wins for ocr.
+		{"deploy_limits", DeployInput{
+			App: "todo", Images: images,
+			Services: []services.Service{
+				{Name: "ocr", Port: 8080, DevPort: 8101, Health: "/healthz", Memory: "3g", TmpSize: "256m"},
+				{Name: "tts", Port: 9000, DevPort: 8102, Health: "/healthz", Memory: "3g"},
+			},
+			Resources: map[string]Resources{"ocr": {Memory: "1g"}},
+		}},
 		{"deploy_gpu_count", DeployInput{
 			App: "todo", Images: images,
 			Services: []services.Service{{Name: "ocr", Port: 8080, DevPort: 8101, Health: "/healthz", GPUs: "2"}},

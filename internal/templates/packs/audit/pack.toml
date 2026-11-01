@@ -1,0 +1,16 @@
+name = "audit"
+description = "An audit trail: database triggers record who changed a record, and when, with a History page and an operator command."
+# The trail records the actor of a signed-in user, and it audits the users table.
+requires = ["auth"]
+
+# The table audit_events, the trigger functions, and the triggers on users (and on
+# user_identities when it exists). An existing migration never changes (ADR 0025).
+[[files]]
+path = "api/db/migrations/00006_audit_events.sql"
+source = "files/api/db/migrations/00006_audit_events.sql"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/components/app/history-list.svelte"
+source = "files/web/src/lib/components/app/history-list.svelte"
+class = "managed"

@@ -1,0 +1,50 @@
+AuditEvent:
+  type: object
+  required: [id, occurred_at, action, table_name, record_id, changes, actor]
+  properties:
+    id:
+      type: integer
+      format: int64
+    occurred_at:
+      type: string
+      format: date-time
+    action:
+      type: string
+    table_name:
+      type: string
+    record_id:
+      type: string
+    owner_id:
+      type: integer
+      format: int64
+    changes:
+      description: Field changes. A row change maps each field to an object with old, new, or redacted. A custom event (audit.Record) may hold any JSON value.
+      type: object
+      additionalProperties: true
+    actor:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        role:
+          type: string
+        source:
+          type: string
+        reason:
+          type: string
+        request_id:
+          type: string
+AuditEventList:
+  type: object
+  required: [items]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/components/schemas/AuditEvent"

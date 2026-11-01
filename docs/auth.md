@@ -511,6 +511,55 @@ If the values are different, the API rejects all form actions with 403.
 
 The middleware sets `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` on API responses that have no policy.
 
+## Account events (audit module)
+
+The audit module records account events. See [Audit trail](audit.md) for the module.
+Without the module, the auth module records no event of its own.
+A new app with `--modules auth,audit` has the wiring in `api/cmd/api/main.go`.
+
+```console
+$ spinup new events --module example.com/events --modules auth,audit --no-git --non-interactive
+...
+$ grep -E 'WithEvents|WithActorContext' events/api/cmd/api/main.go
+		auth.WithEvents(authsink.New(pool)),
+		auth.WithActorContext(authsink.ActorContext),
+```
+
+`auth.WithEvents` sets the event sink. `authsink.New(pool)` is the sink of the audit module.
+`auth.WithActorContext` makes the middleware store the signed-in user as the audit actor.
+A handler then reaches `audit.InTx` with that actor.
+
+The auth module writes these events.
+
+| Event | When | Where the sink runs | If the sink fails |
+| --- | --- | --- | --- |
+| `register` | A new account, through the register endpoint or the first OIDC sign-in | Inside the transaction of the insert | The insert fails |
+| `user_create` | `user create` of the operator command | Inside the transaction | The insert fails |
+| `role_change` | `user set-role` and `user backfill` | Inside the transaction | The change fails |
+| `password_reset` | A new password through a reset token | Inside the transaction | The change fails |
+| `password_rehash` | A new hash of the same password, with new parameters | Inside the transaction | The change fails |
+| `sign_in` | A successful sign-in, with the method `password` or `oidc` | After the sign-in | The kit logs the error, and the user signs in |
+| `sign_out` | A sign-out | After the sign-out | The kit logs the error, and the user signs out |
+| `lockout` | The start of a lockout of an existing account | After the lockout starts | The kit logs the error |
+
+- The first five events are row changes of `users`. The sink binds the actor to the transaction. The trigger on `users` writes the event.
+  In `audit list`, these events show as `create` and `update`.
+- `sign_in`, `sign_out`, and `lockout` are explicit events. The sink writes the action `auth.sign_in`, `auth.sign_out`, or `auth.lockout` on the table `users`.
+  A `sign_in` event holds the method in its changes.
+- The actor of `register` is the new account, with the kind `system` and the reason `register`. The account has no ID before the insert.
+- The actor of `user_create` and `role_change` is `operator:<login>`. The login is `SUDO_USER`, then `USER`, then `unknown`.
+  Add `--reason` to `user create` and `user set-role` to record why.
+- A failed login for an email that has no account writes nothing. A `lockout` event is written once for each lockout.
+- The trigger never stores `password_hash`. The event shows `changed (value hidden)`.
+
+Read the events with the operator command.
+
+<!-- doctest: skip -->
+```console
+$ go run ./cmd/api audit list --resource users --action auth.sign_in --since 2026-11-01
+$ go run ./cmd/api audit list --resource users --actor operator:ada
+```
+
 ## The web pages
 
 The form actions post to the API with the `fetch` of the action.

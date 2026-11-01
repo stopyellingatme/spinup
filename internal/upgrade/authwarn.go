@@ -9,6 +9,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 )
 
@@ -51,6 +52,31 @@ func authUpgradeWarnings(root *os.Root, plan *Plan) error {
 			if _, ok := config["auth"].(map[string]any); ok {
 				file.Reason = "Note: spinup.toml declares [auth], but roles.gen.go is absent. The upgrade creates the default role set.\nTry: run spinup g roles after the upgrade."
 			}
+		}
+	}
+	return nil
+}
+
+// migrationClashWarnings annotates each new pack migration whose version an app
+// migration already uses (ADR 0025 decision 2.6). The kit migrator rejects two files
+// with one version. A file that already has a reason keeps it.
+func migrationClashWarnings(root *os.Root, plan *Plan) error {
+	var added []string
+	for _, file := range plan.Files {
+		if file.Action == ActionCreate && file.Reason == "" && strings.HasPrefix(file.Path, "api/db/migrations/") {
+			added = append(added, file.Path)
+		}
+	}
+	if len(added) == 0 {
+		return nil
+	}
+	warnings, err := modules.MigrationClashes(root.FS(), added)
+	if err != nil {
+		return err
+	}
+	for i := range plan.Files {
+		if warning, ok := warnings[plan.Files[i].Path]; ok && plan.Files[i].Reason == "" {
+			plan.Files[i].Reason = warning
 		}
 	}
 	return nil

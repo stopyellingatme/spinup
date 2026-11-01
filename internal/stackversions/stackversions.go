@@ -81,6 +81,9 @@ type Stack struct {
 	Crates         map[string]string `yaml:"crates"`
 	PythonPackages map[string]string `yaml:"python_packages"`
 	NodePackages   map[string]string `yaml:"node_packages"`
+	// PythonPDFPackages pins the packages that the PDF variant of the Python service
+	// template adds to PythonPackages (ADR 0026).
+	PythonPDFPackages map[string]string `yaml:"python_pdf_packages"`
 	// DigitalOcean holds the droplet defaults of `spinup deploy digital-ocean` (ADR 0017).
 	DigitalOcean DigitalOcean `yaml:"digitalocean"`
 }
@@ -146,6 +149,7 @@ func (s *Stack) Validate() error {
 	problems = append(problems, validateVersions("tools", s.Tools)...)
 	problems = append(problems, validateVersions("crates", s.Crates)...)
 	problems = append(problems, validateVersions("python_packages", s.PythonPackages)...)
+	problems = append(problems, validateVersions("python_pdf_packages", s.PythonPDFPackages)...)
 	problems = append(problems, validateVersions("node_packages", s.NodePackages)...)
 
 	for _, name := range sortedKeys(s.Images) {

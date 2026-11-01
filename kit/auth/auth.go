@@ -81,6 +81,9 @@ type options struct {
 	proxiesSet bool
 	lookup     func(string) (string, bool) // the environment; tests replace it
 	sweep      time.Duration
+
+	events       EventSink
+	actorContext func(context.Context, User) context.Context
 }
 
 // WithSecureCookie sets the Secure attribute of the session cookie. The default is
@@ -144,6 +147,8 @@ type Auth struct {
 	limits       *limiter // nil: no rate limit
 	proxies      proxySet
 	warnedAt     atomic.Int64
+	events       EventSink                                   // nil: no explicit events (ADR 0025)
+	actorContext func(context.Context, User) context.Context // nil: the context does not change
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -218,6 +223,8 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		window:       o.window,
 		now:          o.now,
 		proxies:      proxies,
+		events:       o.events,
+		actorContext: o.actorContext,
 		stop:         make(chan struct{}),
 		done:         make(chan struct{}),
 	}
@@ -376,8 +383,8 @@ func (a *Auth) RequireUser(next http.Handler) http.Handler {
 	})
 }
 
-// loadUser puts the user of the session into the request context. A session of a
-// deleted user is destroyed.
+// loadUser puts the user of the session into the request context, and calls the
+// function of WithActorContext for it. A session of a deleted user is destroyed.
 func (a *Auth) loadUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -388,7 +395,11 @@ func (a *Auth) loadUser(next http.Handler) http.Handler {
 				return
 			}
 			if found {
-				r = r.WithContext(context.WithValue(ctx, userContextKey, user))
+				ctx = context.WithValue(ctx, userContextKey, user)
+				if a.actorContext != nil {
+					ctx = a.actorContext(ctx, user)
+				}
+				r = r.WithContext(ctx)
 			} else if err := a.sessions.Destroy(ctx); err != nil {
 				a.internalError(w, r, "destroy the session of a deleted user", err)
 				return
