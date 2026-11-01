@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/templates"
 	"github.com/stopyellingatme/spinup/internal/testutil"
 )
 
@@ -96,12 +97,56 @@ func TestGoldenGenAudit(t *testing.T) {
 	testutil.Deterministic(t, render)
 }
 
+// oldIdentities is auth 00004 as spinup wrote it before the migration attached
+// the audit triggers itself (ADR 0025 decision 3.9).
+const oldIdentities = `-- +goose Up
+-- A new migration follows password reset. Existing auth migrations never change.
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+CREATE TABLE user_identities (
+    provider text NOT NULL,
+    subject text NOT NULL,
+    user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email text NOT NULL,
+    PRIMARY KEY (provider, subject)
+);
+CREATE INDEX user_identities_user_id_idx ON user_identities (user_id);
+
+-- +goose Down
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+DROP TABLE user_identities;
+`
+
+// retrofitIdentities is the attach that spinup g audit user_identities writes for
+// an old 00004 copy. The audit migration may have attached the triggers already,
+// so it drops them first.
+const retrofitIdentities = `-- +goose Up
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+CREATE TRIGGER user_identities_audit AFTER INSERT OR UPDATE OR DELETE ON user_identities FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'provider,subject');
+CREATE TRIGGER user_identities_audit_truncate AFTER TRUNCATE ON user_identities FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+
+-- +goose Down
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+`
+
+func newIdentities(t *testing.T) string {
+	t.Helper()
+	data, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/migrations/00004_oidc_identities.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 func TestRetrofit(t *testing.T) {
 	t.Parallel()
+	const identities = "00004_oidc_identities.sql"
 	for _, tc := range []struct {
-		name, target, sql, want string
-		args                    []string
-		onlyMigration           bool
+		name, target, file, sql, extra, want string
+		args                                 []string
+		onlyMigration, idempotent            bool
 	}{
 		{name: "resource", target: "notes"},
 		{name: "already attached", target: "note", sql: "CREATE TRIGGER notes_audit AFTER INSERT ON notes FOR EACH ROW EXECUTE FUNCTION audit_row_change('user_id', 'id');", want: "already attaches"},
@@ -110,15 +155,22 @@ func TestRetrofit(t *testing.T) {
 		{name: "down ignored", target: "note", sql: "-- +goose Down\nCREATE TRIGGER notes_audit AFTER INSERT ON notes FOR EACH ROW EXECUTE FUNCTION audit_row_change('user_id', 'id');"},
 		{name: "unknown table", target: "absent", want: "no migration creates"},
 		{name: "unknown redact", target: "notes", args: []string{"--audit-redact", "absent"}, want: "no such column"},
-		{name: "oidc after audit", target: "user_identities", sql: "CREATE TABLE user_identities (provider text, subject text, user_id bigint);", onlyMigration: true},
+		{name: "old oidc migration", target: "user_identities", file: identities, sql: oldIdentities, onlyMigration: true, idempotent: true},
+		{name: "oidc migration attaches", target: "user_identities", file: identities, sql: newIdentities(t), want: "already attaches"},
+		{name: "old oidc migration retrofitted", target: "user_identities", file: identities, sql: oldIdentities, extra: retrofitIdentities, want: "already attaches"},
 		{name: "auth users attached", target: "users", want: "already attaches"},
 		{name: "secret table", target: "sessions", want: "authentication secrets"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			root := fixture(t)
-			if tc.sql != "" {
+			if tc.file != "" {
+				write(t, root, "api/db/migrations/"+tc.file, tc.sql)
+			} else if tc.sql != "" {
 				write(t, root, "api/db/migrations/00008_test.sql", "-- +goose Up\n"+tc.sql)
+			}
+			if tc.extra != "" {
+				write(t, root, "api/db/migrations/00009_audit_user_identities.sql", tc.extra)
 			}
 			out, err := run(t.Context(), gen.Input{Root: root, Args: []string{tc.target}, Flags: flags(t, tc.args...)})
 			if tc.want != "" {
@@ -139,6 +191,9 @@ func TestRetrofit(t *testing.T) {
 				}
 				if tc.onlyMigration && !strings.Contains(string(f.Data), "audit_row_change('', 'provider,subject')") {
 					t.Fatalf("wrong auth arguments: %s", f.Data)
+				}
+				if tc.idempotent && string(f.Data) != retrofitIdentities {
+					t.Fatalf("attach migration =\n%s\nwant\n%s", f.Data, retrofitIdentities)
 				}
 			}
 			if !tc.onlyMigration && !strings.Contains(strings.Join(out.Next, "\n"), "audit.InTx") {

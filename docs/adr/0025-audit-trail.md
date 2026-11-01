@@ -61,6 +61,7 @@ This ADR adds a module `audit`, a kit package `kit/audit`, a retrofit generator,
 7. The module is off by default. `spinup module add audit` turns it on in an existing app.
 8. The `api` pack `main.go.tmpl` gets lines under `has "audit" .modules` (decision 4.8).
 9. An app without the module renders byte-identical files. The golden trees of those apps do not change.
+   One exception came from review: an OIDC app gets the new text of the auth migration 00004 with the module or without it (decision 3.9). Without the module, the new block does nothing.
 
 ### 3. Schema
 
@@ -126,9 +127,16 @@ The table is `audit_events`.
 9. The module attaches triggers to `users`: `audit_row_change('', 'id', 'password_hash')`.
    It attaches a trigger to `user_identities` only when the table exists: `audit_row_change('', 'provider,subject')`. The owner is empty and no column is redacted. `spinup g audit user_identities` writes the same arguments.
    Each attach statement sits in a `DO` block that checks `to_regclass('public.<table>') IS NOT NULL`. The block skips a missing table without an error.
+   Each block also checks `pg_trigger` and attaches a trigger only when it does not exist yet.
    The todo app has no `user_identities` table, so the migration skips it there.
-   If the OIDC migration runs after the audit migration, `user_identities` has no trigger. The command `spinup g audit user_identities` attaches it.
-   The doctor check `audit-wired` warns when `user_identities` exists and has no trigger.
+   The kit migrator applies the auth migration `00004_oidc_identities.sql` after the audit migration when OIDC comes later. File numbers cannot tell the two orders apart.
+   So the auth migration 00004 attaches the triggers too. After `CREATE TABLE user_identities`, a `DO` block attaches `user_identities_audit` and `user_identities_audit_truncate` with the same arguments.
+   The block acts only when `to_regprocedure('public.audit_row_change()') IS NOT NULL` and the trigger does not exist yet. An app without the audit module is not affected. The Down step drops the two triggers with `IF EXISTS` before the table.
+   Both orders attach the trigger: the audit migration when 00004 ran first, and 00004 when it runs after the audit migration.
+   Both files have the class `seed`. Existing apps keep their copies. New apps and newly added modules get the new text. No codemod is necessary.
+   `spinup g audit user_identities` is needed only for an app whose 00004 file came from a spinup version before this change.
+   For such an app, the generator writes an idempotent attach: `DROP TRIGGER IF EXISTS`, then `CREATE TRIGGER`. The generator refuses when another migration attaches the trigger, which includes the new 00004 text.
+   The doctor check `audit-wired` warns when `user_identities` exists, the 00004 file has no attach block, and no other migration attaches the trigger without the `to_regclass` condition.
    The module does not attach triggers to `sessions`, `login_attempts`, or `password_resets`. These tables hold token hashes and have no meaning for an auditor.
 10. The Down step drops the triggers with `DROP TRIGGER IF EXISTS ... ON <table>`, then the table, then the functions, without `CASCADE`.
     `DROP TRIGGER IF EXISTS` on a table that does not exist gives a notice, not an error (proved on 16, 17, and 18), so the Down step runs on the todo shape.
@@ -450,6 +458,7 @@ The pre-seed (unit P0 of run 20261031-201904) measured these facts on 2026-10-31
    - In the todo shape, the migration attaches `users_audit` and `users_audit_truncate` and skips `user_identities` without an error.
    - In the OIDC shape, it attaches `user_identities_audit` and `user_identities_audit_truncate`. `TRUNCATE users, user_identities, password_resets` writes one `truncate` event for each audited table.
    - When auth `00004` runs after the audit migration, `user_identities` has no trigger and its writes have no events. The doctor check `audit-wired` and `spinup g audit user_identities` cover this case.
+     Review fix (decision 3.9): with the new 00004 text, both orders attach the trigger. Applied out of order (00006, then 00004), an OIDC identity insert writes one event. With the old 00004 text, the idempotent attach of `spinup g audit user_identities` works in both orders. Proved on 16.15, 17.11, and 18.6.
    - Down removes every `audit_*` function, the table, and every `*_audit*` trigger. Up again works.
 4. Decision 4.10 holds: `SELECT set_config('spinup.audit', '{"kind":"system","source":"migrate","reason":"backfill"}', true);` on the first line of a goose migration gives `system` events with the source `migrate` and the reason `backfill`.
 

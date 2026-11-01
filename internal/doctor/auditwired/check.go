@@ -60,10 +60,15 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 		up, _, _ := strings.Cut(string(data), "-- +goose Down")
 		sql := sqlComments.ReplaceAllString(up, " ")
 		identities = identities || identityTable.MatchString(sql)
-		trigger = trigger || identityTrigger.MatchString(sql)
+		// The audit pack attaches user_identities only when the table exists when
+		// its migration runs. That attach depends on the order of the migrations,
+		// so it does not count. Auth 00004 attaches the triggers itself since ADR
+		// 0025 decision 3.9. An older copy of 00004 does not.
+		trigger = trigger || (identityTrigger.MatchString(sql) && !identityGuard.MatchString(sql))
 	}
 	if identities && !trigger {
-		return warn("user_identities exists in the migrations without an audit trigger", "spinup g audit user_identities, then run spinup db migrate up")
+		return warn("user_identities can lack its audit trigger: the migration that creates it does not attach one, and the audit migration attaches it only when the table already exists",
+			"spinup g audit user_identities, then run spinup db migrate up")
 	}
 	return doctor.Result{Status: doctor.OK, Message: "audit wiring and identity triggers are present"}
 }
@@ -72,6 +77,7 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 var (
 	sqlComments     = regexp.MustCompile(`(?s)/\*.*?\*/|--[^\n]*`)
 	identityTable   = regexp.MustCompile(`(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\s*\.\s*)?"?user_identities"?\s*\(`)
+	identityGuard   = regexp.MustCompile(`(?i)\bto_regclass\s*\(\s*'(?:"?public"?\.)?"?user_identities"?'\s*\)`)
 	identityTrigger = regexp.MustCompile(`(?is)\bCREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+[^;]+?\sON\s+(?:"?public"?\s*\.\s*)?"?user_identities"?\s+[^;]*?EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?:"?public"?\s*\.\s*)?"?audit_row_change"?\s*\(`)
 )
 

@@ -442,8 +442,8 @@ func TestSchemaOIDCShape(t *testing.T) {
 }
 
 // TestSchemaOIDCAfterAudit adds OIDC (auth 00004) after the audit migration ran, out of
-// order. The audit migration skipped user_identities, so the table has no trigger until
-// spinup g audit user_identities attaches one (the audit-wired check warns).
+// order. The audit migration skipped user_identities, and 00004 attaches the triggers
+// itself (ADR 0025 decision 3.9).
 func TestSchemaOIDCAfterAudit(t *testing.T) {
 	t.Parallel()
 	pool, url := schemaDB(t)
@@ -452,14 +452,115 @@ func TestSchemaOIDCAfterAudit(t *testing.T) {
 	oidc := fsys["00004_oidc_identities.sql"]
 	delete(fsys, "00004_oidc_identities.sql")
 	migrate(t, url, fsys, -1)
+	if got := triggers(t, pool, "user_identities"); len(got) != 0 {
+		t.Fatalf("user_identities triggers before OIDC = %v, want none", got)
+	}
 	fsys["00004_oidc_identities.sql"] = oidc
+	migrate(t, url, fsys, -1)
+	if got := strings.Join(triggers(t, pool, "user_identities"), ","); got != "user_identities_audit,user_identities_audit_truncate" {
+		t.Fatalf("user_identities triggers = %s", got)
+	}
+	exec(t, pool, `INSERT INTO users (email, password_hash) VALUES ('a@example.com', NULL)`)
+	start := lastID(t, pool)
+	exec(t, pool, `INSERT INTO user_identities (provider, subject, user_id, email) VALUES ('github', '42', 1, 'a@example.com')`)
+	got := events(t, pool, start)
+	if len(got) != 1 {
+		t.Fatalf("events = %+v, want one identity event", got)
+	}
+	wantEvent(t, got[0], "create", "user_identities", "github:42", "unattributed", "sql")
+
+	// Down rolls back 00004 first (it ran last), then the audit migration. The
+	// 00004 Down step needs a password for every account.
+	exec(t, pool, `UPDATE users SET password_hash = 'h'`)
+	migrate(t, url, fsys, 0)
+	wantNoAuditObjects(t, pool)
+}
+
+// oldIdentities is auth 00004 as spinup wrote it before the migration attached the
+// audit triggers itself. Existing apps keep this seed copy.
+const oldIdentities = `-- +goose Up
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+CREATE TABLE user_identities (
+    provider text NOT NULL,
+    subject text NOT NULL,
+    user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email text NOT NULL,
+    PRIMARY KEY (provider, subject)
+);
+CREATE INDEX user_identities_user_id_idx ON user_identities (user_id);
+
+-- +goose Down
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+DROP TABLE user_identities;
+`
+
+// retrofitIdentities is the attach of spinup g audit user_identities for an app with
+// the old 00004 copy. It replaces triggers that the audit migration attached in order.
+const retrofitIdentities = `-- +goose Up
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+CREATE TRIGGER user_identities_audit AFTER INSERT OR UPDATE OR DELETE ON user_identities FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'provider,subject');
+CREATE TRIGGER user_identities_audit_truncate AFTER TRUNCATE ON user_identities FOR EACH STATEMENT EXECUTE FUNCTION audit_truncate();
+
+-- +goose Down
+DROP TRIGGER IF EXISTS user_identities_audit_truncate ON user_identities;
+DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
+`
+
+// TestSchemaOldOIDCCopy covers an app whose 00004 file came from a spinup version
+// before the attach block. Out of order, the table has no trigger until the retrofit.
+// In order, the audit migration attaches the triggers and the retrofit replaces them.
+func TestSchemaOldOIDCCopy(t *testing.T) {
+	t.Parallel()
+	for _, outOfOrder := range []bool{true, false} {
+		name := "in order"
+		if outOfOrder {
+			name = "out of order"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			pool, url := schemaDB(t)
+			fsys := oidcShape(t)
+			fsys["00004_oidc_identities.sql"] = sqlFile(oldIdentities)
+			want := "user_identities_audit,user_identities_audit_truncate"
+			if outOfOrder {
+				delete(fsys, "00004_oidc_identities.sql")
+				migrate(t, url, fsys, -1)
+				fsys["00004_oidc_identities.sql"] = sqlFile(oldIdentities)
+				want = ""
+			}
+			migrate(t, url, fsys, -1)
+			if got := strings.Join(triggers(t, pool, "user_identities"), ","); got != want {
+				t.Fatalf("user_identities triggers = %q, want %q", got, want)
+			}
+			fsys["00009_audit_user_identities.sql"] = sqlFile(retrofitIdentities)
+			migrate(t, url, fsys, -1)
+			if got := strings.Join(triggers(t, pool, "user_identities"), ","); got != "user_identities_audit,user_identities_audit_truncate" {
+				t.Fatalf("user_identities triggers after the retrofit = %s", got)
+			}
+			exec(t, pool, `INSERT INTO users (email, password_hash) VALUES ('a@example.com', NULL)`)
+			start := lastID(t, pool)
+			exec(t, pool, `INSERT INTO user_identities (provider, subject, user_id, email) VALUES ('github', '42', 1, 'a@example.com')`)
+			if got := events(t, pool, start); len(got) != 1 || got[0].RecordID != "github:42" {
+				t.Fatalf("events = %+v, want one identity event", got)
+			}
+		})
+	}
+}
+
+// TestSchemaOIDCWithoutAudit proves that the attach block of auth 00004 does nothing
+// in an app without the audit module.
+func TestSchemaOIDCWithoutAudit(t *testing.T) {
+	t.Parallel()
+	pool, url := schemaDB(t)
+	fsys := oidcShape(t)
+	delete(fsys, "00006_audit_events.sql")
 	migrate(t, url, fsys, -1)
 	if got := triggers(t, pool, "user_identities"); len(got) != 0 {
 		t.Fatalf("user_identities triggers = %v, want none", got)
 	}
-	exec(t, pool, `INSERT INTO users (email, password_hash) VALUES ('a@example.com', NULL)`)
+	exec(t, pool, `INSERT INTO users (email, password_hash) VALUES ('a@example.com', 'h')`)
 	exec(t, pool, `INSERT INTO user_identities (provider, subject, user_id, email) VALUES ('github', '42', 1, 'a@example.com')`)
-	if got := events(t, pool, 0); len(got) != 1 || got[0].Table != "users" {
-		t.Fatalf("events = %+v, want the users insert only", got)
-	}
+	migrate(t, url, fsys, 0)
 }

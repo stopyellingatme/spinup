@@ -39,6 +39,7 @@ func (rc resourceCode) auditCRUDAssertions(g *goFile, updated bool) {
 	g.p("actions := []string{\"%s\"}", strings.Join(actions, "\", \""))
 	g.p("if len(events)!=len(actions) {t.Fatalf(\"events = %%+v, want actions %%v\",events,actions)}")
 	g.p("for i,event:= range events {")
+	g.p("if event.Table!=%q || event.RecordID!=strconv.FormatInt(created.Id,10) {t.Fatalf(\"event subject = %%q %%q, want %%q %%d\",event.Table,event.RecordID,%q,created.Id)}", rc.spec.Name.Table(), rc.spec.Name.Table())
 	g.p("if event.Action!=actions[i] || event.Actor.Kind!=audit.KindUser || event.Actor.ID!=userA || event.Actor.Email!=\"owner-a@example.com\" || event.Actor.Role!=%q || event.Actor.Source!=audit.SourceAPI {t.Fatalf(\"event = %%+v\",event)}", rc.auditTestRole())
 	g.p("var changes map[string]map[string]any")
 	g.p("if err:=json.Unmarshal(event.Changes,&changes); err!=nil {t.Fatal(err)}")
