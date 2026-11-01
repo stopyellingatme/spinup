@@ -18,10 +18,9 @@ AuditEvent:
       type: integer
       format: int64
     changes:
+      description: Field changes. A row change maps each field to an object with old, new, or redacted. A custom event (audit.Record) may hold any JSON value.
       type: object
-      additionalProperties:
-        type: object
-        additionalProperties: true
+      additionalProperties: true
     actor:
       type: object
       required: [kind]

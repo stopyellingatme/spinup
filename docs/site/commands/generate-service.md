@@ -5,7 +5,7 @@ Add a sidecar service
 ## Use
 
 ```text
-spinup generate service <name> --lang rust|python|node|<plugin>/<template> [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi] [flags]
+spinup generate service <name> --lang rust|python|node|<plugin>/<template> [--kind service|pdf] [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi] [flags]
 ```
 
 ## Flags
@@ -21,6 +21,7 @@ spinup generate service <name> --lang rust|python|node|<plugin>/<template> [--po
 | `--env` | `` | target environment |
 | `--force` | `false` | overwrite files with different content |
 | `--json` | `false` | write JSON output |
+| `--kind` | `service` | template variant: service, or pdf with --lang python |
 | `--lang` | `` | service language or plugin template (required) |
 | `--no-color` | `false` | turn off color |
 | `--no-openapi` | `false` | omit the OpenAPI file and Go client |

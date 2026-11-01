@@ -9,6 +9,10 @@ It preserves the existing handlers and pages.
 Use `--api-only` to skip the history web route.
 For an auth table, the command writes only the migration.
 The key of `user_identities` is `provider,subject`.
+The OIDC migration `00004_oidc_identities.sql` attaches its own audit trigger when the audit module is on, so a new app needs no command for `user_identities`.
+An app whose `00004_oidc_identities.sql` came from an older spinup version has no such block.
+For that app, `spinup g audit user_identities` writes an attach that first drops the trigger if it exists, so it is safe in either migration order.
+The doctor check `audit-wired` names this command when it is needed.
 The owner argument for this table is empty.
 
 ```console
