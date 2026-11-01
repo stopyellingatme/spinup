@@ -1,3 +1,9 @@
+---
+title: spinup backup schedule
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup schedule
 
 Install or remove backup timers on the VM
@@ -24,3 +30,16 @@ spinup backup schedule [flags]
 | `--remove` | `false` | disable and delete backup timers and services |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the timers without changing the VM
+spinup backup schedule --plan
+
+# Install the backup timers on the VM
+spinup backup schedule
+
+# Remove the backup timers
+spinup backup schedule --remove
+```

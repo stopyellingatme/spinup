@@ -1,3 +1,8 @@
+---
+title: spinup upgrade
+parent: CLI reference
+---
+
 # spinup upgrade
 
 Upgrade app templates in a separate Git worktree
@@ -31,3 +36,20 @@ spinup upgrade [flags]
 | `--ui` | `false` | merge shadcn-svelte component updates |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# See the plan first
+spinup upgrade --plan
+
+# Upgrade to the newest template version in a new worktree
+spinup upgrade
+
+# Upgrade to a chosen version
+spinup upgrade --to 0.9.0
+
+# Continue after you fix conflicts, or give up
+spinup upgrade --continue
+spinup upgrade --abort
+```

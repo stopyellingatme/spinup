@@ -1,3 +1,8 @@
+---
+title: spinup backup
+parent: CLI reference
+---
+
 # spinup backup
 
 Back up the production database with pgBackRest

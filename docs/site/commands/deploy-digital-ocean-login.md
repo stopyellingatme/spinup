@@ -1,3 +1,8 @@
+---
+title: spinup deploy digital-ocean login
+nav_exclude: true
+---
+
 # spinup deploy digital-ocean login
 
 Sign in to DigitalOcean in a browser and store the token
@@ -28,3 +33,13 @@ spinup deploy digital-ocean login [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Sign in to DigitalOcean in a browser
+spinup deploy digital-ocean login
+
+# Print the sign-in URL and open no browser
+spinup deploy digital-ocean login --no-browser
+```

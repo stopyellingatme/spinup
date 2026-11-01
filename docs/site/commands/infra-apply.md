@@ -1,3 +1,9 @@
+---
+title: spinup infra apply
+parent: spinup infra
+grand_parent: CLI reference
+---
+
 # spinup infra apply
 
 Apply infrastructure changes and update the environment host
@@ -22,3 +28,13 @@ spinup infra apply
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Create or update the server and volume
+spinup infra apply --env production
+
+# Show what would happen without changes
+spinup infra apply --dry-run --env production
+```

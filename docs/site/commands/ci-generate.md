@@ -1,3 +1,9 @@
+---
+title: spinup ci generate
+parent: spinup ci
+grand_parent: CLI reference
+---
+
 # spinup ci generate
 
 Render the locked ci pack
@@ -24,3 +30,13 @@ spinup ci generate [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Write the GitHub Actions workflows
+spinup ci generate
+
+# Show the changes without writing
+spinup ci generate --diff
+```

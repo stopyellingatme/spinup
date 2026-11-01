@@ -1,3 +1,9 @@
+---
+title: spinup backup list
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup list
 
 List the backups in the repository
@@ -22,3 +28,10 @@ spinup backup list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the backups in the repository
+spinup backup list
+```

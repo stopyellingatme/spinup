@@ -1,3 +1,8 @@
+---
+title: spinup monitor
+parent: CLI reference
+---
+
 # spinup monitor
 
 Operate monitoring services through SSH
@@ -34,3 +39,12 @@ spinup monitor
 - [`spinup monitor status`](monitor-status.md) — Show monitoring health and disk use
 - [`spinup monitor test-alert`](monitor-test-alert.md) — Send a test alert to configured contact points
 - [`spinup monitor trace`](monitor-trace.md) — Show a Tempo span tree (full profile)
+
+## Examples
+
+```sh
+# Check health, then look at alerts and logs
+spinup monitor status --env production
+spinup monitor alerts --env production
+spinup monitor logs --service api --env production
+```

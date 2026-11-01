@@ -1,3 +1,9 @@
+---
+title: spinup generate client
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate client
 
 Generate TypeScript types from OpenAPI
@@ -24,3 +30,10 @@ spinup generate client
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Regenerate the TypeScript API types after an OpenAPI change
+spinup g client
+```

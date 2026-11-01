@@ -1,3 +1,9 @@
+---
+title: spinup db dump
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db dump
 
 Dump the development database (default .spinup/dumps/app.dump)
@@ -22,3 +28,13 @@ spinup db dump [file]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Dump the development database to the default file
+spinup db dump
+
+# Dump to a named file
+spinup db dump backup.sql
+```

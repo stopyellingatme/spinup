@@ -1,3 +1,9 @@
+---
+title: spinup generate model
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate model
 
 Generate a table: migration, sqlc queries, and OpenAPI schemas
@@ -24,3 +30,10 @@ spinup generate model <name> <field:type>...
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a table without handlers
+spinup g model tag name:string color:string?
+```

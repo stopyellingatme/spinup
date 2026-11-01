@@ -1,3 +1,8 @@
+---
+title: spinup routes
+parent: CLI reference
+---
+
 # spinup routes
 
 List application HTTP routes
@@ -22,3 +27,13 @@ spinup routes
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the HTTP routes of the API
+spinup routes
+
+# Print the routes as JSON
+spinup routes --json
+```

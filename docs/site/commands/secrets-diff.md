@@ -1,3 +1,9 @@
+---
+title: spinup secrets diff
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets diff
 
 Show names changed since Git HEAD
@@ -22,3 +28,10 @@ spinup secrets diff
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show which secret names changed since the last commit
+spinup secrets diff --env production
+```

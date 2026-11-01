@@ -1,3 +1,8 @@
+---
+title: spinup deploy digital-ocean destroy
+nav_exclude: true
+---
+
 # spinup deploy digital-ocean destroy
 
 Delete the droplet, the firewall, and the DNS record of the environment
@@ -27,3 +32,10 @@ spinup deploy digital-ocean destroy [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Delete the droplet, the firewall, and the DNS record
+spinup deploy digital-ocean destroy --env production --i-know
+```

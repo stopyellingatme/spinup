@@ -1,3 +1,9 @@
+---
+title: spinup deploy status
+parent: spinup deploy
+grand_parent: CLI reference
+---
+
 # spinup deploy status
 
 Show the current release, the deploy lock, and the last deploy journal
@@ -23,3 +29,10 @@ spinup deploy status
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the release that runs on the VM
+spinup deploy status --env production
+```

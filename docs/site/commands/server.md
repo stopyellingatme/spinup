@@ -1,3 +1,8 @@
+---
+title: spinup server
+parent: CLI reference
+---
+
 # spinup server
 
 Prepare, audit, and access a VM
@@ -30,3 +35,11 @@ spinup server
 - [`spinup server bootstrap`](server-bootstrap.md) — Prepare a Debian or Ubuntu host
 - [`spinup server logs`](server-logs.md) — Read service logs from the host
 - [`spinup server ssh`](server-ssh.md) — Open an interactive shell on the host
+
+## Examples
+
+```sh
+# Prepare a new VM, then audit it
+spinup server bootstrap --env production
+spinup server audit --env production
+```

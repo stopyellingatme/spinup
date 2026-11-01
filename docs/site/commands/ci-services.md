@@ -1,3 +1,9 @@
+---
+title: spinup ci services
+parent: spinup ci
+grand_parent: CLI reference
+---
+
 # spinup ci services
 
 List services for a GitHub Actions matrix
@@ -22,3 +28,10 @@ spinup ci services
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the services as a GitHub Actions matrix
+spinup ci services --json
+```

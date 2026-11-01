@@ -1,3 +1,8 @@
+---
+title: spinup generate
+parent: CLI reference
+---
+
 # spinup generate
 
 Generate application files
@@ -42,3 +47,16 @@ spinup generate <kind> [args...]
 - [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
 - [`spinup generate roles`](generate-roles.md) — Generate the app role set
 - [`spinup generate service`](generate-service.md) — Add a sidecar service
+
+## Examples
+
+```sh
+# Add a CRUD API and its migration
+spinup g resource ticket title:string done:bool
+
+# Add a web page for the resource
+spinup g page tickets
+
+# Show the plan without writing files
+spinup g resource ticket title:string --dry-run
+```

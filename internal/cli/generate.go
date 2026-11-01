@@ -23,7 +23,15 @@ func newGenerate(app *App) *cobra.Command {
 func generateCommand(app *App, kinds []gen.Generator, p genrun.Prompter, interactive func() bool) *cobra.Command {
 	var diff, force bool
 	var selected *gen.Generator
-	c := &cobra.Command{Use: "generate <kind> [args...]", Aliases: []string{"g"}, Short: "Generate application files"}
+	c := &cobra.Command{Use: "generate <kind> [args...]", Aliases: []string{"g"}, Short: "Generate application files",
+		Example: `  # Add a CRUD API and its migration
+  spinup g resource ticket title:string done:bool
+
+  # Add a web page for the resource
+  spinup g page tickets
+
+  # Show the plan without writing files
+  spinup g resource ticket title:string --dry-run`}
 	c.PersistentFlags().BoolVar(&diff, "diff", false, "show unified diffs without writing")
 	c.PersistentFlags().BoolVar(&force, "force", false, "overwrite files with different content")
 	run := func(cmd *cobra.Command, g gen.Generator, args []string) error {

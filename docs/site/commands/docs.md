@@ -1,3 +1,8 @@
+---
+title: spinup docs
+parent: CLI reference
+---
+
 # spinup docs
 
 Print compatibility data and generate command references

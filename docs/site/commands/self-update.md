@@ -1,3 +1,8 @@
+---
+title: spinup self-update
+parent: CLI reference
+---
+
 # spinup self-update
 
 Verify and install a spinup release
@@ -26,3 +31,16 @@ spinup self-update [flags]
 | `--verbose` | `false` | write extra detail |
 | `--version` | `` | install this release version |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check for a new release
+spinup self-update --check
+
+# Install the newest stable release
+spinup self-update
+
+# Install a version and require a cosign signature
+spinup self-update --version 1.4.0 --require-signature
+```

@@ -1,3 +1,9 @@
+---
+title: spinup cache clean
+parent: spinup cache
+grand_parent: CLI reference
+---
+
 # spinup cache clean
 
 Remove downloaded template archives and signatures
@@ -22,3 +28,10 @@ spinup cache clean
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Remove the downloaded template archives
+spinup cache clean
+```

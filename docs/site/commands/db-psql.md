@@ -1,3 +1,9 @@
+---
+title: spinup db psql
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db psql
 
 Open psql on the development database
@@ -22,3 +28,10 @@ spinup db psql
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Open psql on the development database
+spinup db psql
+```

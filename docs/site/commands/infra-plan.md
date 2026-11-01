@@ -1,3 +1,9 @@
+---
+title: spinup infra plan
+parent: spinup infra
+grand_parent: CLI reference
+---
+
 # spinup infra plan
 
 Preview infrastructure changes
@@ -22,3 +28,10 @@ spinup infra plan
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Preview what OpenTofu would change
+spinup infra plan --env production
+```

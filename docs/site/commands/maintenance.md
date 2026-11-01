@@ -1,3 +1,8 @@
+---
+title: spinup maintenance
+parent: CLI reference
+---
+
 # spinup maintenance
 
 Keep a deployed VM healthy
@@ -34,3 +39,11 @@ spinup maintenance
 - [`spinup maintenance vacuum`](maintenance-vacuum.md) — Vacuum the production database
 - [`spinup maintenance vuln-scan`](maintenance-vuln-scan.md) — Scan running images with Trivy
 - [`spinup maintenance window`](maintenance-window.md) — Show the maintenance window
+
+## Examples
+
+```sh
+# Check the window, then list pending package updates
+spinup maintenance window --env production
+spinup maintenance patch --plan --env production
+```

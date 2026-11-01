@@ -1,3 +1,9 @@
+---
+title: spinup generate dashboard
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate dashboard
 
 Add a custom Grafana dashboard
@@ -25,3 +31,10 @@ spinup generate dashboard <name> [flags]
 | `--panel` | `[]` | time-series panel as title=PromQL expression |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a dashboard with one panel (title=PromQL)
+spinup g dashboard orders --panel 'Orders per second=sum(rate(orders_created_total[5m]))'
+```

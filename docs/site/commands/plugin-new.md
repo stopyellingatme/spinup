@@ -1,3 +1,9 @@
+---
+title: spinup plugin new
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin new
 
 Create a declarative or executable plugin project
@@ -26,3 +32,13 @@ spinup plugin new <name> [flags]
 | `--sdk-path` | `` | local plugin-sdk directory for an executable plugin |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Create a declarative pack plugin in ./my-pack
+spinup plugin new my-pack
+
+# Create an executable plugin in a chosen directory
+spinup plugin new my-exec --kind exec --out ../plugins/my-exec
+```

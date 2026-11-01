@@ -1,3 +1,9 @@
+---
+title: spinup generate openapi
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate openapi
 
 Bundle OpenAPI files and generate Go types
@@ -24,3 +30,10 @@ spinup generate openapi
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Bundle the OpenAPI files and regenerate the Go types
+spinup g openapi
+```

@@ -1,3 +1,8 @@
+---
+title: spinup monitor dashboards sync
+nav_exclude: true
+---
+
 # spinup monitor dashboards sync
 
 Export UI dashboards into the project's custom directory
@@ -23,3 +28,10 @@ spinup monitor dashboards sync
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Export dashboards you edited in the Grafana UI
+spinup monitor dashboards sync --env production
+```

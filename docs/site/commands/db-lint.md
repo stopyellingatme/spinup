@@ -1,3 +1,9 @@
+---
+title: spinup db lint
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db lint
 
 Check migrations for unsafe deploy changes
@@ -22,3 +28,13 @@ spinup db lint [file...]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check every migration for unsafe deploy changes
+spinup db lint
+
+# Check one migration file
+spinup db lint api/db/migrations/00007_add_index.sql
+```

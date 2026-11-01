@@ -1,3 +1,9 @@
+---
+title: spinup secrets rotate
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets rotate
 
 Replace the data encryption key
@@ -22,3 +28,10 @@ spinup secrets rotate
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Replace the data key and re-encrypt every value
+spinup secrets rotate --env production
+```

@@ -1,3 +1,9 @@
+---
+title: spinup db new
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db new
 
 Create an empty SQL migration
@@ -22,3 +28,10 @@ spinup db new <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Create an empty migration, then edit the SQL
+spinup db new add_ticket_index
+```

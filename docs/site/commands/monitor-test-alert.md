@@ -1,3 +1,9 @@
+---
+title: spinup monitor test-alert
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor test-alert
 
 Send a test alert to configured contact points
@@ -23,3 +29,10 @@ spinup monitor test-alert
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check that alerts reach your contact points
+spinup monitor test-alert --env production
+```

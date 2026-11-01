@@ -1,3 +1,9 @@
+---
+title: spinup infra destroy
+parent: spinup infra
+grand_parent: CLI reference
+---
+
 # spinup infra destroy
 
 Destroy the environment infrastructure
@@ -23,3 +29,10 @@ spinup infra destroy [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Delete the server and volume (this removes data)
+spinup infra destroy --i-know --env staging
+```

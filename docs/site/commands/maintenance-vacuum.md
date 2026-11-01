@@ -1,3 +1,9 @@
+---
+title: spinup maintenance vacuum
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance vacuum
 
 Vacuum the production database
@@ -24,3 +30,13 @@ spinup maintenance vacuum [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Vacuum the production database
+spinup maintenance vacuum --env production
+
+# Run VACUUM FULL on one table, outside the window
+spinup maintenance vacuum --full tickets --now --env production
+```

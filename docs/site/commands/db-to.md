@@ -1,3 +1,9 @@
+---
+title: spinup db to
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db to
 
 Migrate up or down to a version
@@ -23,3 +29,13 @@ spinup db to <version> [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Migrate up to version 7
+spinup db to 7
+
+# Move down to version 3 (asks you to confirm data loss)
+spinup db to 3 --i-know
+```

@@ -1,3 +1,9 @@
+---
+title: spinup secrets edit
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets edit
 
 Edit secrets in a terminal
@@ -22,3 +28,10 @@ spinup secrets edit
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Open the decrypted secrets in your editor
+spinup secrets edit --env production
+```

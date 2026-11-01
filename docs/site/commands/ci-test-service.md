@@ -1,3 +1,9 @@
+---
+title: spinup ci test-service
+parent: spinup ci
+grand_parent: CLI reference
+---
+
 # spinup ci test-service
 
 Run tests for one service
@@ -22,3 +28,10 @@ spinup ci test-service <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Run the tests of the service thumbs
+spinup ci test-service thumbs
+```

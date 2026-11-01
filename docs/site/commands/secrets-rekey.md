@@ -1,3 +1,9 @@
+---
+title: spinup secrets rekey
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets rekey
 
 Update encryption recipients from .sops.yaml
@@ -22,3 +28,10 @@ spinup secrets rekey
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Apply the recipients in .sops.yaml after you add a teammate
+spinup secrets rekey --env production
+```

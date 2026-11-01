@@ -1,3 +1,9 @@
+---
+title: spinup tools list
+parent: spinup tools
+grand_parent: CLI reference
+---
+
 # spinup tools list
 
 List pinned tools and installed versions
@@ -22,3 +28,10 @@ spinup tools list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the pinned tools and what is installed
+spinup tools list
+```

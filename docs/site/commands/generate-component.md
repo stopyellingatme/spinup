@@ -1,3 +1,9 @@
+---
+title: spinup generate component
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate component
 
 Add shadcn-svelte components to the web app (needs the network)
@@ -24,3 +30,10 @@ spinup generate component <name>...
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add two shadcn-svelte components
+spinup g component button card
+```

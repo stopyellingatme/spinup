@@ -1,3 +1,9 @@
+---
+title: spinup deploy digital-ocean
+parent: spinup deploy
+grand_parent: CLI reference
+---
+
 # spinup deploy digital-ocean
 
 Create a DigitalOcean droplet for the app and deploy to it
@@ -57,3 +63,13 @@ spinup deploy digital-ocean [flags]
 - [`spinup deploy digital-ocean login`](deploy-digital-ocean-login.md) — Sign in to DigitalOcean in a browser and store the token
 - [`spinup deploy digital-ocean logout`](deploy-digital-ocean-logout.md) — Revoke the stored DigitalOcean token and delete it
 - [`spinup deploy digital-ocean status`](deploy-digital-ocean-status.md) — Show the token source, the account, and the resources of the environment
+
+## Examples
+
+```sh
+# See what the command would create
+spinup deploy digital-ocean --plan
+
+# Create a droplet and deploy to it
+spinup deploy digital-ocean --region nyc3 --domain app.example.com
+```

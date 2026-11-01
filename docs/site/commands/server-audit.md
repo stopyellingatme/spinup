@@ -1,3 +1,9 @@
+---
+title: spinup server audit
+parent: spinup server
+grand_parent: CLI reference
+---
+
 # spinup server audit
 
 Report unsafe settings on the host
@@ -23,3 +29,10 @@ spinup server audit
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Report unsafe settings on the host
+spinup server audit --env production
+```

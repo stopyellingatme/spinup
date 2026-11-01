@@ -1,3 +1,9 @@
+---
+title: spinup db doctor
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db doctor
 
 Check the PostgreSQL version and pending migrations
@@ -22,3 +28,10 @@ spinup db doctor
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check the PostgreSQL version and the pending migrations
+spinup db doctor
+```

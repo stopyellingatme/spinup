@@ -1,3 +1,8 @@
+---
+title: spinup ci
+parent: CLI reference
+---
+
 # spinup ci
 
 Generate and verify GitHub Actions files

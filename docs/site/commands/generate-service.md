@@ -1,3 +1,9 @@
+---
+title: spinup generate service
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate service
 
 Add a sidecar service
@@ -31,3 +37,16 @@ spinup generate service <name> --lang rust|python|node|<plugin>/<template> [--ki
 | `--public` | `` | public URL prefix |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a Rust sidecar service
+spinup g service thumbs --lang rust
+
+# Add a Python PDF report service
+spinup g service reports --lang python --kind pdf
+
+# Add a Node service with a public route behind sign-in
+spinup g service hooks --lang node --public /svc/hooks --auth session
+```

@@ -1,3 +1,9 @@
+---
+title: spinup monitor status
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor status
 
 Show monitoring health and disk use
@@ -23,3 +29,10 @@ spinup monitor status
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show monitoring health and disk use
+spinup monitor status --env production
+```

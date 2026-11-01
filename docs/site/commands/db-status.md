@@ -1,3 +1,9 @@
+---
+title: spinup db status
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db status
 
 List applied and pending migrations
@@ -22,3 +28,10 @@ spinup db status
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List applied and pending migrations
+spinup db status
+```

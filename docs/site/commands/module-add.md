@@ -1,3 +1,9 @@
+---
+title: spinup module add
+parent: spinup module
+grand_parent: CLI reference
+---
+
 # spinup module add
 
 Enable modules on a branch at the locked template version
@@ -35,3 +41,19 @@ spinup module add <name>... [flags]
 | `--shadcn-registry` | `1.7.0` | shadcn-svelte registry version |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Enable one module on a branch
+spinup module add mail
+
+# Enable two modules
+spinup module add audit jobs
+
+# Continue after you resolve conflicts
+spinup module add --continue
+
+# Remove the worktree and branch
+spinup module add --abort
+```

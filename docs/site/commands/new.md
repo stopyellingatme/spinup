@@ -1,3 +1,8 @@
+---
+title: spinup new
+parent: CLI reference
+---
+
 # spinup new
 
 Create an application from template packs
@@ -36,3 +41,19 @@ spinup new <name> [flags]
 | `--trust` | `false` | trust plugin sources and hashes |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Create a full-stack app named todo
+spinup new todo
+
+# Create only the Go API, no git repository
+spinup new todo --api-only --no-git
+
+# Choose the options with flags (no prompts)
+spinup new todo --module github.com/acme/todo --modules ci,deploy,auth --non-interactive
+
+# Add a trusted plugin pack
+spinup new todo --plugin github.com/acme/spinup-pack@v1.2.0 --trust
+```

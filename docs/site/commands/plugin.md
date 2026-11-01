@@ -1,3 +1,8 @@
+---
+title: spinup plugin
+parent: CLI reference
+---
+
 # spinup plugin
 
 Manage trusted template pack plugins
@@ -32,3 +37,11 @@ spinup plugin
 - [`spinup plugin remove`](plugin-remove.md) — Remove plugin records and retain rendered files
 - [`spinup plugin update`](plugin-update.md) — Inspect and trust a plugin version
 - [`spinup plugin verify`](plugin-verify.md) — Re-fetch plugins and verify their trust records
+
+## Examples
+
+```sh
+# List the plugins, then inspect one
+spinup plugin list
+spinup plugin info spinup-pack
+```

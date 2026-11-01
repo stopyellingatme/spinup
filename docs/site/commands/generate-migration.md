@@ -1,3 +1,9 @@
+---
+title: spinup generate migration
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate migration
 
 Generate an empty SQL migration
@@ -24,3 +30,10 @@ spinup generate migration <snake_name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add an empty migration, then edit the SQL
+spinup g migration add_ticket_index
+```

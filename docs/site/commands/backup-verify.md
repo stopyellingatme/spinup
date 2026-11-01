@@ -1,3 +1,9 @@
+---
+title: spinup backup verify
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup verify
 
 Restore a backup in isolation and check the database
@@ -24,3 +30,13 @@ spinup backup verify [flags]
 | `--time` | `` | point in time in RFC 3339 format |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Restore the latest backup in isolation and check it
+spinup backup verify
+
+# Check the state at a point in time
+spinup backup verify --time 2026-10-31T14:00:00Z
+```

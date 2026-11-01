@@ -1,3 +1,9 @@
+---
+title: spinup maintenance window
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance window
 
 Show the maintenance window
@@ -22,3 +28,10 @@ spinup maintenance window
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the maintenance window
+spinup maintenance window --env production
+```

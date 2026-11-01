@@ -1,4 +1,13 @@
-# Command reference
+---
+title: CLI reference
+nav_order: 8
+has_children: true
+has_toc: false
+---
+
+# CLI reference
+
+Each page lists the flags of one command. For examples and how-to guides, see the [command guides](../../commands/index.md).
 
 - [`spinup backup`](backup.md) — Back up the production database with pgBackRest
 - [`spinup backup list`](backup-list.md) — List the backups in the repository

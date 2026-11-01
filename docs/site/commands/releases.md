@@ -1,3 +1,8 @@
+---
+title: spinup releases
+parent: CLI reference
+---
+
 # spinup releases
 
 Inspect and prune stored releases
@@ -28,3 +33,10 @@ spinup releases
 - [`spinup releases list`](releases-list.md) — List the release history and current marker
 - [`spinup releases prune`](releases-prune.md) — Prune old releases while retaining current and previous
 - [`spinup releases show`](releases-show.md) — Show a release snapshot with secret hashes only
+
+## Examples
+
+```sh
+# List the stored releases
+spinup releases --env production
+```

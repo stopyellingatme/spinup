@@ -1,3 +1,9 @@
+---
+title: spinup monitor open
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor open
 
 Open Grafana through a local SSH tunnel
@@ -24,3 +30,13 @@ spinup monitor open [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Open Grafana through an SSH tunnel
+spinup monitor open --env production
+
+# Print the URL and do not open a browser
+spinup monitor open --no-browser --env production
+```

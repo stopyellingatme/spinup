@@ -1,3 +1,9 @@
+---
+title: spinup maintenance pg-major-upgrade
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance pg-major-upgrade
 
 Upgrade the PostgreSQL major with a verified dump and retained old volume
@@ -27,3 +33,16 @@ spinup maintenance pg-major-upgrade [flags]
 | `--to` | `0` | target PostgreSQL major: 16, 17, or 18 |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the steps first
+spinup maintenance pg-major-upgrade --to 18 --plan --env production
+
+# Upgrade (this causes downtime)
+spinup maintenance pg-major-upgrade --to 18 --i-know --env production
+
+# Remove the old volume after you verify the app
+spinup maintenance pg-major-upgrade --cleanup --i-know --env production
+```

@@ -1,3 +1,8 @@
+---
+title: spinup diff
+parent: CLI reference
+---
+
 # spinup diff
 
 Compare tracked files with their templates
@@ -22,3 +27,13 @@ spinup diff [path...]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Compare every tracked file with its template
+spinup diff
+
+# Compare one file
+spinup diff web/src/routes/+layout.svelte
+```

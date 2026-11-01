@@ -1,3 +1,8 @@
+---
+title: spinup tools
+parent: CLI reference
+---
+
 # spinup tools
 
 Install and inspect checksum-verified host tools
@@ -27,3 +32,11 @@ spinup tools
 
 - [`spinup tools install`](tools-install.md) — Download and verify pinned tool releases
 - [`spinup tools list`](tools-list.md) — List pinned tools and installed versions
+
+## Examples
+
+```sh
+# List the tools, then install the missing ones
+spinup tools list
+spinup tools install
+```

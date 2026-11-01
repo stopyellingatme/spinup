@@ -1,3 +1,9 @@
+---
+title: spinup db sqlc
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db sqlc
 
 Generate the Go query code with sqlc
@@ -22,3 +28,10 @@ spinup db sqlc
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Regenerate the Go query code after you edit a query
+spinup db sqlc
+```

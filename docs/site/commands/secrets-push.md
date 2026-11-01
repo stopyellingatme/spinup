@@ -1,3 +1,9 @@
+---
+title: spinup secrets push
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets push
 
 Write the environment's decrypted secrets to the host, under the deploy lock
@@ -23,3 +29,13 @@ spinup secrets push [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Write the decrypted secrets to the host
+spinup secrets push --env production
+
+# Trust the host key on the first connection
+spinup secrets push --accept-new-host-key --env production
+```

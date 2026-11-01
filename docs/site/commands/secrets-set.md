@@ -1,3 +1,9 @@
+---
+title: spinup secrets set
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets set
 
 Read a secret value from stdin
@@ -22,3 +28,10 @@ spinup secrets set <NAME>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Read a value from a file or a pipe
+spinup secrets set API_KEY --env production < api-key.txt
+```

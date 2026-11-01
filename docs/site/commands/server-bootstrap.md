@@ -1,3 +1,9 @@
+---
+title: spinup server bootstrap
+parent: spinup server
+grand_parent: CLI reference
+---
+
 # spinup server bootstrap
 
 Prepare a Debian or Ubuntu host
@@ -26,3 +32,16 @@ spinup server bootstrap [flags]
 | `--ssh-key` | `~/.ssh/id_ed25519.pub` | operator public key for the deploy user |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Preview the changes
+spinup server bootstrap --plan --env production
+
+# Prepare the host with your key
+spinup server bootstrap --ssh-key ~/.ssh/id_ed25519.pub --env production
+
+# Print the cloud-init instead
+spinup server bootstrap --print-cloud-init --env production
+```

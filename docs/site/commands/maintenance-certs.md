@@ -1,3 +1,9 @@
+---
+title: spinup maintenance certs
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance certs
 
 Check the public certificate expiry
@@ -22,3 +28,10 @@ spinup maintenance certs
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show when the public certificate expires
+spinup maintenance certs --env production
+```

@@ -1,3 +1,9 @@
+---
+title: spinup docs reference
+parent: spinup docs
+grand_parent: CLI reference
+---
+
 # spinup docs reference
 
 Write a Markdown reference page for every command
@@ -23,3 +29,10 @@ spinup docs reference [flags]
 | `--out` | `` | directory for generated Markdown pages |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Write a Markdown page for every command
+spinup docs reference --out docs/cli
+```

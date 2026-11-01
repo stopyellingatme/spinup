@@ -1,3 +1,9 @@
+---
+title: spinup secrets get
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets get
 
 Write one secret value to stdout
@@ -22,3 +28,10 @@ spinup secrets get <NAME>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print one secret value
+spinup secrets get DATABASE_PASSWORD --env production
+```

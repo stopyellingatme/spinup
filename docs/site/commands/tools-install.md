@@ -1,3 +1,9 @@
+---
+title: spinup tools install
+parent: spinup tools
+grand_parent: CLI reference
+---
+
 # spinup tools install
 
 Download and verify pinned tool releases
@@ -23,3 +29,16 @@ spinup tools install [sops|age...] [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Install every pinned tool
+spinup tools install
+
+# Install two tools
+spinup tools install sops age
+
+# Reinstall a tool
+spinup tools install age --force
+```

@@ -1,3 +1,8 @@
+---
+title: spinup deploy
+parent: CLI reference
+---
+
 # spinup deploy
 
 Ship the current commit to an environment with zero downtime
@@ -43,3 +48,16 @@ spinup deploy [flags]
 - [`spinup deploy digital-ocean`](deploy-digital-ocean.md) — Create a DigitalOcean droplet for the app and deploy to it
 - [`spinup deploy status`](deploy-status.md) — Show the current release, the deploy lock, and the last deploy journal
 - [`spinup deploy unlock`](deploy-unlock.md) — Remove the deploy lock of an environment
+
+## Examples
+
+```sh
+# See what a deploy would change
+spinup deploy --plan --env production
+
+# Deploy the current commit to production
+spinup deploy --env production
+
+# Continue a deploy that stopped
+spinup deploy --env production --resume
+```

@@ -1,3 +1,9 @@
+---
+title: spinup generate resource
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate resource
 
 Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
@@ -32,3 +38,16 @@ spinup generate resource <name> <field:type>... [flags]
 | `--shared` | `false` | share rows between signed-in users (requires auth) |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a ticket resource with typed fields
+spinup g resource ticket title:string body:text status:enum:open|closed
+
+# Add a resource that all signed-in users share, for staff only
+spinup g resource note body:text --shared --role staff
+
+# Add a resource without web pages
+spinup g resource invoice total:decimal due:date --api-only
+```

@@ -1,3 +1,9 @@
+---
+title: spinup db redo
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db redo
 
 Roll back the last migration and apply it again
@@ -23,3 +29,10 @@ spinup db redo [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Roll back the last migration and apply it again
+spinup db redo --i-know
+```

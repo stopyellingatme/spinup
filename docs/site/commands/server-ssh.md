@@ -1,3 +1,9 @@
+---
+title: spinup server ssh
+parent: spinup server
+grand_parent: CLI reference
+---
+
 # spinup server ssh
 
 Open an interactive shell on the host
@@ -23,3 +29,10 @@ spinup server ssh
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Open a shell on the host
+spinup server ssh --env production
+```

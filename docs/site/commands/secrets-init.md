@@ -1,3 +1,9 @@
+---
+title: spinup secrets init
+parent: spinup secrets
+grand_parent: CLI reference
+---
+
 # spinup secrets init
 
 Create an environment key and encrypted secrets
@@ -25,3 +31,13 @@ spinup secrets init [flags]
 | `--recovery-recipient` | `` | age recipient for recovery (required unless --no-recovery) |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Create the key and the encrypted file
+spinup secrets init --env production --recovery-recipient age1...
+
+# Skip the recovery key (you accept losing the secrets if the key is lost)
+spinup secrets init --env staging --no-recovery
+```

@@ -1,3 +1,8 @@
+---
+title: spinup module
+parent: CLI reference
+---
+
 # spinup module
 
 List and enable built-in modules
@@ -27,3 +32,11 @@ spinup module
 
 - [`spinup module add`](module-add.md) — Enable modules on a branch at the locked template version
 - [`spinup module list`](module-list.md) — List modules and their enabled state
+
+## Examples
+
+```sh
+# List the modules, then enable one
+spinup module list
+spinup module add mail
+```

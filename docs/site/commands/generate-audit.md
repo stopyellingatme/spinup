@@ -1,3 +1,9 @@
+---
+title: spinup generate audit
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate audit
 
 Attach audit triggers and add resource history
@@ -27,3 +33,13 @@ spinup generate audit <resource-or-table> [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add audit triggers and a history page to a resource
+spinup g audit ticket
+
+# Add the trail only, and hide a column
+spinup g audit users --api-only --audit-redact phone
+```

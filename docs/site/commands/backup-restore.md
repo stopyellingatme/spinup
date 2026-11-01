@@ -1,3 +1,9 @@
+---
+title: spinup backup restore
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup restore
 
 Restore a backup into a new or live database
@@ -29,3 +35,16 @@ spinup backup restore [flags]
 | `--time` | `` | point in time in RFC 3339 format |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Preview a restore into a new database
+spinup backup restore --into new --plan
+
+# Restore the latest backup into a new database
+spinup backup restore --into new
+
+# Replace the live database with the state at a point in time
+spinup backup restore --into in-place --time 2026-10-31T14:00:00Z --i-know
+```

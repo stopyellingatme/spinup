@@ -1,3 +1,9 @@
+---
+title: spinup plugin list
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin list
 
 List declared plugins and their locked hashes
@@ -22,3 +28,10 @@ spinup plugin list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the plugins and their locked hashes
+spinup plugin list
+```

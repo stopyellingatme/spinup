@@ -1,3 +1,9 @@
+---
+title: spinup generate handler
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate handler
 
 Generate a plain HTTP handler and its test
@@ -24,3 +30,10 @@ spinup generate handler <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a plain HTTP handler named health_check, with a test
+spinup g handler health_check
+```

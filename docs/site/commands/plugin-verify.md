@@ -1,3 +1,9 @@
+---
+title: spinup plugin verify
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin verify
 
 Re-fetch plugins and verify their trust records
@@ -22,3 +28,10 @@ spinup plugin verify
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Fetch the plugins again and check their hashes
+spinup plugin verify
+```

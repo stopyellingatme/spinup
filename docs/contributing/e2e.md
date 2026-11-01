@@ -83,7 +83,7 @@ Set `SERVICES_TRACE_LOG_DIR` to choose a separate log directory.
 The logs include the Tempo response and the expected trace and parent IDs.
 
 The Node template has no trace code, so this script does not cover it.
-See [Sidecar services](../services.md#monitoring) for the telemetry of the templates.
+See [Sidecar services](../services.md#limits-gpus-and-monitoring) for the telemetry of the templates.
 
 ## Workflows
 

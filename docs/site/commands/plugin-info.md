@@ -1,3 +1,9 @@
+---
+title: spinup plugin info
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin info
 
 Show verified plugin metadata, generators, and files
@@ -22,3 +28,10 @@ spinup plugin info <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the metadata and generators of a plugin
+spinup plugin info spinup-pack
+```

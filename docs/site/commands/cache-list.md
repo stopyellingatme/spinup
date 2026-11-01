@@ -1,3 +1,9 @@
+---
+title: spinup cache list
+parent: spinup cache
+grand_parent: CLI reference
+---
+
 # spinup cache list
 
 List loadable template versions and their sources
@@ -22,3 +28,10 @@ spinup cache list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the template versions that spinup can load
+spinup cache list
+```

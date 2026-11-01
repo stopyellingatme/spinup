@@ -1,3 +1,9 @@
+---
+title: spinup monitor silence
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor silence
 
 Silence alerts matching label=value
@@ -24,3 +30,13 @@ spinup monitor silence <matcher> [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Silence one alert for 2 hours (the default)
+spinup monitor silence alertname=HighErrorRate --env production
+
+# Silence for 30 minutes
+spinup monitor silence alertname=HighErrorRate --for 30m --env production
+```

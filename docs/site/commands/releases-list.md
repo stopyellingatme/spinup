@@ -1,3 +1,9 @@
+---
+title: spinup releases list
+parent: spinup releases
+grand_parent: CLI reference
+---
+
 # spinup releases list
 
 List the release history and current marker
@@ -22,3 +28,10 @@ spinup releases list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the release history and the current release
+spinup releases list --env production
+```

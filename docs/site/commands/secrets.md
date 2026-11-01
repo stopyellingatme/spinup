@@ -1,3 +1,8 @@
+---
+title: spinup secrets
+parent: CLI reference
+---
+
 # spinup secrets
 
 Manage encrypted secrets for each environment
@@ -33,3 +38,12 @@ spinup secrets
 - [`spinup secrets rekey`](secrets-rekey.md) — Update encryption recipients from .sops.yaml
 - [`spinup secrets rotate`](secrets-rotate.md) — Replace the data encryption key
 - [`spinup secrets set`](secrets-set.md) — Read a secret value from stdin
+
+## Examples
+
+```sh
+# Create keys, set a value, then push to the host
+spinup secrets init --env production --recovery-recipient age1...
+spinup secrets set API_KEY --env production < api-key.txt
+spinup secrets push --env production
+```

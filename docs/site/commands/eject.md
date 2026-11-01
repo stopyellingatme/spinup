@@ -1,3 +1,8 @@
+---
+title: spinup eject
+parent: CLI reference
+---
+
 # spinup eject
 
 Take ownership of a managed file
@@ -22,3 +27,10 @@ spinup eject <path>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Take ownership of a managed file so upgrades leave it alone
+spinup eject web/src/routes/+layout.svelte
+```

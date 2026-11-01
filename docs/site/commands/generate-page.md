@@ -1,3 +1,9 @@
+---
+title: spinup generate page
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate page
 
 Generate a SvelteKit page in web/src/routes
@@ -26,3 +32,13 @@ spinup generate page <route> [flags]
 | `--server` | `false` | also write +page.server.ts with a load function |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a page at /about
+spinup g page about
+
+# Add a page with a server load function, for admins only
+spinup g page admin/reports --server --role admin
+```

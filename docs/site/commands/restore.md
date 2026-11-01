@@ -1,3 +1,8 @@
+---
+title: spinup restore
+parent: CLI reference
+---
+
 # spinup restore
 
 Restore a tracked file from its template
@@ -23,3 +28,13 @@ spinup restore <path> [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Put a file back to its template content
+spinup restore api/internal/http/router.go
+
+# Replace the file even if you edited it
+spinup restore api/internal/http/router.go --force
+```

@@ -1,3 +1,8 @@
+---
+title: spinup db
+parent: CLI reference
+---
+
 # spinup db
 
 Operate the application database

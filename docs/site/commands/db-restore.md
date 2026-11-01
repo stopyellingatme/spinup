@@ -1,3 +1,9 @@
+---
+title: spinup db restore
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db restore
 
 Restore a dump into the development database
@@ -22,3 +28,10 @@ spinup db restore <file>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Load a dump into the development database
+spinup db restore backup.sql
+```

@@ -1,3 +1,9 @@
+---
+title: spinup plugin update
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin update
 
 Inspect and trust a plugin version
@@ -25,3 +31,10 @@ spinup plugin update <name> [flags]
 | `--verbose` | `false` | write extra detail |
 | `--version` | `` | new fixed git tag or path plugin version |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Move a plugin to a new version
+spinup plugin update spinup-pack --version v1.3.0 --trust
+```

@@ -1,3 +1,9 @@
+---
+title: spinup db migrate
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db migrate
 
 Run migrations through the application API
@@ -23,3 +29,16 @@ spinup db migrate [up|down|status] [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Apply every pending migration
+spinup db migrate up
+
+# Roll back the last migration (asks you to confirm data loss)
+spinup db migrate down --i-know
+
+# List applied and pending migrations
+spinup db migrate status
+```

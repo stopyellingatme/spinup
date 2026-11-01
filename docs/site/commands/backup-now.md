@@ -1,3 +1,9 @@
+---
+title: spinup backup now
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup now
 
 Take a backup now and print its label, size, and duration
@@ -23,3 +29,13 @@ spinup backup now [flags]
 | `--type` | `diff` | backup type: full, diff, or incr |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Take a differential backup now
+spinup backup now
+
+# Take a full backup of production
+spinup backup now --type full --env production
+```

@@ -1,3 +1,9 @@
+---
+title: spinup docs compat
+parent: spinup docs
+grand_parent: CLI reference
+---
+
 # spinup docs compat
 
 Print compatible CLI, kit, template, and stack versions
@@ -23,3 +29,13 @@ spinup docs compat [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the compatible versions
+spinup docs compat
+
+# Print them as a Markdown table
+spinup docs compat --markdown
+```

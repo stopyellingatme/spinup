@@ -1,3 +1,8 @@
+---
+title: spinup dev
+parent: CLI reference
+---
+
 # spinup dev
 
 Run the local development stack
@@ -31,3 +36,16 @@ spinup dev [flags]
 | `--verbose` | `false` | write extra detail |
 | `--watch` | `air` | Go watcher: air or wgo |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Start the API, the web app, and the database
+spinup dev
+
+# Start with Grafana LGTM monitoring
+spinup dev --lgtm
+
+# Run only the API and its database
+spinup dev --no-web --no-services
+```

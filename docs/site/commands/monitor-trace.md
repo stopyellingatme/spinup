@@ -1,3 +1,9 @@
+---
+title: spinup monitor trace
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor trace
 
 Show a Tempo span tree (full profile)
@@ -23,3 +29,10 @@ spinup monitor trace <trace-id>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the span tree of one trace
+spinup monitor trace 4bf92f3577b34da6a3ce929d0e0e4736 --env production
+```

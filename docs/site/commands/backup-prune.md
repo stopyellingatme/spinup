@@ -1,3 +1,9 @@
+---
+title: spinup backup prune
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup prune
 
 Apply backup retention and list the remaining backups
@@ -23,3 +29,13 @@ spinup backup prune [flags]
 | `--plan` | `false` | preview retention without removing backups |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Preview which backups the retention rules remove
+spinup backup prune --plan
+
+# Apply the retention rules
+spinup backup prune
+```

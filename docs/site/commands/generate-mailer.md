@@ -1,3 +1,9 @@
+---
+title: spinup generate mailer
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate mailer
 
 Add a typed mailer and email templates
@@ -24,3 +30,10 @@ spinup generate mailer <name> [field:type...]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a mailer with two typed fields
+spinup g mailer welcome name:string url:string
+```

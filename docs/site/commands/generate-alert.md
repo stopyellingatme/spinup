@@ -1,3 +1,9 @@
+---
+title: spinup generate alert
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate alert
 
 Add a custom Prometheus alert rule
@@ -28,3 +34,13 @@ spinup generate alert <name> --expr <PromQL> [flags]
 | `--summary` | `` | short alert summary |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Alert when a target is down for 5 minutes
+spinup g alert TargetDown --expr 'up == 0' --severity critical
+
+# Alert on server errors, with a summary
+spinup g alert HighErrors --expr 'sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) > 0' --for 10m --summary "API returns 5xx"
+```

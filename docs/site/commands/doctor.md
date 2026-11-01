@@ -1,3 +1,8 @@
+---
+title: spinup doctor
+parent: CLI reference
+---
+
 # spinup doctor
 
 Check local application health
@@ -24,3 +29,16 @@ spinup doctor [flags]
 | `--remote` | `false` | run checks on the deployed VM |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check the local app
+spinup doctor
+
+# Run only the quick checks
+spinup doctor --quick
+
+# Check the deployed VM
+spinup doctor --remote --env production
+```

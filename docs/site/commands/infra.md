@@ -1,3 +1,8 @@
+---
+title: spinup infra
+parent: CLI reference
+---
+
 # spinup infra
 
 Provision Hetzner Cloud infrastructure with OpenTofu
@@ -29,3 +34,12 @@ spinup infra
 - [`spinup infra destroy`](infra-destroy.md) — Destroy the environment infrastructure
 - [`spinup infra output`](infra-output.md) — Show infrastructure outputs
 - [`spinup infra plan`](infra-plan.md) — Preview infrastructure changes
+
+## Examples
+
+```sh
+# Preview changes, apply them, then read the outputs
+spinup infra plan --env production
+spinup infra apply --env production
+spinup infra output --env production
+```

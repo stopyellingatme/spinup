@@ -1,3 +1,8 @@
+---
+title: spinup check
+parent: CLI reference
+---
+
 # spinup check
 
 Check application drift for CI
@@ -23,3 +28,13 @@ spinup check [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Fail when the app drifted from its template (for CI)
+spinup check
+
+# Accept an app that is behind a newer template version
+spinup check --allow-behind
+```

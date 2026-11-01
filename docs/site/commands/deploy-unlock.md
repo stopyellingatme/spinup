@@ -1,3 +1,9 @@
+---
+title: spinup deploy unlock
+parent: spinup deploy
+grand_parent: CLI reference
+---
+
 # spinup deploy unlock
 
 Remove the deploy lock of an environment
@@ -24,3 +30,10 @@ spinup deploy unlock [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Remove a stale deploy lock
+spinup deploy unlock --env production --force
+```

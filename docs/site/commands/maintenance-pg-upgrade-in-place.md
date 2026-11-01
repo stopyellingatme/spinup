@@ -1,3 +1,9 @@
+---
+title: spinup maintenance pg-upgrade-in-place
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance pg-upgrade-in-place
 
 Upgrade PostgreSQL with pg_upgrade --link and retain the old directory
@@ -27,3 +33,16 @@ spinup maintenance pg-upgrade-in-place [flags]
 | `--to` | `0` | target PostgreSQL major: 17 or 18 |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the steps first
+spinup maintenance pg-upgrade-in-place --to 18 --plan --env production
+
+# Upgrade in place (this causes downtime)
+spinup maintenance pg-upgrade-in-place --to 18 --i-know --env production
+
+# Delete the old data directory after you verify the app
+spinup maintenance pg-upgrade-in-place --cleanup --i-know --env production
+```

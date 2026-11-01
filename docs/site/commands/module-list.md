@@ -1,3 +1,9 @@
+---
+title: spinup module list
+parent: spinup module
+grand_parent: CLI reference
+---
+
 # spinup module list
 
 List modules and their enabled state
@@ -22,3 +28,13 @@ spinup module list
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the modules and which ones are enabled
+spinup module list
+
+# Print the list as JSON
+spinup module list --json
+```

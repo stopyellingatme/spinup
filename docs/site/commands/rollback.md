@@ -1,3 +1,8 @@
+---
+title: spinup rollback
+parent: CLI reference
+---
+
 # spinup rollback
 
 Switch to a stored release without changing the database
@@ -24,3 +29,16 @@ spinup rollback [flags]
 | `--verbose` | `false` | write extra detail |
 | `--with-db-plan` | `false` | print manual database recovery instructions without restoring data |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Go back to the previous release
+spinup rollback --env production
+
+# Go back to a chosen release
+spinup rollback --to 20261101T093000Z-ab12cd3 --env production
+
+# Print the steps to recover the database by hand
+spinup rollback --with-db-plan --env production
+```

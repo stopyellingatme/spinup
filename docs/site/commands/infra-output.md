@@ -1,3 +1,9 @@
+---
+title: spinup infra output
+parent: spinup infra
+grand_parent: CLI reference
+---
+
 # spinup infra output
 
 Show infrastructure outputs
@@ -22,3 +28,13 @@ spinup infra output
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the host address and other outputs
+spinup infra output --env production
+
+# Print them as JSON
+spinup infra output --json --env production
+```

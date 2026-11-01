@@ -1,3 +1,9 @@
+---
+title: spinup generate roles
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate roles
 
 Generate the app role set
@@ -24,3 +30,10 @@ spinup generate roles
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Rewrite api/internal/roles/roles.gen.go from the [auth] table of spinup.toml
+spinup g roles
+```

@@ -1,3 +1,9 @@
+---
+title: spinup maintenance vuln-scan
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance vuln-scan
 
 Scan running images with Trivy
@@ -23,3 +29,13 @@ spinup maintenance vuln-scan [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Scan the running images and fail on critical findings only
+spinup maintenance vuln-scan --fail-on critical --env production
+
+# Scan with the default level (high)
+spinup maintenance vuln-scan --env production
+```

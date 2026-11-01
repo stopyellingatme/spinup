@@ -1,3 +1,8 @@
+---
+title: spinup build
+parent: CLI reference
+---
+
 # spinup build
 
 Build the application API
@@ -28,3 +33,16 @@ spinup build [flags]
 | `--target` | `[]` | image target to build; repeat or separate names with commas |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Build the API binary
+spinup build
+
+# Build the container images for a release tag
+spinup build --image --tag v1.2.0
+
+# Build and push only the API image
+spinup build --image --target api --push
+```

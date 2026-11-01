@@ -1,3 +1,9 @@
+---
+title: spinup backup status
+parent: spinup backup
+grand_parent: CLI reference
+---
+
 # spinup backup status
 
 Show the repository status and the last backup
@@ -22,3 +28,10 @@ spinup backup status
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the repository status and the last backup
+spinup backup status
+```

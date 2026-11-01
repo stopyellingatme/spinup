@@ -1,3 +1,9 @@
+---
+title: spinup maintenance patch
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance patch
 
 Install available package updates
@@ -25,3 +31,13 @@ spinup maintenance patch [flags]
 | `--reboot` | `false` | reboot when the host requires it |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the package updates without installing them
+spinup maintenance patch --plan --env production
+
+# Install updates and reboot if the host needs it
+spinup maintenance patch --reboot --env production
+```

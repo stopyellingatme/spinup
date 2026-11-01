@@ -1,3 +1,9 @@
+---
+title: spinup monitor alerts
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor alerts
 
 Show firing and pending alerts
@@ -23,3 +29,10 @@ spinup monitor alerts
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the alerts that fire now
+spinup monitor alerts --env production
+```

@@ -1,3 +1,9 @@
+---
+title: spinup generate job
+parent: spinup generate
+grand_parent: CLI reference
+---
+
 # spinup generate job
 
 Add a background job (River) to api/internal/jobs
@@ -24,3 +30,10 @@ spinup generate job <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Add a background job
+spinup g job send_digest
+```

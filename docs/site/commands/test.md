@@ -1,3 +1,8 @@
+---
+title: spinup test
+parent: CLI reference
+---
+
 # spinup test
 
 Run application tests
@@ -29,3 +34,16 @@ spinup test [flags]
 | `--verbose` | `false` | write extra detail |
 | `--web` | `false` | run web tests (M4) |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Run the API tests
+spinup test
+
+# Run matching tests with the race detector
+spinup test --run TestTicket --race
+
+# Report coverage
+spinup test --cover
+```

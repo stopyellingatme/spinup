@@ -1,3 +1,8 @@
+---
+title: spinup cache
+parent: CLI reference
+---
+
 # spinup cache
 
 Manage cached template versions

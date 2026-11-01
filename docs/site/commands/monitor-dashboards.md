@@ -1,3 +1,9 @@
+---
+title: spinup monitor dashboards
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor dashboards
 
 Manage custom Grafana dashboards

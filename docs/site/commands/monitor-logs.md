@@ -1,3 +1,9 @@
+---
+title: spinup monitor logs
+parent: spinup monitor
+grand_parent: CLI reference
+---
+
 # spinup monitor logs
 
 Query Loki logs
@@ -26,3 +32,16 @@ spinup monitor logs [flags]
 | `--since` | `1h` | query this duration into the past |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the last hour of logs for one service
+spinup monitor logs --service api --env production
+
+# Show the last 15 minutes
+spinup monitor logs --service api --since 15m --env production
+
+# Use your own LogQL query
+spinup monitor logs --query '{service_name="api"} |= "error"' --env production
+```

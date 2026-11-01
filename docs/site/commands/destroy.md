@@ -1,3 +1,8 @@
+---
+title: spinup destroy
+parent: CLI reference
+---
+
 # spinup destroy
 
 Remove unchanged generated files
@@ -22,3 +27,13 @@ spinup destroy <kind> <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Remove the files that spinup g resource ticket made
+spinup destroy resource ticket
+
+# Preview the removal
+spinup destroy handler health_check --dry-run
+```

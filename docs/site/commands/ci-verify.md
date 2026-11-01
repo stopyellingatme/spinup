@@ -1,3 +1,9 @@
+---
+title: spinup ci verify
+parent: spinup ci
+grand_parent: CLI reference
+---
+
 # spinup ci verify
 
 Check workflow safety and run optional actionlint
@@ -22,3 +28,10 @@ spinup ci verify
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Check the workflows for unsafe patterns
+spinup ci verify
+```

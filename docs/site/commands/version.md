@@ -1,3 +1,8 @@
+---
+title: spinup version
+parent: CLI reference
+---
+
 # spinup version
 
 Print the spinup version
@@ -23,3 +28,16 @@ spinup version [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the version
+spinup version
+
+# Check for a newer stable release
+spinup version --check
+
+# Print the version as JSON
+spinup version --json
+```

@@ -1,3 +1,9 @@
+---
+title: spinup maintenance prune
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance prune
 
 Remove unused app images and build cache
@@ -23,3 +29,13 @@ spinup maintenance prune [flags]
 | `--plan` | `false` | list images without removing them |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# List the images that would be removed
+spinup maintenance prune --plan --env production
+
+# Remove unused images and build cache
+spinup maintenance prune --env production
+```

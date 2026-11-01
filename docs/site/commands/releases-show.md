@@ -1,3 +1,9 @@
+---
+title: spinup releases show
+parent: spinup releases
+grand_parent: CLI reference
+---
+
 # spinup releases show
 
 Show a release snapshot with secret hashes only
@@ -22,3 +28,10 @@ spinup releases show <id>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show one release (secrets appear as hashes)
+spinup releases show 20261101T093000Z-ab12cd3 --env production
+```

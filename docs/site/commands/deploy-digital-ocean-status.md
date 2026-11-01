@@ -1,3 +1,8 @@
+---
+title: spinup deploy digital-ocean status
+nav_exclude: true
+---
+
 # spinup deploy digital-ocean status
 
 Show the token source, the account, and the resources of the environment
@@ -23,3 +28,10 @@ spinup deploy digital-ocean status
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the DigitalOcean resources of the environment
+spinup deploy digital-ocean status --env production
+```

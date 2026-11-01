@@ -1,3 +1,8 @@
+---
+title: spinup deploy digital-ocean logout
+nav_exclude: true
+---
+
 # spinup deploy digital-ocean logout
 
 Revoke the stored DigitalOcean token and delete it
@@ -23,3 +28,10 @@ spinup deploy digital-ocean logout
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Delete the stored DigitalOcean token
+spinup deploy digital-ocean logout
+```

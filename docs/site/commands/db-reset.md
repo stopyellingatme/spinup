@@ -1,3 +1,9 @@
+---
+title: spinup db reset
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db reset
 
 Recreate the development database and migrate up
@@ -22,3 +28,10 @@ spinup db reset
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Recreate the development database and migrate up
+spinup db reset
+```

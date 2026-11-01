@@ -1,3 +1,9 @@
+---
+title: spinup maintenance pg-minor-upgrade
+parent: spinup maintenance
+grand_parent: CLI reference
+---
+
 # spinup maintenance pg-minor-upgrade
 
 Upgrade PostgreSQL to the pinned minor after a backup
@@ -24,3 +30,13 @@ spinup maintenance pg-minor-upgrade [flags]
 | `--plan` | `false` | print the steps without changes |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Print the steps first
+spinup maintenance pg-minor-upgrade --plan --env production
+
+# Upgrade now, even outside the maintenance window
+spinup maintenance pg-minor-upgrade --now --env production
+```

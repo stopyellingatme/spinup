@@ -1,3 +1,9 @@
+---
+title: spinup plugin remove
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin remove
 
 Remove plugin records and retain rendered files
@@ -22,3 +28,10 @@ spinup plugin remove <name>
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Remove the plugin record (rendered files stay)
+spinup plugin remove spinup-pack
+```

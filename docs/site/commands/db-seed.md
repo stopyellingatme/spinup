@@ -1,3 +1,9 @@
+---
+title: spinup db seed
+parent: spinup db
+grand_parent: CLI reference
+---
+
 # spinup db seed
 
 Run the seed files in the development database
@@ -22,3 +28,10 @@ spinup db seed
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Run the seed files
+spinup db seed
+```

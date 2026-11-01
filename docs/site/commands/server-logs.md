@@ -1,3 +1,9 @@
+---
+title: spinup server logs
+parent: spinup server
+grand_parent: CLI reference
+---
+
 # spinup server logs
 
 Read service logs from the host
@@ -25,3 +31,16 @@ spinup server logs <service> [flags]
 | `--since` | `` | show logs since a timestamp or duration, such as 10m |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Show the logs of the api service
+spinup server logs api --env production
+
+# Follow the logs of all replicas
+spinup server logs api --follow --env production
+
+# Show the last 10 minutes
+spinup server logs api --since 10m --env production
+```

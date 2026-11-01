@@ -1,3 +1,9 @@
+---
+title: spinup plugin add
+parent: spinup plugin
+grand_parent: CLI reference
+---
+
 # spinup plugin add
 
 Inspect and trust a plugin without rendering files
@@ -25,3 +31,13 @@ spinup plugin add <source> [flags]
 | `--verbose` | `false` | write extra detail |
 | `--version` | `` | fixed git tag or path plugin version |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Inspect a plugin, then trust it
+spinup plugin add github.com/acme/spinup-pack --version v1.2.0 --trust
+
+# Trust a plugin that runs code on your machine
+spinup plugin add github.com/acme/spinup-exec --version v0.3.0 --trust-exec spinup-exec
+```

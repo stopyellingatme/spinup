@@ -1,3 +1,9 @@
+---
+title: spinup releases prune
+parent: spinup releases
+grand_parent: CLI reference
+---
+
 # spinup releases prune
 
 Prune old releases while retaining current and previous
@@ -23,3 +29,10 @@ spinup releases prune [flags]
 | `--offline` | `false` | never download template versions |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
+
+## Examples
+
+```sh
+# Keep only the 5 newest releases
+spinup releases prune --keep 5 --env production
+```
