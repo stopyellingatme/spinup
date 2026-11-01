@@ -34,7 +34,7 @@ $ spinup monitor open --env production
 ...
 ```
 
-`module add` works on a branch, so run the `git merge` command that it prints before you deploy. See [Upgrade](upgrading.md#add-or-remove-modules).
+`module add` works on a branch, so run the `git merge` command that it prints before you deploy. See [Upgrade](upgrading.md#add-modules).
 The deploy fails early if the `GRAFANA_ADMIN_PASSWORD` secret is missing. See [Secrets](deploy/secrets.md) to set up secrets for an environment.
 Keep `monitor open` running while you use Grafana. Press Ctrl-C to close the tunnel.
 Sign in as `admin`. See [Open Grafana](#open-grafana).
