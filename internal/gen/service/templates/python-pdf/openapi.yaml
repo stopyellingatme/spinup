@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: PDF Service API
+  version: 1.0.0
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Report readiness
+      responses:
+        '200':
+          description: The service is ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+  /v1/render:
+    post:
+      operationId: render
+      summary: Render a template to PDF
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenderRequest'
+      responses:
+        '200':
+          description: The PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The render failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  schemas:
+    RenderRequest:
+      type: object
+      required: [template, data]
+      properties:
+        template:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+          description: The file service/templates/<template>.html.j2
+          example: sample
+        data:
+          type: object
+          additionalProperties: true
+          description: The template reads this object as the variable data
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

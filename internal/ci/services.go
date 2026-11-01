@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
+
 	spexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/services"
@@ -78,9 +80,54 @@ func Matrix(root string) (MatrixDoc, error) {
 	return doc, nil
 }
 
+// VariantPDF is the variant of a Python service that renders PDF files with WeasyPrint (ADR 0026).
+const VariantPDF = "pdf"
+
+// pdfPackages are the Debian packages that WeasyPrint needs (ADR 0026 decision 4.2).
+const pdfPackages = "libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fontconfig fonts-dejavu-core fonts-liberation"
+
+// DetectVariant returns VariantPDF when the pyproject.toml in dir names the weasyprint
+// package, and "" otherwise. A missing or unreadable manifest gives "".
+func DetectVariant(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		return ""
+	}
+	var manifest struct {
+		Project struct {
+			Dependencies []string `toml:"dependencies"`
+		} `toml:"project"`
+	}
+	if err := toml.Unmarshal(data, &manifest); err != nil {
+		return ""
+	}
+	for _, dep := range manifest.Project.Dependencies {
+		// A PEP 508 requirement starts with the name. A space, a version operator, an
+		// extra, a marker, or a URL ends it.
+		name, _, _ := strings.Cut(dep, ";")
+		if end := strings.IndexAny(name, " \t<>=!~[(@"); end >= 0 {
+			name = name[:end]
+		}
+		if strings.EqualFold(name, "weasyprint") {
+			return VariantPDF
+		}
+	}
+	return ""
+}
+
 // TestDockerfile renders a test image from the supplied stack pins without reading files.
 // Node checks for the optional typecheck script inside the image.
 func TestDockerfile(lang string, stack *stackversions.Stack) (string, error) {
+	return TestDockerfileFor(lang, "", stack)
+}
+
+// TestDockerfileFor renders a test image like TestDockerfile for a template variant.
+// The variant VariantPDF adds the Debian packages of WeasyPrint to a Python image.
+// Any other variant gives the output of TestDockerfile.
+func TestDockerfileFor(lang, variant string, stack *stackversions.Stack) (string, error) {
+	if variant == VariantPDF && lang != "python" {
+		return "", &ui.Error{What: "Cannot render service tests", Why: fmt.Sprintf("the variant pdf needs python, got %q", lang), Try: "use the variant pdf only for a Python service"}
+	}
 	if stack == nil {
 		return "", &ui.Error{What: "Cannot render service tests", Why: "the stack pins are missing", Try: "supply the stack pins"}
 	}
@@ -107,7 +154,11 @@ func TestDockerfile(lang string, stack *stackversions.Stack) (string, error) {
 	case "rust":
 		return fmt.Sprintf("FROM %s\nWORKDIR /app\nCOPY . .\nRUN cargo test --locked\n", refs[0]), nil
 	case "python":
-		return fmt.Sprintf("FROM %s\nCOPY --from=%s /uv /bin/uv\nWORKDIR /app\nCOPY . .\nRUN uv sync --locked\nRUN uv run python -m pytest\n", refs[0], refs[1]), nil
+		apt := ""
+		if variant == VariantPDF {
+			apt = "RUN apt-get update && apt-get install -y --no-install-recommends " + pdfPackages + " && rm -rf /var/lib/apt/lists/*\n"
+		}
+		return fmt.Sprintf("FROM %s\n%sCOPY --from=%s /uv /bin/uv\nWORKDIR /app\nCOPY . .\nRUN uv sync --locked\nRUN uv run python -m pytest\n", refs[0], apt, refs[1]), nil
 	default: // node
 		pnpm := stack.NPM["pnpm"]
 		if pnpm == "" {
@@ -182,7 +233,11 @@ func TestService(ctx context.Context, runner spexec.Runner, root, name string, o
 			return serviceTestError(name, err.Error(), "check the embedded stack pins", err)
 		}
 	}
-	dockerfile, err := TestDockerfile(lang, opts.Stack)
+	variant := ""
+	if lang == "python" {
+		variant = DetectVariant(dir)
+	}
+	dockerfile, err := TestDockerfileFor(lang, variant, opts.Stack)
 	if err != nil {
 		return err
 	}

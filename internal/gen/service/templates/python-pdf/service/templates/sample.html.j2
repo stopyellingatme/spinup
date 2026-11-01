@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ data.title }}</title>
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <header>
+    <h1>{{ data.title }}</h1>
+    {% if data.subtitle is defined %}<p class="subtitle">{{ data.subtitle }}</p>{% endif %}
+  </header>
+  {% if data.rows is defined %}
+  <table>
+    <thead><tr><th>Item</th><th class="number">Value</th></tr></thead>
+    <tbody>
+      {% for row in data.rows %}
+      <tr><td>{{ row.label }}</td><td class="number">{{ row.value }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% if data.notes is defined %}<p class="notes">{{ data.notes }}</p>{% endif %}
+</body>
+</html>

@@ -393,3 +393,116 @@ func serviceProject(t *testing.T, tables string) string {
 func serviceTable(name string, port int) string {
 	return "\n[[services]]\nname = " + strconv.Quote(name) + "\nport = 8080\ndev_port = " + strconv.Itoa(port) + "\nhealth = \"/healthz\"\n"
 }
+
+const pdfAptLine = "RUN apt-get update && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fontconfig fonts-dejavu-core fonts-liberation && rm -rf /var/lib/apt/lists/*\n"
+
+func TestDockerfileFor(t *testing.T) {
+	t.Parallel()
+	stack := stackversions.MustLoad()
+	for _, lang := range []string{"rust", "python", "node"} {
+		for _, variant := range []string{"", "service", "other"} {
+			t.Run(lang+"/"+variant, func(t *testing.T) {
+				t.Parallel()
+				got, err := ci.TestDockerfileFor(lang, variant, stack)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := ci.TestDockerfile(lang, stack)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Fatalf("variant %q changed the Dockerfile:\n%s", variant, got)
+				}
+			})
+		}
+	}
+	t.Run("pdf", func(t *testing.T) {
+		t.Parallel()
+		base, err := ci.TestDockerfile("python", stack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := ci.TestDockerfileFor("python", ci.VariantPDF, stack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		from, rest, ok := strings.Cut(base, "\n")
+		if !ok || got != from+"\n"+pdfAptLine+rest {
+			t.Fatalf("pdf Dockerfile = %q, want the python Dockerfile with the apt line after FROM", got)
+		}
+	})
+	for _, lang := range []string{"rust", "node"} {
+		t.Run("pdf needs python/"+lang, func(t *testing.T) {
+			t.Parallel()
+			got, err := ci.TestDockerfileFor(lang, ci.VariantPDF, stack)
+			var uiErr *ui.Error
+			if got != "" || !errors.As(err, &uiErr) || uiErr.Try == "" || !strings.Contains(err.Error(), "python") {
+				t.Fatalf("got %q, error = %v", got, err)
+			}
+		})
+	}
+}
+
+func TestDetectVariant(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, pyproject, want string
+	}{
+		{"pdf", "[project]\ndependencies = [\"fastapi==0.162.0\", \"weasyprint==70.0\"]\n", ci.VariantPDF},
+		{"pdf without pin", "[project]\ndependencies = [\"WeasyPrint >= 70\"]\n", ci.VariantPDF},
+		{"base", "[project]\ndependencies = [\"fastapi==0.162.0\"]\n", ""},
+		{"similar name", "[project]\ndependencies = [\"weasyprint-extras==1.0\"]\n", ""},
+		{"dev only", "[project]\ndependencies = []\n[dependency-groups]\ndev = [\"weasyprint==70.0\"]\n", ""},
+		{"comment", "# weasyprint\n[project]\ndependencies = []\n", ""},
+		{"bad TOML", "[project\n", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			writeServiceFile(t, filepath.Join(dir, "pyproject.toml"), tc.pyproject)
+			if got := ci.DetectVariant(dir); got != tc.want {
+				t.Fatalf("DetectVariant = %q, want %q", got, tc.want)
+			}
+		})
+	}
+	t.Run("missing", func(t *testing.T) {
+		t.Parallel()
+		if got := ci.DetectVariant(t.TempDir()); got != "" {
+			t.Fatalf("DetectVariant = %q, want empty", got)
+		}
+	})
+}
+
+func TestPDFServiceTemplate(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join("..", "gen", "service", "templates", "python-pdf")
+	if got := ci.DetectLang(dir); got != "python" {
+		t.Fatalf("DetectLang = %q, want python", got)
+	}
+	if got := ci.DetectVariant(dir); got != ci.VariantPDF {
+		t.Fatalf("DetectVariant = %q, want pdf", got)
+	}
+	if got := ci.DetectVariant(filepath.Join("..", "gen", "service", "templates", "python")); got != "" {
+		t.Fatalf("DetectVariant of the base template = %q, want empty", got)
+	}
+}
+
+func TestRunPDFServiceTests(t *testing.T) {
+	t.Parallel()
+	root := serviceProject(t, serviceTable("reports", 8101))
+	dir := filepath.Join(root, "services", "reports")
+	writeServiceFile(t, filepath.Join(dir, "pyproject.toml"), "[project]\ndependencies = [\"weasyprint==70.0\"]\n")
+	writeServiceFile(t, filepath.Join(dir, "uv.lock"), "lock\n")
+	var out bytes.Buffer
+	if err := ci.TestService(context.Background(), nil, root, "reports", ci.TestServiceOptions{DryRun: true, Out: &out}); err != nil {
+		t.Fatal(err)
+	}
+	want, err := ci.TestDockerfileFor("python", ci.VariantPDF, stackversions.MustLoad())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != want || !strings.Contains(want, pdfAptLine) {
+		t.Fatalf("dry run = %q, want %q", out.String(), want)
+	}
+}

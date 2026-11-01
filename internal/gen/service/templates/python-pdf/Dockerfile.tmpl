@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+FROM {{ .PythonImage }}
+COPY --from={{ .UVImage }} /uv /bin/uv
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fontconfig fonts-dejavu-core fonts-liberation \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -f
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONDONTWRITEBYTECODE=1
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-build
+COPY service ./service
+RUN groupadd --gid 10001 service && useradd --uid 10001 --gid service --no-create-home service
+USER service
+ENV PORT={{ .Port }} HOME=/tmp XDG_CACHE_HOME=/tmp/cache
+EXPOSE {{ .Port }}
+CMD ["/app/.venv/bin/uvicorn", "service.main:app", "--host", "0.0.0.0", "--port", "{{ .Port }}"]

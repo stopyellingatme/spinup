@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,13 +31,14 @@ var templates embed.FS
 func init() {
 	registry.Register(gen.Generator{
 		Name: "service", Short: "Add a sidecar service",
-		Usage: "<name> --lang rust|python|node|<plugin>/<template> [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi]",
+		Usage: "<name> --lang rust|python|node|<plugin>/<template> [--kind service|pdf] [--port 8080] [--dev-port N] [--public /svc/<name>] [--auth none|session] [--no-openapi]",
 		Flags: flags, Run: plan,
 	})
 }
 
 func flags(fs *pflag.FlagSet) {
 	fs.String("lang", "", "service language or plugin template (required)")
+	fs.String("kind", kindService, "template variant: service, or pdf with --lang python")
 	fs.Int("port", 8080, "container port")
 	fs.Int("dev-port", 0, "host port (default: first unused port from 8101)")
 	fs.String("public", "", "public URL prefix")
@@ -59,6 +61,13 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 	pluginName, templateName, pluginTemplate := strings.Cut(lang, "/")
 	if lang != "rust" && lang != "python" && lang != "node" && (!pluginTemplate || pluginName == "" || templateName == "" || strings.Contains(templateName, "/")) {
 		return nil, fmt.Errorf("cannot generate service: --lang is required and must be rust, python, or node, got %q\nTry: spinup g service %s --lang rust", lang, name)
+	}
+	kind, _ := in.Flags.GetString("kind")
+	switch {
+	case kind != kindService && kind != kindPDF:
+		return nil, fmt.Errorf("cannot generate service: --kind must be service or pdf, got %q\nTry: spinup g service %s --lang python --kind pdf", kind, name)
+	case kind == kindPDF && lang != "python":
+		return nil, fmt.Errorf("cannot generate service: --kind pdf needs --lang python, got %q\nTry: spinup g service %s --lang python --kind pdf", lang, name)
 	}
 	dir := services.ContextDir(name)
 	if _, err := os.Lstat(filepath.Join(in.Root, filepath.FromSlash(dir))); err == nil {
@@ -120,7 +129,12 @@ func plan(ctx context.Context, in gen.Input) (*gen.Output, error) {
 		}
 		*image.ref = pin.Ref()
 	}
-	p, err := renderTemplates(lang, svc, data)
+	trees := []string{lang}
+	if kind == kindPDF {
+		trees = append(trees, "python-pdf")
+		svc.Memory, svc.TmpSize = pdfMemory, pdfTmpSize
+	}
+	p, err := renderTemplates(trees, svc, data)
 	if err != nil {
 		return nil, err
 	}
@@ -198,48 +212,81 @@ func nextDevPort(list []services.Service) int {
 	return 0 // Validate reports that no valid port remains.
 }
 
+const (
+	kindService = "service"
+	kindPDF     = "pdf"
+	// pdfMemory and pdfTmpSize are the deploy limits of a PDF service (ADR 0026 decision 4.10).
+	pdfMemory  = "3g"
+	pdfTmpSize = "256m"
+)
+
+// placeholders names files that keep a directory in the template trees. The
+// generator never renders them.
+var placeholders = map[string]bool{".gitkeep": true, ".keep": true}
+
 type templateData struct {
 	Name, App                                                   string
 	Port                                                        int
 	RustImage, DistrolessImage, PythonImage, UVImage, NodeImage string
 }
 
-func renderTemplates(lang string, svc services.Service, data templateData) (vfs.Plan, error) {
-	var p vfs.Plan
-	base := "templates/" + lang
-	err := fs.WalkDir(templates, base, func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		rel := strings.TrimPrefix(name, base+"/")
-		if svc.OpenAPI == "" && rel == "openapi.yaml" {
-			return nil
-		}
-		content, err := templates.ReadFile(name)
-		if err != nil {
-			return err
-		}
-		if strings.HasSuffix(rel, ".tmpl") {
-			tmpl, err := template.New(name).Option("missingkey=error").Parse(string(content))
+// renderTemplates renders the template trees in order. A file of a later tree
+// replaces the file with the same output path of an earlier tree. The plan
+// lists the files in the order of a walk of one tree, so a single tree gives
+// the same plan as a plain walk.
+func renderTemplates(trees []string, svc services.Service, data templateData) (vfs.Plan, error) {
+	lang := strings.Join(trees, "+")
+	files := map[string][]byte{}
+	for _, tree := range trees {
+		base := "templates/" + tree
+		err := fs.WalkDir(templates, base, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			var buf bytes.Buffer
-			if err := tmpl.Execute(&buf, data); err != nil {
+			if entry.IsDir() || placeholders[entry.Name()] {
+				return nil
+			}
+			rel := strings.TrimPrefix(name, base+"/")
+			if svc.OpenAPI == "" && rel == "openapi.yaml" {
+				return nil
+			}
+			content, err := templates.ReadFile(name)
+			if err != nil {
 				return err
 			}
-			content = buf.Bytes()
-			rel = strings.TrimSuffix(rel, ".tmpl")
+			if strings.HasSuffix(rel, ".tmpl") {
+				tmpl, err := template.New(name).Option("missingkey=error").Parse(string(content))
+				if err != nil {
+					return err
+				}
+				var buf bytes.Buffer
+				if err := tmpl.Execute(&buf, data); err != nil {
+					return err
+				}
+				content = buf.Bytes()
+				rel = strings.TrimSuffix(rel, ".tmpl")
+			}
+			files[rel] = content
+			return nil
+		})
+		if err != nil {
+			return vfs.Plan{}, fmt.Errorf("render %s service: %w\nTry: report this as a spinup bug", lang, err)
 		}
-		return p.Add(vfs.File{Path: path.Join(services.ContextDir(svc.Name), rel), Data: content, Mode: 0o644, Class: string(manifest.Scaffold)})
-	})
-	if err != nil {
-		return vfs.Plan{}, fmt.Errorf("render %s service: %w\nTry: report this as a spinup bug", lang, err)
+	}
+	paths := slices.SortedFunc(maps.Keys(files), walkOrder)
+	var p vfs.Plan
+	for _, rel := range paths {
+		if err := p.Add(vfs.File{Path: path.Join(services.ContextDir(svc.Name), rel), Data: files[rel], Mode: 0o644, Class: string(manifest.Scaffold)}); err != nil {
+			return vfs.Plan{}, fmt.Errorf("render %s service: %w\nTry: report this as a spinup bug", lang, err)
+		}
 	}
 	return p, nil
+}
+
+// walkOrder compares slash-separated paths element by element, which is the
+// order of fs.WalkDir.
+func walkOrder(a, b string) int {
+	return slices.Compare(strings.Split(a, "/"), strings.Split(b, "/"))
 }
 
 func appendTable(src []byte, svc services.Service) []byte {
@@ -260,6 +307,12 @@ func appendTable(src []byte, svc services.Service) []byte {
 	}
 	if svc.OpenAPI != "" {
 		fmt.Fprintf(&buf, "openapi = %q\n", svc.OpenAPI)
+	}
+	if svc.Memory != "" {
+		fmt.Fprintf(&buf, "memory = %q\n", svc.Memory)
+	}
+	if svc.TmpSize != "" {
+		fmt.Fprintf(&buf, "tmp_size = %q\n", svc.TmpSize)
 	}
 	if len(svc.Healthcheck) > 0 {
 		buf.WriteString("healthcheck = [")
