@@ -1,0 +1,169 @@
+# App gate: the PDF report sidecar (ADR 0026 decision 7.11). The service tests pass in the Docker
+# test image. The service image builds, and it runs with the deploy flags: a read-only root file
+# system, no capabilities, a tmpfs /tmp, and the memory limit. The sample renders to a PDF, and a
+# render that names an external image fails without a network connection.
+# The builds need Docker and the network (PyPI, Debian packages, and the pinned base images).
+[!exec:docker] skip 'docker is required for the service image'
+[!exec:curl] skip 'curl is required to call the service'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gatepdf --api-only --modules ci,deploy --module example.com/gatepdf --no-git --non-interactive
+cd gatepdf
+exec spinup g service reports --lang python --kind pdf
+grep '^memory = "3g"$' spinup.toml
+grep '^tmp_size = "256m"$' spinup.toml
+exists services/reports/Dockerfile services/reports/service/render.py
+
+# Two templates that only the gate uses. Both take a URL from data, as a hostile report would.
+cp $WORK/probe.html.j2 services/reports/service/templates/probe.html.j2
+
+# The pytest suite of the service runs in the test image with the Debian packages.
+exec spinup ci test-service reports
+
+# Build the image for the platform of the Docker daemon, run it, and call it.
+exec bash $WORK/pdf.sh
+stdout '^reports: sample render ok, %PDF- header ok, content type ok$'
+stdout '^reports: user 10001:10001 ok$'
+stdout '^reports: user 1000:1000 ok$'
+stdout '^reports: data URL image renders$'
+stdout '^reports: external image refused, listener saw no connection$'
+stdout '^reports: file URL outside the assets directory refused$'
+stdout '^reports: unknown template answers 404$'
+
+-- probe.html.j2 --
+<!doctype html>
+<html><body><p>probe</p><img src="{{ data.url }}"></body></html>
+
+-- pdf.sh --
+# pdf.sh builds the reports image with spinup build, runs it with the deploy flags for two users,
+# and checks the sample render and the refused fetches. A trap removes the containers, the network,
+# and the image, also when a check fails.
+set -euo pipefail
+
+app=gatepdf
+tag="gate-$$"
+image="$app-reports:$tag"
+network="gatepdf-$$"
+containers=()
+
+cleanup() {
+  local status=$?
+  set +e
+  for c in ${containers[@]+"${containers[@]}"}; do
+    if [[ $status -ne 0 ]]; then
+      echo "--- docker logs $c" >&2
+      docker logs "$c" >&2
+    fi
+    docker rm -f "$c" >/dev/null 2>&1
+  done
+  docker network rm "$network" >/dev/null 2>&1
+  docker image rm -f "$image" >/dev/null 2>&1
+  exit "$status"
+}
+trap cleanup EXIT
+
+arch="$(docker version --format '{{.Server.Arch}}')"
+spinup build --image --target reports --tag "$tag" --platform "linux/$arch" >&2
+echo "reports: image size $(docker image inspect "$image" --format '{{.Size}}') bytes" >&2
+
+docker network create "$network" >/dev/null
+
+# The flags of compose.services.yml: the user, a read-only root, no capabilities, no new
+# privileges, the /tmp tmpfs of tmp_size, and the memory limit of memory.
+deploy_flags=(--read-only --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=256m --memory 3g --network "$network")
+
+fail() {
+  echo "pdf.sh: $*" >&2
+  exit 1
+}
+
+# start <name> <user> runs the image and waits for /healthz. It sets port.
+start() {
+  local name=$1 user=$2 body
+  containers+=("$name")
+  docker run -d --name "$name" --user "$user" "${deploy_flags[@]}" -p 127.0.0.1::8080 "$image" >/dev/null
+  port="$(docker port "$name" 8080/tcp | head -n 1 | sed 's/.*://')"
+  body="$(curl -fsS -m 5 --retry 60 --retry-delay 1 --retry-connrefused --retry-all-errors "http://127.0.0.1:$port/healthz")"
+  [[ $body == ok ]] || fail "$name /healthz answered $body, want ok"
+}
+
+# render <port> <body> <output file> prints the HTTP status and the content type.
+render() {
+  curl -sS -m 40 -o "$3" -w '%{http_code} %{content_type}' -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:$1/v1/render"
+}
+
+sample='{"template":"sample","data":{"title":"Work order 42","rows":[{"label":"Pump","value":"12"}]}}'
+
+for user in 10001:10001 1000:1000; do
+  name="$app-reports-${user%%:*}-$$"
+  start "$name" "$user"
+  seconds_before=$SECONDS
+  result="$(render "$port" "$sample" "$name.pdf")"
+  [[ $result == "200 application/pdf" ]] || { head -c 400 "$name.pdf" >&2; fail "user $user: sample render answered '$result', want '200 application/pdf'"; }
+  [[ "$(head -c 5 "$name.pdf")" == "%PDF-" ]] || fail "user $user: the body does not start with %PDF-"
+  [[ $(wc -c <"$name.pdf") -gt 1000 ]] || fail "user $user: the PDF is too small"
+  echo "reports: first render of user $user took about $((SECONDS - seconds_before)) s" >&2
+  if [[ $user == 10001:10001 ]]; then
+    echo "reports: sample render ok, %PDF- header ok, content type ok"
+    # An unknown template is a 404 problem, not a PDF.
+    result="$(render "$port" '{"template":"missing","data":{}}' "$name.404")"
+    [[ $result == 404* ]] || fail "unknown template answered '$result', want 404"
+    echo "reports: unknown template answers 404"
+  fi
+  # Prove the deploy flags: the process runs as the user, and the root file system is read-only.
+  [[ "$(docker exec "$name" id -u):$(docker exec "$name" id -g)" == "$user" ]] || fail "the container does not run as $user"
+  if docker exec "$name" sh -c 'touch /app/write-test' 2>/dev/null; then
+    fail "the root file system of the container is writable"
+  fi
+  echo "reports: user $user ok"
+  if [[ $user == 10001:10001 ]]; then
+    primary=$name primary_port=$port
+  fi
+done
+
+# A data URL image is local, so the probe template renders. This shows that a later failure comes
+# from the fetcher and not from the template.
+png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='
+result="$(render "$primary_port" "{\"template\":\"probe\",\"data\":{\"url\":\"$png\"}}" probe-data.pdf)"
+[[ $result == "200 application/pdf" ]] || { head -c 400 probe-data.pdf >&2; fail "the probe with a data URL answered '$result', want 200"; }
+echo "reports: data URL image renders"
+
+# A listener in the same network counts connections. A control connection proves that it works.
+listener="$app-listener-$$"
+containers+=("$listener")
+docker run -d --name "$listener" --network "$network" --entrypoint /app/.venv/bin/python "$image" -c '
+import socket
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("0.0.0.0", 9999))
+s.listen()
+print("ready", flush=True)
+while True:
+    c, _ = s.accept()
+    print("connection", flush=True)
+    c.close()
+' >/dev/null
+for _ in $(seq 1 30); do
+  docker logs "$listener" 2>&1 | grep -q '^ready$' && break
+  sleep 1
+done
+docker exec "$listener" /app/.venv/bin/python -c 'import socket; socket.create_connection(("127.0.0.1", 9999), 5).close()'
+sleep 1
+[[ "$(docker logs "$listener" 2>&1 | grep -c '^connection$')" == 1 ]] || fail "the listener control connection was not counted"
+
+result="$(render "$primary_port" "{\"template\":\"probe\",\"data\":{\"url\":\"http://$listener:9999/x.png\"}}" probe-external.pdf)"
+case $result in
+  500*) ;;
+  *) fail "a render with an external image answered '$result', want 500" ;;
+esac
+[[ "$(head -c 5 probe-external.pdf)" != "%PDF-" ]] || fail "a render with an external image returned a PDF"
+sleep 1
+[[ "$(docker logs "$listener" 2>&1 | grep -c '^connection$')" == 1 ]] || fail "the service connected to the external image host"
+echo "reports: external image refused, listener saw no connection"
+
+result="$(render "$primary_port" '{"template":"probe","data":{"url":"file:///etc/passwd"}}' probe-file.pdf)"
+case $result in
+  500*) ;;
+  *) fail "a render with file:///etc/passwd answered '$result', want 500" ;;
+esac
+echo "reports: file URL outside the assets directory refused"
