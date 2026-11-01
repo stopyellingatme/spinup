@@ -16,6 +16,7 @@ func TestValidateAcceptsAFullService(t *testing.T) {
 	s.Env = map[string]string{"MODEL": "small"}
 	s.DB = true
 	s.GPUs = "all"
+	s.Memory, s.TmpSize = "3g", "256m"
 	two := valid()
 	two.Name, two.DevPort, two.OpenAPI, two.GPUs = "embed", 8102, "", "2"
 	if err := Validate([]Service{s, two}, nil); err != nil {
@@ -45,6 +46,9 @@ func TestValidateRejects(t *testing.T) {
 		{"env reserved", func(s *Service) { s.Env = map[string]string{"OTEL_X": "1"} }, "OTEL_"},
 		{"env pattern", func(s *Service) { s.Env = map[string]string{"a-b": "1"} }, "env key"},
 		{"gpus", func(s *Service) { s.GPUs = "0" }, "gpus"},
+		{"memory unit", func(s *Service) { s.Memory = "3" }, "memory \"3\""},
+		{"memory word", func(s *Service) { s.Memory = "3 GiB" }, "memory"},
+		{"tmp size", func(s *Service) { s.TmpSize = "0m" }, "tmp_size \"0m\""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := valid()

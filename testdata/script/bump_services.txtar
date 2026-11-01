@@ -30,6 +30,7 @@ exec bash scripts/bump-services.sh lock --dry-run
 stdout 'docker run --rm .*rust:.*@sha256:'
 stdout 'docker create .*ghcr.io/astral-sh/uv:.*@sha256:'
 stdout 'docker run --rm .*python:.*@sha256:'
+stdout 'docker run --rm .*/python-pdf:/work .*python:.*@sha256:.* uv lock'
 stdout 'docker run --rm .*node:.*@sha256:'
 stdout 'cargo generate-lockfile'
 stdout 'uv lock'
@@ -57,6 +58,9 @@ stdout '\| crate \| serde \| 1.0.229 \| 2.0.0 \| no \|'
 stdout '\| crate \| tokio \| 1.54.1 \| unknown \| no \|'
 stdout '\| crate \| tower \| 0.5.3 \| unknown \| no \|'
 stdout '\| python \| fastapi \| 0.162.0 \| 0.163.0 \| yes \|'
+stdout '\| python-pdf \| weasyprint \| 70.0 \| 0.163.0 \| no \|'
+stdout '\| python-pdf \| jinja2 \| 3.1.6 \| 0.163.0 \| no \|'
+stdout '\| python-pdf \| pypdf \| 6.21.1 \| 0.163.0 \| no \|'
 stdout '\| node \| @hono/node-server \| 2.1.5 \| 3.0.0 \| no \|'
 stdout '\| node \| @types/node \| 24.19.2 \| 3.0.0 \| no \|'
 stdout '\| image \| rust \| 1.99.1-alpine3.24 \| manual check \| no \|'
@@ -72,6 +76,7 @@ env REGISTRY_DOWN=1
 exec bash scripts/bump-services.sh report
 stdout '\| crate \| axum \| 0.8.9 \| unknown \| no \|'
 stdout '\| python \| fastapi \| 0.162.0 \| unknown \| no \|'
+stdout '\| python-pdf \| weasyprint \| 70.0 \| unknown \| no \|'
 stdout '\| node \| hono \| 4.13.14 \| unknown \| no \|'
 ! stdout 'fixture-secret'
 ! stderr .
@@ -79,11 +84,13 @@ exec git status --porcelain
 ! stdout .
 
 # Emulate Docker to check publication and cleanup without running containers.
-mkdir internal/gen/service/templates/rust internal/gen/service/templates/python internal/gen/service/templates/node
+mkdir internal/gen/service/templates/rust internal/gen/service/templates/python internal/gen/service/templates/python-pdf internal/gen/service/templates/node
 cp $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.toml internal/gen/service/templates/rust/Cargo.toml
 cp $SPINUP_REPO/internal/gen/service/templates/rust/Cargo.lock internal/gen/service/templates/rust/Cargo.lock
 cp $SPINUP_REPO/internal/gen/service/templates/python/pyproject.toml internal/gen/service/templates/python/pyproject.toml
 cp $SPINUP_REPO/internal/gen/service/templates/python/uv.lock internal/gen/service/templates/python/uv.lock
+cp $SPINUP_REPO/internal/gen/service/templates/python-pdf/pyproject.toml internal/gen/service/templates/python-pdf/pyproject.toml
+cp $SPINUP_REPO/internal/gen/service/templates/python-pdf/uv.lock internal/gen/service/templates/python-pdf/uv.lock
 cp $SPINUP_REPO/internal/gen/service/templates/node/package.json internal/gen/service/templates/node/package.json
 cp $SPINUP_REPO/internal/gen/service/templates/node/pnpm-lock.yaml internal/gen/service/templates/node/pnpm-lock.yaml
 exec git add .
@@ -102,13 +109,15 @@ exec bash $WORK/check-cleanup.sh
 
 env DOCKER_FAIL=
 exec bash scripts/bump-services.sh lock
-stdout 'refreshed Cargo.lock, uv.lock, and pnpm-lock.yaml'
+stdout 'refreshed Cargo.lock, uv.lock \(python and python-pdf\), and pnpm-lock.yaml'
 grep '^refreshed rust$' internal/gen/service/templates/rust/Cargo.lock
 grep '^refreshed python$' internal/gen/service/templates/python/uv.lock
+grep '^refreshed python-pdf$' internal/gen/service/templates/python-pdf/uv.lock
 grep '^refreshed node$' internal/gen/service/templates/node/pnpm-lock.yaml
 exec git diff --name-only
 stdout 'internal/gen/service/templates/rust/Cargo.lock'
 stdout 'internal/gen/service/templates/python/uv.lock'
+stdout 'internal/gen/service/templates/python-pdf/uv.lock'
 stdout 'internal/gen/service/templates/node/pnpm-lock.yaml'
 ! stdout 'Cargo.toml|pyproject.toml|package.json|toolchain'
 exec git ls-files --others --exclude-standard
@@ -152,10 +161,10 @@ case "$1" in
         echo 'refreshed rust' > "$project/Cargo.lock"
         echo 'changed manifest' > "$project/Cargo.toml"
         echo 'toolchain fixture' > "$project/rust-toolchain.toml" ;;
-      */python)
+      */python|*/python-pdf)
         test -f "$project/../uv"
         test -f "$project/uv.lock"
-        echo 'refreshed python' > "$project/uv.lock"
+        echo "refreshed ${project##*/}" > "$project/uv.lock"
         echo 'changed manifest' > "$project/pyproject.toml" ;;
       */node)
         if [[ ${DOCKER_FAIL:-0} == 1 ]]; then exit 1; fi

@@ -236,8 +236,11 @@ func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) 
 	var modules []string
 	for _, p := range packs {
 		available[p.Name] = p
-		// An API-only app cannot take a module that needs the web frontend (such as auth).
-		if p.Name != "base" && p.Name != "api" && p.Name != "web" && (!apiOnly || !slices.Contains(p.Requires, "web")) {
+	}
+	for _, p := range packs {
+		// An API-only app cannot take a module that needs the web frontend, directly
+		// (such as auth) or through a required pack (such as audit).
+		if p.Name != "base" && p.Name != "api" && p.Name != "web" && (!apiOnly || !needsWeb(available, p.Name, map[string]bool{})) {
 			modules = append(modules, p.Name)
 		}
 	}
@@ -263,7 +266,7 @@ func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) 
 	}
 	for _, name := range values {
 		p, ok := available[name]
-		if ok && apiOnly && slices.Contains(p.Requires, "web") {
+		if ok && apiOnly && needsWeb(available, name, map[string]bool{}) {
 			return nil, fmt.Errorf("module %q needs the web frontend, and --api-only leaves it out\nTry: drop --api-only, or remove %s from --modules", name, name)
 		}
 		if !ok || name == "base" || name == "api" || name == "web" {
@@ -272,6 +275,23 @@ func selectPacks(packs []*templates.Pack, answers map[string]any, apiOnly bool) 
 		selected[name] = p
 	}
 	return orderPacks(selected)
+}
+
+// needsWeb reports whether the named pack requires the web pack, directly or through
+// another required pack. A missing pack or a cycle does not need the web pack here:
+// orderPacks reports those.
+func needsWeb(available map[string]*templates.Pack, name string, seen map[string]bool) bool {
+	p, ok := available[name]
+	if !ok || seen[name] {
+		return false
+	}
+	seen[name] = true
+	for _, required := range p.Requires {
+		if required == "web" || needsWeb(available, required, seen) {
+			return true
+		}
+	}
+	return false
 }
 
 func orderPacks(selected map[string]*templates.Pack) ([]*templates.Pack, error) {

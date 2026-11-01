@@ -81,6 +81,9 @@ type options struct {
 	proxiesSet bool
 	lookup     func(string) (string, bool) // the environment; tests replace it
 	sweep      time.Duration
+
+	events       EventSink
+	actorContext func(context.Context, User) context.Context
 }
 
 // WithSecureCookie sets the Secure attribute of the session cookie. The default is
@@ -144,6 +147,8 @@ type Auth struct {
 	limits       *limiter // nil: no rate limit
 	proxies      proxySet
 	warnedAt     atomic.Int64
+	events       EventSink                                   // nil: no explicit events (ADR 0025)
+	actorContext func(context.Context, User) context.Context // nil: the context does not change
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -218,6 +223,8 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		window:       o.window,
 		now:          o.now,
 		proxies:      proxies,
+		events:       o.events,
+		actorContext: o.actorContext,
 		stop:         make(chan struct{}),
 		done:         make(chan struct{}),
 	}
