@@ -44,15 +44,16 @@ func packFile(t *testing.T, pack, name string) *fstest.MapFile {
 // OIDC, and, with withAudit, the audit module.
 func schema(t *testing.T, withAudit bool) fstest.MapFS {
 	fsys := fstest.MapFS{
-		"00001_init.sql":            packFile(t, "api", "00001_init.sql"),
-		"00002_create_auth.sql":     packFile(t, "auth", "00002_create_auth.sql"),
-		"00003_password_resets.sql": packFile(t, "auth", "00003_password_resets.sql"),
-		"00004_oidc_identities.sql": packFile(t, "auth", "00004_oidc_identities.sql"),
-		"00005_users_role.sql":      packFile(t, "auth", "00005_users_role.sql"),
+		"00001_init.sql":               packFile(t, "api", "00001_init.sql"),
+		"00002_create_auth.sql":        packFile(t, "auth", "00002_create_auth.sql"),
+		"00003_password_resets.sql":    packFile(t, "auth", "00003_password_resets.sql"),
+		"00004_oidc_identities.sql":    packFile(t, "auth", "00004_oidc_identities.sql"),
+		"00005_users_role.sql":         packFile(t, "auth", "00005_users_role.sql"),
+		"00007_users_auth_version.sql": packFile(t, "auth", "00007_users_auth_version.sql"),
 	}
 	if withAudit {
 		fsys["00006_audit_events.sql"] = packFile(t, "audit", "00006_audit_events.sql")
-		fsys["00007_notes.sql"] = &fstest.MapFile{Data: []byte(`-- +goose Up
+		fsys["00008_notes.sql"] = &fstest.MapFile{Data: []byte(`-- +goose Up
 CREATE TABLE notes (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id bigint NOT NULL REFERENCES users(id),
@@ -300,7 +301,7 @@ func TestAuthEvents(t *testing.T) {
 		t.Fatalf("reset events = %+v", got)
 	}
 	want(t, got[0], "update", "users", audit.Actor{Kind: "user", ID: 1, Email: "ana@example.com", Role: "manager", Source: "api", Reason: "password_reset", RequestID: "req-api-auth-reset-confirm"})
-	if string(got[0].Changes) != `{"password_hash": {"redacted": true}}` {
+	if string(got[0].Changes) != `{"auth_version": {"new": 2, "old": 1}, "password_hash": {"redacted": true}}` {
 		t.Errorf("reset changes = %s", got[0].Changes)
 	}
 	if strings.Contains(string(got[0].Changes), "argon2") {
