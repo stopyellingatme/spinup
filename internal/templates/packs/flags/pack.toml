@@ -1,0 +1,15 @@
+name = "flags"
+description = "Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page."
+# The rules use the user and the role of kit/auth, and the admin page needs the web app.
+requires = ["auth"]
+
+# spinup g flags rewrites both files from the [flags] tables of spinup.toml (ADR 0029).
+[[files]]
+path = "api/internal/flags/flags.gen.go"
+source = "files/api/internal/flags/flags.gen.go"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/flags.gen.ts"
+source = "files/web/src/lib/flags.gen.ts"
+class = "managed"

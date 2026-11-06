@@ -70,6 +70,8 @@ type Config struct {
 		// DefaultRole selects the role for new accounts.
 		DefaultRole string `toml:"default_role"`
 	} `toml:"auth"`
+	// Flags declares the feature flags of the app (ADR 0029).
+	Flags      map[string]FlagDecl `toml:"flags"`
 	Monitoring struct {
 		Profile      string
 		HeartbeatURL string `toml:"heartbeat_url"`
@@ -167,7 +169,7 @@ func Parse(data []byte) (*Config, error) {
 		_, config.authAdminSet = auth["admin_role"]
 		_, config.authDefaultSet = auth["default_role"]
 	}
-	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services", "auth"} {
+	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services", "auth", "flags"} {
 		delete(raw, key)
 	}
 	config.Extra = raw
@@ -230,6 +232,9 @@ func (c *Config) Validate() error {
 		}
 	}
 	if err := c.AuthRoles().Validate(); err != nil {
+		problems = append(problems, err)
+	}
+	if err := c.FlagDecls().Validate(); err != nil {
 		problems = append(problems, err)
 	}
 	return errors.Join(problems...)

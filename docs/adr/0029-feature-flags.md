@@ -88,7 +88,7 @@ Facts about the current code that shape the design:
    - `FlagConst(key)` values are unique, and no value is `Set`. `FlagConst` is `RoleConst` under a new name (`internal/project/roles.go:84-93`). Example: `new_checkout` gives `NewCheckout`.
    - Each error names the key and the rule, and ends with `\nTry: correct [flags.<key>] in spinup.toml and run spinup g flags.`
 4. `Config` gets the field `Flags map[string]FlagDecl` with the tag `toml:"flags"`. `Parse` adds `"flags"` to the known keys (`internal/project/project.go:170`). `Config.Validate` calls `c.FlagDecls().Validate()` after the roles check (`internal/project/project.go:232`).
-5. `internal/project/flags.go` holds these pure declarations. It is a shared file (main loop only), because F1 and the pre-seed both touch the types:
+5. `internal/project/flags.go` holds these pure declarations. The pre-seed writes its first version, and F1 owns it after that (owner decision, 2026-11-06). It is not a shared file:
    ```go
    // FlagDecl is one [flags.<key>] table of spinup.toml.
    type FlagDecl struct {

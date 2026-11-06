@@ -15,7 +15,7 @@ import (
 // TestWebResponseSecurity checks response headers for anonymous and authenticated pages.
 func TestWebResponseSecurity(t *testing.T) {
 	t.Parallel()
-	data, err := fs.ReadFile(templates.Embedded(), "web/files/web/src/hooks.server.ts")
+	data, err := fs.ReadFile(templates.Embedded(), "web/files/web/src/hooks.server.ts.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ for (const user of [null, { id: 1, email: 'user@example.com' }]) {
 // ADDRESS_HEADER is set, and never passes a header from the browser.
 func TestWebHandleFetch(t *testing.T) {
 	t.Parallel()
-	data, err := fs.ReadFile(templates.Embedded(), "web/files/web/src/hooks.server.ts")
+	data, err := fs.ReadFile(templates.Embedded(), "web/files/web/src/hooks.server.ts.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}
