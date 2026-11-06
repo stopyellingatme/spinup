@@ -8,6 +8,12 @@ import (
  "os"
  "os/signal"
  "syscall"
+[[- if has "flags" .modules ]]
+ "time"
+
+ appflags "[[ .module ]]/api/internal/flags"
+ "github.com/stopyellingatme/spinup/kit/x/flags"
+[[- end ]]
 
 [[ if has "auth" .modules ]] kitmigrations "[[ .module ]]/api/db/kit"
 [[ end ]] "[[ .module ]]/api/db/migrations"
@@ -94,6 +100,22 @@ func run() (err error) {
  if err != nil { return err }
 [[- end ]]
 [[- end ]]
+[[- if has "flags" .modules ]]
+ var flagsEnv struct {
+  Refresh time.Duration `env:"FLAGS_REFRESH" default:"10s"`
+ }
+ if err := config.Load(&flagsEnv); err != nil {
+  return err
+ }
+ flagsProvider, err := flags.New(flags.WithDeclared(appflags.Set))
+ if err != nil {
+  return err
+ }
+ flagStore := flags.NewStore(pool, flagsProvider, roles.Set)
+ if err := flagStore.Start(ctx, flagsEnv.Refresh); err != nil {
+  return err
+ }
+[[- end ]]
  a := app.New(
   app.WithName([[ quote .app_name ]]),
   app.WithVersion(version),
@@ -105,11 +127,19 @@ func run() (err error) {
   app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
 [[- if has "auth" .modules ]]
   app.WithMiddleware(authn.Middleware()),
+[[- if has "flags" .modules ]]
+  app.WithMiddleware(flagsProvider.Middleware()),
+[[- end ]]
   app.WithRoutes(authn.Routes),
   app.WithCommand("user", auth.UserCommand(authn)),
 [[- if has "mail" .modules ]]
   app.WithRoutes(resetRoutes),
 [[- end ]]
+[[- end ]]
+[[- if has "flags" .modules ]]
+  app.WithRoutes(flagStore.Routes(authn)),
+  app.WithCommand("flags", flagStore.Command()),
+  app.WithReadiness("flags", flagStore.Ready),
 [[- end ]]
 [[- if has "mail" .modules ]]
 [[- if has "jobs" .modules ]]
@@ -127,6 +157,9 @@ func run() (err error) {
   app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
 [[- if has "auth" .modules ]]
   app.WithShutdown(authn.Close),
+[[- if has "flags" .modules ]]
+  app.WithShutdown(flagStore.Close),
+[[- end ]]
 [[- end ]]
  )
  return a.Run(ctx, os.Args[1:])

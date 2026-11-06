@@ -126,6 +126,11 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 			return err
 		}
 	}
+	if slices.Contains(selection.Added, "flags") {
+		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.FlagsNextSteps(), "<module>", cfg.App.Module)); err != nil {
+			return err
+		}
+	}
 	if o.Options.DryRun {
 		return nil
 	}
