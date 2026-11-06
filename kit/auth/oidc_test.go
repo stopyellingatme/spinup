@@ -170,12 +170,12 @@ func newOIDCTestApp(t *testing.T, p *oidcTestProvider) *oidcTestApp {
 	}
 	app := &oidcTestApp{}
 	h := &oidcHandler{auth: a, origin: "http://app.test", cipher: aead, client: &http.Client{Timeout: time.Second, Transport: p.server}, providers: []*oidcProvider{{name: "test", label: "Test provider", issuer: p.server.URL, clientID: "client", secret: "secret", scopes: []string{"openid", "email", "profile"}}}}
-	h.user = func(_ context.Context, provider, subject, email string, verified bool) (User, error) {
+	h.user = func(_ context.Context, provider, subject, email string, verified bool) (User, int64, error) {
 		if provider != "test" || subject != "subject-1" || email != "person@example.com" || !verified {
-			return User{}, errors.New("wrong identity")
+			return User{}, 0, errors.New("wrong identity")
 		}
 		app.linked++
-		return User{ID: 42, Email: email}, nil
+		return User{ID: 42, Email: email}, 1, nil
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/auth/oidc/{provider}/start", a.endpoint(h.start))
@@ -509,7 +509,7 @@ func TestOIDCAccounts(t *testing.T) {
 				}
 			}
 			// An email change never moves a known subject to a different account.
-			again, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "different@example.com", true)
+			again, _, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "different@example.com", true)
 			if err != nil || again.ID != id || again.Email != "person@example.com" {
 				t.Fatalf("identity changed: %+v %v", again, err)
 			}
@@ -525,7 +525,7 @@ func TestOIDCUnverifiedEmailNotLinked(t *testing.T) {
 	t.Parallel()
 	f := oidcDBFixture(t)
 	f.register(t, "person@example.com")
-	if _, err := f.auth.oidcUser(t.Context(), "test", "attacker", "person@example.com", false); err == nil {
+	if _, _, err := f.auth.oidcUser(t.Context(), "test", "attacker", "person@example.com", false); err == nil {
 		t.Fatal("unverified email linked")
 	}
 	var count int
@@ -540,7 +540,7 @@ func TestOIDCConcurrentLink(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
-			if _, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "person@example.com", true); err != nil {
+			if _, _, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "person@example.com", true); err != nil {
 				t.Error(err)
 			}
 		})
@@ -555,7 +555,7 @@ func TestOIDCConcurrentLink(t *testing.T) {
 func TestOIDCKnownIdentityPreservesCredentials(t *testing.T) {
 	t.Parallel()
 	f := oidcDBFixture(t)
-	user, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "person@example.com", true)
+	user, _, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "person@example.com", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -568,11 +568,11 @@ func TestOIDCKnownIdentityPreservesCredentials(t *testing.T) {
 	if login.Code != http.StatusOK || sessionCookie(login) == nil {
 		t.Fatalf("password login: %d %s", login.Code, login.Body)
 	}
-	again, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "different@example.com", true)
+	again, _, err := f.auth.oidcUser(t.Context(), "test", "subject-1", "different@example.com", true)
 	if err != nil || again != user {
 		t.Fatalf("known identity: %+v %v", again, err)
 	}
-	_, storedHash, found, err := f.auth.credentialsByEmail(t.Context(), user.Email)
+	_, _, storedHash, found, err := f.auth.credentialsByEmail(t.Context(), user.Email)
 	if err != nil || !found || storedHash != hash {
 		t.Fatalf("known identity removed the restored password: found=%v err=%v", found, err)
 	}
@@ -588,25 +588,25 @@ func TestOIDCLinkRollback(t *testing.T) {
 		sql  string
 	}{
 		{"identity insert", `ALTER TABLE user_identities ADD CHECK (subject <> 'rejected')`},
-		{"session deletion", `CREATE FUNCTION reject_session_delete() RETURNS trigger LANGUAGE plpgsql AS $$
-		BEGIN RAISE EXCEPTION 'session deletion failed'; END; $$;
-		CREATE TRIGGER reject_session_delete BEFORE DELETE ON sessions FOR EACH ROW EXECUTE FUNCTION reject_session_delete()`},
+		{"auth version update", `CREATE FUNCTION reject_version_update() RETURNS trigger LANGUAGE plpgsql AS $$
+		BEGIN RAISE EXCEPTION 'auth version update failed'; END; $$;
+		CREATE TRIGGER reject_version_update BEFORE UPDATE OF auth_version ON users FOR EACH ROW EXECUTE FUNCTION reject_version_update()`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			f := oidcDBFixture(t)
 			token := f.register(t, "person@example.com")
-			_, originalHash, _, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
+			_, _, originalHash, _, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
 			if err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.pool.Exec(t.Context(), tc.sql); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.auth.oidcUser(t.Context(), "test", "rejected", "person@example.com", true); err == nil {
+			if _, _, err := f.auth.oidcUser(t.Context(), "test", "rejected", "person@example.com", true); err == nil {
 				t.Fatal("link succeeded despite a store failure")
 			}
-			_, hash, found, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
+			_, _, hash, found, err := f.auth.credentialsByEmail(t.Context(), "person@example.com")
 			if err != nil || !found || hash != originalHash {
 				t.Fatalf("failed link changed the password: found=%v err=%v", found, err)
 			}

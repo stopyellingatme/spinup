@@ -340,13 +340,13 @@ func TestEventsOIDCWithAuditTrail(t *testing.T) {
 	if _, err := f.pool.Exec(t.Context(), up); err != nil {
 		t.Fatal(err)
 	}
-	user, err := f.auth.oidcUser(t.Context(), "google", "1234567", "new@example.com", true)
+	user, _, err := f.auth.oidcUser(t.Context(), "google", "1234567", "new@example.com", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.register(t, "linked@example.com")
 	rec.take()
-	if _, err := f.auth.oidcUser(t.Context(), "github", "42", "linked@example.com", true); err != nil {
+	if _, _, err := f.auth.oidcUser(t.Context(), "github", "42", "linked@example.com", true); err != nil {
 		t.Fatal(err)
 	}
 	calls := rec.take()

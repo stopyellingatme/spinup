@@ -132,6 +132,15 @@ func TestRouteClass(t *testing.T) {
 		{"POST", "/api/auth/logout", 0, false},
 		{"GET", "/api/session", 0, false},
 		{"POST", "/api/auth/login/", 0, false},
+		// The mux unescapes each segment, so these reach the limited handlers.
+		{"POST", "/api/auth/%6Cogin", classLogin, true},
+		{"POST", "/%61pi/auth/register", classRegister, true},
+		{"GET", "/%61pi/auth/oidc/demo/callback", classOIDCCallback, true},
+		{"GET", "/api/auth/oidc/demo/%63allback", classOIDCCallback, true},
+		// An encoded slash never separates segments, for the mux and for the check.
+		{"POST", "/api/auth%2Flogin", 0, false},
+		{"GET", "/api/auth/oidc/demo%2Fcallback", 0, false},
+		{"PUT", "/api/auth/login", 0, false},
 	} {
 		r := httptest.NewRequestWithContext(t.Context(), tc.method, "http://api.test"+tc.path, nil)
 		class, ok := routeClass(r)

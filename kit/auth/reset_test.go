@@ -17,12 +17,12 @@ import (
 	"github.com/stopyellingatme/spinup/kit/mail"
 )
 
-func resetFixture(t *testing.T, m mail.Mailer) *fixture {
+func resetFixture(t *testing.T, m mail.Mailer, opts ...Option) *fixture {
 	t.Helper()
 	if os.Getenv("DATABASE_URL") == "" {
 		t.Skip("reset integration tests require DATABASE_URL")
 	}
-	f := newFixture(t)
+	f := newFixture(t, opts...)
 	// Read the real pack migration. The file set does not permit a testdata copy.
 	sql, err := os.ReadFile("../../internal/templates/packs/auth/files/api/db/migrations/00003_password_resets.sql")
 	if err != nil {

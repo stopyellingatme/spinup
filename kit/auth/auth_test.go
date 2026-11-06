@@ -60,6 +60,8 @@ func newFixture(t *testing.T, opts ...Option) *fixture {
 	if _, err := pool.Exec(t.Context(), `ALTER TABLE users ADD COLUMN role text NOT NULL DEFAULT ''`); err != nil {
 		t.Fatal(err)
 	}
+	// Read the real pack migration of the auth version and the session user.
+	applyPackMigration(t, pool, "00007_users_auth_version.sql")
 	c := &clock{now: time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)}
 	base := []Option{WithSecureCookie(false), withEnv(map[string]string{"AUTH_RATE_LIMIT": "off"}), func(o *options) { o.params = testParams; o.now = c.Now }}
 	a, err := New(pool, append(base, opts...)...)
@@ -82,6 +84,19 @@ func newFixture(t *testing.T, opts ...Option) *fixture {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'")
 	})
 	return &fixture{auth: a, pool: pool, handler: httpx.Chain(mux, httpx.RequestID(), a.Middleware()), clock: c}
+}
+
+// applyPackMigration runs the up part of an auth pack migration on pool.
+func applyPackMigration(t *testing.T, pool *pgxpool.Pool, name string) {
+	t.Helper()
+	sql, err := os.ReadFile("../../internal/templates/packs/auth/files/api/db/migrations/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, _, _ := strings.Cut(string(sql), "-- +goose Down")
+	if _, err := pool.Exec(t.Context(), up); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // request describes one call to the test handler.
