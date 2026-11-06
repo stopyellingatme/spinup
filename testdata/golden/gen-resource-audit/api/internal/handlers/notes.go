@@ -67,13 +67,20 @@ func (s *Server) ListNotes(ctx context.Context, req gen.ListNotesRequestObject) 
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.Queries.CountNotes(ctx, user.ID)
-	if err != nil {
-		return nil, err
+	// Each row carries the total. A page past the last row has no row, so
+	// it counts the rows itself.
+	var total int64
+	if len(rows) > 0 {
+		total = rows[0].Total
+	} else if offset > 0 {
+		total, err = s.Queries.CountNotes(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	items := make([]gen.Note, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, noteFromStore(row))
+		items = append(items, noteFromStore(row.Note))
 	}
 	return gen.ListNotes200JSONResponse{Items: items, Total: total}, nil
 }

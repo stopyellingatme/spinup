@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -67,6 +68,8 @@ type Spec struct {
 	Audit AuditSpec
 	// Roles are the declared roles that can use the resource.
 	Roles []string
+	// ownerRefs are the ref fields that must refer to rows of the same user.
+	ownerRefs []ownerRef
 }
 
 // Part plans extra files for each resource, such as web pages.
@@ -299,6 +302,9 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 			}
 		}
 	}
+	if spec.ownerRefs, err = planOwnerRefs(spec); err != nil {
+		return nil, err
+	}
 	if err := configureAudit(&spec, in.Flags, config, auditColumns(spec)); err != nil {
 		return nil, err
 	}
@@ -424,6 +430,17 @@ func planAPI(spec Spec, tests bool, declaredRoles []string) (vfs.Plan, error) {
 		return vfs.Plan{}, err
 	}
 	rc := newResourceCode(spec, module, deniedRole(spec.Roles, declaredRoles))
+	server, err := os.ReadFile(filepath.Join(spec.Root, filepath.FromSlash(serverPath)))
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		rc.newServer, rc.boundedOffset = true, true
+	case err != nil:
+		return vfs.Plan{}, fmt.Errorf("read %s: %w\nTry: check the file permissions", serverPath, err)
+	default:
+		// An app owns server.go after the first resource. Only a server.go
+		// with the offset bound passes the generated offset test.
+		rc.boundedOffset = bytes.Contains(server, []byte("maxOffset"))
+	}
 	handlers, err := rc.handlersGo()
 	if err != nil {
 		return vfs.Plan{}, err

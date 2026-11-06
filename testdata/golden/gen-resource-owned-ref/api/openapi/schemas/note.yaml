@@ -1,0 +1,61 @@
+# Schemas of the note resource. spinup bundles them into api/openapi/bundle.gen.yaml.
+Note:
+  type: object
+  required:
+    - id
+    - title
+    - project_id
+    - parent_id
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+    title:
+      type: string
+    project_id:
+      type: integer
+      format: int64
+      description: The id of a row in projects.
+    parent_id:
+      type: integer
+      format: int64
+      nullable: true
+      description: The id of a row in notes.
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+NoteInput:
+  type: object
+  required:
+    - title
+    - project_id
+  properties:
+    title:
+      type: string
+    project_id:
+      type: integer
+      format: int64
+      description: The id of a row in projects.
+    parent_id:
+      type: integer
+      format: int64
+      nullable: true
+      description: The id of a row in notes.
+NoteList:
+  type: object
+  required:
+    - items
+    - total
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/components/schemas/Note"
+    total:
+      type: integer
+      format: int64

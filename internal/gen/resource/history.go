@@ -142,7 +142,7 @@ func (rc resourceCode) historyGo() ([]byte, error) {
 	g.p("if err != nil {return %s{status:http.StatusUnprocessableEntity,body:httpx.Problem{Type:\"about:blank\",Title:http.StatusText(http.StatusUnprocessableEntity),Status:http.StatusUnprocessableEntity,Detail:err.Error()}},nil}", response)
 	g.p("events,err := audit.List(ctx,s.DB,filter)")
 	g.p("if err != nil {")
-	g.p("slog.ErrorContext(ctx,\"read resource history\",\"error\",err)")
+	g.p("logx.FromContext(ctx).ErrorContext(ctx,\"read resource history\",\"request_id\",httpx.RequestIDFrom(ctx),\"error\",err)")
 	g.p("return %s{status:http.StatusInternalServerError,body:httpx.Problem{Type:\"about:blank\",Title:http.StatusText(http.StatusInternalServerError),Status:http.StatusInternalServerError,Detail:\"Cannot read history. Try: check the database schema and retry.\"}},nil", response)
 	g.p("}")
 	g.p("if events == nil {events = []audit.Event{}}")
