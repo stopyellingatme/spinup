@@ -119,7 +119,7 @@ func CheckAuditMigration(root, migration string) error {
 		return err
 	}
 	version := func(name string) uint64 { v, _ := strconv.ParseUint(strings.SplitN(name, "_", 2)[0], 10, 64); return v }
-	if !ok || migration == "" || version(def.File) == 0 || version(def.File) >= version(migration) {
+	if !ok || migration == "" || version(def.File) == 0 || (!def.Kit && version(def.File) >= version(migration)) {
 		return fmt.Errorf("cannot attach audit triggers because the audit_events migration is missing or is not older than %s\nTry: spinup module add audit, then run the generator again", migration)
 	}
 	return nil

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	kitmigrations "example.com/todo/api/db/kit"
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/roles"
 	"example.com/todo/api/internal/routes"
@@ -80,7 +81,7 @@ func run() (err error) {
 		app.WithCommand("user", auth.UserCommand(authn)),
 		app.WithCommand("audit", audit.Command(pool)),
 		app.WithReadiness("db", pool.Ping),
-		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL))),
+		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL), db.WithKitMigrations(kitmigrations.FS))),
 		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
 		app.WithShutdown(authn.Close),
 	)

@@ -15,7 +15,7 @@ func oidcGoldenFiles(t *testing.T, selected fstest.MapFS) error {
 	all := testutil.RenderPack(t, []string{"base", "api", "web", "auth"}, map[string]any{
 		"app_name": "todo", "module": "example.com/todo", "modules": "ci,auth", "auth_oidc": true,
 	})
-	for _, path := range []string{"api/db/migrations/00004_oidc_identities.sql", "web/src/lib/components/OidcButtons.svelte", "web/src/routes/login/+page.svelte"} {
+	for _, path := range []string{"api/db/kit/00004_oidc_identities.sql", "web/src/lib/components/OidcButtons.svelte", "web/src/routes/login/+page.svelte"} {
 		data, err := fs.ReadFile(all, path)
 		if err != nil {
 			return err
@@ -36,7 +36,7 @@ func TestOIDCModuleCombinations(t *testing.T) {
 					packs = append(packs, "mail")
 				}
 				all := testutil.RenderPack(t, packs, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": modules, "auth_oidc": enabled})
-				for _, path := range []string{"api/db/migrations/00004_oidc_identities.sql", "web/src/lib/components/OidcButtons.svelte"} {
+				for _, path := range []string{"api/db/kit/00004_oidc_identities.sql", "web/src/lib/components/OidcButtons.svelte"} {
 					_, err := fs.Stat(all, path)
 					if (err == nil) != enabled {
 						t.Fatalf("%s: OIDC=%v, error=%v", path, enabled, err)

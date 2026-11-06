@@ -2,7 +2,7 @@
 version: "2"
 sql:
   - engine: postgresql
-    schema: db/migrations
+    schema: [[ if has "auth" .modules ]][db/kit, db/migrations][[ else ]]db/migrations[[ end ]]
     queries: db/queries
     gen:
       go:

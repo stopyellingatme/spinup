@@ -101,13 +101,7 @@ func DefaultDeps() Deps {
 		Check: func(ctx context.Context, root string, out io.Writer) error {
 			return drift.Check(ctx, drift.Options{Dir: root, Offline: true}, true, ui.New(nil, out, out, ui.Options{NoColor: true, NonInteractive: true}))
 		},
-		Lint: func(root string) ([]lint.Finding, error) {
-			dir := root + "/api/db/migrations"
-			if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
-				return nil, nil
-			}
-			return lint.LintDir(dir)
-		},
+		Lint:    LintMigrations,
 		Build:   build.BuildImages,
 		HTTPGet: httpGet,
 		Now:     time.Now,
@@ -121,6 +115,24 @@ func DefaultDeps() Deps {
 		PreDeploy:   PreDeployHooks,
 		PostRelease: PostReleaseHooks,
 	}
+}
+
+// LintMigrations checks kit migrations first, then app migrations.
+// Missing directories have no findings.
+func LintMigrations(root string) ([]lint.Finding, error) {
+	var findings []lint.Finding
+	for _, dir := range []string{"api/db/kit", "api/db/migrations"} {
+		path := root + "/" + dir
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		got, err := lint.LintDir(path)
+		if err != nil {
+			return nil, err
+		}
+		findings = append(findings, got...)
+	}
+	return findings, nil
 }
 
 func (d *Deps) fill() {

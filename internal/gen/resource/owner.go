@@ -1,16 +1,11 @@
 package resource
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
-	"strings"
 
-	"github.com/stopyellingatme/spinup/internal/db/ops"
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
 )
 
@@ -111,25 +106,14 @@ func hasOwnerKey(root, table, body string) (bool, error) {
 		return true, nil
 	}
 	index := regexp.MustCompile(`(?is)\bCREATE\s+UNIQUE\s+INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?(?:"?\w+"?\s+)?ON\s+(?:ONLY\s+)?(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s*(?:USING\s+btree\s*)?` + uniqueOwnerColumns)
-	dir := migrationsDir(root)
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
-	}
+	paths, err := migrationPaths(root)
 	if err != nil {
-		return false, fmt.Errorf("read %s: %w\nTry: check the directory permissions", ops.MigrationsDir, err)
+		return false, err
 	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(dir, name))
+	for _, path := range paths {
+		data, err := os.ReadFile(filepath.Join(root, path))
 		if err != nil {
-			return false, fmt.Errorf("read %s/%s: %w\nTry: check the file permissions", ops.MigrationsDir, name, err)
+			return false, fmt.Errorf("read %s: %w\nTry: check the file permissions", path, err)
 		}
 		if index.MatchString(upSection(string(data))) {
 			return true, nil

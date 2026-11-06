@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -79,49 +78,48 @@ func run(_ context.Context, in gen.Input) (*gen.Output, error) {
 
 func planMigration(spec resource.Spec, table, keys string) (vfs.File, error) {
 	dir := filepath.Join(spec.Root, ops.MigrationsDir)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return vfs.File{}, fmt.Errorf("read migrations: %w\nTry: check the directory permissions", err)
+	var migrations []string
+	for _, migrationDir := range []string{"api/db/kit", ops.MigrationsDir} {
+		entries, err := os.ReadDir(filepath.Join(spec.Root, migrationDir))
+		if errors.Is(err, os.ErrNotExist) && migrationDir == "api/db/kit" {
+			continue
+		}
+		if err != nil {
+			return vfs.File{}, fmt.Errorf("read %s: %w\nTry: check the directory permissions", migrationDir, err)
+		}
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+				continue
+			}
+			path := filepath.Join(migrationDir, entry.Name())
+			data, err := os.ReadFile(filepath.Join(spec.Root, path))
+			if err != nil {
+				return vfs.File{}, fmt.Errorf("read %s: %w\nTry: check the file permissions", path, err)
+			}
+			migrations = append(migrations, migrationUp(string(data)))
+		}
 	}
 	// Match only an Up statement. A Down DROP or a comment does not attach a trigger.
 	trigger := regexp.MustCompile(`(?is)\bCREATE\s+(?:CONSTRAINT\s+)?TRIGGER\s+\S+\s+[^;]*?\bON\s+(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s+[^;]*?\bEXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?:public\.)?audit_(?:row_change|truncate)\s*\(`)
-	tableVersion := ""
+	tableIndex := -1
 	uncertain := false
 	createTable := regexp.MustCompile(`(?is)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s*\(`)
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-		if err != nil {
-			return vfs.File{}, fmt.Errorf("read migration: %w\nTry: check the file permissions", err)
-		}
-		if createTable.MatchString(migrationUp(string(data))) {
-			tableVersion = strings.SplitN(entry.Name(), "_", 2)[0]
+	for i, migration := range migrations {
+		if createTable.MatchString(migration) {
+			tableIndex = i
 			break
 		}
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-		if err != nil {
-			return vfs.File{}, fmt.Errorf("read migration: %w\nTry: check the file permissions", err)
-		}
-		up := migrationUp(string(data))
+	for i, migration := range migrations {
+		up := migration
 		if trigger.MatchString(up) {
-			version := strings.SplitN(entry.Name(), "_", 2)[0]
-			// The audit pack attaches users and user_identities in a DO block only
-			// when the table exists. That attach depends on the order in which the
-			// migrations ran. An attach in any other migration is certain.
+			// A guarded attach can precede the table in either space.
+			// OIDC can also arrive later, below the applied kit version.
 			conditional := strings.Contains(up, "to_regclass('public."+table+"')")
-			if conditional && (olderVersion(version, tableVersion) || orderDependent(table)) {
+			if conditional && (i < tableIndex || orderDependent(table)) {
 				uncertain = true
 				continue
 			}
-
 			return vfs.File{}, fmt.Errorf("cannot audit %s because a migration already attaches its audit trigger\nTry: review the existing audit migration", table)
 		}
 	}
@@ -158,15 +156,6 @@ func planMigration(spec resource.Spec, table, keys string) (vfs.File, error) {
 // version before ADR 0025 decision 3.9 has no attach block of its own.
 func orderDependent(table string) bool {
 	return table == "user_identities"
-}
-
-func olderVersion(schema, next string) bool {
-	a, err := strconv.ParseUint(schema, 10, 64)
-	if err != nil || a == 0 {
-		return false
-	}
-	b, err := strconv.ParseUint(next, 10, 64)
-	return err == nil && a < b
 }
 
 func migrationUp(sql string) string {

@@ -1,6 +1,6 @@
 [[files]]
-path = "api/db/migrations/00003_password_resets.sql"
-source = "files/api/db/migrations/00003_password_resets.sql"
+path = "api/db/kit/00003_password_resets.sql"
+source = "files/api/db/kit/00003_password_resets.sql"
 class = "seed"
 when = "modules contains 'mail'"
 

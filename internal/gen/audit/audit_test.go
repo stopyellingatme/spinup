@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stopyellingatme/spinup/internal/gen"
+	"github.com/stopyellingatme/spinup/internal/gen/resource"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/templates"
 	"github.com/stopyellingatme/spinup/internal/testutil"
@@ -133,7 +134,7 @@ DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;
 
 func newIdentities(t *testing.T) string {
 	t.Helper()
-	data, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/migrations/00004_oidc_identities.sql")
+	data, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/kit/00004_oidc_identities.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +166,7 @@ func TestRetrofit(t *testing.T) {
 			t.Parallel()
 			root := fixture(t)
 			if tc.file != "" {
-				write(t, root, "api/db/migrations/"+tc.file, tc.sql)
+				write(t, root, "api/db/kit/"+tc.file, tc.sql)
 			} else if tc.sql != "" {
 				write(t, root, "api/db/migrations/00008_test.sql", "-- +goose Up\n"+tc.sql)
 			}
@@ -200,5 +201,24 @@ func TestRetrofit(t *testing.T) {
 				t.Fatalf("missing recipe: %v", out.Next)
 			}
 		})
+	}
+}
+
+func TestConditionalAttachAcrossSpaces(t *testing.T) {
+	t.Parallel()
+	root := fixture(t)
+	write(t, root, "api/db/migrations/00002_create_widgets.sql", "-- +goose Up\nCREATE TABLE widgets(id bigint);")
+	write(t, root, "api/db/kit/00009_conditional.sql", `-- +goose Up
+DO $$ BEGIN
+IF to_regclass('public.widgets') IS NOT NULL THEN
+CREATE TRIGGER widgets_audit AFTER INSERT ON widgets FOR EACH ROW EXECUTE FUNCTION audit_row_change('', 'id');
+END IF;
+END $$;`)
+	file, err := planMigration(resource.Spec{Root: root}, "widgets", "id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Path != "api/db/migrations/00008_audit_widgets.sql" || !strings.Contains(string(file.Data), "DROP TRIGGER IF EXISTS widgets_audit") {
+		t.Fatalf("migration = %+v", file)
 	}
 }

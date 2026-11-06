@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	kitmigrations "example.com/todo/api/db/kit"
 	"example.com/todo/api/db/migrations"
 	mailapp "example.com/todo/api/internal/mail"
 	"example.com/todo/api/internal/roles"
@@ -88,7 +89,7 @@ func run() (err error) {
 		app.WithRoutes(resetRoutes),
 		app.WithCommand("mail-worker", mailers.WorkerCommand(pool)),
 		app.WithReadiness("db", pool.Ping),
-		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL), db.WithHook(jobs.MigrationHook()))),
+		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL), db.WithKitMigrations(kitmigrations.FS), db.WithHook(jobs.MigrationHook()))),
 		app.WithCommand("jobs-migrate", jobs.MigrateCommand(jobs.WithMigrateDatabaseURL(cfg.DatabaseURL))),
 		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
 		app.WithShutdown(authn.Close),

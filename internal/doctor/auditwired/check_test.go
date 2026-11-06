@@ -106,8 +106,8 @@ func main() { auth.WithEvents(authsink.New(pool)); auth.WithActorContext(authsin
 		}
 		return string(data)
 	}
-	audit := pack("audit/files/api/db/migrations/00006_audit_events.sql")
-	identities := pack("auth/files/api/db/migrations/00004_oidc_identities.sql")
+	audit := pack("audit/files/api/db/kit/00006_audit_events.sql")
+	identities := pack("auth/files/api/db/kit/00004_oidc_identities.sql")
 	for _, tc := range []struct {
 		name   string
 		files  map[string]string
@@ -129,8 +129,15 @@ func main() { auth.WithEvents(authsink.New(pool)); auth.WithActorContext(authsin
 				t.Fatal(err)
 			}
 			write(t, root, "api/cmd/api/main.go", wired)
+			if err := os.MkdirAll(filepath.Join(root, "api/db/migrations"), 0o755); err != nil {
+				t.Fatal(err)
+			}
 			for name, data := range tc.files {
-				write(t, root, "api/db/migrations/"+name, data)
+				dir := "api/db/kit/"
+				if strings.Contains(name, "audit_user_identities") {
+					dir = "api/db/migrations/"
+				}
+				write(t, root, dir+name, data)
 			}
 			got := runCheck(t.Context(), &doctor.Context{Root: root})
 			if got.Status != tc.status {

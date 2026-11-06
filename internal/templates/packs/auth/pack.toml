@@ -7,8 +7,8 @@ requires = ["web"]
 
 # The users, sessions (scs pgxstore), and login_attempts tables. An existing migration never changes.
 [[files]]
-path = "api/db/migrations/00002_create_auth.sql"
-source = "files/api/db/migrations/00002_create_auth.sql"
+path = "api/db/kit/00002_create_auth.sql"
+source = "files/api/db/kit/00002_create_auth.sql"
 class = "seed"
 
 # The helper that form actions use to call the Go API and pass its session cookie to the browser.
@@ -59,17 +59,22 @@ class = "scaffold"
 
 # The role column keeps existing users without an assigned role.
 [[files]]
-path = "api/db/migrations/00005_users_role.sql"
-source = "files/api/db/migrations/00005_users_role.sql"
+path = "api/db/kit/00005_users_role.sql"
+source = "files/api/db/kit/00005_users_role.sql"
 class = "seed"
 
 # The auth version of each account and the user of each session (kit auth session checks).
 [[files]]
-path = "api/db/migrations/00007_users_auth_version.sql"
-source = "files/api/db/migrations/00007_users_auth_version.sql"
+path = "api/db/kit/00007_users_auth_version.sql"
+source = "files/api/db/kit/00007_users_auth_version.sql"
 class = "seed"
 
 [[files]]
 path = "api/internal/roles/roles.gen.go"
 source = "files/api/internal/roles/roles.gen.go"
+class = "managed"
+
+[[files]]
+path = "api/db/kit/embed.go"
+source = "files/api/db/kit/embed.go"
 class = "managed"
