@@ -66,6 +66,7 @@ auth        off    web       Accounts with kit auth: register, log in, log out, 
 backups     off    deploy    Continuous PostgreSQL backups with pgBackRest: full, differential, and WAL to encrypted S3-compatible storage.
 ci          on     -         Build, test, deploy, verify backups, and propose upgrades with GitHub Actions.
 deploy      on     api       Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments.
+flags       off    auth      Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page.
 jobs        off    api       Background jobs on River: a worker process and River migrations in the migrate step.
 mail        off    api       Typed email templates, SMTP delivery, Mailpit, and optional River retries.
 monitoring  off    deploy    Production monitoring next to the app: Alloy, Prometheus, Loki, and Grafana (lite), plus Tempo and exporters (full).
