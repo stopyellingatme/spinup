@@ -31,6 +31,7 @@ var knownImports = []struct{ name, path, alias string }{
 	{"errors", "errors", ""},
 	{"fmt", "fmt", ""},
 	{"http", "net/http", ""},
+	{"httptest", "net/http/httptest", ""},
 	{"io", "io", ""},
 	{"os", "os", ""},
 	{"json", "encoding/json", ""},

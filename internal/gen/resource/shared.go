@@ -3,6 +3,8 @@ package resource
 import (
 	"go/format"
 	"strings"
+
+	"github.com/stopyellingatme/spinup/internal/gen/resource/validation"
 )
 
 // serverGo is api/internal/handlers/server.go. The first resource writes it,
@@ -157,30 +159,7 @@ func responseProblem(r *http.Request, err error) httpx.Problem {
 
 // requiredFieldsGo is shared by the resource handlers. A separate file also
 // supports apps whose existing server.go predates required-field validation.
-const requiredFieldsGo = `package handlers
-
-import (
-	"net/http"
-
-	"github.com/stopyellingatme/spinup/kit/httpx"
-)
-
-// requiredFields maps ServeMux patterns to required JSON properties.
-// Each resource registers its POST and PUT patterns during initialization.
-var requiredFields = map[string][]string{}
-
-// RequireFields validates required properties before the strict JSON decoder.
-func RequireFields(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := httpx.RequireJSONFields(r, requiredFields[r.Pattern]); err != nil {
-			httpx.WriteProblem(w, r, httpx.ProblemFrom(err))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-`
+const requiredFieldsGo = validation.Source
 
 // routesGenGo is api/internal/routes/routes_gen.go once the application has
 // a resource. Its content does not depend on the resources (ADR 0007 §3).
