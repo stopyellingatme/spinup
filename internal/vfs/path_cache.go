@@ -25,7 +25,7 @@ func (c pathCache) readDir(dir string) ([]string, error) {
 	// NTFS updates that copy late. A new entry then does not change ModTime, so
 	// Windows reads the directory each time.
 	if cached, ok := c[dir]; ok && runtime.GOOS != "windows" && os.SameFile(info, cached.info) &&
-		info.ModTime().Equal(cached.info.ModTime()) && info.Size() == cached.info.Size() {
+		listingUnchanged(cached.info, info) {
 		return cached.names, nil
 	}
 	entries, err := os.ReadDir(dir)
@@ -38,6 +38,17 @@ func (c pathCache) readDir(dir string) ([]string, error) {
 	}
 	c[dir] = checkedDirectory{info: info, names: names}
 	return names, nil
+}
+
+// listingUnchanged reports whether a directory with the metadata now still
+// has the listing that was read with the metadata old. It trusts only a
+// modification time with sub-second precision. A filesystem that stores whole
+// seconds (HFS+, FAT, some network mounts) can change the directory in the
+// same second and keep the same time. Such a time has zero nanoseconds,
+// except for one value in a billion, and that case only costs a ReadDir.
+func listingUnchanged(old, now fs.FileInfo) bool {
+	return now.ModTime().Nanosecond() != 0 &&
+		now.ModTime().Equal(old.ModTime()) && now.Size() == old.Size()
 }
 
 // record updates a cached listing after Apply creates or removes an entry.
