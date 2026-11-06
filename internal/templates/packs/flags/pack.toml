@@ -18,3 +18,28 @@ class = "managed"
 path = "api/db/kit/00008_feature_flags.sql"
 source = "files/api/db/kit/00008_feature_flags.sql"
 class = "seed"
+
+[[files]]
+path = "web/src/lib/flags.ts"
+source = "files/web/src/lib/flags.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/server/flags.ts"
+source = "files/web/src/lib/server/flags.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/routes/admin/flags/+page.server.ts"
+source = "files/web/src/routes/admin/flags/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/flags/+page.svelte"
+source = "files/web/src/routes/admin/flags/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/flags/schema.ts"
+source = "files/web/src/routes/admin/flags/schema.ts"
+class = "scaffold"
