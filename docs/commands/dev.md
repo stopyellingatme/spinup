@@ -31,7 +31,7 @@ Press Ctrl-C to stop. Docker services keep running unless you add `--down`.
 
 You need these tools. `spinup doctor --quick` checks them, and `spinup dev` runs the same check first.
 
-- Go 1.26 or later
+- Go 1.27 or later
 - Node 24 or later, with pnpm through corepack (or bun, if you chose it)
 - Docker
 - On Windows, WSL2. Run the command inside WSL2.

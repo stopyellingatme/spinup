@@ -84,7 +84,7 @@ spinup uses Git for upgrades. It needs Git 2.44 or newer.
 
 ### go-version
 
-The API builds with Go 1.26 or newer.
+The API builds with Go 1.27 or newer.
 **Fix:** install Go from [go.dev](https://go.dev/dl/), then run `spinup doctor` again.
 
 ### node-version

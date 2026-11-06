@@ -101,8 +101,8 @@ func goVersion(ctx context.Context, c *doctor.Context) doctor.Result {
 		return result
 	}
 	output, err := command(ctx, c, "go", "version")
-	if err != nil || !version(output, "go", 1, 26) {
-		return fail("Go 1.26 or later is required", "install Go 1.26 or later and repeat spinup doctor")
+	if err != nil || !version(output, "go", 1, 27) {
+		return fail("Go 1.27 or later is required", "install Go 1.27 or later and repeat spinup doctor")
 	}
 	return doctor.Result{Status: doctor.OK, Message: output}
 }

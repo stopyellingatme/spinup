@@ -25,7 +25,7 @@ spinup dev
 `spinup dev` installs the web packages, starts PostgreSQL and Mailpit in Docker, applies the migrations, and starts the API and the web app.
 
 Open http://localhost:5173 for the app, http://localhost:8080 for the API, and http://localhost:8025 for Mailpit.
-You need Go 1.26 or later, Node 24 or later, pnpm through corepack, and Docker. Read the [install guide](https://stopyellingatme.github.io/spinup/get-started/install.html) for details.
+You need Go 1.27 or later, Node 24 or later, pnpm through corepack, and Docker. Read the [install guide](https://stopyellingatme.github.io/spinup/get-started/install.html) for details.
 
 Add a CRUD API with its pages, then deploy:
 
