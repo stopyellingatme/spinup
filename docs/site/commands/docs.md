@@ -10,7 +10,7 @@ Print compatibility data and generate command references
 ## Use
 
 ```text
-spinup docs
+spinup docs [flags]
 ```
 
 ## Flags

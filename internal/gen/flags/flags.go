@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
@@ -30,6 +31,9 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("cannot generate flags: spinup.toml is missing\nTry: run this inside a spinup project")
+		}
+		if strings.Contains(err.Error(), "\nTry:") {
+			return nil, fmt.Errorf("cannot generate flags: %w", err)
 		}
 		return nil, fmt.Errorf("cannot generate flags: %w\nTry: run this inside a spinup project", err)
 	}

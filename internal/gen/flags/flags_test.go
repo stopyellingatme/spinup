@@ -71,3 +71,16 @@ func TestPositionalArgument(t *testing.T) {
 		t.Fatalf("error = %v, want %q", err, want)
 	}
 }
+
+func TestUnknownFieldKeepsTryLine(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, project.ConfigFile), []byte("[flags.demo]\ndescription = \"Demo\"\nbogus = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lock := manifest.New()
+	lock.Packs = []string{"flags"}
+	_, err := plan(context.Background(), gen.Input{Root: root, Lock: lock})
+	if err == nil || !strings.Contains(err.Error(), "Try: correct [flags.demo] in spinup.toml") || strings.Contains(err.Error(), "inside a spinup project") {
+		t.Fatalf("err = %v", err)
+	}
+}
