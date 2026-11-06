@@ -73,3 +73,54 @@ func TestStructuredValueRedaction(t *testing.T) {
 		t.Fatal(output)
 	}
 }
+
+func TestNestedValueRedaction(t *testing.T) {
+	defer SetRedactor(nil)
+	SetRedactor(nil)
+	type credentials struct {
+		Password string
+		Name     string
+	}
+	fields := map[string]any{"nested": map[string]any{
+		"password": "hidden-map",
+		"headers":  http.Header{"Authorization": {"hidden-auth"}, "Cookie": {"hidden-cookie"}},
+		"query":    url.Values{"token": {"hidden-query"}, "page": {"visible-page"}},
+		"list":     []any{map[string]string{"secret": "hidden-slice"}, credentials{"hidden-struct", "visible-name"}},
+		"url":      "postgres://user:hidden-url@db/app",
+	}}
+	var out bytes.Buffer
+	New(&out, Options{}).Info("nested", "fields", fields)
+	if strings.Contains(out.String(), "hidden-") {
+		t.Fatalf("nested secrets escaped redaction: %s", out.String())
+	}
+	for _, visible := range []string{"visible-page", "visible-name"} {
+		if !strings.Contains(out.String(), visible) {
+			t.Fatalf("missing %q: %s", visible, out.String())
+		}
+	}
+	if fields["nested"].(map[string]any)["password"] != "hidden-map" {
+		t.Fatal("redaction mutated the input")
+	}
+}
+
+func TestRedactionDepthAndCycles(t *testing.T) {
+	cycle := map[string]any{"password": "hidden-cycle"}
+	cycle["self"] = cycle
+	type node struct {
+		Password string
+		Next     *node
+	}
+	root := &node{Password: "hidden-pointer"}
+	root.Next = root
+	deep := map[string]any{"password": "hidden-deep"}
+	for range 20 {
+		deep = map[string]any{"next": deep}
+	}
+	for _, value := range []any{cycle, root, deep} {
+		var out bytes.Buffer
+		New(&out, Options{}).Info("bounded", "value", value)
+		if strings.Contains(out.String(), "hidden-") || strings.Contains(out.String(), "!ERROR") || !strings.Contains(out.String(), "****") {
+			t.Fatal(out.String())
+		}
+	}
+}

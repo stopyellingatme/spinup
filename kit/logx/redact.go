@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -111,20 +109,7 @@ func (defaultRedactor) Redact(key string, value slog.Value) slog.Value {
 	case slog.KindString:
 		return slog.StringValue(maskURLs(value.String()))
 	case slog.KindAny:
-		// Errors and Stringers often contain connection URLs.
-		switch v := value.Any().(type) {
-		case error:
-			return slog.StringValue(maskURLs(v.Error()))
-		case fmt.Stringer:
-			return slog.StringValue(maskURLs(v.String()))
-		case http.Header:
-			return slog.AnyValue(redactStringSlices(v))
-		case url.Values:
-			return slog.AnyValue(redactStringSlices(v))
-		}
-		if redacted, ok := redactStringMap(value.Any()); ok {
-			return slog.AnyValue(redacted)
-		}
+		return slog.AnyValue(redactValue(reflect.ValueOf(value.Any()), 0))
 	}
 	return value
 }
@@ -139,34 +124,91 @@ func isSecretKey(key string) bool {
 	return false
 }
 
-func redactStringSlices(values map[string][]string) map[string][]string {
-	redacted := make(map[string][]string, len(values))
-	for key, value := range values {
-		if isSecretKey(key) {
-			redacted[key] = []string{"****"}
-			continue
-		}
-		redacted[key] = append([]string(nil), value...)
-	}
-	return redacted
-}
+// Stop before following a container at this depth. This also bounds cycles.
+const maxRedactionDepth = 8
 
-func redactStringMap(value any) (map[string]any, bool) {
-	mapValue := reflect.ValueOf(value)
-	if mapValue.Kind() != reflect.Map || mapValue.Type().Key().Kind() != reflect.String {
-		return nil, false
+func redactValue(value reflect.Value, depth int) any {
+	if !value.IsValid() {
+		return nil
 	}
-	redacted := make(map[string]any, mapValue.Len())
-	iter := mapValue.MapRange()
-	for iter.Next() {
-		key := iter.Key().String()
-		if isSecretKey(key) {
-			redacted[key] = "****"
-			continue
+	if depth >= maxRedactionDepth {
+		return "****"
+	}
+	if value.Kind() == reflect.Interface {
+		return redactValue(value.Elem(), depth)
+	}
+	if value.Kind() == reflect.Pointer && value.IsNil() {
+		return nil
+	}
+	if value.CanInterface() {
+		// Errors and Stringers often contain connection URLs.
+		switch v := value.Interface().(type) {
+		case error:
+			return maskURLs(v.Error())
+		case fmt.Stringer:
+			return maskURLs(v.String())
 		}
-		redacted[key] = iter.Value().Interface()
 	}
-	return redacted, true
+	switch value.Kind() {
+	case reflect.Pointer:
+		return redactValue(value.Elem(), depth+1)
+	case reflect.String:
+		return maskURLs(value.String())
+	case reflect.Map:
+		if value.IsNil() {
+			return nil
+		}
+		if value.Type().Key().Kind() != reflect.String {
+			return "****"
+		}
+		clean := make(map[string]any, value.Len())
+		iter := value.MapRange()
+		for iter.Next() {
+			key := iter.Key().String()
+			if isSecretKey(key) {
+				clean[key] = "****"
+			} else {
+				clean[key] = redactValue(iter.Value(), depth+1)
+			}
+		}
+		return clean
+	case reflect.Slice, reflect.Array:
+		if value.Kind() == reflect.Slice && value.IsNil() {
+			return nil
+		}
+		// Keep the JSON encoding of byte slices unchanged.
+		if value.Type() == reflect.TypeFor[[]byte]() {
+			return append([]byte(nil), value.Bytes()...)
+		}
+		clean := make([]any, value.Len())
+		for i := range value.Len() {
+			clean[i] = redactValue(value.Index(i), depth+1)
+		}
+		return clean
+	case reflect.Struct:
+		clean := make(map[string]any)
+		for i := range value.NumField() {
+			field := value.Type().Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			if isSecretKey(name) || isSecretKey(field.Name) {
+				clean[name] = "****"
+			} else {
+				clean[name] = redactValue(value.Field(i), depth+1)
+			}
+		}
+		return clean
+	default:
+		return value.Interface()
+	}
 }
 
 var urlCredentials = regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://[^/@\s:]*:)[^\s]*@`)
