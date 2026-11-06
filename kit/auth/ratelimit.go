@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -98,35 +99,93 @@ const (
 	pathResetRequest = "/api/auth/reset/request"
 	pathResetConfirm = "/api/auth/reset/confirm"
 
-	oidcPrefix          = "/api/auth/oidc/"
-	oidcCallbackSuffix  = "/callback"
-	patternOIDCCallback = "GET " + oidcPrefix + "{provider}" + oidcCallbackSuffix
+	patternOIDCCallback = "GET /api/auth/oidc/{provider}/callback"
 )
 
-var limitedPaths = map[string]limitClass{
-	pathRegister:     classRegister,
-	pathLogin:        classLogin,
-	pathResetRequest: classResetRequest,
-	pathResetConfirm: classResetConfirm,
+// limitedRoutes holds the path segments of the limited routes. An empty segment
+// stands for the {provider} wildcard.
+var limitedRoutes = [...]struct {
+	class limitClass
+	get   bool // GET (and HEAD) instead of POST
+	segs  []string
+}{
+	{classRegister, false, routeSegments(pathRegister)},
+	{classLogin, false, routeSegments(pathLogin)},
+	{classResetRequest, false, routeSegments(pathResetRequest)},
+	{classResetConfirm, false, routeSegments(pathResetConfirm)},
+	{classOIDCCallback, true, routeSegments(strings.TrimPrefix(patternOIDCCallback, "GET "))},
 }
 
-// routeClass returns the class of a request that the rate limit covers. All
-// limited routes except the OIDC callback are POST routes with an exact path.
-func routeClass(r *http.Request) (limitClass, bool) {
-	if r.Method == http.MethodPost {
-		c, ok := limitedPaths[r.URL.Path]
-		return c, ok
+// routeSegments splits the path of a mux pattern into its segments. A wildcard
+// segment becomes empty.
+func routeSegments(pattern string) []string {
+	segs := strings.Split(strings.TrimPrefix(pattern, "/"), "/")
+	for i, seg := range segs {
+		if strings.HasPrefix(seg, "{") {
+			segs[i] = ""
+		}
 	}
-	if r.Method == http.MethodGet || r.Method == http.MethodHead {
-		// The mux matches {provider} on the escaped path, and so does this check.
-		p := r.URL.EscapedPath()
-		if rest, ok := strings.CutPrefix(p, oidcPrefix); ok {
-			if provider, ok := strings.CutSuffix(rest, oidcCallbackSuffix); ok && provider != "" && !strings.Contains(provider, "/") {
-				return classOIDCCallback, true
-			}
+	return segs
+}
+
+// routeClass returns the class of a request that the rate limit covers. It
+// matches the path with the rules of http.ServeMux: it compares the escaped
+// path segment by segment, and unescapes each segment before the compare. Thus
+// /%61pi/auth/login is the login route, as for the mux. An encoded slash (%2F)
+// stays inside its segment and never separates two segments.
+func routeClass(r *http.Request) (limitClass, bool) {
+	var get bool
+	switch r.Method {
+	case http.MethodPost:
+	case http.MethodGet, http.MethodHead:
+		get = true
+	default:
+		return 0, false
+	}
+	path := r.URL.EscapedPath()
+	for _, route := range limitedRoutes {
+		if route.get == get && matchSegments(path, route.segs) {
+			return route.class, true
 		}
 	}
 	return 0, false
+}
+
+// matchSegments reports whether the escaped path has exactly the segments segs.
+// An empty item of segs matches any segment that is not empty.
+func matchSegments(path string, segs []string) bool {
+	for _, want := range segs {
+		rest, ok := strings.CutPrefix(path, "/")
+		if !ok {
+			return false
+		}
+		seg := rest
+		path = ""
+		if i := strings.IndexByte(rest, '/'); i >= 0 {
+			seg, path = rest[:i], rest[i:]
+		}
+		if strings.IndexByte(seg, '%') >= 0 {
+			seg = unescapeSegment(seg)
+		}
+		if want == "" {
+			if seg == "" {
+				return false
+			}
+		} else if seg != want {
+			return false
+		}
+	}
+	return path == ""
+}
+
+// unescapeSegment unescapes one path segment as http.ServeMux does: a segment
+// with an invalid escape stays as it is.
+func unescapeSegment(seg string) string {
+	u, err := url.PathUnescape(seg)
+	if err != nil {
+		return seg
+	}
+	return u
 }
 
 // rule is the GCRA form of a Limit. All fields are nanoseconds.

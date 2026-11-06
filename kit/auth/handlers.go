@@ -88,7 +88,7 @@ func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
 		a.hashFailed(w, r, "hash a password", err)
 		return
 	}
-	user, created, err := a.createUser(r.Context(), email, hash)
+	user, version, created, err := a.createUser(r.Context(), email, hash)
 	if errors.Is(err, errRegistrationClosed) {
 		registrationClosed(w, r)
 		return
@@ -105,7 +105,7 @@ func (a *Auth) register(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if err := a.startSession(r.Context(), user); err != nil {
+	if err := a.startSession(r.Context(), user, version); err != nil {
 		a.internalError(w, r, "start a session", err)
 		return
 	}
@@ -154,19 +154,21 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusTooManyRequests, Detail: "Too many failed logins for this email address. Try again later."})
 		return
 	}
-	user, stored, found, err := a.credentialsByEmail(ctx, email)
+	user, version, stored, found, err := a.credentialsByEmail(ctx, email)
 	if err != nil {
 		a.internalError(w, r, "read a user", err)
 		return
 	}
-	if !found {
-		// Spend the same work as a real check, so the time does not reveal accounts.
-		stored = a.dummy
-	}
 	var match bool
 	var used params
 	var verifyErr error
-	if err := a.slots.runAdmitted(ctx, func() { match, used, verifyErr = verifyPassword(stored, in.Password) }); err != nil {
+	if err := a.slots.runAdmitted(ctx, func() {
+		if !found {
+			// Spend the same work as a real check, so the time does not reveal accounts.
+			stored = a.dummy()
+		}
+		match, used, verifyErr = a.verify(stored, in.Password)
+	}); err != nil {
 		// No password was checked, so this attempt must not count toward the lockout.
 		if releaseErr := a.releaseAttempt(context.WithoutCancel(ctx), attempt); releaseErr != nil {
 			a.logger.WarnContext(ctx, "auth: cannot release a login attempt", "error", releaseErr, "request_id", httpx.RequestIDFrom(ctx))
@@ -195,7 +197,10 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 	if used != a.params {
 		a.rehash(ctx, user, stored, in.Password)
 	}
-	if err := a.startSession(ctx, user); err != nil {
+	// The session stores the auth version of the credential read. A password
+	// reset that commits after that read increments the version, so loadUser
+	// rejects this session, even when its commit comes after the reset.
+	if err := a.startSession(ctx, user, version); err != nil {
 		a.internalError(w, r, "start a session", err)
 		return
 	}
@@ -227,8 +232,9 @@ func (a *Auth) session(w http.ResponseWriter, r *http.Request) {
 }
 
 // startSession signs user in on a new session token. The old token stops working,
-// which prevents session fixation.
-func (a *Auth) startSession(ctx context.Context, user User) error {
+// which prevents session fixation. version is the auth version of user that the
+// login read. loadUser accepts the session only while users.auth_version equals it.
+func (a *Auth) startSession(ctx context.Context, user User, version int64) error {
 	if err := a.sessions.Clear(ctx); err != nil {
 		return err
 	}
@@ -236,6 +242,7 @@ func (a *Auth) startSession(ctx context.Context, user User) error {
 		return err
 	}
 	a.sessions.Put(ctx, sessionUserKey, user.ID)
+	a.sessions.Put(ctx, sessionVersionKey, version)
 	return nil
 }
 

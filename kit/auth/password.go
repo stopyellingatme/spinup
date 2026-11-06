@@ -36,6 +36,16 @@ type params struct {
 // 64 MiB of memory, 3 passes, and 4 lanes, with a 16-byte salt and a 32-byte key.
 var defaultParams = params{memory: 64 * 1024, time: 3, threads: 4, saltLen: 16, keyLen: 32}
 
+// dummyPassword is the input of defaultDummyHash. Nobody can sign in with it:
+// a login for an unknown email verifies the dummy hash and always fails.
+const dummyPassword = "spinup auth dummy password"
+
+// defaultDummyHash is the argon2id PHC string of dummyPassword with
+// defaultParams. A login for an unknown email verifies it, so its time equals
+// the time of a real check. A constant saves one hash (64 MiB, about 50 ms) at
+// startup. TestDefaultDummyHash checks that it still has defaultParams.
+const defaultDummyHash = "$argon2id$v=19$m=65536,t=3,p=4$xmacgIdFT+LdBcyfC8JKWA$NC4pbY4QN3rpiDL8IOSDcPB2cRXj/3eZ9wn0CbRRIcs"
+
 // Limits for parsed hashes, so a damaged or hostile row cannot exhaust memory.
 const (
 	maxMemory  = 1 << 21 // KiB (2 GiB)

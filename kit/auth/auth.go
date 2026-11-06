@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alexedwards/scs/pgxstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -139,7 +138,8 @@ type Auth struct {
 	csrf         *http.CrossOriginProtection
 	logger       *slog.Logger
 	params       params
-	dummy        string
+	dummy        func() string // the hash that a login for an unknown email verifies
+	verify       func(encoded, password string) (bool, params, error)
 	slots        *hashSlots
 	threshold    int
 	window       time.Duration
@@ -218,6 +218,8 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		pool:         pool,
 		logger:       o.logger,
 		params:       o.params,
+		dummy:        dummyHash(o.params),
+		verify:       verifyPassword,
 		slots:        newHashSlots(o.hashConcurrent, o.hashWaiting, o.hashWait),
 		threshold:    o.threshold,
 		window:       o.window,
@@ -244,18 +246,14 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	}))
 
 	a.sessions = scs.New()
-	// The cleanup goroutine of Auth deletes expired rows, with logging and a clean stop.
-	a.sessions.Store = pgxstore.NewWithConfig(pool, pgxstore.Config{CleanUpInterval: 0})
+	// The store reads the session user in the same query as the session. The
+	// cleanup goroutine of Auth deletes expired rows, with logging and a clean stop.
+	a.sessions.Store = sessionStore{a: a}
 	a.sessions.Lifetime = o.lifetime
 	a.sessions.IdleTimeout = o.idleTimeout
 	a.sessions.HashTokenInStore = true
 	a.sessions.Cookie = scs.SessionCookie{Name: CookieName, HttpOnly: true, Path: "/", SameSite: http.SameSiteLaxMode, Secure: o.secure, Persist: true}
 	a.sessions.ErrorFunc = a.sessionError
-
-	// A random password that nobody knows. Logins for unknown emails verify it.
-	var secret [32]byte
-	_, _ = rand.Read(secret[:])
-	a.dummy = hashPassword(a.params, hex.EncodeToString(secret[:]))
 
 	allOff := true
 	for _, l := range rates {
@@ -328,12 +326,29 @@ type contextKey int
 
 const (
 	userContextKey contextKey = iota
+	// installedContextKey marks a request that passed the Auth middleware. Its
+	// value is the *sessionLookup of the request.
 	installedContextKey
 	limitContextKey
 )
 
 // sessionUserKey is the session key that holds the user ID (int64).
 const sessionUserKey = "auth.user_id"
+
+// dummyHash returns the function that gives the hash that a login for an
+// unknown email verifies, so the time does not reveal accounts. With
+// defaultParams it is the constant defaultDummyHash, so New computes no hash.
+// Other parameters compute one hash of a random password on first use.
+func dummyHash(p params) func() string {
+	if p == defaultParams {
+		return func() string { return defaultDummyHash }
+	}
+	return sync.OnceValue(func() string {
+		var secret [32]byte
+		_, _ = rand.Read(secret[:])
+		return hashPassword(p, hex.EncodeToString(secret[:]))
+	})
+}
 
 // UserFrom returns the user of the request session. The second result is false
 // when no user is signed in or when the Auth middleware did not run.
@@ -359,7 +374,7 @@ func (a *Auth) Middleware() httpx.Middleware {
 			if w.Header().Get("Content-Security-Policy") == "" {
 				w.Header().Set("Content-Security-Policy", DefaultCSP)
 			}
-			r = r.WithContext(context.WithValue(r.Context(), installedContextKey, true))
+			r = r.WithContext(context.WithValue(r.Context(), installedContextKey, &sessionLookup{}))
 			r, ok := a.allow(w, r)
 			if !ok {
 				return
@@ -384,29 +399,52 @@ func (a *Auth) RequireUser(next http.Handler) http.Handler {
 }
 
 // loadUser puts the user of the session into the request context, and calls the
-// function of WithActorContext for it. A session of a deleted user is destroyed.
+// function of WithActorContext for it. The session store already read the user
+// with the session, so this costs no query. A session of a deleted user, or of
+// an older auth version (a password reset or an OIDC link came after the
+// login), is destroyed, and the request continues without a user.
 func (a *Auth) loadUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if id, ok := a.sessions.Get(ctx, sessionUserKey).(int64); ok {
-			user, found, err := a.userByID(ctx, id)
+			version, ok := a.sessions.Get(ctx, sessionVersionKey).(int64)
+			if !ok {
+				version = 1 // a session from before auth versions
+			}
+			user, current, found, err := a.sessionUser(ctx, id)
 			if err != nil {
 				a.internalError(w, r, "load the session user", err)
 				return
 			}
-			if found {
+			if found && current == version {
 				ctx = context.WithValue(ctx, userContextKey, user)
 				if a.actorContext != nil {
 					ctx = a.actorContext(ctx, user)
 				}
 				r = r.WithContext(ctx)
 			} else if err := a.sessions.Destroy(ctx); err != nil {
-				a.internalError(w, r, "destroy the session of a deleted user", err)
+				a.internalError(w, r, "destroy the session of a deleted user or an old auth version", err)
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// sessionUser returns the user with id and its auth version. It uses the row
+// that the session store read with the session. Only a session without
+// sessions.user_id (from before auth migration 00007), or a request through
+// another store, needs a query.
+func (a *Auth) sessionUser(ctx context.Context, id int64) (User, int64, bool, error) {
+	if l := lookupFrom(ctx); l != nil && l.done && l.userID == id {
+		if !l.found {
+			return User{}, 0, false, nil
+		}
+		user := l.user
+		user.Role = a.effectiveRole(user.Role)
+		return user, l.version, true, nil
+	}
+	return a.userVersionByID(ctx, id)
 }
 
 // installed answers 500 and returns false when the Auth middleware did not run.

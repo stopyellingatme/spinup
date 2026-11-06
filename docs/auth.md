@@ -32,6 +32,7 @@ $ ls api/db/migrations
 00001_init.sql
 00002_create_auth.sql
 00005_users_role.sql
+00007_users_auth_version.sql
 embed.go
 ```
 
@@ -261,6 +262,7 @@ $ pnpm test
 | --- | --- | --- |
 | `api/db/migrations/00002_create_auth.sql` | seed | The tables `users`, `sessions`, and `login_attempts`. |
 | `api/db/migrations/00005_users_role.sql` | seed | The `role` column of `users`. |
+| `api/db/migrations/00007_users_auth_version.sql` | seed | The `auth_version` column of `users` and the `user_id` column of `sessions`. See [Sign-in security](build/auth-security.md#sessions). |
 | `api/cmd/api/main.go` | scaffold | Your API main file. The module adds the auth middleware, the routes, and the `user` command. |
 | `api/internal/roles/roles.gen.go` | managed | The role set of the app. See [Roles](build/roles.md). |
 | `web/src/lib/server/auth.ts` | managed | The page guards, redirect check, API requests, and session cookies. |

@@ -153,7 +153,9 @@ The app looks up the account and sends the email in a background queue, so the r
 
 `POST /api/auth/reset/confirm` takes `{"token","password"}`.
 The new password follows the registration rules.
-A confirmation ends all sessions of the user, removes all reset tokens, and clears the login lockout.
+A confirmation ends all sessions of the user, uses up all reset tokens of the user, and clears the login lockout.
+The confirmation increments the auth version of the account. Thus a sign-in that was in progress during the reset also ends.
+The API deletes a reset token 24 hours after its use or its expiry.
 The email never contains the password.
 
 | Rule | Value |

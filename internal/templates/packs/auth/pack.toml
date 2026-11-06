@@ -63,6 +63,12 @@ path = "api/db/migrations/00005_users_role.sql"
 source = "files/api/db/migrations/00005_users_role.sql"
 class = "seed"
 
+# The auth version of each account and the user of each session (kit auth session checks).
+[[files]]
+path = "api/db/migrations/00007_users_auth_version.sql"
+source = "files/api/db/migrations/00007_users_auth_version.sql"
+class = "seed"
+
 [[files]]
 path = "api/internal/roles/roles.gen.go"
 source = "files/api/internal/roles/roles.gen.go"

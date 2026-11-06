@@ -22,6 +22,7 @@ $ ls api/db/migrations
 00002_create_auth.sql
 00004_oidc_identities.sql
 00005_users_role.sql
+00007_users_auth_version.sql
 embed.go
 $ grep OidcButtons web/src/routes/login/+page.svelte
 	import OidcButtons from '#lib/components/OidcButtons.svelte';
@@ -150,7 +151,7 @@ The claim `email_verified` must be the boolean `true` or the string `"true"`.
 | The identity is new, and no account matches | The API creates an account with no password. It follows the [registration mode](../auth.md#choose-who-can-register). |
 
 {: .warning }
-Linking a provider to an existing account removes the password of the account and signs out its other sessions. The user can set a password again with password reset, which needs the [mail module](../mail.md).
+Linking a provider to an existing account removes the password of the account and signs out its other sessions. The link increments the auth version of the account, so every older session ends at its next request. The user can set a password again with password reset, which needs the [mail module](../mail.md).
 
 Password sign-in rejects an account with no password, with the usual generic error.
 A new account gets `default_role`. See [Roles](roles.md).
@@ -161,7 +162,7 @@ A new account gets `default_role`. See [Roles](roles.md).
 | --- | --- | --- |
 | The button does not appear | The provider is not in `AUTH_OIDC_PROVIDERS`, or the API was not restarted. | Check the name and restart the API. |
 | The provider shows `redirect_uri_mismatch` | The callback URL at the provider differs from the one above. | Register the exact callback URL. |
-| The button leads to a 503 problem | The API cannot reach the issuer. | Check `AUTH_OIDC_<NAME>_ISSUER` and the network. |
+| The button leads to a 503 problem | The API cannot reach the issuer. All requests share one discovery request, which stops after 15 seconds. After a failure, the API answers 503 for 5 seconds before it tries again. | Check `AUTH_OIDC_<NAME>_ISSUER` and the network. |
 | A user lands on `/login?error=rate_limited` | The callback rate limit applies. | Read [Sign-in security](auth-security.md). |
 | Flows break after a restart | Each process made its own key. | Set `AUTH_OIDC_COOKIE_KEY`. |
 

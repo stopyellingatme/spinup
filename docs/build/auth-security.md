@@ -42,15 +42,22 @@ authn, err := auth.New(pool,
 | --- | --- | --- |
 | Cookie name | `session` | |
 | Cookie flags | `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` unless `SPINUP_ENV=dev` | |
-| Store | The `sessions` table. It holds a SHA-256 hash of each token, not the token. | |
+| Store | The `sessions` table. It holds a SHA-256 hash of each token, not the token, and the ID of the session user. | |
 | Lifetime | 7 days. A new sign-in starts a new lifetime. | `auth.WithLifetime(d)` |
 | Idle timeout | None | `auth.WithIdleTimeout(d)` |
 
 - Sign-in and registration rotate the session token. The old token stops working.
 - Sign-out deletes the session from the store and expires the cookie.
 - The session of a deleted user ends at its next request.
-- A background task deletes expired sessions and old sign-in attempts every 5 minutes.
+- Each account has an auth version, the column `users.auth_version`. A session keeps the version of its sign-in.
+- A password reset and an OIDC link increment the version. Every older session of the account ends at its next request.
+- A sign-in that was in progress during a password reset also ends, because it keeps the old version.
+- One query reads the session and its user, so a signed-in request costs one database round trip.
+- A background task runs every 5 minutes. It deletes expired sessions, old sign-in attempts, and password reset tokens that were used or expired more than 24 hours ago.
 - With an idle timeout, the browser cookie can expire before the server session, because server-side calls do not refresh the browser cookie.
+
+{: .note }
+The auth version and the session user come from the migration `api/db/migrations/00007_users_auth_version.sql`. `spinup upgrade` adds it to an older app. Run `spinup db migrate up` before you start the new API. Without the migration, each request with a session gets 500, and the API log says `Try: run spinup db migrate up`. A session from before the migration keeps working. It costs one more query until it ends.
 
 If `SPINUP_ENV` is not set, the API assumes `production`. Cookies stay `Secure`, and the `/_dev` routes stay off.
 The generated `Dockerfile.api` sets `SPINUP_ENV=production`. `spinup dev` and `.env.example` select `dev`.
@@ -71,7 +78,8 @@ The kit hashes passwords with argon2id and stores PHC strings, for example `$arg
 
 - The comparison runs in constant time.
 - If the parameters of a stored hash differ from the current parameters, a successful sign-in stores a new hash.
-- A sign-in for an unknown email checks a dummy hash, so the response time does not show which emails have accounts.
+- A sign-in for an unknown email checks a dummy hash with the same parameters, so the response time does not show which emails have accounts.
+- With the default parameters, the dummy hash is a constant. The API does not compute a hash when it starts.
 - The kit removes the spaces around an email and changes it to lower case. The result must be a bare address of 254 characters or fewer.
 
 ### Hash limits
@@ -117,6 +125,8 @@ Each class has its own limit. The burst passes at once. After that, one request 
 | `oidc_callback` | `GET /api/auth/oidc/<provider>/callback` | 100 | 1 s |
 
 Sign-out, `GET /api/session`, the provider list, and the OIDC start route have no limit.
+The limit compares the path segment by segment after it decodes each segment, as the router does.
+Thus `/%61pi/auth/login` uses the budget of `/api/auth/login`. An encoded slash (`%2F`) never separates two segments.
 A refused OIDC callback redirects to `/login?error=rate_limited`.
 
 ### Change a limit

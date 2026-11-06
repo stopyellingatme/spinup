@@ -12,8 +12,8 @@ exists api/db/migrations/00006_audit_events.sql
 # The resource has a trigger in its create migration, a History endpoint, and writes in audit.InTx.
 # api_token is redacted by name. The web pages need no post-step here, so the gate skips them.
 exec spinup g resource work_order title:string status:string api_token:string --role manager,staff --history-role manager --api-only
-exists api/db/migrations/00007_create_work_orders.sql
-grep 'audit_row_change' api/db/migrations/00007_create_work_orders.sql
+exists api/db/migrations/00008_create_work_orders.sql
+grep 'audit_row_change' api/db/migrations/00008_create_work_orders.sql
 grep 'audit.InTx' api/internal/handlers/work_orders.go
 exists api/internal/handlers/work_orders_history.go
 
@@ -28,7 +28,7 @@ cd ..
 exec spinup db migrate up
 exec spinup db migrate status
 stdout '00006_audit_events\.sql'
-stdout '00007_create_work_orders\.sql'
+stdout '00008_create_work_orders\.sql'
 ! stdout '^pending'
 
 # The operator command of the app binary creates an account. The users trigger records it.

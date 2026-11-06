@@ -27,6 +27,13 @@ import (
 
 const oidcLifetime = 10 * time.Minute
 
+// oidcDiscoveryTimeout bounds one discovery request to a provider.
+const oidcDiscoveryTimeout = 15 * time.Second
+
+// oidcRetryAfter is the time that a failed discovery stays cached. Requests in
+// that time fail at once and do not repeat a stalled discovery in series.
+const oidcRetryAfter = 5 * time.Second
+
 var oidcName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 type oidcSettings struct {
@@ -39,8 +46,12 @@ type oidcProvider struct {
 	name, label, issuer, clientID, secret string
 	scopes                                []string
 	err                                   error
-	mu                                    sync.Mutex
-	discovered                            *oidc.Provider
+
+	mu         sync.Mutex
+	discovered *oidc.Provider // nil until a discovery succeeds
+	inflight   chan struct{}  // closed when the running discovery ends, nil when none runs
+	failed     error          // the last discovery error
+	failedAt   time.Time      // the time of failed
 }
 
 type oidcHandler struct {
@@ -50,7 +61,7 @@ type oidcHandler struct {
 	cipher    cipher.AEAD
 	err       error
 	client    *http.Client
-	user      func(context.Context, string, string, string, bool) (User, error)
+	user      func(context.Context, string, string, string, bool) (User, int64, error)
 }
 
 type oidcFlow struct {
@@ -182,17 +193,66 @@ func (h *oidcHandler) provider(w http.ResponseWriter, r *http.Request) *oidcProv
 	return nil
 }
 
+// discover returns the discovered provider p. All callers share one discovery
+// request, which runs on its own context with oidcDiscoveryTimeout, so a canceled
+// caller does not fail the other callers. A caller stops waiting when its ctx
+// ends. A failure stays cached for oidcRetryAfter.
 func (h *oidcHandler) discover(ctx context.Context, p *oidcProvider) (*oidc.Provider, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.discovered == nil {
-		var err error
-		p.discovered, err = oidc.NewProvider(oidc.ClientContext(ctx, h.client), p.issuer)
-		if err != nil {
-			return nil, err
-		}
+	if p.discovered != nil {
+		p.mu.Unlock()
+		return p.discovered, nil
 	}
-	return p.discovered, nil
+	if p.failed != nil && h.now().Sub(p.failedAt) < oidcRetryAfter {
+		err := p.failed
+		p.mu.Unlock()
+		return nil, err
+	}
+	done := p.inflight
+	if done == nil {
+		done = make(chan struct{})
+		p.inflight = done
+		go h.runDiscovery(p, done)
+	}
+	p.mu.Unlock()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	// A discovery sets discovered or failed before it closes done, and only a
+	// success clears failed.
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.discovered != nil {
+		return p.discovered, nil
+	}
+	return nil, p.failed
+}
+
+// runDiscovery runs one discovery of p, stores its result, and closes done.
+func (h *oidcHandler) runDiscovery(p *oidcProvider, done chan struct{}) {
+	ctx, cancel := context.WithTimeout(context.Background(), oidcDiscoveryTimeout)
+	defer cancel()
+	// The provider keeps the client of this context, not the context itself.
+	discovered, err := oidc.NewProvider(oidc.ClientContext(ctx, h.client), p.issuer)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err != nil {
+		p.failed, p.failedAt = err, h.now()
+	} else {
+		p.discovered, p.failed = discovered, nil
+	}
+	p.inflight = nil
+	close(done)
+}
+
+// now returns the time of the Auth clock, or the system time without an Auth.
+func (h *oidcHandler) now() time.Time {
+	if h.auth != nil && h.auth.now != nil {
+		return h.auth.now()
+	}
+	return time.Now()
 }
 
 func (h *oidcHandler) oauth(p *oidcProvider, discovered *oidc.Provider) oauth2.Config {
@@ -324,7 +384,7 @@ func (h *oidcHandler) callback(w http.ResponseWriter, r *http.Request) {
 		oidcInvalid(w, r)
 		return
 	}
-	user, err := h.user(ctx, p.name, id.Subject, email, verified)
+	user, version, err := h.user(ctx, p.name, id.Subject, email, verified)
 	if errors.Is(err, errRegistrationClosed) {
 		registrationClosed(w, r)
 		return
@@ -333,7 +393,7 @@ func (h *oidcHandler) callback(w http.ResponseWriter, r *http.Request) {
 		h.auth.internalError(w, r, "link the OIDC identity", err)
 		return
 	}
-	if err := h.auth.startSession(ctx, user); err != nil {
+	if err := h.auth.startSession(ctx, user, version); err != nil {
 		h.auth.internalError(w, r, "start the OIDC session", err)
 		return
 	}

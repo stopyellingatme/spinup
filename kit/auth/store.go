@@ -26,54 +26,63 @@ func (a *Auth) effectiveRole(role string) string {
 
 // userByID returns the user with id. found is false when no such user exists.
 func (a *Auth) userByID(ctx context.Context, id int64) (user User, found bool, err error) {
-	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id).Scan(&user.ID, &user.Email, &user.Role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return User{}, false, nil
-	}
-	user.Role = a.effectiveRole(user.Role)
-	return user, err == nil, err
+	user, _, found, err = a.userVersionByID(ctx, id)
+	return user, found, err
 }
 
-// credentialsByEmail returns the user and the password hash for email. An account without a
-// password (OIDC only) is not found, so the password login gives the same generic error.
-func (a *Auth) credentialsByEmail(ctx context.Context, email string) (user User, hash string, found bool, err error) {
-	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+`, password_hash FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&user.ID, &user.Email, &user.Role, &hash)
+// userVersionByID returns the user with id and its auth version. found is false
+// when no such user exists.
+func (a *Auth) userVersionByID(ctx context.Context, id int64) (user User, version int64, found bool, err error) {
+	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+`, auth_version FROM users WHERE id = $1`, id).Scan(&user.ID, &user.Email, &user.Role, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return User{}, "", false, nil
+		return User{}, 0, false, nil
 	}
 	user.Role = a.effectiveRole(user.Role)
-	return user, hash, err == nil, err
+	return user, version, err == nil, schemaHint(err)
 }
 
-// createUser applies the registration mode and inserts a user.
-// created is false when the email is taken.
-func (a *Auth) createUser(ctx context.Context, email, hash string) (user User, created bool, err error) {
+// credentialsByEmail returns the user, its auth version, and the password hash for email.
+// An account without a password (OIDC only) is not found, so the password login gives
+// the same generic error. A login stores the version in its session: a password reset
+// after this read increments the version, so that session stops working.
+func (a *Auth) credentialsByEmail(ctx context.Context, email string) (user User, version int64, hash string, found bool, err error) {
+	err = a.pool.QueryRow(ctx, `SELECT `+userColumns+`, auth_version, password_hash FROM users WHERE email = $1 AND password_hash IS NOT NULL`, email).Scan(&user.ID, &user.Email, &user.Role, &version, &hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, 0, "", false, nil
+	}
+	user.Role = a.effectiveRole(user.Role)
+	return user, version, hash, err == nil, schemaHint(err)
+}
+
+// createUser applies the registration mode and inserts a user. It also returns
+// the auth version of the new user. created is false when the email is taken.
+func (a *Auth) createUser(ctx context.Context, email, hash string) (user User, version int64, created bool, err error) {
 	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
-		return User{}, false, err
+		return User{}, 0, false, err
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	role, err := a.registrationRole(ctx, tx)
 	if err != nil {
-		return User{}, false, err
+		return User{}, 0, false, err
 	}
 	if err := a.rowEvent(ctx, tx, Event{Name: EventRegister, User: User{Email: email, Role: role}}); err != nil {
-		return User{}, false, err
+		return User{}, 0, false, err
 	}
 	err = tx.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id, email, role`,
-		email, hash, role).Scan(&user.ID, &user.Email, &user.Role)
+		`INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id, email, role, auth_version`,
+		email, hash, role).Scan(&user.ID, &user.Email, &user.Role, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return User{}, false, nil
+		return User{}, 0, false, nil
 	}
 	if err != nil {
-		return User{}, false, err
+		return User{}, 0, false, schemaHint(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return User{}, false, err
+		return User{}, 0, false, err
 	}
 	user.Role = a.effectiveRole(user.Role)
-	return user, true, nil
+	return user, version, true, nil
 }
 
 // updatePasswordHash replaces the hash of user, but only when it still equals old.
@@ -136,11 +145,26 @@ func (a *Auth) clearFailures(ctx context.Context, email string) error {
 	return err
 }
 
-// deleteExpired deletes expired sessions and failed logins outside the window.
+// resetRetention is the time that a used or expired password reset row stays
+// in the database after its use or expiry.
+const resetRetention = 24 * time.Hour
+
+// deleteExpired deletes expired sessions, failed logins outside the window, and
+// password reset rows that were used or expired more than resetRetention ago.
+// The password_resets table exists only with the mail module, so the last step
+// checks for the table first.
 func (a *Auth) deleteExpired(ctx context.Context) error {
 	if _, err := a.pool.Exec(ctx, `DELETE FROM sessions WHERE expiry < now()`); err != nil {
 		return err
 	}
-	_, err := a.pool.Exec(ctx, `DELETE FROM login_attempts WHERE attempted_at < $1`, a.now().Add(-a.window))
+	now := a.now()
+	if _, err := a.pool.Exec(ctx, `DELETE FROM login_attempts WHERE attempted_at < $1`, now.Add(-a.window)); err != nil {
+		return err
+	}
+	var resets bool
+	if err := a.pool.QueryRow(ctx, `SELECT to_regclass('password_resets') IS NOT NULL`).Scan(&resets); err != nil || !resets {
+		return err
+	}
+	_, err := a.pool.Exec(ctx, `DELETE FROM password_resets WHERE used_at < $1 OR expires_at < $1`, now.Add(-resetRetention))
 	return err
 }
