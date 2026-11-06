@@ -2,9 +2,12 @@ package httpx
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 )
 
 // FieldError describes a validation failure for one input field.
@@ -95,20 +98,20 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	return err
 }
 
-// DecodeJSON reads exactly one JSON value into dst and rejects unknown fields.
+// DecodeJSON reads exactly one JSON value into dst with exact field names.
+// It rejects unknown fields, duplicate names, and invalid UTF-8.
 // It returns an Error with a stable message and status 400, or 413 for size errors.
 // Use MaxBody to impose a request size limit.
 func DecodeJSON(r *http.Request, dst any) error {
 	if r.Body == nil {
 		return decodeError(http.StatusBadRequest, "The request body must contain one JSON value.")
 	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dst); err != nil {
+	decoder := takeJSONDecoder(r.Body)
+	defer putJSONDecoder(decoder)
+	if err := jsonv2.UnmarshalDecode(decoder, dst, jsonv2.RejectUnknownMembers(true)); err != nil {
 		return classifyDecodeError(err)
 	}
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+	if err := decoder.SkipValue(); !errors.Is(err, io.EOF) {
 		if err != nil {
 			return classifyDecodeError(err)
 		}
@@ -116,6 +119,8 @@ func DecodeJSON(r *http.Request, dst any) error {
 	}
 	return nil
 }
+
+const invalidJSONDetail = "The request body must contain valid JSON with only known fields and correct value types."
 
 func classifyDecodeError(err error) error {
 	var tooLarge *http.MaxBytesError
@@ -126,8 +131,29 @@ func classifyDecodeError(err error) error {
 		return decodeError(http.StatusBadRequest, "The request body must contain one JSON value.")
 	}
 	// Keep parser details private. Their wording can change between Go releases.
-	return decodeError(http.StatusBadRequest, "The request body must contain valid JSON with only known fields and correct value types.")
+	return decodeError(http.StatusBadRequest, invalidJSONDetail)
 }
 func decodeError(status int, detail string) *Error {
 	return &Error{Problem: Problem{Status: status, Detail: detail}}
+}
+
+// Keep the common request path close to UnmarshalRead, which also pools decoders.
+var jsonDecoders = sync.Pool{New: func() any {
+	return jsontext.NewDecoder(http.NoBody)
+}}
+
+func takeJSONDecoder(body io.Reader) *jsontext.Decoder {
+	decoder := jsonDecoders.Get().(*jsontext.Decoder)
+	decoder.Reset(body)
+	return decoder
+}
+
+func putJSONDecoder(decoder *jsontext.Decoder) {
+	// Do not retain buffers from unusually large requests in the pool.
+	if decoder.InputOffset()+int64(len(decoder.UnreadBuffer())) > 64*1024 {
+		return
+	}
+	// Release the request reader before returning the decoder to the pool.
+	decoder.Reset(http.NoBody)
+	jsonDecoders.Put(decoder)
 }

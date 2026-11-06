@@ -2,41 +2,100 @@ package httpx
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 )
 
-// RequireJSONFields checks that each required key exists and is not null.
-// Missing or null keys produce a 422 Error with field errors sorted by name.
-// Invalid JSON produces 400. A non-object value produces 422.
-// The body remains readable and retains its original Close method.
-// Use MaxBody before this check to limit the body size.
-func RequireJSONFields(r *http.Request, required []string) error {
-	if len(required) == 0 {
-		return nil
-	}
+// BodyRules defines the top-level fields allowed in a JSON request object.
+type BodyRules struct {
+	// Required lists fields that must exist and must not be null.
+	Required []string
+	// Known lists allowed fields. An empty list allows any field name.
+	Known []string
+}
+
+// CheckJSONBody validates one JSON object with exact field names and the given rules.
+// It rejects duplicate names at any depth and invalid UTF-8 with status 400.
+// Non-object values and missing or null required fields produce status 422.
+// Field errors are sorted by name. An empty body with empty rules is allowed.
+//
+// The body remains readable and retains its original Close method, including on errors.
+// Use MaxBody before this check to impose a size limit, which produces status 413.
+func CheckJSONBody(r *http.Request, rules BodyRules) error {
 	if r.Body == nil {
+		if len(rules.Required) == 0 && len(rules.Known) == 0 {
+			return nil
+		}
 		return classifyDecodeError(io.EOF)
 	}
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		return classifyDecodeError(err)
-	}
-	var values map[string]json.RawMessage
-	if err := json.Unmarshal(data, &values); err != nil {
-		var typ *json.UnmarshalTypeError
-		if errors.As(err, &typ) {
-			return decodeError(http.StatusUnprocessableEntity, "The request body must be a JSON object.")
+	// Record consumed bytes so every return path preserves the original body.
+	body := r.Body
+	var data bytes.Buffer
+	defer func() {
+		r.Body = struct {
+			io.Reader
+			io.Closer
+		}{io.MultiReader(&data, body), body}
+	}()
+	decoder := takeJSONDecoder(io.TeeReader(body, &data))
+	defer putJSONDecoder(decoder)
+	kind := decoder.PeekKind()
+	present := make([]bool, len(rules.Required))
+	unknown := false
+	if kind == '{' {
+		if _, err := decoder.ReadToken(); err != nil {
+			return classifyDecodeError(err)
+		}
+		for decoder.PeekKind() != '}' {
+			name, err := decoder.ReadToken()
+			if err != nil {
+				return classifyDecodeError(err)
+			}
+			key := name.String()
+			if len(rules.Known) > 0 && !slices.Contains(rules.Known, key) {
+				unknown = true
+			}
+			nonnull := decoder.PeekKind() != 'n'
+			if err := decoder.SkipValue(); err != nil {
+				return classifyDecodeError(err)
+			}
+			if nonnull {
+				for i, required := range rules.Required {
+					if key == required {
+						present[i] = true
+					}
+				}
+			}
+		}
+		if _, err := decoder.ReadToken(); err != nil {
+			return classifyDecodeError(err)
+		}
+	} else if err := decoder.SkipValue(); err != nil {
+		if errors.Is(err, io.EOF) && len(rules.Required) == 0 && len(rules.Known) == 0 {
+			return nil
 		}
 		return classifyDecodeError(err)
 	}
+
+	// Validate trailing input before reporting schema or root-kind failures.
+	if err := decoder.SkipValue(); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return classifyDecodeError(err)
+		}
+		return decodeError(http.StatusBadRequest, "The request body must contain only one JSON value.")
+	}
+	if kind != '{' {
+		return decodeError(http.StatusUnprocessableEntity, "The request body must be a JSON object.")
+	}
+	if unknown {
+		return decodeError(http.StatusBadRequest, invalidJSONDetail)
+	}
 	var errs []FieldError
-	for _, key := range required {
-		value, ok := values[key]
-		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+	for i, key := range rules.Required {
+		if !present[i] {
 			errs = append(errs, FieldError{Field: key, Message: "is required"})
 		}
 	}
@@ -48,9 +107,11 @@ func RequireJSONFields(r *http.Request, required []string) error {
 			Errors: errs,
 		}}
 	}
-	r.Body = struct {
-		io.Reader
-		io.Closer
-	}{bytes.NewReader(data), r.Body}
 	return nil
+}
+
+// RequireJSONFields validates a JSON object and its required fields with CheckJSONBody.
+// It validates syntax even when required is empty. Unknown field names are allowed.
+func RequireJSONFields(r *http.Request, required []string) error {
+	return CheckJSONBody(r, BodyRules{Required: required})
 }
