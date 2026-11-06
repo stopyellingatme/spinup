@@ -22,7 +22,6 @@ spinup docs reference [flags]
 | `-C, --dir` | `` | run in this project directory |
 | `--dry-run` | `false` | show changes without writing |
 | `--env` | `` | target environment |
-| `-h, --help` | `false` | help for reference |
 | `--json` | `false` | write JSON output |
 | `--no-color` | `false` | turn off color |
 | `--non-interactive` | `false` | never prompt |

@@ -28,11 +28,6 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup ci services`](ci-services.md) — List services for a GitHub Actions matrix
 - [`spinup ci test-service`](ci-test-service.md) — Run tests for one service
 - [`spinup ci verify`](ci-verify.md) — Check workflow safety and run optional actionlint
-- [`spinup completion`](completion.md) — Generate the autocompletion script for the specified shell
-- [`spinup completion bash`](completion-bash.md) — Generate the autocompletion script for bash
-- [`spinup completion fish`](completion-fish.md) — Generate the autocompletion script for fish
-- [`spinup completion powershell`](completion-powershell.md) — Generate the autocompletion script for powershell
-- [`spinup completion zsh`](completion-zsh.md) — Generate the autocompletion script for zsh
 - [`spinup db`](db.md) — Operate the application database
 - [`spinup db doctor`](db-doctor.md) — Check the PostgreSQL version and pending migrations
 - [`spinup db dump`](db-dump.md) — Dump the development database (default .spinup/dumps/app.dump)
@@ -69,7 +64,6 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup generate client`](generate-client.md) — Generate TypeScript types from OpenAPI
 - [`spinup generate component`](generate-component.md) — Add shadcn-svelte components to the web app (needs the network)
 - [`spinup generate dashboard`](generate-dashboard.md) — Add a custom Grafana dashboard
-- [`spinup generate flags`](generate-flags.md) — Generate the app flag set
 - [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
 - [`spinup generate job`](generate-job.md) — Add a background job (River) to api/internal/jobs
 - [`spinup generate mailer`](generate-mailer.md) — Add a typed mailer and email templates
@@ -80,7 +74,6 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup generate resource`](generate-resource.md) — Generate a CRUD API resource: migration, queries, OpenAPI, handlers, and tests
 - [`spinup generate roles`](generate-roles.md) — Generate the app role set
 - [`spinup generate service`](generate-service.md) — Add a sidecar service
-- [`spinup help`](help.md) — Help about any command
 - [`spinup infra`](infra.md) — Provision Hetzner Cloud infrastructure with OpenTofu
 - [`spinup infra apply`](infra-apply.md) — Apply infrastructure changes and update the environment host
 - [`spinup infra destroy`](infra-destroy.md) — Destroy the environment infrastructure
