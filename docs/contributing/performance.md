@@ -39,7 +39,8 @@ The loop creates its own databases on that server and drops them at the end. It 
 
 ## Run the loop
 
-Run all suites for a baseline. A full run takes 15 to 40 minutes, because the `app` suite does three cold builds.
+Run all suites for a baseline. On an Apple M1 Max, a full run measures for about 5 minutes.
+On a busy machine, the load gates can add up to one hour of waits.
 
 <!-- doctest: skip -->
 ```console
