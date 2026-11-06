@@ -2,11 +2,10 @@ package upgrade
 
 import (
 	"context"
-	"strings"
 	"testing"
 )
 
-func TestPlanWarnsAboutUntrackedMigrationCollision(t *testing.T) {
+func TestPlanSeparatesUntrackedMigrationNumbers(t *testing.T) {
 	t.Parallel()
 	r, root := runFixture(t, false)
 	r.Source.(chainSource)["0.2.0"] = planVersion("0.2.0",
@@ -23,9 +22,12 @@ func TestPlanWarnsAboutUntrackedMigrationCollision(t *testing.T) {
 		t.Fatalf("steps = %d, want 1", len(report.Steps))
 	}
 	for _, file := range report.Steps[0].Files {
-		if file.Path == roleMigrationPath && strings.Contains(file.Reason, "00005_widgets.sql") {
+		if file.Path == roleMigrationPath {
+			if file.Action != ActionCreate || file.Reason != "" {
+				t.Fatalf("kit migration = %+v", file)
+			}
 			return
 		}
 	}
-	t.Fatalf("migration warning is missing: %+v", report.Steps[0].Files)
+	t.Fatalf("kit migration is missing: %+v", report.Steps[0].Files)
 }

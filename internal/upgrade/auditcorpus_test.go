@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	auditMigrationPath = "api/db/migrations/00006_audit_events.sql"
+	auditMigrationPath = "api/db/kit/00006_audit_events.sql"
 	auditMainPath      = "api/cmd/api/main.go"
 )
 
@@ -190,7 +190,7 @@ func TestAuditUpgradeCorpus(t *testing.T) {
 }
 
 // TestAuditModuleAddNextSteps runs spinup module add audit on an app whose migration 00006
-// is taken. The preview must carry the clash warning and the Next: lines for main.go.
+// is taken. The preview keeps both spaces and prints the Next: lines for main.go.
 func TestAuditModuleAddNextSteps(t *testing.T) {
 	t.Parallel()
 	r, root := moduleFixture(t, false)
@@ -205,9 +205,10 @@ func TestAuditModuleAddNextSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := r.Out.(*bytes.Buffer).String()
+	if strings.Contains(out, "also used by") {
+		t.Fatalf("unexpected clash warning: %s", out)
+	}
 	for _, part := range []string{
-		"also used by 00006_create_notes.sql",
-		"Try: rename the app migration to the next free number",
 		"Next: in api/cmd/api/main.go, import:",
 		"auth.WithEvents(authsink.New(pool)),",
 		`app.WithCommand("audit", audit.Command(pool)),`,

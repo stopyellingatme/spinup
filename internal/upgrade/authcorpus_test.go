@@ -97,7 +97,7 @@ func TestRolesUpgradeCorpus(t *testing.T) {
 				}
 			}
 			roleData := project.RenderRolesFile((*project.Config)(nil).AuthRoles())
-			migration := authCorpusRead(t, "../templates/packs/auth/files/api/db/migrations/00005_users_role.sql")
+			migration := authCorpusRead(t, "../templates/packs/auth/files/api/db/kit/00005_users_role.sql")
 			nextSpecs = append(nextSpecs, planSpec{path: project.RolesFilePath, data: string(roleData), class: "managed"}, planSpec{path: roleMigrationPath, data: string(migration), class: "seed"})
 			plan, err := BuildPlan(t.Context(), PlanInput{Root: root, Lock: lock, Old: old, New: planVersion("0.2.0", nextSpecs...), Merger: merge.NewGit(execx.OSRunner{})})
 			if err != nil {
