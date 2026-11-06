@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
 // Load reads, migrates, and validates the lock at path.
@@ -36,7 +34,7 @@ func (l *Lock) Save(path string) error {
 	if _, err := file.Write(data); err != nil {
 		return saveError(path, err)
 	}
-	if err := vfs.SyncFile(file); err != nil {
+	if err := file.Sync(); err != nil {
 		return saveError(path, err)
 	}
 	if err := file.Close(); err != nil {

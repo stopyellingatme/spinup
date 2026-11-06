@@ -548,8 +548,19 @@ def collect_meta(ctx, suites, args_repr=""):
         "load_limit": ctx.load_limit,
         "gate_max_s": ctx.gate_max_s,
         "gate_budget_s": ctx.gate_budget_s,
-        "args": args_repr,
+        "args": _redact_args(args_repr),
     }
+
+
+def _redact_args(text):
+    """Drop credentials from every URL in a command line, also in the --flag=url form."""
+    out = []
+    for token in text.split(" "):
+        flag, sep, value = token.rpartition("=") if token.startswith("-") else ("", "", token)
+        if "://" in value and "@" in value:
+            value = _redact(value)
+        out.append(flag + sep + value)
+    return " ".join(out)
 
 
 def _redact(url):
