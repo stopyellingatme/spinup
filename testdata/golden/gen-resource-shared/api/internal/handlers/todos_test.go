@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	kitmigrations "example.com/todo/api/db/kit"
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/gen"
 	"example.com/todo/api/internal/handlers"
@@ -25,7 +26,7 @@ import (
 
 func TestTodosCRUD(t *testing.T) {
 	t.Parallel()
-	pool := testkit.DBWithMigrations(t, migrations.FS)
+	pool := testkit.DBWithMigrations(t, migrations.FS, testkit.WithKitMigrations(kitmigrations.FS))
 	handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {
 		routes.Register(mux, routes.Deps{DB: pool})
 	})).Handler()

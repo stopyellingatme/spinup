@@ -693,7 +693,11 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	if rc.spec.Audit.On {
 		g.p("if os.Getenv(\"DATABASE_URL\")==\"\" {t.Skip(\"DATABASE_URL is required for audit events\")}")
 	}
-	g.p("pool := testkit.DBWithMigrations(t, migrations.FS)")
+	if rc.spec.Owned || rc.spec.Shared {
+		g.p("pool := testkit.DBWithMigrations(t, migrations.FS, testkit.WithKitMigrations(kitmigrations.FS))")
+	} else {
+		g.p("pool := testkit.DBWithMigrations(t, migrations.FS)")
+	}
 	g.p("handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {")
 	g.p("routes.Register(mux, routes.Deps{DB: pool})")
 	g.p("})).Handler()")
@@ -933,7 +937,18 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		}
 		rc.roleTest(g, base, "{"+strings.Join(parts, ", ")+"}")
 	}
-	return g.bytes()
+	source, err := g.bytes()
+	if err != nil {
+		return nil, err
+	}
+	if rc.spec.Owned || rc.spec.Shared {
+		// The import builder supports local package names without aliases.
+		// Add the kit alias next to the app migrations import.
+		appImport := fmt.Sprintf("%q", rc.module+"/db/migrations")
+		kitImport := fmt.Sprintf("kitmigrations %q\n\t", rc.module+"/db/kit")
+		source = []byte(strings.Replace(string(source), appImport, kitImport+appImport, 1))
+	}
+	return source, nil
 }
 
 // requiredFieldsTest tests presence through the complete generated HTTP stack.

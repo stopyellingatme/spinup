@@ -14,6 +14,9 @@ import (
 )
 
 const snapshotSQL = `SELECT id, version_id, is_applied FROM goose_db_version ORDER BY id;
+SELECT 'SELECT ''kit'', id, version_id, is_applied FROM spinup_kit_version ORDER BY id;'
+WHERE to_regclass('public.spinup_kit_version') IS NOT NULL
+\gexec
 SELECT format('SELECT json_build_array(%L, count(*))::text FROM %I.%I;', schemaname || '.' || tablename, schemaname, tablename)
 FROM pg_tables
 WHERE schemaname <> 'information_schema' AND schemaname !~ '^pg_'
@@ -116,13 +119,13 @@ exec docker volume create "$1"`
 	if _, err = u.sql(ctx, name, "ANALYZE;\n"); err != nil {
 		return err
 	}
-	fmt.Fprintln(u.o.Out, "Compare goose_db_version and every user table row count")
+	fmt.Fprintln(u.o.Out, "Compare goose_db_version, spinup_kit_version, and every user table row count")
 	restored, err := u.sql(ctx, name, snapshotSQL)
 	if err != nil {
 		return err
 	}
 	if !bytes.Equal(bytes.TrimSpace(old), bytes.TrimSpace(restored)) {
-		return failure("verify restored database", errors.New("goose_db_version or user table row counts differ. The swap was not started"))
+		return failure("verify restored database", errors.New("goose_db_version, spinup_kit_version, or user table row counts differ. The swap was not started"))
 	}
 	fmt.Fprintln(u.o.Out, "Stop the old postgres and swap the Compose image and volume")
 	if _, err = u.run(ctx, "docker", "stop", name); err != nil {

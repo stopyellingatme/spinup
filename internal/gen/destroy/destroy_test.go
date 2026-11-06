@@ -19,7 +19,7 @@ func TestRun(t *testing.T) {
 	root := t.TempDir()
 	lock := manifest.New()
 	name, _ := fields.ParseName("todo")
-	paths := append(resource.Paths(name), "api/db/migrations/00002_create_todos.sql")
+	paths := append(resource.Paths(name), "api/db/migrations/00002_create_todos.sql", "api/db/kit/00002_create_auth.sql")
 	for _, path := range paths {
 		p := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
@@ -77,7 +77,7 @@ func TestRun(t *testing.T) {
 	for _, path := range paths {
 		_, tracked := updated.Files[path]
 		_, err := os.Stat(filepath.Join(root, path))
-		keep := path == changed || strings.Contains(path, "/migrations/")
+		keep := path == changed || (strings.Contains(path, "/migrations/") || strings.Contains(path, "/kit/"))
 		if tracked != keep || (err == nil) != keep {
 			t.Fatalf("%s: tracked=%v error=%v", path, tracked, err)
 		}

@@ -111,7 +111,7 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 			return nil
 		}
 		if o.SkipBackup {
-			unsafe, err := UnsafePending(filepath.Join(root, filepath.FromSlash(MigrationsDir)), nil)
+			unsafe, err := unsafePendingSpaces(root, nil, nil)
 			if err != nil {
 				return fmt.Errorf("refuse --skip-backup: the pending migrations could not be checked: %w\nTry: start postgres, then deploy again", err)
 			}
@@ -127,7 +127,7 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 		return errors.New("pre-deploy backup: postgres is not running on an existing deployment\nTry: start postgres, or pass --skip-backup when every pending migration is marked safe")
 	}
 	if o.SkipBackup {
-		unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir)))
+		unsafe, err := unsafePending(ctx, c.Remote, app, root)
 		if err != nil {
 			return fmt.Errorf("refuse --skip-backup: the pending migrations could not be checked: %w\nTry: deploy without --skip-backup", err)
 		}
@@ -142,7 +142,7 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 	}
 	// Record whether every pending migration is marked safe (rollback --with-db-plan uses it).
 	if c.Results != nil {
-		unsafe, err := unsafePending(ctx, c.Remote, app, filepath.Join(root, filepath.FromSlash(MigrationsDir)))
+		unsafe, err := unsafePending(ctx, c.Remote, app, root)
 		// A failed check cannot establish that a rollback is safe.
 		c.Results[deploy.ResultMigrationsSafe] = strconv.FormatBool(err == nil && len(unsafe) == 0)
 	}
@@ -192,12 +192,43 @@ func AppliedVersion(ctx context.Context, r remote.Runner, app string) (int64, er
 	return newest, nil
 }
 
-func unsafePending(ctx context.Context, r remote.Runner, app, dir string) ([]string, error) {
+func unsafePending(ctx context.Context, r remote.Runner, app, root string) ([]string, error) {
+	var kitApplied []int64
+	kitDir := filepath.Join(root, "api/db/kit")
+	if _, err := os.Stat(kitDir); err == nil {
+		kitApplied, err = deploy.AppliedKitMigrations(ctx, r, app)
+		if err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("inspect %s: %w\nTry: check the migrations directory", kitDir, err)
+	}
 	applied, err := deploy.AppliedMigrations(ctx, r, app)
 	if err != nil {
 		return nil, err
 	}
-	return UnsafePending(dir, applied)
+	return unsafePendingSpaces(root, applied, kitApplied)
+}
+
+func unsafePendingSpaces(root string, applied, kitApplied []int64) ([]string, error) {
+	var unsafe []string
+	kitDir := filepath.Join(root, "api/db/kit")
+	if _, err := os.Stat(kitDir); err == nil {
+		names, err := UnsafePending(kitDir, kitApplied)
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range names {
+			unsafe = append(unsafe, "kit "+name)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("inspect %s: %w\nTry: check the migrations directory", kitDir, err)
+	}
+	names, err := UnsafePending(filepath.Join(root, filepath.FromSlash(MigrationsDir)), applied)
+	if err != nil {
+		return nil, err
+	}
+	return append(unsafe, names...), nil
 }
 
 // UnsafePending returns migrations absent from applied that lack the SafeMarker line.

@@ -156,7 +156,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if module == "" {
 		return nil, fmt.Errorf("cannot generate a job: spinup.lock has no module answer\nTry: spinup doctor")
 	}
-	data := map[string]string{"Snake": name.Snake, "Pascal": name.Pascal, "Module": module}
+	data := map[string]any{"Snake": name.Snake, "Pascal": name.Pascal, "Module": module, "Auth": modules.Enabled(&project.Config{Modules: in.Lock.Packs}, "auth")}
 	jobFile, err := render(jobTemplate, data)
 	if err != nil {
 		return nil, err
@@ -396,7 +396,8 @@ import (
 	"context"
 	"testing"
 
-	"{{ .Module }}/api/db/migrations"
+	{{ if .Auth }}kitmigrations "{{ .Module }}/api/db/kit"
+	{{ end }}"{{ .Module }}/api/db/migrations"
 	"github.com/stopyellingatme/spinup/kit/jobs"
 	"github.com/stopyellingatme/spinup/kit/testkit"
 )
@@ -405,7 +406,7 @@ func Test{{ .Pascal }}(t *testing.T) {
 	if got := ({{ .Pascal }}Args{}).Kind(); got != "{{ .Snake }}" {
 		t.Fatalf("Kind() = %q, want {{ .Snake }}", got)
 	}
-	pool := testkit.DBWithMigrations(t, migrations.FS)
+	pool := testkit.DBWithMigrations(t, migrations.FS{{ if .Auth }}, testkit.WithKitMigrations(kitmigrations.FS){{ end }})
 	work := {{ .Pascal }}(Deps{DB: pool})
 	job := jobs.Job[{{ .Pascal }}Args]{ID: 1, Args: {{ .Pascal }}Args{}, Attempt: 1}
 	if err := work(context.Background(), job); err != nil {

@@ -214,3 +214,35 @@ func keys(m map[string]string) []string {
 	}
 	return out
 }
+
+func TestGeneratedJobKitMigrations(t *testing.T) {
+	t.Parallel()
+	for _, authenticated := range []bool{false, true} {
+		t.Run(map[bool]string{false: "without auth", true: "with auth"}[authenticated], func(t *testing.T) {
+			t.Parallel()
+			packs := []string{"base", "api", "jobs"}
+			if authenticated {
+				packs = append(packs, "auth")
+			}
+			out, err := generator(t).Run(t.Context(), gen.Input{Root: t.TempDir(), Lock: lock(packs...), Args: []string{"send_digest"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var source string
+			for _, file := range out.Plan.Files {
+				if file.Path == "api/internal/jobs/send_digest_test.go" {
+					source = string(file.Data)
+				}
+			}
+			if source == "" {
+				t.Fatal("test file missing")
+			}
+			if strings.Contains(source, "testkit.WithKitMigrations(kitmigrations.FS)") != authenticated {
+				t.Fatal(source)
+			}
+			if strings.Contains(source, `kitmigrations "example.com/todo/api/db/kit"`) != authenticated {
+				t.Fatal(source)
+			}
+		})
+	}
+}

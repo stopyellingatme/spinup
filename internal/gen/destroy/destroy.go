@@ -79,7 +79,7 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 		if err != nil {
 			return nil, err
 		}
-		if clean != path || strings.HasPrefix(path, "api/db/migrations/") {
+		if clean != path || (strings.HasPrefix(path, "api/db/migrations/") || strings.HasPrefix(path, "api/db/kit/")) {
 			return nil, destroyError(fmt.Errorf("unsafe generator path %q", path))
 		}
 		disk := filepath.Join(o.Root, filepath.FromSlash(path))
