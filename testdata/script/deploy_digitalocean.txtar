@@ -64,6 +64,7 @@ cd $WORK
 [!exec:ssh-keygen] skip 'ssh-keygen is not installed'
 [!exec:ssh] skip 'ssh is not installed'
 [!exec:git] skip 'git is not installed'
+[!exec:docker] skip 'docker is not installed (deploy looks for it, even with --plan)'
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 cd todo
