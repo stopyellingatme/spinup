@@ -99,6 +99,17 @@ err = tx.Commit(ctx)
 
 If the transaction rolls back, the job is never created.
 
+Encoded job arguments have a default limit of 1 MiB (1,048,576 bytes).
+Both `Insert` and `InsertTx` reject larger arguments before inserting a row.
+Arguments at the limit are accepted.
+The worker also checks stored arguments before decoding them.
+An oversized stored job fails its attempt and follows the configured retry policy.
+The same limit applies to periodic inserts.
+
+Use `jobs.WithMaxPayloadBytes(bytes)` to change the limit on both `jobs.New` and `jobs.NewWorker`.
+Nonpositive values restore the default limit.
+Use references to stored data when a job needs large content.
+
 Pass insert options after the arguments:
 
 | Option | Effect | Example |

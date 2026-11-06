@@ -214,6 +214,10 @@ func TestGracefulShutdown(t *testing.T) {
 	select {
 	case <-h.started:
 	case err := <-done:
+		var listenErr *net.OpError
+		if errors.As(err, &listenErr) && listenErr.Op == "listen" {
+			t.Skipf("listener unavailable: %v", listenErr)
+		}
 		t.Fatalf("server did not start: %v", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("listen timeout")

@@ -21,6 +21,9 @@ const DefaultQueue = river.QueueDefault
 // time on [DefaultQueue] when no [WithQueue] option is given.
 const DefaultQueueWorkers = 10
 
+// DefaultMaxPayloadBytes limits the encoded job arguments to one MiB.
+const DefaultMaxPayloadBytes = 1024 * 1024
+
 // Args are the arguments of one job kind. River stores them as JSON, so use
 // exported fields with json tags. Kind returns a stable name for the kind,
 // such as "send_digest". Do not change it after jobs of the kind exist.
@@ -42,10 +45,17 @@ type Job[T Args] struct {
 type Option func(*config)
 
 type config struct {
-	logger       *slog.Logger
-	queues       map[string]int
-	maxAttempts  int
-	pollInterval time.Duration
+	logger          *slog.Logger
+	queues          map[string]int
+	maxAttempts     int
+	pollInterval    time.Duration
+	maxPayloadBytes int
+}
+
+// WithMaxPayloadBytes limits encoded JSON arguments for inserts and worker attempts.
+// Nonpositive values use DefaultMaxPayloadBytes. Configure the client and worker alike.
+func WithMaxPayloadBytes(n int) Option {
+	return func(c *config) { c.maxPayloadBytes = n }
 }
 
 // WithLogger sets the logger for River (default slog.Default()).
@@ -85,6 +95,9 @@ func newConfig(opts []Option) config {
 	if c.logger == nil {
 		c.logger = slog.Default()
 	}
+	if c.maxPayloadBytes <= 0 {
+		c.maxPayloadBytes = DefaultMaxPayloadBytes
+	}
 	return c
 }
 
@@ -93,12 +106,32 @@ func (c config) river() *river.Config {
 		Logger:            c.logger,
 		MaxAttempts:       c.maxAttempts,
 		FetchPollInterval: c.pollInterval,
+		Plugins: []rivertype.Plugin{
+			river.HookInsertBeginFunc(func(_ context.Context, params *rivertype.JobInsertParams) error {
+				return checkPayloadSize("insert a job", params.EncodedArgs, c.maxPayloadBytes)
+			}),
+			river.HookWorkBeginFunc(func(_ context.Context, job *rivertype.JobRow) error {
+				// River calls this hook before it decodes the stored arguments.
+				return checkPayloadSize("work a job", job.EncodedArgs, c.maxPayloadBytes)
+			}),
+		},
 	}
 	// River refuses a poll interval below its fetch cooldown.
 	if c.pollInterval > 0 && c.pollInterval < river.FetchCooldownDefault {
 		rc.FetchCooldown = c.pollInterval
 	}
 	return rc
+}
+
+func checkPayloadSize(operation string, payload []byte, limit int) error {
+	if len(payload) <= limit {
+		return nil
+	}
+	return &userError{
+		what: "jobs: " + operation,
+		why:  fmt.Sprintf("encoded arguments contain %d bytes, exceeding the %d-byte limit", len(payload), limit),
+		try:  "reduce the job arguments, or configure WithMaxPayloadBytes on both the client and worker",
+	}
 }
 
 // Client inserts jobs. It does not work them. Use it in the API process.

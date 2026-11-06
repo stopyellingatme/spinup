@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/stopyellingatme/spinup/kit/config"
 	"github.com/stopyellingatme/spinup/kit/httpx"
@@ -12,6 +13,19 @@ import (
 
 // Option configures an App during construction.
 type Option func(*App)
+
+// WithRequestTimeout sets the request context timeout, overriding REQUEST_TIMEOUT.
+// Nonpositive values use the default of 30 seconds. Handlers must honor cancellation.
+func WithRequestTimeout(timeout time.Duration) Option {
+	return func(a *App) { a.requestTimeout = timeout }
+}
+
+// WithRequestTimeoutExempt exempts matching requests from the application deadline.
+// Use it for streaming, SSE, or websocket routes. Devtools routes are already exempt.
+// The predicate must support concurrent calls. A nil predicate adds no exemptions.
+func WithRequestTimeoutExempt(exempt func(*http.Request) bool) Option {
+	return func(a *App) { a.timeoutExempt = exempt }
+}
 
 // WithName sets the application name returned by /version.
 func WithName(name string) Option { return func(a *App) { a.name = name } }

@@ -79,6 +79,8 @@ return a.Run(ctx, os.Args[1:])
 | --- | --- |
 | `WithRoutes(func(*http.ServeMux))` | Adds routes. Call it more than once to add more. |
 | `WithMiddleware(...)` | Adds middleware around every route. |
+| `WithRequestTimeout(duration)` | Limits the request context. The default is 30 seconds. Overrides `REQUEST_TIMEOUT`. |
+| `WithRequestTimeoutExempt(predicate)` | Exempts matching requests from the application deadline. Use it for streaming, SSE, or websocket routes. |
 | `WithReadiness(name, check)` | Adds a check to `/readyz`. A failed check gives 503. Each check has two seconds. |
 | `WithCommand(name, run)` | Adds a command such as `migrate`. See [App binary commands](app-commands.md). |
 | `WithShutdown(func)` | Runs when the server stops, in reverse order. |
@@ -86,6 +88,20 @@ return a.Run(ctx, os.Args[1:])
 | `WithSPA(fs)` | Serves a static web app from the binary. The embed mode uses it. |
 
 `a.Handler()` returns the full handler. Use it in tests.
+
+The request deadline includes middleware, database connection waits, and database work.
+Handlers must honor context cancellation.
+An expired deadline gives a 503 problem if the response has not started.
+The app does not replace a response that has already started.
+Devtools routes under `/_dev` are exempt in development.
+Other routes have no automatic exemption.
+
+`REQUEST_TIMEOUT` accepts a Go duration, such as `10s`.
+An absent, invalid, or nonpositive value uses 30 seconds.
+The app reads this variable directly during `app.New`.
+For settings loaded through `config.Load`, add a duration field and pass its value to `WithRequestTimeout`.
+The server write timeout uses the same configured duration.
+For long-lived responses, configure transport deadlines with `http.NewResponseController` as needed.
 
 ## config
 

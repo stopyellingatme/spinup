@@ -45,14 +45,20 @@ type App struct {
 	migrationStatus func(context.Context) ([]devtools.Migration, error)
 	routeMu         sync.Mutex
 	routePatterns   map[string]struct{}
+	requestTimeout  time.Duration
+	timeoutExempt   func(*http.Request) bool
 }
 
 // New constructs an API with the default middleware and built-in routes.
 // The defaults are port 8080, a 20-second shutdown timeout, and JSON logging to stderr.
 func New(opts ...Option) *App {
 	a := &App{readiness: make(map[string]func(context.Context) error), commands: make(map[string]func(context.Context, []string) error), routePatterns: make(map[string]struct{})}
+	a.requestTimeout, _ = time.ParseDuration(os.Getenv("REQUEST_TIMEOUT"))
 	for _, opt := range opts {
 		opt(a)
+	}
+	if a.requestTimeout <= 0 {
+		a.requestTimeout = 30 * time.Second
 	}
 	if a.config.Port <= 0 {
 		a.config.Port = 8080
@@ -112,6 +118,7 @@ func New(opts ...Option) *App {
 		a.addRoute("/_dev/")
 		middleware = append(middleware, dev.Middleware(), a.recordRoute())
 	}
+	middleware = append(middleware, a.requestDeadline())
 	a.handler = a.telemetryHandler(httpx.Chain(mux, append(middleware, a.middleware...)...), mux)
 	return a
 }
@@ -240,7 +247,7 @@ func (a *App) serveListener(ctx context.Context, listener net.Listener) error {
 		Handler:           a.handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      a.requestTimeout,
 		IdleTimeout:       120 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return logx.WithLogger(context.WithoutCancel(ctx), a.logger) },
 	}

@@ -96,7 +96,11 @@ before: connecting to postgres://app:s3cret@db/app
 after:  connecting to postgres://app:****@db/app
 ```
 
-The check also reaches nested groups, attributes added with `With`, and the values of a map, `http.Header`, or `url.Values` one level deep.
+The check reaches nested groups and attributes added with `With`.
+It also checks nested maps with string keys, `http.Header`, `url.Values`, slices, arrays, and exported struct fields.
+Struct fields use their JSON names when present. Fields with `json:"-"` are omitted.
+The check follows pointers and stops at eight levels. Values at that depth become `****`, which also bounds cycles.
+Redaction does not change the original containers.
 
 ### Add your own rules
 
