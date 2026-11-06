@@ -36,7 +36,7 @@ func TestAppliedMigrations(t *testing.T) {
 	}{
 		{name: "complete set with a gap", table: "0\n", rows: "0\n1\n6\n", want: []int64{0, 1, 6}},
 		{name: "missing table", table: "-1\n"},
-		{name: "empty table", table: "0\n"},
+		{name: "empty table", table: "0\n", want: []int64{}},
 		{name: "invalid version", table: "0\n", rows: "1\ninvalid\n6\n", err: "parse the applied migration version"},
 		{name: "query failure", table: "0\n", code: 1, err: "query the applied migrations"},
 	} {
@@ -205,5 +205,51 @@ func TestLintMigrationSpaces(t *testing.T) {
 	got, err := DefaultDeps().Lint(root)
 	if err != nil || len(got) != 2 || got[0].File != "00008_drop.sql" || got[1].File != "00002_drop.sql" {
 		t.Fatalf("lint = %+v, %v", got, err)
+	}
+}
+
+func TestPendingOnVMLegacyKitAdoption(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, table string
+		collide     bool
+		want        []string
+	}{
+		{name: "project legacy rows", table: "-1\n", want: []string{"kit 00008_flags.sql"}},
+		{name: "app owns legacy version", table: "-1\n", collide: true, want: []string{"kit 00002_auth.sql", "kit 00008_flags.sql"}},
+		{name: "existing empty kit table", table: "0\n", want: []string{"kit 00002_auth.sql", "kit 00007_auth_version.sql", "kit 00008_flags.sql"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			vm := &remote.Fake{}
+			expectAppliedMigrations(vm, "1\n2\n7\n8\n")
+			vm.Expect(migrationQuery(kitTableQuery)...).Return(tc.table, "", 0)
+			if tc.table != "-1\n" {
+				vm.Expect(migrationQuery(kitAppliedQuery)...).Return("", "", 0)
+			}
+			ms := []migration{{Space: "kit", Version: 2, Name: "00002_auth.sql"}, {Space: "kit", Version: 7, Name: "00007_auth_version.sql"}, {Space: "kit", Version: 8, Name: "00008_flags.sql"}, {Space: "app", Version: 1, Name: "00001_init.sql"}}
+			if tc.collide {
+				ms = append(ms, migration{Space: "app", Version: 2, Name: "00002_notes.sql"})
+			}
+			f := &flow{vm: vm, l: &local{app: "todo", migrations: ms}}
+			got, err := f.pendingOnVM(t.Context(), &Release{})
+			if err != nil || !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("pending = %v, error = %v, want %v", got, err, tc.want)
+			}
+			vm.AssertDone(t)
+		})
+	}
+}
+
+func TestLintAppIndexOnKitTable(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"api/db/kit/00002_auth.sql":         "-- +goose Up\nCREATE TABLE users (id bigint);\nCREATE INDEX users_initial ON users(id);",
+		"api/db/migrations/00001_index.sql": "-- +goose Up\nCREATE INDEX users_later ON users(id);",
+	})
+	got, err := LintMigrations(root)
+	if err != nil || len(got) != 1 || got[0].File != "00001_index.sql" || got[0].Rule != "index-not-concurrent" {
+		t.Fatalf("lint = %+v, error = %v", got, err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	execx "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
@@ -53,9 +54,12 @@ func TestKitMigrationsPlanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldSpecs := auditCorpusSpecs(t, root)
-	old := planVersion("0.1.0-alpha.419", oldSpecs...)
+	old := planVersion("0.1.0-alpha.418", oldSpecs...)
 	lock := planLock("", "")
 	lock.TemplateVersion = old.Version
+	lock.Packs = append(lock.Packs, "auth")
+	old.Packs.(fstest.MapFS)["auth/pack.toml"] = &fstest.MapFile{Data: []byte("name = 'auth'\n")}
+
 	rendered, err := Render(old, lock.Packs, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +79,9 @@ func TestKitMigrationsPlanner(t *testing.T) {
 		specs = append(specs, spec)
 	}
 	specs = append(specs, planSpec{path: "api/db/kit/embed.go", data: "package kit\n", class: "managed"})
-	newer := planVersion("0.1.0-alpha.420", specs...)
+	newer := planVersion("0.1.0-alpha.419", specs...)
+	newer.Packs.(fstest.MapFS)["auth/pack.toml"] = &fstest.MapFile{Data: []byte("name = 'auth'\n")}
+
 	r := &Runner{Root: root, Source: chainSource{old.Version: old, newer.Version: newer}, Out: &bytes.Buffer{}, Merger: merge.NewGit(execx.OSRunner{})}
 	report, err := r.preview(t.Context(), lock, []string{newer.Version}, Options{})
 	if err != nil {
@@ -102,7 +108,7 @@ func TestKitMigrationsPlanner(t *testing.T) {
 	}
 	for _, m := range migrate.All() {
 		if m.ID == migrate.KitMigrationsID {
-			if err := m.Apply(&migrate.Ctx{Root: root}); err != nil {
+			if err := m.Apply(&migrate.Ctx{Root: root, Lock: lock}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -170,7 +176,7 @@ var migrate = db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseUR
 			writePlanFile(t, root, mainPath, disk, 0o644)
 			writePlanFile(t, root, "api/sqlc.yaml", "schema: db/migrations\n", 0o644)
 			lock := planLock("", "")
-			old := planVersion("0.1.0-alpha.419", planSpec{path: mainPath, data: oldMain, class: "scaffold"}, planSpec{path: "api/sqlc.yaml", data: "schema: db/migrations\n", class: "managed"})
+			old := planVersion("0.1.0-alpha.418", planSpec{path: mainPath, data: oldMain, class: "scaffold"}, planSpec{path: "api/sqlc.yaml", data: "schema: db/migrations\n", class: "managed"})
 			rendered, err := Render(old, lock.Packs, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -178,7 +184,7 @@ var migrate = db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseUR
 			for _, file := range rendered.Files {
 				lock.Files[file.Path] = manifest.FileEntry{Class: manifest.Class(file.Class), Template: file.Template, Hash: manifest.Hash(file.Data), Mode: "0644"}
 			}
-			newer := planVersion("0.1.0-alpha.420", planSpec{path: mainPath, data: newMain, class: "scaffold"}, planSpec{path: "api/sqlc.yaml", data: "schema: [db/kit, db/migrations]\n", class: "managed"})
+			newer := planVersion("0.1.0-alpha.419", planSpec{path: mainPath, data: newMain, class: "scaffold"}, planSpec{path: "api/sqlc.yaml", data: "schema: [db/kit, db/migrations]\n", class: "managed"})
 			plan, err := BuildPlan(t.Context(), PlanInput{Root: root, Lock: lock, Old: old, New: newer, Merger: merge.NewGit(execx.OSRunner{})})
 			if err != nil {
 				t.Fatal(err)

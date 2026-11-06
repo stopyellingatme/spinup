@@ -384,8 +384,9 @@ func (m migration) label(tagged bool) string {
 	return space + " " + m.Name
 }
 
-// pendingMigrations compares each space against its own applied set.
+// pendingMigrations compares each space after projecting legacy kit adoption.
 func pendingMigrations(ms []migration, applied, kitApplied []int64) []string {
+	kitApplied = projectKitAdoption(ms, applied, kitApplied)
 	tagged := slices.ContainsFunc(ms, func(m migration) bool { return m.Space == "kit" })
 	appSet, kitSet := map[int64]bool{}, map[int64]bool{}
 	for _, version := range applied {
@@ -407,6 +408,39 @@ func pendingMigrations(ms []migration, applied, kitApplied []int64) []string {
 	return out
 }
 
+// ProjectKitAdoption projects legacy kit rows before the first kit migration run.
+// A nil kitApplied means that the kit version table does not exist.
+// Versions 2–7 remain app-owned when an app file has the same version.
+func ProjectKitAdoption(root string, applied, kitApplied []int64) ([]int64, error) {
+	if kitApplied != nil {
+		return kitApplied, nil
+	}
+	ms, err := migrations(root)
+	if err != nil {
+		return nil, err
+	}
+	return projectKitAdoption(ms, applied, kitApplied), nil
+}
+
+func projectKitAdoption(ms []migration, applied, kitApplied []int64) []int64 {
+	if kitApplied != nil {
+		return kitApplied
+	}
+	appVersions := map[int64]bool{}
+	for _, m := range ms {
+		if m.Space != "kit" {
+			appVersions[m.Version] = true
+		}
+	}
+	var projected []int64
+	for _, version := range applied {
+		if version >= 2 && version <= 7 && !appVersions[version] {
+			projected = append(projected, version)
+		}
+	}
+	return projected
+}
+
 const (
 	gooseTableQuery   = "SELECT CASE WHEN to_regclass('public.goose_db_version') IS NULL THEN '-1' ELSE '0' END"
 	gooseAppliedQuery = "SELECT version_id FROM goose_db_version WHERE is_applied ORDER BY version_id"
@@ -421,7 +455,7 @@ func AppliedMigrations(ctx context.Context, r remote.Runner, app string) ([]int6
 }
 
 // AppliedKitMigrations returns all applied kit versions on the VM.
-// A database without spinup_kit_version gives an empty set.
+// A missing spinup_kit_version table gives nil. An existing table gives a non-nil set.
 func AppliedKitMigrations(ctx context.Context, r remote.Runner, app string) ([]int64, error) {
 	return appliedMigrations(ctx, r, app, kitTableQuery, kitAppliedQuery, "spinup_kit_version")
 }
@@ -439,7 +473,7 @@ func appliedMigrations(ctx context.Context, r remote.Runner, app, tableQuery, ap
 	if err != nil {
 		return nil, fmt.Errorf("query the applied migrations: %w\nTry: check postgres on the VM", err)
 	}
-	var applied []int64
+	applied := []int64{}
 	for _, value := range strings.Fields(string(result.Stdout)) {
 		version, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {

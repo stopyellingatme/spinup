@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/migrate"
 	"github.com/stopyellingatme/spinup/internal/migrate/migratetest"
 )
@@ -24,8 +25,8 @@ func kitMigration(t *testing.T, id string) migrate.Migration {
 
 func TestKitMigrationsMove(t *testing.T) {
 	t.Parallel()
-	m := kitMigration(t, "0003_kit_migrations")
-	if m.Stage != migrate.Before || m.Since != "0.1.0-alpha.420" {
+	m := kitMigrationWithPacks(t, "auth", "audit")
+	if m.Stage != migrate.Before || m.Since != "0.1.0-alpha.419" {
 		t.Fatalf("migration = %+v", m)
 	}
 	files := map[string]string{
@@ -66,7 +67,7 @@ func TestKitMigrationsRenamed(t *testing.T) {
 	for _, name := range []string{"00008_users_role.sql", "00009_create_auth.sql", "00010_password_resets.sql", "00011_oidc_identities.sql", "00012_audit_events.sql", "00013_users_auth_version.sql"} {
 		t.Run(name, func(t *testing.T) {
 			root := writeTree(t, map[string]string{"api/db/migrations/" + name: "-- renamed", "api/db/migrations/00002_create_auth.sql": "-- original"})
-			m := kitMigration(t, "0003_kit_migrations")
+			m := kitMigrationWithPacks(t, "auth", "audit")
 			c := &migrate.Ctx{Root: root}
 			changes, err := m.Plan(c)
 			if err == nil || len(changes) == 0 || changes[len(changes)-1].Desc != "Manual step: "+name+" is a renamed kit migration" {
@@ -95,7 +96,7 @@ func TestKitMigrationsCopies(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := writeTree(t, map[string]string{"api/db/migrations/00002_create_auth.sql": "-- source\r\n", "api/db/kit/00002_create_auth.sql": tc.target})
-			m := kitMigration(t, "0003_kit_migrations")
+			m := kitMigrationWithPacks(t, "auth", "audit")
 			err := m.Apply(&migrate.Ctx{Root: root})
 			if tc.fail {
 				if err == nil || !strings.Contains(err.Error(), "Try: remove one of the two copies") {
@@ -133,4 +134,88 @@ func TestKitMigrationsNoop(t *testing.T) {
 		t.Fatalf("changes = %+v, error = %v", changes, err)
 	}
 	migratetest.Run(t, m, root, root)
+}
+
+func kitMigrationWithPacks(t *testing.T, packs ...string) migrate.Migration {
+	t.Helper()
+	m := kitMigration(t, migrate.KitMigrationsID)
+	plan, apply := m.Plan, m.Apply
+	m.Plan = func(c *migrate.Ctx) ([]migrate.Change, error) {
+		copy := *c
+		copy.Lock = &manifest.Lock{Packs: packs}
+		return plan(&copy)
+	}
+	m.Apply = func(c *migrate.Ctx) error {
+		copy := *c
+		copy.Lock = &manifest.Lock{Packs: packs}
+		return apply(&copy)
+	}
+	return m
+}
+
+func TestKitMigrationsPackOwnership(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		packs []string
+		file  string
+		move  bool
+	}{
+		{name: "app password resets without auth", packs: []string{"api"}, file: "00003_password_resets.sql"},
+		{name: "renamed app file without auth", packs: []string{"api"}, file: "00009_create_auth.sql"},
+		{name: "audit name without audit", packs: []string{"api", "auth"}, file: "00006_audit_events.sql"},
+		{name: "renamed audit name without audit", packs: []string{"api", "auth"}, file: "00009_audit_events.sql"},
+		{name: "auth file", packs: []string{"api", "auth"}, file: "00003_password_resets.sql", move: true},
+		{name: "audit file", packs: []string{"api", "auth", "audit"}, file: "00006_audit_events.sql", move: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path := "api/db/migrations/" + tc.file
+			root := writeTree(t, map[string]string{path: "-- app bytes\n"})
+			m := kitMigrationWithPacks(t, tc.packs...)
+			c := &migrate.Ctx{Root: root}
+			changes, err := m.Plan(c)
+			wantCount := 0
+			if tc.move {
+				wantCount = 1
+			}
+			if err != nil || len(changes) != wantCount {
+				t.Fatalf("changes = %v, error = %v", changes, err)
+			}
+			if err := m.Apply(c); err != nil {
+				t.Fatal(err)
+			}
+			if tc.move {
+				path = "api/db/kit/" + tc.file
+			}
+			data, err := os.ReadFile(filepath.Join(root, path))
+			if err != nil || string(data) != "-- app bytes\n" {
+				t.Fatalf("file = %q, error = %v", data, err)
+			}
+		})
+	}
+}
+
+func TestKitCodemodsSelectedForRelease(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		id    string
+		stage migrate.Stage
+	}{
+		{migrate.KitMigrationsID, migrate.Before}, {migrate.KitTestkitID, migrate.After},
+	} {
+		pending, err := migrate.Pending("0.1.0-alpha.418", "0.1.0-alpha.419", nil, tc.stage)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, m := range pending {
+			if m.ID == tc.id {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s not selected for alpha.419", tc.id)
+		}
+	}
 }

@@ -218,7 +218,7 @@ END $$;`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file.Path != "api/db/migrations/00008_audit_widgets.sql" || !strings.Contains(string(file.Data), "DROP TRIGGER IF EXISTS widgets_audit") {
+	if file.Path != "api/db/migrations/00010_audit_widgets.sql" || !strings.Contains(string(file.Data), "DROP TRIGGER IF EXISTS widgets_audit") {
 		t.Fatalf("migration = %+v", file)
 	}
 }

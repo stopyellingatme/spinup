@@ -30,7 +30,7 @@ func TestKitMigrationReaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(strings.Join(plan.Paths(), ","), "api/db/migrations/00002_create_notes.sql") {
+	if !strings.Contains(strings.Join(plan.Paths(), ","), "api/db/migrations/00008_create_notes.sql") {
 		t.Fatal(plan.Paths())
 	}
 }

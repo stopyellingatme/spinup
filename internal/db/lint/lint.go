@@ -30,31 +30,39 @@ func Lint(name string, sql []byte) ([]Finding, error) {
 
 // LintDir checks SQL migrations in name order.
 func LintDir(dir string) ([]Finding, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("read migrations directory %q: %w", dir, err)
-	}
-	var names []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			names = append(names, entry.Name())
-		}
-	}
-	sort.Strings(names)
+	return LintDirs(dir)
+}
+
+// LintDirs checks directories in the given order with one table history.
+// Files within each directory are checked in name order.
+func LintDirs(dirs ...string) ([]Finding, error) {
 	created := map[string]bool{}
 	var findings []Finding
-	for _, name := range names {
-		data, readErr := os.ReadFile(filepath.Join(dir, name))
-		if readErr != nil {
-			return nil, fmt.Errorf("read migration %q: %w", name, readErr)
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil, fmt.Errorf("read migrations directory %q: %w", dir, err)
 		}
-		got, lintErr := lint(name, data, created)
-		if lintErr != nil {
-			return nil, lintErr
+		var names []string
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+				names = append(names, entry.Name())
+			}
 		}
-		findings = append(findings, got...)
-		for _, table := range createdTables(data) {
-			created[table] = true
+		sort.Strings(names)
+		for _, name := range names {
+			data, readErr := os.ReadFile(filepath.Join(dir, name))
+			if readErr != nil {
+				return nil, fmt.Errorf("read migration %q: %w", name, readErr)
+			}
+			got, lintErr := lint(name, data, created)
+			if lintErr != nil {
+				return nil, lintErr
+			}
+			findings = append(findings, got...)
+			for _, table := range createdTables(data) {
+				created[table] = true
+			}
 		}
 	}
 	return findings, nil

@@ -19,9 +19,9 @@ import (
 
 func kitFiles() fstest.MapFS {
 	return fstest.MapFS{
-		"00002_create_auth.sql":        {Data: []byte("-- +goose Up\nCREATE TABLE users (id bigint PRIMARY KEY);\n-- +goose Down\nDROP TABLE users;\n")},
+		"00002_create_auth.sql":        {Data: []byte("-- +goose Up\nCREATE TABLE users (id bigint PRIMARY KEY);\nCREATE TABLE sessions (token text PRIMARY KEY);\n-- +goose Down\nDROP TABLE sessions;\nDROP TABLE users;\n")},
 		"00005_users_role.sql":         {Data: []byte("-- +goose Up\nALTER TABLE users ADD COLUMN role text;\n-- +goose Down\nALTER TABLE users DROP COLUMN role;\n")},
-		"00007_users_auth_version.sql": {Data: []byte("-- +goose Up\nALTER TABLE users ADD COLUMN auth_version bigint;\n-- +goose Down\nALTER TABLE users DROP COLUMN auth_version;\n")},
+		"00007_users_auth_version.sql": {Data: []byte("-- +goose Up\nALTER TABLE users ADD COLUMN auth_version bigint;\nALTER TABLE sessions ADD COLUMN user_id bigint REFERENCES users(id);\n-- +goose Down\nALTER TABLE sessions DROP COLUMN user_id;\nALTER TABLE users DROP COLUMN auth_version;\n")},
 	}
 }
 
@@ -58,7 +58,7 @@ func TestKitMigrationAdoptionTodo(t *testing.T) {
 	url := testkit.URL(t, pool)
 	app, kit := appFiles(), kitFiles()
 	seedLegacy(t, pool, app, kit)
-	want := "adopted  kit 00002_create_auth.sql\nmigrate: 2 pending\napplied  kit 00005_users_role.sql\napplied  kit 00007_users_auth_version.sql\n"
+	want := "migrate: 2 pending\napplied  kit 00005_users_role.sql\napplied  kit 00007_users_auth_version.sql\n"
 	if got := kitCmd(t, url, app, kit, "up"); got != want {
 		t.Fatalf("up = %q, want %q", got, want)
 	}
@@ -160,8 +160,10 @@ func TestKitMigrationConcurrentAdoption(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if count := strings.Count(outputs[0].String()+outputs[1].String(), "adopted  kit 00002_create_auth.sql\n"); count != 1 {
-		t.Fatalf("adopted lines = %d", count)
+	for _, out := range outputs {
+		if out.Len() != 0 {
+			t.Fatalf("adoption wrote to stdout: %q", out.String())
+		}
 	}
 	var count int
 	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM "+db.KitVersionTable+" WHERE version_id = 2").Scan(&count); err != nil || count != 1 {
@@ -307,8 +309,8 @@ func TestKitMigrationLegacyProbes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if count := strings.Count(out.String(), "adopted  kit "); count != 6 {
-				t.Fatalf("adopted %d files:\n%s", count, out.String())
+			if out.Len() != 0 {
+				t.Fatalf("adoption wrote to stdout: %q", out.String())
 			}
 			list, err := m.KitStatus(t.Context())
 			if err != nil || len(list) != 6 {
@@ -406,5 +408,49 @@ func TestKitCommandEmptySpaceSkipsHooks(t *testing.T) {
 		if out.String() != want {
 			t.Fatalf("empty kit output = %q, want %q", out.String(), want)
 		}
+	}
+}
+
+func TestKitMigrationVersionAfterAdoption(t *testing.T) {
+	t.Parallel()
+	pool := testkit.DB(t)
+	app, kit := appFiles(), kitFiles()
+	seedLegacy(t, pool, app, kit)
+	if got := kitCmd(t, testkit.URL(t, pool), app, kit, "version"); got != "3\n" {
+		t.Fatalf("version stdout = %q", got)
+	}
+	var count int
+	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM spinup_kit_version WHERE version_id = 2 AND is_applied").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("adopted rows = %d, error = %v", count, err)
+	}
+}
+
+func TestKitMigrationProbeRequiresSessionsUserID(t *testing.T) {
+	t.Parallel()
+	pool := testkit.DB(t)
+	app, kit := appFiles(), kitFiles()
+	legacy := fstest.MapFS{}
+	for name, file := range app {
+		legacy[name] = file
+	}
+	for name, file := range kit {
+		legacy[name] = file
+	}
+	url := testkit.URL(t, pool)
+	runCmd(t, url, legacy, "up")
+	if _, err := pool.Exec(t.Context(), "ALTER TABLE sessions DROP COLUMN user_id"); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	err := db.MigrateCommand(app, db.WithKitMigrations(kit), db.WithDatabaseURL(url), db.WithOutput(&out))(t.Context(), []string{"version"})
+	if err == nil || !strings.Contains(err.Error(), "row 7 in goose_db_version is not kit migration") {
+		t.Fatalf("partial version 7: %v", err)
+	}
+	var count int
+	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM goose_db_version WHERE version_id IN (2, 5, 7)").Scan(&count); err != nil || count != 3 {
+		t.Fatalf("legacy rows after rollback = %d, error = %v", count, err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("failed adoption stdout = %q", out.String())
 	}
 }

@@ -36,7 +36,7 @@ func TestExample(t *testing.T) {
 func TestKitTestkitMigration(t *testing.T) {
 	t.Parallel()
 	m := kitMigration(t, "0004_kit_testkit")
-	if m.Stage != migrate.After || m.Since != "0.1.0-alpha.420" {
+	if m.Stage != migrate.After || m.Since != "0.1.0-alpha.419" {
 		t.Fatalf("migration = %+v", m)
 	}
 	root := writeTree(t, map[string]string{"api/db/kit/embed.go": "package kit\n", "api/internal/handlers/example_test.go": oldKitTest})

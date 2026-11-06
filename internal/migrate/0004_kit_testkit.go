@@ -33,7 +33,7 @@ type kitTestEdit struct {
 func kitTestkit() Migration {
 	return Migration{
 		ID:    KitTestkitID,
-		Since: "0.1.0-alpha.420",
+		Since: "0.1.0-alpha.419",
 		Desc:  "Include kit migrations in generated test databases",
 		Stage: After,
 		Plan: func(c *Ctx) ([]Change, error) {

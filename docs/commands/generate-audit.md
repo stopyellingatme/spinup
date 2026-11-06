@@ -22,7 +22,7 @@ $ spinup g resource work_order title:string --no-audit --api-only
 $ spinup g resource part name:string --no-audit --api-only
 ...
 $ spinup g audit work_order --api-only --dry-run
-create api/db/migrations/00004_audit_work_orders.sql (seed)
+create api/db/migrations/00010_audit_work_orders.sql (seed)
 create api/internal/handlers/work_orders_history.go (scaffold)
 create api/openapi/paths/work_orders_history.yaml (scaffold)
 create api/openapi/schemas/audit_event.yaml (scaffold)
