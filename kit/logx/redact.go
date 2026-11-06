@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"sync/atomic"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Redactor transforms log attributes. Implementations must support concurrent calls.
@@ -115,13 +117,50 @@ func (defaultRedactor) Redact(key string, value slog.Value) slog.Value {
 }
 
 func isSecretKey(key string) bool {
-	lower := strings.ToLower(key)
+	// Most attribute names are already lowercase ASCII.
+	folded := false
+	for i := 0; i < len(key); i++ {
+		if key[i] >= 'A' && key[i] <= 'Z' || key[i] >= utf8.RuneSelf {
+			folded = true
+			break
+		}
+	}
 	for _, secret := range []string{"password", "secret", "token", "authorization", "cookie", "api_key", "dsn"} {
-		if strings.Contains(lower, secret) {
-			return true
+		if !folded {
+			if strings.Contains(key, secret) {
+				return true
+			}
+			continue
+		}
+		for i := range key {
+			if hasLowerPrefix(key[i:], secret) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// hasLowerPrefix compares without allocating a lowercase copy. Unicode folding
+// matches strings.ToLower, including keys that contain the Kelvin sign.
+func hasLowerPrefix(value, lower string) bool {
+	for i := 0; i < len(lower); i++ {
+		if len(value) == 0 {
+			return false
+		}
+		c, size := rune(value[0]), 1
+		if c >= utf8.RuneSelf {
+			c, size = utf8.DecodeRuneInString(value)
+			c = unicode.ToLower(c)
+		} else if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != rune(lower[i]) {
+			return false
+		}
+		value = value[size:]
+	}
+	return true
 }
 
 // Stop before following a container at this depth. This also bounds cycles.
@@ -213,4 +252,9 @@ func redactValue(value reflect.Value, depth int) any {
 
 var urlCredentials = regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://[^/@\s:]*:)[^\s]*@`)
 
-func maskURLs(value string) string { return urlCredentials.ReplaceAllString(value, "${1}****@") }
+func maskURLs(value string) string {
+	if !strings.Contains(value, "://") {
+		return value
+	}
+	return urlCredentials.ReplaceAllString(value, "${1}****@")
+}
