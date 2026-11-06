@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/render"
@@ -47,8 +48,31 @@ type Result struct {
 	KitReplace string
 }
 
-// Catalog loads every embedded public pack in name order.
+// Catalog returns independent copies of the validated embedded public packs in name order.
 func Catalog() ([]*templates.Pack, error) {
+	packs, err := embeddedCatalog()
+	if err != nil {
+		return nil, err
+	}
+	copies := make([]*templates.Pack, len(packs))
+	for i, pack := range packs {
+		copy := *pack
+		copy.Requires = slices.Clone(pack.Requires)
+		copy.Files = slices.Clone(pack.Files)
+		copy.Questions = slices.Clone(pack.Questions)
+		for j := range copy.Questions {
+			copy.Questions[j].Choices = slices.Clone(pack.Questions[j].Choices)
+		}
+		copies[i] = &copy
+	}
+	return copies, nil
+}
+
+// The embedded source is fixed for the life of the process. Versioned and
+// external sources use the template store and do not pass through this cache.
+var embeddedCatalog = sync.OnceValues(loadEmbeddedCatalog)
+
+func loadEmbeddedCatalog() ([]*templates.Pack, error) {
 	fsys := templates.Embedded()
 	names, err := templates.List(fsys)
 	if err != nil {

@@ -489,3 +489,22 @@ func TestEmbedRefusesAuth(t *testing.T) {
 		t.Fatalf("Generate error = %v", err)
 	}
 }
+
+func TestCatalogReturnsIndependentPacks(t *testing.T) {
+	first, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) == 0 || len(first[0].Files) == 0 {
+		t.Fatal("catalog has no files")
+	}
+	first[0].Name = "changed"
+	first[0].Files[0].Path = "changed"
+	if second[0].Name == "changed" || second[0].Files[0].Path == "changed" {
+		t.Fatal("catalog calls share mutable packs")
+	}
+}
