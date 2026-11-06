@@ -165,6 +165,9 @@ func Parse(data []byte) (*Config, error) {
 	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse %s extra keys: %w", ConfigFile, err)
 	}
+	if err := checkFlagFields(raw["flags"]); err != nil {
+		return nil, err
+	}
 	if auth, ok := raw["auth"].(map[string]any); ok {
 		_, config.authAdminSet = auth["admin_role"]
 		_, config.authDefaultSet = auth["default_role"]
