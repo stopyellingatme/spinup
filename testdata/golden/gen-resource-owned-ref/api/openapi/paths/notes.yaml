@@ -1,0 +1,250 @@
+# Operations of the note resource. spinup bundles them into api/openapi/bundle.gen.yaml.
+/api/notes:
+  get:
+    operationId: listNotes
+    summary: List notes
+    tags: [notes]
+    parameters:
+      - name: limit
+        in: query
+        description: The number of notes to return.
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: offset
+        in: query
+        description: The number of notes to skip.
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+          default: 0
+    responses:
+      "200":
+        description: A page of notes in id order.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteList"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  post:
+    operationId: createNote
+    summary: Create a note
+    tags: [notes]
+    requestBody:
+      description: A JSON object of at most 1 MiB.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/NoteInput"
+    responses:
+      "201":
+        description: The new note.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Note"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "413":
+        description: The request body exceeds 1 MiB.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+/api/notes/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  get:
+    operationId: getNote
+    summary: Get a note
+    tags: [notes]
+    responses:
+      "200":
+        description: The note.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Note"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The note does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  put:
+    operationId: updateNote
+    summary: Replace a note
+    tags: [notes]
+    requestBody:
+      description: A JSON object of at most 1 MiB.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/NoteInput"
+    responses:
+      "200":
+        description: The updated note.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Note"
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The note does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "413":
+        description: The request body exceeds 1 MiB.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "422":
+        description: The request has invalid values.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+  delete:
+    operationId: deleteNote
+    summary: Delete a note
+    tags: [notes]
+    responses:
+      "204":
+        description: The note is deleted.
+      "400":
+        description: The request is malformed.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "404":
+        description: The note does not exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "409":
+        description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "401":
+        description: A signed-in user is required.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      default:
+        description: An unexpected error.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"

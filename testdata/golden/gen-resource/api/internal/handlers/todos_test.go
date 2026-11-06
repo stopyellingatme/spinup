@@ -1,7 +1,9 @@
 package handlers_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"example.com/todo/api/db/migrations"
 	"example.com/todo/api/internal/gen"
@@ -48,6 +51,11 @@ func TestTodosCRUD(t *testing.T) {
 	list := testkit.DecodeJSON[gen.TodoList](t, rec)
 	if list.Total != 1 || len(list.Items) != 1 || !reflect.DeepEqual(list.Items[0], created) {
 		t.Fatalf("list: got %+v, want one item %+v", list, created)
+	}
+	// A page past the last row still has the total.
+	rec = testkit.Do(t, handler, http.MethodGet, "/api/todos?offset=1", nil)
+	if past := testkit.DecodeJSON[gen.TodoList](t, rec); rec.Code != http.StatusOK || past.Total != 1 || len(past.Items) != 0 {
+		t.Fatalf("list past the end: status %d, got %+v, want total 1 and no items", rec.Code, past)
 	}
 
 	rec = testkit.Do(t, handler, http.MethodPut, path, strings.NewReader(`{"title": "title 2", "done": false, "due": null, "priority": "high"}`))
@@ -96,6 +104,7 @@ func TestTodosRejectsBadInput(t *testing.T) {
 		{"Put invalid UTF-8", http.MethodPut, "/api/todos/1", "{\"title\":\"\xff\"}", http.StatusBadRequest},
 		{"bad id", http.MethodGet, "/api/todos/abc", "", http.StatusBadRequest},
 		{"limit too large", http.MethodGet, "/api/todos?limit=201", "", http.StatusUnprocessableEntity},
+		{"offset too large", http.MethodGet, "/api/todos?offset=10001", "", http.StatusUnprocessableEntity},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -238,5 +247,35 @@ func TestTodosChecksJSONBody(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestTodosResponseErrors checks the answers of ResponseError in server.go to
+// errors that are not problems.
+func TestTodosResponseErrors(t *testing.T) {
+	t.Parallel()
+	// A client that went away gets nothing: nobody reads the answer.
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	rec := httptest.NewRecorder()
+	handlers.ResponseError(rec, httptest.NewRequestWithContext(canceled, http.MethodGet, "/api/todos", nil), fmt.Errorf("list: %w", context.Canceled))
+	if rec.Body.Len() != 0 || rec.Header().Get("Content-Type") != "" {
+		t.Fatalf("canceled: status %d, body %q, want no answer", rec.Code, rec.Body)
+	}
+
+	// An expired request deadline is a 503 problem, not a 500.
+	expired, stop := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer stop()
+	rec = httptest.NewRecorder()
+	handlers.ResponseError(rec, httptest.NewRequestWithContext(expired, http.MethodGet, "/api/todos", nil), fmt.Errorf("list: %w", context.DeadlineExceeded))
+	if problem := testkit.DecodeJSON[httpx.Problem](t, rec); rec.Code != http.StatusServiceUnavailable || problem.Status != http.StatusServiceUnavailable {
+		t.Fatalf("deadline: status %d, problem %+v, want 503", rec.Code, problem)
+	}
+
+	// Any other error is a 500 problem.
+	rec = httptest.NewRecorder()
+	handlers.ResponseError(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/todos", nil), errors.New("broken"))
+	if problem := testkit.DecodeJSON[httpx.Problem](t, rec); rec.Code != http.StatusInternalServerError || problem.Detail != "" {
+		t.Fatalf("other error: status %d, problem %+v, want a 500 without details", rec.Code, problem)
 	}
 }

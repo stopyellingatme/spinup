@@ -72,7 +72,7 @@ Use [`spinup g model`](#add-only-a-table) to create it first.
 | File | Class | Contents |
 | --- | --- | --- |
 | `api/db/migrations/NNNNN_create_<plural>.sql` | seed | The table with `id`, your fields, `created_at`, and `updated_at`. |
-| `api/db/queries/<plural>.sql` | scaffold | The sqlc queries to list, count, get, create, update, and delete. |
+| `api/db/queries/<plural>.sql` | scaffold | The sqlc queries to list (with the total count), count, get, create, update, and delete. |
 | `api/openapi/paths/<plural>.yaml` | scaffold | The five routes. |
 | `api/openapi/schemas/<singular>.yaml` | scaffold | The `Todo`, `TodoInput`, and `TodoList` schemas. |
 | `api/internal/handlers/<plural>.go` | scaffold | The handlers. They convert between database types and API types. |
@@ -86,12 +86,18 @@ The [generate](generate.md) page explains these steps and the file classes.
 
 ## Use the API
 
-The list route takes `limit` (1 to 200, default 50) and `offset` (default 0).
+The list route takes `limit` (1 to 200, default 50) and `offset` (0 to 10000, default 0).
 It returns the items in `id` order and the total count.
+One query gets the page and the total.
 
 ```sh
 curl 'http://localhost:8080/api/todos?limit=10&offset=0'
 ```
+
+An offset above 10000 gets a 422 answer with a field error on `offset`.
+PostgreSQL reads and skips every row before the page, so a deep page is slow.
+For a large collection, add a filter to the list query and to the route.
+Do not page through all the rows.
 
 Errors use the problem details format (RFC 9457, `application/problem+json`):
 
@@ -101,6 +107,11 @@ Errors use the problem details format (RFC 9457, `application/problem+json`):
 | A row that does not exist | 404 |
 | A unique value that already exists, or a delete of a row that other rows refer to | 409 |
 | A value of the wrong type, a bad enum value, a missing required field, or a broken database rule | 422 |
+| The request deadline of the app expired | 503 |
+
+If the client closes the connection, the handler writes no answer.
+The log then has only a debug line, not an error.
+The handlers log through the request logger of the kit, so each line has the `request_id`.
 
 ## Change the resource later
 
@@ -206,7 +217,27 @@ What changes with `auth`:
 - The table gets a `user_id` column, and the API does not show it.
 - Every route needs a signed-in user. A request without one gets 401.
 - A user sees only their own rows. A request for another user's row gets 404, also for update and delete.
+- A `ref:<model>` field to another owned resource can refer only to rows of the same user. This rule also applies to a field that refers to the resource itself.
 - The generated tests check these rules with two users.
+
+The migration enforces the reference rule with a foreign key on the reference and `user_id` together.
+PostgreSQL checks it in the same statement as the insert or update, so the check needs no extra query.
+A reference to a row of another user gets the same answer as a reference to a row that does not exist.
+The answer is 422, with a field error on the reference field.
+Thus the API does not show that the row of the other user exists.
+
+```console
+$ spinup g resource project name:string --api-only
+...
+$ spinup g resource task title:string project:ref:project --api-only --dry-run --diff | grep 'FOREIGN KEY'
++    CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id, user_id) REFERENCES projects (id, user_id)
+```
+
+The foreign key needs a unique index on `(user_id, id)` in the referenced table.
+Each new owned table has this index.
+If an older owned table does not have it, the new migration adds it.
+That statement can block writes to the older table while PostgreSQL builds the index.
+The statement has a `-- spinup:allow-destructive` line, so `spinup db lint` accepts it.
 
 Use `--shared` for a table that every signed-in user can read and write.
 A shared table has no owner column, but its routes still need a signed-in user.

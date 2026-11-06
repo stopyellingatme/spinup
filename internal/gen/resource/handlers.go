@@ -33,6 +33,10 @@ type resourceCode struct {
 	conv string
 	// deniedRole is outside the roles that can use this resource.
 	deniedRole string
+	// newServer reports that this plan also writes server.go.
+	newServer bool
+	// boundedOffset reports that server.go rejects an offset above maxOffset.
+	boundedOffset bool
 }
 
 func newResourceCode(spec Spec, module, deniedRole string) resourceCode {
@@ -381,24 +385,31 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
+	g.p("// Each row carries the total. A page past the last row has no row, so")
+	g.p("// it counts the rows itself.")
+	g.p("var total int64")
+	g.p("if len(rows) > 0 {")
+	g.p("total = rows[0].Total")
+	g.p("} else if offset > 0 {")
 	if rc.spec.Owned {
-		g.p("total, err := s.Queries.Count%s(ctx, user.ID)", plural)
+		g.p("total, err = s.Queries.Count%s(ctx, user.ID)", plural)
 	} else {
-		g.p("total, err := s.Queries.Count%s(ctx)", plural)
+		g.p("total, err = s.Queries.Count%s(ctx)", plural)
 	}
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
+	g.p("}")
 	g.p("items := make([]gen.%s, 0, len(rows))", rc.item)
 	g.p("for _, row := range rows {")
 	if withErr {
-		g.p("item, err := %sFromStore(row)", rc.conv)
+		g.p("item, err := %sFromStore(row.%s)", rc.conv, rc.row)
 		g.p("if err != nil {")
 		g.p("return nil, err")
 		g.p("}")
 		g.p("items = append(items, item)")
 	} else {
-		g.p("items = append(items, %sFromStore(row))", rc.conv)
+		g.p("items = append(items, %sFromStore(row.%s))", rc.conv, rc.row)
 	}
 	g.p("}")
 	g.p("return gen.List%s200JSONResponse{Items: items, Total: total}, nil", plural)
@@ -425,9 +436,7 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	} else {
 		g.p("row, err := s.Queries.Create%s(ctx, params)", singular)
 	}
-	g.p("if err != nil {")
-	g.p("return nil, err")
-	g.p("}")
+	rc.writeError(g)
 	convert("gen.Create" + singular + "201JSONResponse")
 	g.p("}")
 	g.p("")
@@ -478,9 +487,7 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 		g.p("return err")
 		g.p("})")
 	}
-	g.p("if err != nil {")
-	g.p("return nil, err")
-	g.p("}")
+	rc.writeError(g)
 	convert("gen.Update" + singular + "200JSONResponse")
 	g.p("}")
 	g.p("")
@@ -515,7 +522,46 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("}")
 	g.p("return gen.Delete%s204Response{}, nil", singular)
 	g.p("}")
+	rc.refError(g)
 	return g.bytes()
+}
+
+// writeError writes the error check after a create or update query.
+func (rc resourceCode) writeError(g *goFile) {
+	g.p("if err != nil {")
+	if len(rc.spec.ownerRefs) > 0 {
+		g.p("return nil, %sRefError(err)", rc.conv)
+	} else {
+		g.p("return nil, err")
+	}
+	g.p("}")
+}
+
+// refError writes the function that turns a broken owner key into a field
+// error. PostgreSQL checks the key in the write statement itself, so the
+// check needs no extra query.
+func (rc resourceCode) refError(g *goFile) {
+	if len(rc.spec.ownerRefs) == 0 {
+		return
+	}
+	table := rc.spec.Name.Table()
+	g.p("")
+	g.p("// %sRefError gives the field error of a reference to a row that does not", rc.conv)
+	g.p("// exist or that belongs to another user. Both break the same owner key, so")
+	g.p("// the answer does not show that the row of another user exists.")
+	g.p("func %sRefError(err error) error {", rc.conv)
+	g.p("var pgErr *pgconn.PgError")
+	g.p("if !errors.As(err, &pgErr) || pgErr.Code != \"23503\" { // foreign_key_violation")
+	g.p("return err")
+	g.p("}")
+	g.p("switch pgErr.ConstraintName {")
+	for _, r := range rc.spec.ownerRefs {
+		g.p("case %q:", r.constraint(table))
+		g.p("return invalid([]httpx.FieldError{{Field: %q, Message: %q}})", r.Column, refMessage)
+	}
+	g.p("}")
+	g.p("return err")
+	g.p("}")
 }
 
 // sample returns a JSON value for f. The second sample differs from the
@@ -584,28 +630,53 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		parent, _ := fields.ParseName(f.Type.Ref)
 		parentVars[parent.Table()] = parent.Camel() + "ID"
 	}
-	body := func(second bool) (string, []string) {
+	// owned reports whether the test gives the rows of a parent table to a
+	// user, and ownedParent whether any parent is such a table.
+	owned, ownedParent := map[string]bool{}, false
+	for _, p := range parents {
+		owned[p.Table] = p.Owned
+		ownedParent = ownedParent || p.Owned
+	}
+	// otherVars name the rows of user B. User B reuses the rows of tables
+	// without an owner.
+	ownerChecks := rc.spec.Owned && len(rc.spec.ownerRefs) > 0
+	otherVars := map[string]string{}
+	for table, v := range parentVars {
+		otherVars[table] = v
+		if owned[table] {
+			otherVars[table] = "other" + strings.ToUpper(v[:1]) + v[1:]
+		}
+	}
+	// bodyText returns a Go string expression with a JSON body. vars name
+	// the referenced rows. When col is set, its value is the Go expression
+	// value.
+	bodyText := func(second bool, vars map[string]string, col, value string) string {
 		var parts, args []string
 		for _, f := range rc.fields {
-			var parentVar string
-			if f.Type.Ref != "" {
+			v := ""
+			switch {
+			case f.col == col:
+				v = "%d"
+				args = append(args, value)
+			case f.Type.Ref != "":
 				parent, _ := fields.ParseName(f.Type.Ref)
-				parentVar = parentVars[parent.Table()]
-			}
-			v := sample(f, second, parentVar)
-			if v == "%d" {
-				args = append(args, parentVar)
+				v = sample(f, second, vars[parent.Table()])
+				if v == "%d" {
+					args = append(args, vars[parent.Table()])
+				}
+			default:
+				v = sample(f, second, "")
 			}
 			parts = append(parts, fmt.Sprintf("%q: %s", f.col, v))
 		}
-		return "{" + strings.Join(parts, ", ") + "}", args
+		text := "{" + strings.Join(parts, ", ") + "}"
+		if len(args) == 0 {
+			return "`" + text + "`"
+		}
+		return "fmt.Sprintf(`" + text + "`, " + strings.Join(args, ", ") + ")"
 	}
 	bodyExpr := func(second bool) string {
-		text, args := body(second)
-		if len(args) == 0 {
-			return "strings.NewReader(`" + text + "`)"
-		}
-		return "strings.NewReader(fmt.Sprintf(`" + text + "`, " + strings.Join(args, ", ") + "))"
+		return "strings.NewReader(" + bodyText(second, parentVars, "", "") + ")"
 	}
 	// changed is the first field whose two samples differ. Ref fields keep
 	// the same row.
@@ -634,11 +705,13 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		g.p("actorBase.ServeHTTP(w,r.WithContext(authsink.ActorContext(r.Context(),u)))")
 		g.p("})")
 	}
-	if rc.spec.Owned || rc.spec.Shared {
+	if rc.spec.Owned || rc.spec.Shared || ownedParent {
 		g.p("var userA int64")
 		g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-a@example.com', 'test-hash-a') RETURNING id`).Scan(&userA); err != nil {")
 		g.p("t.Fatalf(\"insert user A: %%v\", err)")
 		g.p("}")
+	}
+	if rc.spec.Owned || rc.spec.Shared {
 		if rc.spec.Owned {
 			g.p("var userB int64")
 			g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('owner-b@example.com', 'test-hash-b') RETURNING id`).Scan(&userB); err != nil {")
@@ -663,15 +736,30 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		g.p("")
 		g.p("// Rows that the %s refer to.", strings.ReplaceAll(n.PluralSnake(), "_", " "))
 	}
-	for _, p := range parents {
-		if v, ok := parentVars[p.Table]; ok {
-			g.p("var %s int64", v)
-			g.p("if err := pool.QueryRow(t.Context(), `%s RETURNING id`).Scan(&%s); err != nil {", p.SQL, v)
-		} else {
-			g.p("if _, err := pool.Exec(t.Context(), `%s`); err != nil {", p.SQL)
+	insertParents := func(user string, vars map[string]string, onlyOwned bool) {
+		for _, p := range parents {
+			if onlyOwned && !p.Owned {
+				continue
+			}
+			args := ""
+			if p.Owned {
+				args = ", " + user
+			}
+			if v, ok := vars[p.Table]; ok {
+				g.p("var %s int64", v)
+				g.p("if err := pool.QueryRow(t.Context(), `%s RETURNING id`%s).Scan(&%s); err != nil {", p.SQL, args, v)
+			} else {
+				g.p("if _, err := pool.Exec(t.Context(), `%s`%s); err != nil {", p.SQL, args)
+			}
+			g.p("t.Fatalf(\"insert a row into %s: %%v\", err)", p.Table)
+			g.p("}")
 		}
-		g.p("t.Fatalf(\"insert a row into %s: %%v\", err)", p.Table)
-		g.p("}")
+	}
+	insertParents("userA", parentVars, false)
+	if ownerChecks && ownedParent {
+		g.p("")
+		g.p("// Rows of user B. Owner keys need rows of the same user.")
+		insertParents("userB", otherVars, true)
 	}
 	g.p("")
 	g.p("rec := testkit.Do(t, handler, http.MethodPost, %q, %s)", base, bodyExpr(false))
@@ -696,6 +784,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		g.p("otherList := testkit.DecodeJSON[gen.%sList](t, rec)", rc.item)
 		g.p("if otherList.Total != 0 || len(otherList.Items) != 0 { t.Fatalf(\"other user list: got %%+v, want empty\", otherList) }")
 	}
+	if ownerChecks {
+		rc.ownerRefTest(g, base, bodyText, parentVars, otherVars)
+	}
 
 	g.p("")
 	g.p("rec = testkit.Do(t, handler, http.MethodGet, path, nil)")
@@ -713,6 +804,11 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("list := testkit.DecodeJSON[gen.%sList](t, rec)", rc.item)
 	g.p("if list.Total != 1 || len(list.Items) != 1 || !reflect.DeepEqual(list.Items[0], created) {")
 	g.p("t.Fatalf(\"list: got %%+v, want one item %%+v\", list, created)")
+	g.p("}")
+	g.p("// A page past the last row still has the total.")
+	g.p("rec = testkit.Do(t, handler, http.MethodGet, %q, nil)", base+"?offset=1")
+	g.p("if past := testkit.DecodeJSON[gen.%sList](t, rec); rec.Code != http.StatusOK || past.Total != 1 || len(past.Items) != 0 {", rc.item)
+	g.p("t.Fatalf(\"list past the end: status %%d, got %%+v, want total 1 and no items\", rec.Code, past)")
 	g.p("}")
 	g.p("")
 	g.p("rec = testkit.Do(t, handler, http.MethodPut, path, %s)", bodyExpr(true))
@@ -744,6 +840,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("if rec.Code != http.StatusNotFound {")
 	g.p("t.Fatalf(\"get after delete: status %%d, want %%d\\n%%s\", rec.Code, http.StatusNotFound, rec.Body)")
 	g.p("}")
+	if ownerChecks {
+		rc.ownerDeleteTest(g, parents, parentVars)
+	}
 	if rc.spec.Audit.On {
 		updated := changed != nil
 		for _, f := range rc.fields {
@@ -788,6 +887,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	}
 	g.p("{\"bad id\", http.MethodGet, %q, \"\", http.StatusBadRequest},", base+"/abc")
 	g.p("{\"limit too large\", http.MethodGet, %q, \"\", http.StatusUnprocessableEntity},", base+"?limit=201")
+	if rc.boundedOffset {
+		g.p("{\"offset too large\", http.MethodGet, %q, \"\", http.StatusUnprocessableEntity},", base+"?offset=10001")
+	}
 	g.p("}")
 	g.p("for _, tc := range tests {")
 	g.p("t.Run(tc.name, func(t *testing.T) {")
@@ -811,6 +913,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	}
 	rc.requiredFieldsTest(g, base)
 	rc.jsonBodyTest(g, base)
+	if rc.newServer {
+		rc.responseErrorsTest(g, base)
+	}
 	if rc.spec.Owned || rc.spec.Shared {
 		rc.authenticationTest(g, base)
 	}

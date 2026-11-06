@@ -2,7 +2,7 @@
 -- Run `spinup db sqlc` after you change this file or a migration.
 
 -- name: ListTodos :many
-SELECT id, user_id, title, done, due, priority, created_at, updated_at
+SELECT sqlc.embed(todos), (SELECT count(*) FROM todos AS counted WHERE counted.user_id = sqlc.arg(user_id))::bigint AS total
 FROM todos
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY id

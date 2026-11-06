@@ -2,7 +2,7 @@
 -- Run `spinup db sqlc` after you change this file or a migration.
 
 -- name: ListTodos :many
-SELECT id, title, done, due, priority, created_at, updated_at
+SELECT sqlc.embed(todos), (SELECT count(*) FROM todos AS counted)::bigint AS total
 FROM todos
 ORDER BY id
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);

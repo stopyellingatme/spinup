@@ -2,7 +2,7 @@
 -- Run `spinup db sqlc` after you change this file or a migration.
 
 -- name: ListNotes :many
-SELECT id, user_id, title, api_token, created_at, updated_at
+SELECT sqlc.embed(notes), (SELECT count(*) FROM notes AS counted WHERE counted.user_id = sqlc.arg(user_id))::bigint AS total
 FROM notes
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY id

@@ -195,6 +195,7 @@ func pathsYAML(spec Spec) []byte {
 	w.line(5, "type: integer")
 	w.line(5, "format: int32")
 	w.line(5, "minimum: 0")
+	w.line(5, "maximum: 10000")
 	w.line(5, "default: 0")
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("A page of %s in id order.", pluralWords), "application/json", singular+"List")

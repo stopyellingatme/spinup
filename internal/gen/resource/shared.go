@@ -13,6 +13,7 @@ const serverGo = `// Package handlers implements the API operations in api/opena
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stopyellingatme/spinup/kit/httpx"
+	"github.com/stopyellingatme/spinup/kit/logx"
 )
 
 // Server implements the operations of gen.StrictServerInterface. Each
@@ -44,10 +46,13 @@ func NewServer(pool *pgxpool.Pool) *Server {
 
 var _ gen.StrictServerInterface = (*Server)(nil)
 
-// The page size limits of the list operations.
+// The page limits of the list operations. A large offset makes PostgreSQL
+// read and skip every row before the page, so maxOffset bounds that work.
+// Filter a large collection instead of paging deep into it.
 const (
 	defaultLimit = 50
 	maxLimit     = 200
+	maxOffset    = 10000
 )
 
 // errNotFound is the error of an operation on a row that does not exist.
@@ -75,8 +80,8 @@ func page(limit, offset *int32) (int32, int32, error) {
 	}
 	if offset != nil {
 		o = *offset
-		if o < 0 {
-			errs = append(errs, httpx.FieldError{Field: "offset", Message: "must not be negative"})
+		if o < 0 || o > maxOffset {
+			errs = append(errs, httpx.FieldError{Field: "offset", Message: "must be from 0 to 10000"})
 		}
 	}
 	if len(errs) > 0 {
@@ -121,11 +126,26 @@ func requestProblem(err error) httpx.Problem {
 }
 
 // ResponseError writes the problem for an error that an operation returns.
-// It logs the errors that become a 500 response.
+// It logs the errors that become a 500 response through the request logger.
+// A client that went away gets no answer, and the log has only a debug line.
+// An expired request deadline is a 503 problem.
 func ResponseError(w http.ResponseWriter, r *http.Request, err error) {
+	ctx := r.Context()
+	record := func(level slog.Level, msg string) {
+		logx.FromContext(ctx).Log(ctx, level, msg, "method", r.Method, "path", r.URL.Path, "request_id", httpx.RequestIDFrom(ctx), "error", err)
+	}
+	switch {
+	case errors.Is(ctx.Err(), context.Canceled):
+		record(slog.LevelDebug, "request canceled by the client")
+		return
+	case errors.Is(ctx.Err(), context.DeadlineExceeded), errors.Is(err, context.DeadlineExceeded):
+		record(slog.LevelWarn, "request deadline expired")
+		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusServiceUnavailable, Detail: "The request deadline expired. Try: retry the request later."})
+		return
+	}
 	p := responseProblem(r, err)
 	if p.Status >= http.StatusInternalServerError {
-		slog.ErrorContext(r.Context(), "request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+		record(slog.LevelError, "request failed")
 	}
 	httpx.WriteProblem(w, r, p)
 }

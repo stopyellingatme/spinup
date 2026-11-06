@@ -42,6 +42,7 @@ var knownImports = []struct{ name, path, alias string }{
 	{"time", "time", ""},
 	{"app", "github.com/stopyellingatme/spinup/kit/app", ""},
 	{"httpx", "github.com/stopyellingatme/spinup/kit/httpx", ""},
+	{"logx", "github.com/stopyellingatme/spinup/kit/logx", ""},
 	{"openapi_types", "github.com/oapi-codegen/runtime/types", "openapi_types"},
 	{"pgconn", "github.com/jackc/pgx/v5/pgconn", ""},
 	{"pgtype", "github.com/jackc/pgx/v5/pgtype", ""},

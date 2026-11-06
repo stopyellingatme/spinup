@@ -21,6 +21,7 @@
           type: integer
           format: int32
           minimum: 0
+          maximum: 10000
           default: 0
     responses:
       "200":
