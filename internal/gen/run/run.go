@@ -88,7 +88,11 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 	if err != nil {
 		return nil, err
 	}
-	changes, err := vfs.Diff(o.Root, plan)
+	compare := vfs.Compare
+	if o.Diff && !o.JSON {
+		compare = vfs.Diff // only the text diff output prints UnifiedDiff
+	}
+	changes, err := compare(o.Root, plan)
 	if err != nil {
 		return nil, withHint("compare generator files", err, "check the project paths and permissions")
 	}

@@ -205,6 +205,12 @@ func Diff(root string, p Plan) ([]Change, error) {
 	return compare(root, p, true)
 }
 
+// Compare compares the plan with files below root like Diff, but it leaves
+// UnifiedDiff empty. Use it when no caller prints the diffs.
+func Compare(root string, p Plan) ([]Change, error) {
+	return compare(root, p, false)
+}
+
 func compare(root string, p Plan, includeDiff bool) ([]Change, error) {
 	root, err := resolvedRoot(root)
 	if err != nil {
