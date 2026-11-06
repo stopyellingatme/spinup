@@ -1,0 +1,104 @@
+# App gate: the flags module (ADR 0029). An app with auth and flags builds, migrates, and serves.
+# A public flag follows the full path: the operator command sets 100 percent, a signed-in user
+# reads the flag, and the admin route turns it off. The server refreshes within one second.
+# The gate needs a database and curl.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to call the API'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gateflags --modules auth,flags --module example.com/gateflags --no-git --non-interactive
+cd gateflags
+exists api/db/kit/00008_feature_flags.sql
+
+# Declare a public flag and generate the typed keys.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g flags
+grep 'NewCheckout = "new_checkout"' api/internal/flags/flags.gen.go
+grep 'export type FlagKey = .new_checkout.;' web/src/lib/flags.gen.ts
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "ok"'
+stdout '(?s)"id": "flags-wired",\s+"status": "ok"'
+
+# Build, vet, and test the API.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+exec go build -o $WORK/gateflags-api ./cmd/api
+cd ..
+
+# Apply the migrations. A second run is a no-op.
+exec spinup db migrate up
+exec spinup db migrate status
+stdout 'kit 00008_feature_flags\.sql'
+! stdout '^pending'
+
+# Make two accounts: an administrator and a member of staff.
+cd api
+stdin $WORK/password.txt
+exec $WORK/gateflags-api user create --email ada@example.com --role manager --password-stdin
+stdin $WORK/password.txt
+exec $WORK/gateflags-api user create --email bob@example.com --role staff --password-stdin
+
+# The flag starts with its declared default.
+exec $WORK/gateflags-api flags list
+stdout 'new_checkout +off +- +0 +0 +public'
+
+# Start the server with a refresh time of one second.
+env PORT=38437
+env FLAGS_REFRESH=1s
+exec $WORK/gateflags-api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38437/healthz
+stdout '^200$'
+exec curl -sS -o ready.json -w '%{http_code}' http://127.0.0.1:38437/readyz
+stdout '^200$'
+grep '"flags":\s*"ok"' ready.json
+
+# A signed-out visitor and both accounts sign in. Each answer is a map of public flags.
+exec curl -sS -c ada.jar -H 'Content-Type: application/json' -d '{"email":"ada@example.com","password":"gate password 1"}' http://127.0.0.1:38437/api/auth/login
+exec curl -sS -c bob.jar -H 'Content-Type: application/json' -d '{"email":"bob@example.com","password":"gate password 1"}' http://127.0.0.1:38437/api/auth/login
+exec curl -sS -b ada.jar http://127.0.0.1:38437/api/flags
+stdout '^\{"flags":\{"new_checkout":false\}\}$'
+
+# The operator command sets 100 percent. Another process sees it within the refresh time.
+exec $WORK/gateflags-api flags set new_checkout --percent 100
+stdout 'updated new_checkout\s+roles= percent=100'
+exec sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -b ada.jar http://127.0.0.1:38437/api/flags | grep -q "\"new_checkout\":true" && exit 0; sleep 1; done; echo "the flag stayed off"; exit 1'
+exec curl -sS -b bob.jar http://127.0.0.1:38437/api/flags
+stdout '^\{"flags":\{"new_checkout":true\}\}$'
+
+# A percentage never reaches a signed-out visitor. The visitor gets the global value.
+exec curl -sS http://127.0.0.1:38437/api/flags
+stdout '^\{"flags":\{"new_checkout":false\}\}$'
+
+# The admin route lists the rule. Staff cannot use it. The manager turns the flag off.
+exec curl -sS -b ada.jar http://127.0.0.1:38437/api/admin/flags
+stdout '"percentage":100'
+stdout '"admin_role":"manager"'
+exec curl -sS -o /dev/null -w '%{http_code}' -X PUT -b bob.jar -H 'Content-Type: application/json' -d '{"enabled":false,"roles":[],"percentage":0}' http://127.0.0.1:38437/api/admin/flags/new_checkout
+stdout '^403$'
+exec curl -sS -o /dev/null -w '%{http_code}' -X PUT -b ada.jar -H 'Content-Type: application/json' -d '{"enabled":false,"roles":[],"percentage":0}' http://127.0.0.1:38437/api/admin/flags/new_checkout
+stdout '^200$'
+exec sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -b bob.jar http://127.0.0.1:38437/api/flags | grep -q "\"new_checkout\":false" && exit 0; sleep 1; done; echo "the flag stayed on"; exit 1'
+
+# A user rule beats the global switch. The audit module is off, so no history exists.
+exec $WORK/gateflags-api flags user new_checkout --email bob@example.com --on
+stdout 'updated new_checkout\s+bob@example.com on'
+exec sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -b bob.jar http://127.0.0.1:38437/api/flags | grep -q "\"new_checkout\":true" && exit 0; sleep 1; done; echo "the user rule did not apply"; exit 1'
+exec curl -sS -b ada.jar http://127.0.0.1:38437/api/flags
+stdout '^\{"flags":\{"new_checkout":false\}\}$'
+
+# The command shows the final state.
+exec $WORK/gateflags-api flags list
+stdout 'new_checkout +off +- +0 +1 +public'
+kill server
+cd ..
+
+-- declaration.toml --
+
+[flags.new_checkout]
+description = "The new checkout flow"
+public = true
+
+-- password.txt --
+gate password 1

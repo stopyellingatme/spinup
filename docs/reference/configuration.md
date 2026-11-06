@@ -90,7 +90,7 @@ The file `spinup.lock` is different. spinup writes it, and you do not edit it.
 | `modules` | list of strings | `["ci", "deploy"]` for a new app | The optional modules that are on. Change it with `spinup module add`, not by hand. |
 | `default_env` | string | none | The environment that a command uses when you leave out `--env`. It must name an `[env.*]` table. |
 
-The modules are `audit`, `auth`, `backups`, `ci`, `deploy`, `jobs`, `mail`, `monitoring`, `secrets`, and `tofu`.
+The modules are `audit`, `auth`, `backups`, `ci`, `deploy`, `flags`, `jobs`, `mail`, `monitoring`, `secrets`, and `tofu`.
 Run `spinup module list` to see which are on.
 
 ```toml
@@ -135,6 +135,31 @@ roles = ["admin", "front_desk", "viewer"]
 admin_role = "admin"
 default_role = "viewer"
 ```
+
+## [flags.KEY]
+
+The [feature flags](../build/flags.md) of the app. Use one table for each flag. You can leave them out.
+After you change them, run `spinup g flags` to rewrite `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts`.
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `description` | string | none | What the flag does. It is required, with 1 to 200 characters and no line break. |
+| `default` | bool | `false` | The answer before the first load from the database, and the first value of a new flag. |
+| `public` | bool | `false` | If true, the web pages and `GET /api/flags` get the answer. |
+| `owner` | string | none | Free text, up to 254 characters. The app does not use it. |
+| `expires` | date | none | `YYYY-MM-DD`. The doctor warns after this day. |
+
+A key matches `^[a-z][a-z0-9_]{0,47}$`. It has no double underscore and no trailing underscore.
+The app has 0 to 64 flags. An unknown key in a flag table is an error.
+
+```toml
+[flags.new_checkout]
+description = "The new checkout flow"
+public = true
+expires = "2027-03-31"
+```
+
+The environment variable `FLAGS_REFRESH` sets how often each API process reads the flags. The default is `10s`. See [App binary commands](app-commands.md#settings-from-the-environment).
 
 ## [monitoring]
 

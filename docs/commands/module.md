@@ -39,6 +39,7 @@ Add `--json` for a structured list.
 | --- | --- | --- |
 | `auth` | Accounts, sessions, and sign-in pages | [Accounts and sign-in](../auth.md) |
 | `audit` | A history of who changed which record | [Audit trail](../audit.md) |
+| `flags` | Feature flags for a feature, a role, a user, or a percentage of users | [Feature flags](../build/flags.md) |
 | `jobs` | Background jobs with a worker process | [Background jobs](../build/jobs.md) |
 | `mail` | Email templates and SMTP delivery | [Mail](../mail.md) |
 | `secrets` | Encrypted secrets for each environment | [Secrets](../deploy/secrets.md) |
@@ -158,6 +159,22 @@ That file belongs to you, so spinup does not edit it.
 If the plan warns about duplicate migration versions, fix them before you run the migrations.
 Then run `spinup db migrate` and `spinup g audit <resource>` for each table you want to track.
 [Audit trail](../audit.md) explains the wiring, the access rules, and the limits.
+
+## Add the flags module to an existing app
+
+`flags` needs `auth` and the web app.
+Upgrade the app first, then add the module.
+
+<!-- doctest: skip -->
+```console
+$ spinup upgrade --yes
+$ spinup module add flags --yes --non-interactive
+```
+
+The migration goes in `api/db/kit/`, so it does not clash with your own migrations.
+The command prints `Next:` lines with the code to paste into `api/cmd/api/main.go` and the web files.
+Then run `spinup db migrate up`, declare a flag in `spinup.toml`, and run `spinup g flags`.
+[Feature flags](../build/flags.md) shows each edit.
 
 ## Troubleshooting
 

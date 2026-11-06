@@ -32,6 +32,7 @@ The commands depend on the modules that are on.
 | [`jobs-migrate`](#jobs-migrate) | `jobs` | Runs the migrations of the job queue. |
 | [`user`](#user) | `auth` | Creates accounts and changes roles. |
 | [`audit`](#audit) | `audit` | Reads, exports, and prunes the audit trail. |
+| [`flags`](#flags) | `flags` | Lists and changes feature flags. |
 | [`mail-worker`](#mail-worker) | `mail` and `jobs` | Runs a worker that only sends mail. |
 
 If you give an unknown command, the program lists the commands that your app has:
@@ -180,6 +181,39 @@ $ go run ./cmd/api audit list --resource users
 {: .warning }
 `audit prune` deletes events for good. It refuses to run without `--yes`.
 
+## flags
+
+Lists and changes the [feature flags](../build/flags.md). The command never prompts and needs no web server.
+It writes to the database, and each running process reads the change within `FLAGS_REFRESH`.
+
+| Action | What it does |
+| --- | --- |
+| `flags list [--json]` | Prints one line for each flag. `--json` prints the entries with the declared roles. |
+| `flags enable KEY` | Turns the global switch on. |
+| `flags disable KEY` | Turns the global switch off. |
+| `flags set KEY [--roles a,b] [--percent N]` | Sets the roles or the percentage. One of the two flags is required. `--roles ""` clears the roles. `--percent 0` clears the percentage. |
+| `flags user KEY --email E (--on \| --off \| --clear)` | Sets or removes the rule of one account. Exactly one of the three flags is required. |
+| `flags prune --yes` | Deletes the rows that have no declaration. |
+
+The columns of `flags list` are the key, the state, the roles, the percentage, the number of user rules, and notes.
+The notes are `public`, `default on`, `expires` or `expired` with a date, and `stale`.
+A stale row has no declaration in `spinup.toml`. A role that `[auth]` no longer declares shows `(undeclared)`.
+
+<!-- doctest: skip -->
+```console
+$ go run ./cmd/api flags list
+KEY           STATE  ROLES    PERCENT  USERS  NOTES
+new_checkout  on     manager  50       1      public,expires 2027-03-31
+$ go run ./cmd/api flags disable new_checkout
+updated new_checkout	off
+$ go run ./cmd/api flags prune
+flags prune: --yes is required, because the command deletes rows.
+Try: flags prune --yes
+```
+
+With the [audit trail](../audit.md), each change writes an event. The actor is the operator of the shell.
+`flags prune` is the only action that deletes a row. It never deletes a declared flag.
+
 ## mail-worker
 
 Runs a worker for the `mail` queue only. Use it when you want mail capacity that is separate from the other jobs.
@@ -208,6 +242,7 @@ The ones you meet most:
 | `PORT` | `8080` | The HTTP port. |
 | `SPINUP_ENV` | `production` | If it is unset or `dev`, the program also reads the `.env` file. `dev` turns on the `/_dev` page. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
+| `FLAGS_REFRESH` | `10s` | With the `flags` module: how often a process reads the flags from the database. The lowest value is `1s`. |
 
 ## Troubleshooting
 
