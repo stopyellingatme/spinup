@@ -195,6 +195,11 @@ The body remains readable and retains its original `Close` method.
 It validates JSON syntax even when no field is required. An empty body with empty rules is allowed.
 `WriteAttachment` sends a file download. The middleware are `RequestID`, `Recover`, `AccessLog`, `SecurityHeaders`, and `MaxBody`.
 
+`AccessLog` records the method, path, status, bytes, duration, and request ID.
+Successful responses (2xx) from `/healthz` and `/readyz` use the debug level.
+Other responses, including failed probes, use the info level.
+Log writes have no buffer. The default redactor masks secret values before the handler receives each record.
+
 ## auth
 
 `auth.New` builds the sign-in layer on your pool. It needs the tables of the auth module.

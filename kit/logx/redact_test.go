@@ -124,3 +124,29 @@ func TestRedactionDepthAndCycles(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretKeyMatching(t *testing.T) {
+	for _, key := range []string{"Password", "client_SECRET", "accessToken", "Set-Cookie", "API_KEY", "database_dsn", "cooKie", "APİ_KEY"} {
+		if !isSecretKey(key) {
+			t.Errorf("secret key %q was not detected", key)
+		}
+	}
+	for _, key := range []string{"method", "path", "status", "bytes", "duration_ms", "request_id", "toſen"} {
+		if isSecretKey(key) {
+			t.Errorf("ordinary key %q was masked", key)
+		}
+	}
+	for _, key := range []string{"CLIENT_SECRET", "cooKie", "APİ_KEY", strings.Repeat("X", 128) + "TOKEN"} {
+		if got := testing.AllocsPerRun(100, func() { _ = isSecretKey(key) }); got != 0 {
+			t.Errorf("secret key %q matching allocated %g times", key, got)
+		}
+	}
+}
+
+func TestMaskURLsMatchesRegexp(t *testing.T) {
+	for _, value := range []string{"", "HTTP request", "/api/notes", "postgres:user:private@db", "https://example.com", "postgres://user:private@db/app", "postgres://user:private/part@db/app", "failed: https://user:private@example.com/path and postgres://other:p%40ss@db/app", "scheme+name://user:private@host", "https://user:private@part@host"} {
+		if got, want := maskURLs(value), urlCredentials.ReplaceAllString(value, "${1}****@"); got != want {
+			t.Errorf("%q: got %q, want %q", value, got, want)
+		}
+	}
+}
