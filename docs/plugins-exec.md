@@ -47,7 +47,7 @@ $ spinup plugin new hello --kind exec --dry-run
 The scaffold also has the declarative generator `hello-note`, as in a [plugin pack](plugins.md#write-your-own-plugin).
 Without `--sdk-path`, the `go.mod` file holds a placeholder version of the SDK.
 Replace it with a published version before you build.
-The module needs Go 1.26 or later.
+The module needs Go 1.27 or later.
 See [Create a plugin](commands/plugin-new.md) for every flag.
 
 ## Write the handler

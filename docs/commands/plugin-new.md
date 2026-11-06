@@ -77,7 +77,7 @@ The executable plugin has these parts:
 {: .warning }
 An executable plugin runs with your full user privileges. Read the code before you trust a plugin, including your own.
 
-The module needs Go 1.26 or later.
+The module needs Go 1.27 or later.
 Two flags change how the module is set up:
 
 | Flag | What it does | Example |

@@ -9,7 +9,7 @@ The conformance kit detects protocol failures and tree changes during its probes
 It is a test suite, not a security sandbox.
 Review all code before you grant trust.
 
-Use Go 1.26 or later.
+Use Go 1.27 or later.
 If you did not supply `--sdk-path`, replace the SDK placeholder version in `go.mod` with a published version.
 For a local checkout, add a replacement for `github.com/stopyellingatme/spinup/plugin-sdk` to its `plugin-sdk` directory.
 

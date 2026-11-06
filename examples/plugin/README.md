@@ -9,7 +9,7 @@ The conformance kit detects protocol failures and tree changes during its probes
 It is a test suite, not a security sandbox.
 Review all code before you grant trust.
 
-Use Go 1.26 or later.
+Use Go 1.27 or later.
 The module uses the SDK from `../../plugin-sdk` in this repository.
 Keep this relative replacement when you test the example in this repository.
 

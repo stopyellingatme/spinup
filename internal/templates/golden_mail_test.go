@@ -159,7 +159,7 @@ func TestMailStandardWorkerDelivery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	workspace := "go 1.26.0\nuse ./api\nreplace github.com/stopyellingatme/spinup/kit => " + strconv.Quote(kit) + "\n"
+	workspace := "go 1.27.0\nuse ./api\nreplace github.com/stopyellingatme/spinup/kit => " + strconv.Quote(kit) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.work"), []byte(workspace), 0o600); err != nil {
 		t.Fatal(err)
 	}

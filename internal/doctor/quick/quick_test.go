@@ -25,9 +25,9 @@ func TestToolChecks(t *testing.T) {
 		check         func(context.Context, *doctor.Context) doctor.Result
 		want          doctor.Status
 	}{
-		{"go supported", "go", []string{"version"}, "go version go1.26.0 darwin/arm64", false, goVersion, doctor.OK},
+		{"go supported", "go", []string{"version"}, "go version go1.27.0 darwin/arm64", false, goVersion, doctor.OK},
 		{"go newer", "go", []string{"version"}, "go version go2.0.0 linux/amd64", false, goVersion, doctor.OK},
-		{"go old", "go", []string{"version"}, "go version go1.25.2 linux/amd64", false, goVersion, doctor.Fail},
+		{"go old", "go", []string{"version"}, "go version go1.26.0 linux/amd64", false, goVersion, doctor.Fail},
 		{"go malformed", "go", []string{"version"}, "go version unknown", false, goVersion, doctor.Fail},
 		{"go absent", "go", []string{"version"}, "", true, goVersion, doctor.Fail},
 		{"node supported", "node", []string{"--version"}, "v24.0.0", false, nodeVersion, doctor.OK},
