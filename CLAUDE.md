@@ -45,6 +45,7 @@ The Rust rewrite stopped after R2 (ADR `docs/adr/0022-go-and-sidecar-services.md
 - The roles guard (the `[auth]` table of `spinup.toml`, the generated `api/internal/roles/roles.gen.go`, `auth.Roles` and `RequireRole` in the kit, registration modes, the operator `user` command, `--role` in the generators, the `roles-drift` doctor check, out-of-order migrations) is in `docs/adr/0024-roles.md`. `internal/project/project.go` and `internal/project/roles.go` are shared files (main loop only).
 - The audit trail (the `audit` module, the table `audit_events` and its triggers, `kit/audit` with `Bind`, `InTx`, `Record`, `List`, and `Prune`, the auth events and actor context, `spinup g audit`, the History endpoint and page, the operator `audit` command, the `audit-wired` doctor check) is in `docs/adr/0025-audit-trail.md`. The audit migration `internal/templates/packs/audit/files/api/db/migrations/00006_audit_events.sql` is a shared file (main loop only).
 - The PDF report sidecar (`spinup g service <name> --lang python --kind pdf`, the `templates/python-pdf` overlay, WeasyPrint with a blocking URL fetcher and a child process for each render, the `memory` and `tmp_size` keys of `[[services]]`, `httpx.WriteAttachment`, and `pdf.Serve`) is in `docs/adr/0026-pdf-report-sidecar.md`. The lockfiles `internal/gen/service/templates/python-pdf/pyproject.toml` and `uv.lock` are shared files (main loop only).
+- JSON v2 and the Go 1.27 minimum (strict request decoding in `httpx.DecodeJSON`, `httpx.CheckJSONBody` and `BodyRules` for generated write routes, v1 kept for responses and persisted JSON) are in `docs/adr/0027-json-v2.md`.
 
 ## Commands
 
@@ -79,7 +80,7 @@ Test contracts:
 
 | Tool | Version | Note |
 |---|---|---|
-| Go | 1.27.2 | `/opt/homebrew/bin/go`. `GOTOOLCHAIN=local` always. Modules declare `go 1.26.0`. |
+| Go | 1.27.2 | `/opt/homebrew/bin/go`. `GOTOOLCHAIN=local` always. Modules declare `go 1.27.0` (ADR 0027). |
 | Node | 24.x | `/opt/homebrew/opt/node@24/bin`. The Makefile puts it on `PATH`. Do not call a bare `node` in an interactive shell. It is a broken nvm function. |
 | pnpm | 12.11.2 | `scripts/bin/pnpm` runs it through corepack (no global install). The Makefile puts `scripts/bin` on `PATH`. Use `$REPO/scripts/bin/pnpm` outside make. Offline installs: `pnpm install --frozen-lockfile --offline`. |
 | golangci-lint | 2.14.0 | config: `.golangci.yml` |
