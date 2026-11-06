@@ -4,6 +4,8 @@
 # The gate needs a database and curl.
 [!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
 [!exec:curl] skip 'curl is required to call the API'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
 
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new gateflags --modules auth,flags --module example.com/gateflags --no-git --non-interactive
@@ -18,6 +20,13 @@ grep 'export type FlagKey = .new_checkout.;' web/src/lib/flags.gen.ts
 exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
 stdout '(?s)"id": "flags-drift",\s+"status": "ok"'
 stdout '(?s)"id": "flags-wired",\s+"status": "ok"'
+
+# Type-check the web app: the admin page, the layout data, and the FlagKey union.
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+cd ..
 
 # Build, vet, and test the API.
 cd api
@@ -102,3 +111,9 @@ public = true
 
 -- password.txt --
 gate password 1
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"

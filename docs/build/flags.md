@@ -328,7 +328,7 @@ An administrator on the admin page is the actor. The command uses the operator o
 Without the audit module, the pages show only the time of the last change.
 
 If you add the audit module after the flags module, the database has no triggers on the flag tables.
-The check `flags-wired` warns. Run `spinup db new audit_feature_flags`, and paste these four statements into the new file:
+The API logs a warning at startup: `feature_flags has no audit triggers`. The check `flags-wired` cannot always see this case, because it reads only files. Run `spinup db new audit_feature_flags`, and paste these four statements into the new file:
 
 ```sql
 -- +goose Up

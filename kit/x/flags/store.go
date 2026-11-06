@@ -469,6 +469,26 @@ func (s *Store) syncOnce(ctx context.Context) {
 	s.mu.Lock()
 	s.synced = true
 	s.mu.Unlock()
+	s.warnAuditGap(ctx)
+}
+
+// auditGapQuery is true when the audit functions exist but feature_flags has no
+// audit trigger. That happens when the audit module came after the flags
+// migration ran, because the migration attaches the triggers only when the
+// functions already exist (ADR 0029 decision 6.1).
+const auditGapQuery = `SELECT to_regprocedure('public.audit_row_change()') IS NOT NULL
+	AND to_regclass('public.feature_flags') IS NOT NULL
+	AND NOT EXISTS (SELECT 1 FROM pg_trigger
+		WHERE tgrelid = to_regclass('public.feature_flags') AND tgname = 'feature_flags_audit')`
+
+// warnAuditGap logs a warning when flag changes are not audited although the
+// audit module is on. The doctor check reads only files, so it cannot see this.
+func (s *Store) warnAuditGap(ctx context.Context) {
+	var gap bool
+	if err := s.pool.QueryRow(ctx, auditGapQuery).Scan(&gap); err != nil || !gap {
+		return
+	}
+	s.logger.WarnContext(ctx, "flags: the audit module is on, but feature_flags has no audit triggers, so flag changes are not audited. Try: run spinup db new audit_feature_flags, paste the CREATE TRIGGER statements from docs/build/flags.md, then run spinup db migrate up.")
 }
 
 func (s *Store) refreshWithTimeout(ctx context.Context, timeout time.Duration) {

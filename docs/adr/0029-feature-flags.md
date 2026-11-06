@@ -370,7 +370,7 @@ Facts about the current code that shape the design:
    // Refresh is Load, then Flags.Replace.
    func (s *Store) Refresh(ctx context.Context) error
    ```
-   `Load` uses `pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})`, so the two `SELECT` statements see one state. `LoadedAt` is the database `now()` of that transaction, not the process clock. The snapshot holds the rules of every row, stale rows included, so a stale key still answers its stored value until `flags prune`.
+   `Load` uses `pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})`, so the two `SELECT` statements see one state. `LoadedAt` is the database `now()` of that transaction, not the process clock. The snapshot holds the rules of every row, stale rows included, so `flags list` and the admin list can show them. Evaluation of a stale key returns `false` with the reason `error`, because the key is not declared (decision 5.1, step 0). The generated constant is gone, so code cannot name the key. `flags prune` deletes the row.
 5. Writes. Each method validates, then runs one transaction through `audit.InTx` (decision 7), then calls `Refresh`:
    ```go
    func (s *Store) Enable(ctx context.Context, key string) error

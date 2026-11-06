@@ -625,3 +625,28 @@ func TestStoreWriteWithoutSyncCreatesRow(t *testing.T) {
 		t.Fatalf("enabled = %v, err = %v", enabled, err)
 	}
 }
+
+func TestStoreStartWarnsAboutAuditGap(t *testing.T) {
+	pool := flagDB(t, false)
+	storeExec(t, pool, `CREATE FUNCTION audit_row_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`)
+	s, _, logs := storeFixture(t, pool)
+	if err := s.Start(t.Context(), time.Second); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close(context.Background()) })
+	if !strings.Contains(logs.String(), "feature_flags has no audit triggers") {
+		t.Fatalf("logs = %s", logs.String())
+	}
+}
+
+func TestStoreStartNoAuditGapWithoutAudit(t *testing.T) {
+	pool := flagDB(t, false)
+	s, _, logs := storeFixture(t, pool)
+	if err := s.Start(t.Context(), time.Second); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close(context.Background()) })
+	if strings.Contains(logs.String(), "audit triggers") {
+		t.Fatalf("logs = %s", logs.String())
+	}
+}
