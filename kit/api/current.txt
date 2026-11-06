@@ -212,6 +212,7 @@ kit/db const DefaultMaxConns = 20
 kit/db const DefaultMigrationLockTimeout = 5 * time.Second
 kit/db const DefaultMigrationStatementTimeout = 5 * time.Minute
 kit/db const DefaultStatementTimeout = 30 * time.Second
+kit/db const KitVersionTable = "spinup_kit_version"
 kit/db field Hook.AfterUp func(ctx context.Context, url string) error
 kit/db field Hook.BeforeDown func(ctx context.Context, url string) error
 kit/db field MigrationStatus.Applied bool
@@ -223,6 +224,7 @@ kit/db func Open(context.Context, string, ...Option) (*pgxpool.Pool, error)
 kit/db func WithAppName(string) Option
 kit/db func WithDatabaseURL(string) MigrateOption
 kit/db func WithHook(Hook) MigrateOption
+kit/db func WithKitMigrations(fs.FS) MigrateOption
 kit/db func WithLockTimeout(time.Duration) Option
 kit/db func WithMaxConns(int) Option
 kit/db func WithMigrationLockTimeout(time.Duration) MigrateOption
@@ -233,6 +235,13 @@ kit/db ptrmethod Migrator.Close() error
 kit/db ptrmethod Migrator.Down(context.Context) error
 kit/db ptrmethod Migrator.DownTo(context.Context, int64) error
 kit/db ptrmethod Migrator.HasVersion(int64) bool
+kit/db ptrmethod Migrator.KitDown(context.Context) error
+kit/db ptrmethod Migrator.KitDownTo(context.Context, int64) error
+kit/db ptrmethod Migrator.KitHasVersion(int64) bool
+kit/db ptrmethod Migrator.KitStatus(context.Context) ([]MigrationStatus, error)
+kit/db ptrmethod Migrator.KitUp(context.Context) error
+kit/db ptrmethod Migrator.KitUpTo(context.Context, int64) error
+kit/db ptrmethod Migrator.KitVersion(context.Context) (int64, error)
 kit/db ptrmethod Migrator.Pending(context.Context) ([]string, error)
 kit/db ptrmethod Migrator.Redo(context.Context) error
 kit/db ptrmethod Migrator.Status(context.Context) ([]MigrationStatus, error)
@@ -373,7 +382,9 @@ kit/telemetry type Options struct
 kit/testkit const ImageEnv = "SPINUP_TEST_PG_IMAGE"
 kit/testkit const PostgresImage = "postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
 kit/testkit func DB(testing.TB) *pgxpool.Pool
-kit/testkit func DBWithMigrations(testing.TB, fs.FS) *pgxpool.Pool
+kit/testkit func DBWithMigrations(testing.TB, fs.FS, ...DBOption) *pgxpool.Pool
 kit/testkit func DecodeJSON[T any](testing.TB, *httptest.ResponseRecorder) T
 kit/testkit func Do(testing.TB, http.Handler, string, string, io.Reader) *httptest.ResponseRecorder
 kit/testkit func URL(testing.TB, *pgxpool.Pool) string
+kit/testkit func WithKitMigrations(fs.FS) DBOption
+kit/testkit type DBOption func(*dbConfig)
