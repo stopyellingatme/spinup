@@ -30,9 +30,9 @@ Try: spinup g resource <name> <field:type>...
 client generation skipped: no web pack
 Created 0, updated 0 files
 Next: cd web && pnpm check
-$ find api/internal/services -type f
-api/internal/services/ocr/oapi-codegen.yaml
+$ find api/internal/services -type f | sort
 api/internal/services/ocr/client.gen.go
+api/internal/services/ocr/oapi-codegen.yaml
 api/internal/services/ocr/ocr.go
 ```
 

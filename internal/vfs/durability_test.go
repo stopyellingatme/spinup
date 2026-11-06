@@ -95,6 +95,10 @@ func TestApplyWritesRenamesAndRollsBack(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// On Windows, os.Stat loads the file ID on the first os.SameFile call, by path.
+			// Load the IDs now, so that they identify the files from before Apply.
+			_ = os.SameFile(original, original)
+			_ = os.SameFile(deleted, deleted)
 			oldHook := applyHook
 			t.Cleanup(func() { applyHook = oldHook })
 			applyHook = func(name string) error {

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // pathCache lasts for one comparison or apply pass. It caches directory names,
@@ -20,7 +21,10 @@ func (c pathCache) readDir(dir string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cached, ok := c[dir]; ok && os.SameFile(info, cached.info) &&
+	// On Windows, os.Stat reads directory metadata from the parent's index, and
+	// NTFS updates that copy late. A new entry then does not change ModTime, so
+	// Windows reads the directory each time.
+	if cached, ok := c[dir]; ok && runtime.GOOS != "windows" && os.SameFile(info, cached.info) &&
 		info.ModTime().Equal(cached.info.ModTime()) && info.Size() == cached.info.Size() {
 		return cached.names, nil
 	}
