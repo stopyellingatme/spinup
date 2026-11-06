@@ -161,14 +161,14 @@ An existing database holds the pack versions in `goose_db_version`. The kit must
     - 4: `to_regclass('public.user_identities')`
     - 5: column `users.role`
     - 6: `to_regclass('public.audit_events')`
-    - 7: column `users.auth_version`
+    - 7: column `users.auth_version` and column `sessions.user_id`
 
     `adopt` moves row `V` only when the probe of `V` finds the object. A missing object stops `adopt` and rolls back the transaction: `migrate: row <V> in goose_db_version is not kit migration <file>. Try: renumber the app migration row by hand (UPDATE goose_db_version SET version_id = <app number> WHERE version_id = <V>), then run migrate up again.` Kit versions after 7 never need adoption, so they have no probe. A test covers the renamed case.
 10. An app whose owner renamed a pack file after the clash warning (for example `00008_users_role.sql`) has an applied row at a number that the kit does not know. The codemod refuses that app (§4.4). The ADR accepts this. The warning path exists since ADR 0024 and 0025, a few weeks.
 
 ### 4. The upgrade of an existing app: codemod `0003_kit_migrations`
 
-1. The codemod runs in the `Before` stage (`internal/migrate/contract.go:14-16`). It moves files before the plan, so the plan sees the kit paths on disk. `Since` is the first version of this change.
+1. The codemod runs in the `Before` stage (`internal/migrate/contract.go:14-16`). It moves files before the plan, so the plan sees the kit paths on disk. `Since` is the first release that carries this change. It ships in the same release as codemod 0002, so both use `0.1.0-alpha.419` (amended after review R1a). It moves a file only when the lock lists the pack that ships it (`auth` for 00002-00005 and 00007, `audit` for 00006), so an app-owned file with a pack name stays.
 2. It knows the pack base names: `00002_create_auth.sql`, `00003_password_resets.sql`, `00004_oidc_identities.sql`, `00005_users_role.sql`, `00006_audit_events.sql`, `00007_users_auth_version.sql`. The lock cannot tell a pack seed file from an app seed file (context §10), so the names are the key.
 3. For each name present in `api/db/migrations`, it moves the file to `api/db/kit/<name>` with the same bytes. It creates the directory. `Plan` lists one change for each file: `Move <name> to api/db/kit`.
 4. If `api/db/migrations` holds a file `NNNNN_<pack suffix>.sql` with a number other than the pack number, `Plan` returns the change `Manual step: <file> is a renamed kit migration` and an error with `Try: move the file to api/db/kit under its own number, run UPDATE goose_db_version SET version_id = <pack number> WHERE version_id = <NNNNN> once in every database, then rename the file to the pack name and run spinup upgrade again`. The upgrade stops with this message.
@@ -185,7 +185,7 @@ An existing database holds the pack versions in `goose_db_version`. The kit must
 
 Each reader learns the kit directory. The app directory keeps its role for new files.
 
-1. `NextMigrationName` and `newestVersion` read `api/db/migrations` only, unchanged (`internal/db/ops/migrations.go:37-71`, `:203-217`). A new app migration never sees a kit number. The clash is gone by construction.
+1. `NextMigrationName` takes the highest number across `api/db/migrations` and `api/db/kit`, plus one (amended after review R1a). A new app migration never reuses a kit number. Without this rule, a new app file `00002_*.sql` would make §3.3 skip the adoption of an applied auth row 2 on a database that has not adopted yet, and kit 00002 would run twice. `newestVersion` reads `api/db/migrations` only (`internal/db/ops/migrations.go:203-217`).
 2. `g resource` reads both directories in `findTable` and `hasOwnerKey` (`internal/gen/resource/sql.go:174`, `owner.go:109`). A `ref` field to `users` resolves through the kit directory. The kit directory comes first in the scan order. New files still go to the app directory (`resource.go:218`, `:233`).
 3. `g audit` scans both directories for the create statement and for existing triggers (`internal/gen/audit/audit.go:80-128`). It writes its attach migration in the app space (`:152`). The kit space runs first, so the audit functions exist when the attach runs.
 4. `kit/testkit.DBWithMigrations` gains options: `func DBWithMigrations(t testing.TB, fsys fs.FS, opts ...DBOption) *pgxpool.Pool` and `func WithKitMigrations(fsys fs.FS) DBOption`. The template database runs the kit space first. The template hash covers both file systems (`kit/testkit/template.go:40-46`). The generated tests pass the option under `auth` (`internal/gen/resource/handlers.go:59`, `:696`, `internal/gen/job/job.go:399`, `:408`).
@@ -271,3 +271,12 @@ Shared files for the main loop: the audit migration moves from `internal/templat
 2. §2.3: each kit status line carries the word `kit`.
 3. §3.6: `adopt` prints one `adopted  kit <file>` line for each moved row.
 4. §4.4: an app with a renamed pack file gets a refusal and a manual step. There is no `adopt-as` command.
+
+## Amendments after review R1a (2026-11-06)
+
+1. §5.1: new app migration numbers continue after the highest number in both directories.
+2. §3.9: the probe of version 7 also checks `sessions.user_id`.
+3. §4.1: `Since` is `0.1.0-alpha.419` for codemods 0003 and 0004, and the codemod checks the lock before it moves a file.
+4. §5.6 and §5.7: on a VM where `spinup_kit_version` does not exist yet, deploy and the backup hook project the adoption of §3.3. A legacy kit version counts as applied when `goose_db_version` has it applied and the app directory has no file with that version.
+5. §3.6: the `adopted  kit` lines go to standard error, so `migrate version` prints only the number. The CLI parser of `migrate version` reads the last line.
+6. §5.8: `db lint` lints both directories with one table set, kit first, so an app index on a kit table still needs `CONCURRENTLY`.
