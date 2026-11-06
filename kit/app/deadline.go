@@ -15,6 +15,8 @@ func (a *App) requestDeadline() httpx.Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			devtools := a.config.Env == "dev" && (r.URL.Path == "/_dev" || strings.HasPrefix(r.URL.Path, "/_dev/"))
 			if devtools || a.timeoutExempt != nil && a.timeoutExempt(r) {
+				// Exempt streams must also outlive the server transport timeout.
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 				next.ServeHTTP(w, r)
 				return
 			}

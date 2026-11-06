@@ -2,6 +2,7 @@ package logx
 
 import (
 	"context"
+	"encoding"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -186,6 +187,12 @@ func redactValue(value reflect.Value, depth int) any {
 			return maskURLs(v.Error())
 		case fmt.Stringer:
 			return maskURLs(v.String())
+		case encoding.TextMarshaler:
+			text, err := v.MarshalText()
+			if err != nil {
+				return "****"
+			}
+			return maskURLs(string(text))
 		}
 	}
 	switch value.Kind() {

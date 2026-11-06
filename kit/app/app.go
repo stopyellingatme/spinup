@@ -97,7 +97,8 @@ func New(opts ...Option) *App {
 	for _, routes := range a.routes {
 		routes(mux)
 	}
-	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders()}
+	// Apply deadlines before devtools wraps the writer without deadline control.
+	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders(), a.requestDeadline()}
 	docsMounted := a.apiDocs && (a.config.Env == "dev" || a.config.APIDocs)
 	if docsMounted {
 		opts := apidocs.Options{Spec: a.apiSpec}
@@ -118,7 +119,6 @@ func New(opts ...Option) *App {
 		a.addRoute("/_dev/")
 		middleware = append(middleware, dev.Middleware(), a.recordRoute())
 	}
-	middleware = append(middleware, a.requestDeadline())
 	a.handler = a.telemetryHandler(httpx.Chain(mux, append(middleware, a.middleware...)...), mux)
 	return a
 }

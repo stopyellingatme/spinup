@@ -15,6 +15,7 @@ import (
 
 // ToolCommand returns a cached Go tool command, or the original go tool command.
 // The cache is outside the project. SPINUP_NO_TOOL_CACHE=1 disables it.
+// Local replacements and active workspaces bypass the cache.
 // Resolution failures leave tool execution to go tool, which reports its errors.
 func ToolCommand(ctx context.Context, dir string, runner exec.Runner, name string, args ...string) exec.Cmd {
 	fallback := exec.Cmd{Name: "go", Args: append([]string{"tool", "-modfile=tools.mod", name}, args...), Dir: dir}
@@ -63,18 +64,44 @@ func toolKey(ctx context.Context, dir string, runner exec.Runner, name string) (
 	if err != nil {
 		return "", err
 	}
-	environment, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE"}, Dir: dir})
+	environment, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK"}, Dir: dir})
 	if err != nil {
 		return "", err
 	}
 	var values struct {
-		GOOS, GOARCH, GOFLAGS, GOCACHE string
+		GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK string
 	}
 	if err := json.Unmarshal(environment.Stdout, &values); err != nil {
 		return "", err
 	}
 	if version.ExitCode != 0 || environment.ExitCode != 0 || len(version.Stdout) == 0 || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
 		return "", fmt.Errorf("go tool environment is unavailable")
+	}
+	if values.GOWORK != "" && values.GOWORK != "off" {
+		return "", fmt.Errorf("go tool cache is disabled for workspaces")
+	}
+	// Ask Go to parse replacements, including quoted paths and block directives.
+	if strings.Contains(string(mod), "replace") {
+		result, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"mod", "edit", "-json", "-modfile=tools.mod"}, Dir: dir})
+		if err != nil {
+			return "", err
+		}
+		var module struct {
+			Replace []struct {
+				New struct{ Path, Version string }
+			}
+		}
+		if err := json.Unmarshal(result.Stdout, &module); err != nil {
+			return "", err
+		}
+		if result.ExitCode != 0 {
+			return "", fmt.Errorf("go tool replacements are unavailable")
+		}
+		for _, replacement := range module.Replace {
+			if replacement.New.Version == "" {
+				return "", fmt.Errorf("go tool cache is disabled for local replacements")
+			}
+		}
 	}
 	// JSON frames each input, so different input boundaries cannot share a key.
 	data, err := json.Marshal([][]byte{mod, sum, version.Stdout, []byte(values.GOOS), []byte(values.GOARCH), []byte(values.GOFLAGS), []byte(values.GOCACHE), []byte(name)})

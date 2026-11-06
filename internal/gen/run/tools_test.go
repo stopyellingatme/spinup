@@ -33,7 +33,7 @@ func toolCacheFixture(t *testing.T) (string, string) {
 
 func expectToolEnvironment(fake *exec.Fake, version, environment string) {
 	fake.Expect("go", "version").Return(version, "", 0)
-	fake.Expect("go", "env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE").Return(environment, "", 0)
+	fake.Expect("go", "env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK").Return(environment, "", 0)
 }
 
 func TestToolCommandCache(t *testing.T) {
@@ -186,5 +186,95 @@ func TestToolCommandReresolvesMissingBinary(t *testing.T) {
 			}
 			binary = next
 		}
+	}
+}
+
+func TestToolCommandMutableSources(t *testing.T) {
+	for _, source := range []string{"relative replacement", "absolute replacement", "block replacement", "workspace"} {
+		t.Run(source, func(t *testing.T) {
+			dir, binary := toolCacheFixture(t)
+			// Populate an immutable cache entry before enabling mutable sources.
+			prime := &exec.Fake{}
+			expectToolEnvironment(prime, "go1.27.2", testGoEnv)
+			prime.Expect("go", "tool", "-modfile=tools.mod", "-n", "sqlc").Return(binary, "", 0)
+			if cmd := ToolCommand(context.Background(), dir, prime, "sqlc"); cmd.Name != binary {
+				t.Fatalf("prime command = %+v", cmd)
+			}
+			prime.AssertDone(t)
+			environment := testGoEnv
+			mod := "module tools\n"
+			switch source {
+			case "relative replacement":
+				mod += "replace example.com/tool => ./tool\n"
+			case "absolute replacement":
+				mod += "replace example.com/tool => " + filepath.ToSlash(t.TempDir()) + "\n"
+			case "block replacement":
+				mod += "replace (\nexample.com/tool v1.0.0 => \"../local tool\"\n)\n"
+			case "workspace":
+				environment = testGoEnv[:len(testGoEnv)-1] + `,"GOWORK":"/project/go.work"}`
+			}
+			put(t, dir, "tools.mod", mod)
+			fake := &exec.Fake{}
+			expectToolEnvironment(fake, "go1.27.2", environment)
+			if source != "workspace" {
+				fake.Expect("go", "mod", "edit", "-json", "-modfile=tools.mod").Return(`{"Replace":[{"New":{"Path":"./tool"}}]}`, "", 0)
+			}
+			cmd := ToolCommand(context.Background(), dir, fake, "sqlc", "generate")
+			for _, call := range fake.Calls() {
+				if call.Dir != dir {
+					t.Fatalf("resolution ran outside API directory: %+v", call)
+				}
+				if len(call.Args) > 0 && call.Args[0] == "tool" {
+					t.Fatalf("mutable source attempted cached tool resolution: %+v", call)
+				}
+			}
+			if cmd.Name != "go" || cmd.Dir != dir || !reflect.DeepEqual(cmd.Args, []string{"tool", "-modfile=tools.mod", "sqlc", "generate"}) {
+				t.Fatalf("mutable source command = %+v (cached binary %s)", cmd, binary)
+			}
+			fake.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("fresh tool output", "", 0)
+			result, err := fake.Run(context.Background(), cmd)
+			if err != nil || string(result.Stdout) != "fresh tool output" {
+				t.Fatalf("tool output = %q, error = %v", result.Stdout, err)
+			}
+			fake.AssertDone(t)
+		})
+	}
+}
+
+func TestToolCommandVersionedReplacement(t *testing.T) {
+	dir, binary := toolCacheFixture(t)
+	put(t, dir, "tools.mod", "module tools\nreplace example.com/tool => example.com/fork v1.2.3\n")
+	fake := &exec.Fake{}
+	environment := testGoEnv[:len(testGoEnv)-1] + `,"GOWORK":"off"}`
+	expectToolEnvironment(fake, "go1.27.2", environment)
+	fake.Expect("go", "mod", "edit", "-json", "-modfile=tools.mod").Return(`{"Replace":[{"New":{"Path":"example.com/fork","Version":"v1.2.3"}}]}`, "", 0)
+	fake.Expect("go", "tool", "-modfile=tools.mod", "-n", "sqlc").Return(binary, "", 0)
+	if cmd := ToolCommand(context.Background(), dir, fake, "sqlc"); cmd.Name != binary {
+		t.Fatalf("versioned replacement command = %+v", cmd)
+	}
+	fake.AssertDone(t)
+}
+
+func TestToolCommandReplacementFailures(t *testing.T) {
+	for _, failure := range []string{"command", "JSON", "exit status"} {
+		t.Run(failure, func(t *testing.T) {
+			dir, _ := toolCacheFixture(t)
+			put(t, dir, "tools.mod", "module tools\nreplace example.com/tool => ./tool\n")
+			fake := &exec.Fake{}
+			expectToolEnvironment(fake, "go1.27.2", testGoEnv)
+			expectation := fake.Expect("go", "mod", "edit", "-json", "-modfile=tools.mod")
+			switch failure {
+			case "command":
+				expectation.Fail(errors.New("cannot parse module"))
+			case "JSON":
+				expectation.Return("not JSON", "", 0)
+			case "exit status":
+				expectation.Return(`{}`, "", 1)
+			}
+			if cmd := ToolCommand(context.Background(), dir, fake, "sqlc"); cmd.Name != "go" {
+				t.Fatalf("failed replacement command = %+v", cmd)
+			}
+			fake.AssertDone(t)
+		})
 	}
 }
