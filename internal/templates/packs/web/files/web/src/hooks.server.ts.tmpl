@@ -26,9 +26,39 @@ async function loadUser(cookie: string | null): Promise<App.User | null> {
 	}
 }
 
+[[ if has "flags" .modules -]]
+/** loadFlags reads the public flags of this request from the Go API. It never throws. */
+async function loadFlags(cookie: string | null): Promise<Record<string, boolean>> {
+	try {
+		const res = await fetch(`${api}/api/flags`, {
+			headers: cookie ? { cookie, accept: 'application/json' } : { accept: 'application/json' }
+		});
+		if (!res.ok) {
+			console.warn(`flags: GET ${api}/api/flags returned ${res.status}`);
+			return {};
+		}
+		const body = (await res.json()) as { flags?: Record<string, boolean> };
+		return body.flags ?? {};
+	} catch (err) {
+		console.error(`flags: cannot reach the API at ${api}:`, err);
+		return {};
+	}
+}
+
+export const handle: Handle = async ({ event, resolve }) => {
+	const cookie = event.request.headers.get('cookie');
+	// The session and the flags load in parallel. A failed flag read leaves every public flag off.
+	const [user, flags] =
+		event.url.pathname === '/healthz'
+			? [null, {}]
+			: await Promise.all([loadUser(cookie), loadFlags(cookie)]);
+	event.locals.user = user;
+	event.locals.flags = flags;
+[[- else -]]
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user =
 		event.url.pathname === '/healthz' ? null : await loadUser(event.request.headers.get('cookie'));
+[[- end ]]
 	const response = await resolve(event);
 	if (!response.headers.has('X-Frame-Options')) response.headers.set('X-Frame-Options', 'DENY');
 	if (!response.headers.has('Content-Security-Policy')) {

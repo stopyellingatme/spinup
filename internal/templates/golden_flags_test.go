@@ -19,7 +19,7 @@ func TestGoldenFlags(t *testing.T) {
 	render := func() (fs.FS, error) {
 		all := testutil.RenderPack(t, []string{"base", "api", "web", "auth", "flags"}, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": "auth,flags"})
 		selected := fstest.MapFS{}
-		for _, path := range []string{"api/cmd/api/main.go", "api/db/kit/00008_feature_flags.sql", "api/internal/flags/flags.gen.go", "web/src/lib/flags.gen.ts"} {
+		for _, path := range []string{"api/cmd/api/main.go", "api/db/kit/00008_feature_flags.sql", "api/internal/flags/flags.gen.go", "web/src/lib/flags.gen.ts", "web/src/lib/flags.ts", "web/src/lib/server/flags.ts", "web/src/routes/admin/flags/+page.server.ts", "web/src/routes/admin/flags/+page.svelte", "web/src/routes/admin/flags/schema.ts", "web/src/hooks.server.ts", "web/src/app.d.ts", "web/src/routes/+layout.server.ts", "web/src/routes/+layout.svelte", "web/src/lib/components/app/user-menu.svelte"} {
 			data, err := fs.ReadFile(all, path)
 			if err != nil {
 				return nil, err

@@ -1,4 +1,9 @@
 import type { LayoutServerLoad } from './$types';
 
+[[ if has "flags" .modules -]]
+// hooks.server.ts sets locals.user and locals.flags. Every page gets them as data.user and data.flags.
+export const load: LayoutServerLoad = ({ locals }) => ({ user: locals.user, flags: locals.flags });
+[[- else -]]
 // hooks.server.ts sets locals.user. Every page gets it as data.user.
 export const load: LayoutServerLoad = ({ locals }) => ({ user: locals.user });
+[[- end ]]
