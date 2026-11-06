@@ -21,7 +21,7 @@ func TestGoldenAudit(t *testing.T) {
 	render := func() (fs.FS, error) {
 		all := testutil.RenderPack(t, []string{"base", "api", "web", "auth", "audit"}, map[string]any{"app_name": "todo", "module": "example.com/todo", "modules": "auth,audit"})
 		selected := fstest.MapFS{}
-		for _, path := range []string{"api/cmd/api/main.go", "api/db/migrations/00006_audit_events.sql", "web/src/lib/components/app/history-list.svelte"} {
+		for _, path := range []string{"api/cmd/api/main.go", "api/db/kit/00006_audit_events.sql", "web/src/lib/components/app/history-list.svelte"} {
 			data, err := fs.ReadFile(all, path)
 			if err != nil {
 				return nil, err
@@ -38,7 +38,7 @@ func TestGoldenAudit(t *testing.T) {
 	testutil.Deterministic(t, render)
 	// Exercise the rendered wiring and migration through the registered static check.
 	root := t.TempDir()
-	for _, path := range []string{"api/cmd/api/main.go", "api/db/migrations/00006_audit_events.sql"} {
+	for _, path := range []string{"api/cmd/api/main.go", "api/db/kit/00006_audit_events.sql"} {
 		data, err := fs.ReadFile(fsys, path)
 		if err != nil {
 			t.Fatal(err)
@@ -52,11 +52,11 @@ func TestGoldenAudit(t *testing.T) {
 		}
 	}
 	// Check the real conditional trigger against the OIDC table migration too.
-	identityMigration, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/migrations/00004_oidc_identities.sql")
+	identityMigration, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/kit/00004_oidc_identities.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "api/db/migrations/00004_oidc_identities.sql"), identityMigration, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "api/db/kit/00004_oidc_identities.sql"), identityMigration, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	lock := manifest.New()

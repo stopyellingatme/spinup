@@ -16,8 +16,8 @@ import (
 // authGoldenPath selects the files of the auth pack and the API main file,
 // which wires kit auth when the auth module is on.
 func authGoldenPath(path string) bool {
-	return path == "api/db/migrations/00002_create_auth.sql" ||
-		path == "api/db/migrations/00005_users_role.sql" ||
+	return path == "api/db/kit/00002_create_auth.sql" ||
+		path == "api/db/kit/00005_users_role.sql" ||
 		path == "api/internal/roles/roles.gen.go" ||
 		path == "api/cmd/api/main.go" ||
 		path == "web/src/lib/server/auth.ts" ||
@@ -97,7 +97,9 @@ func TestAuthPackClasses(t *testing.T) {
 	for _, f := range p.Files {
 		want := "scaffold"
 		switch {
-		case strings.HasPrefix(f.Path, "api/db/migrations/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
+		case f.Path == "api/db/kit/embed.go":
+			want = "managed"
+		case strings.HasPrefix(f.Path, "api/db/kit/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
 			want = "seed"
 		case strings.HasPrefix(f.Path, "web/src/lib/server/"), f.Path == "api/cmd/api/reset.go", f.Path == "api/internal/roles/roles.gen.go":
 			want = "managed"
@@ -142,7 +144,7 @@ func TestAuthOffKeepsAPIMain(t *testing.T) {
 // TestAuthMigrationMatchesKit checks that the kit auth tests run on the schema that apps get.
 func TestAuthMigrationMatchesKit(t *testing.T) {
 	t.Parallel()
-	pack, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/migrations/00002_create_auth.sql")
+	pack, err := fs.ReadFile(templates.Embedded(), "auth/files/api/db/kit/00002_create_auth.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,8 @@ import (
  "os/signal"
  "syscall"
 
- "[[ .module ]]/api/db/migrations"
+[[ if has "auth" .modules ]] kitmigrations "[[ .module ]]/api/db/kit"
+[[ end ]] "[[ .module ]]/api/db/migrations"
  "[[ .module ]]/api/internal/routes"
  "[[ .module ]]/api/openapi"
 [[- if eq (index . "frontend_mode") "embed" ]]
@@ -119,7 +120,7 @@ func run() (err error) {
   app.WithCommand("audit", audit.Command(pool)),
 [[- end ]]
   app.WithReadiness("db", pool.Ping),
-  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),
+  app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL)[[ if has "auth" .modules ]], db.WithKitMigrations(kitmigrations.FS)[[ end ]][[ if has "jobs" .modules ]], db.WithHook(jobs.MigrationHook())[[ end ]])),
 [[- if has "jobs" .modules ]]
   app.WithCommand("jobs-migrate", jobs.MigrateCommand(jobs.WithMigrateDatabaseURL(cfg.DatabaseURL))),
 [[- end ]]

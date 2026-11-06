@@ -5,8 +5,8 @@ type = "bool"
 default = false
 
 [[files]]
-path = "api/db/migrations/00004_oidc_identities.sql"
-source = "files/api/db/migrations/00004_oidc_identities.sql"
+path = "api/db/kit/00004_oidc_identities.sql"
+source = "files/api/db/kit/00004_oidc_identities.sql"
 class = "seed"
 when = "auth_oidc"
 

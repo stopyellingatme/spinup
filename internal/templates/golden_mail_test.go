@@ -27,7 +27,7 @@ func TestGoldenMail(t *testing.T) {
 			if err != nil || entry.IsDir() {
 				return err
 			}
-			if !strings.HasPrefix(path, "api/internal/mail/") && path != "api/db/migrations/00003_password_resets.sql" && !strings.HasPrefix(path, "web/src/routes/reset/") && path != "api/cmd/api/main.go" && path != "api/cmd/api/reset.go" && path != "api/cmd/worker/main.go" {
+			if !strings.HasPrefix(path, "api/internal/mail/") && path != "api/db/kit/00003_password_resets.sql" && !strings.HasPrefix(path, "web/src/routes/reset/") && path != "api/cmd/api/main.go" && path != "api/cmd/api/reset.go" && path != "api/cmd/worker/main.go" {
 				return nil
 			}
 			data, err := fs.ReadFile(all, path)
