@@ -120,19 +120,15 @@ func DefaultDeps() Deps {
 // LintMigrations checks kit migrations first, then app migrations.
 // Missing directories have no findings.
 func LintMigrations(root string) ([]lint.Finding, error) {
-	var findings []lint.Finding
+	var dirs []string
 	for _, dir := range []string{"api/db/kit", "api/db/migrations"} {
 		path := root + "/" + dir
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			continue
 		}
-		got, err := lint.LintDir(path)
-		if err != nil {
-			return nil, err
-		}
-		findings = append(findings, got...)
+		dirs = append(dirs, path)
 	}
-	return findings, nil
+	return lint.LintDirs(dirs...)
 }
 
 func (d *Deps) fill() {

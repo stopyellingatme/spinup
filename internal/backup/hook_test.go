@@ -426,3 +426,42 @@ func TestHookKitMigrations(t *testing.T) {
 		})
 	}
 }
+
+func TestHookProjectsKitAdoption(t *testing.T) {
+	t.Parallel()
+	for _, skip := range []bool{false, true} {
+		t.Run(strconv.FormatBool(skip), func(t *testing.T) {
+			t.Parallel()
+			root := newProject(t, true, "", map[string]string{"00009_app.sql": "-- spinup:safe\nSELECT 1;"})
+			dir := filepath.Join(root, "api/db/kit")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"00002_auth.sql", "00007_auth_version.sql"} {
+				if err := os.WriteFile(filepath.Join(dir, name), []byte("-- +goose Up\nSELECT 1;"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f := &remote.Fake{}
+			releaseHistory(f, "[{}]")
+			f.Expect(psRunning...).Return("postgres\n", "", 0)
+			f.Expect(append(append([]string(nil), psql...), "SELECT CASE WHEN to_regclass('public.spinup_kit_version') IS NULL THEN '-1' ELSE '0' END")...).Return("-1\n", "", 0)
+			f.Expect(append(append([]string(nil), psql...), gooseTableQuery)...).Return("0\n", "", 0)
+			f.Expect(append(append([]string(nil), psql...), gooseAppliedQuery)...).Return("1\n2\n7\n9\n", "", 0)
+			if !skip {
+				f.ExpectUpload("/opt/todo/backups/pgbackrest.conf")
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				f.Expect(Command("todo", "--type=diff", "backup")...).Return("", "", 0)
+				f.Expect(Command("todo", "--output=json", "info")...).Return(fixture(t, "info.json"), "", 0)
+				expectMetrics(f)
+			}
+			results := map[string]string{}
+			ctx := WithDeployOptions(t.Context(), DeployOptions{Dir: root, SkipBackup: skip})
+			err := Hook(ctx, &deploy.HookContext{App: "todo", Remote: f, Results: results})
+			if err != nil || results[deploy.ResultMigrationsSafe] != "true" {
+				t.Fatalf("results = %v, error = %v", results, err)
+			}
+			f.AssertDone(t)
+		})
+	}
+}

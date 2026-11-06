@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
+
+	"github.com/stopyellingatme/spinup/internal/manifest"
 )
 
 // KitMigrationsID identifies the codemod that separates kit and app migrations.
@@ -26,7 +29,7 @@ func init() { Register(kitMigrations()) }
 func kitMigrations() Migration {
 	return Migration{
 		ID:    KitMigrationsID,
-		Since: "0.1.0-alpha.420",
+		Since: "0.1.0-alpha.419",
 		Desc:  "Move pack migrations to api/db/kit",
 		Stage: Before,
 		Plan: func(c *Ctx) ([]Change, error) {
@@ -35,7 +38,7 @@ func kitMigrations() Migration {
 				return nil, kitMigrationError(err)
 			}
 			defer root.Close()
-			return planKitMigrations(root)
+			return planKitMigrations(root, c.Lock)
 		},
 		Apply: func(c *Ctx) error {
 			root, err := os.OpenRoot(c.Root)
@@ -43,7 +46,7 @@ func kitMigrations() Migration {
 				return kitMigrationError(err)
 			}
 			defer root.Close()
-			changes, err := planKitMigrations(root)
+			changes, err := planKitMigrations(root, c.Lock)
 			if err != nil || len(changes) == 0 {
 				return err
 			}
@@ -78,7 +81,7 @@ func kitMigrations() Migration {
 	}
 }
 
-func planKitMigrations(root *os.Root) ([]Change, error) {
+func planKitMigrations(root *os.Root, lock *manifest.Lock) ([]Change, error) {
 	entries, err := fs.ReadDir(root.FS(), "api/db/migrations")
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -93,6 +96,14 @@ func planKitMigrations(root *os.Root) ([]Change, error) {
 			continue
 		}
 		for _, pack := range kitMigrationNames {
+			owner := "auth"
+			if pack == "00006_audit_events.sql" {
+				owner = "audit"
+			}
+			if lock == nil || !slices.Contains(lock.Packs, owner) {
+				continue
+			}
+
 			if name[5:] != pack[5:] {
 				continue
 			}

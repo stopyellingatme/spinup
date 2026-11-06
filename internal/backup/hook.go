@@ -211,6 +211,11 @@ func unsafePending(ctx context.Context, r remote.Runner, app, root string) ([]st
 }
 
 func unsafePendingSpaces(root string, applied, kitApplied []int64) ([]string, error) {
+	kitApplied, err := deploy.ProjectKitAdoption(root, applied, kitApplied)
+	if err != nil {
+		return nil, err
+	}
+
 	var unsafe []string
 	kitDir := filepath.Join(root, "api/db/kit")
 	if _, err := os.Stat(kitDir); err == nil {

@@ -29,11 +29,10 @@ var (
 	versionedSQL  = regexp.MustCompile(`^([0-9]+)_(.+)\.sql$`)
 )
 
-// NextMigrationName returns the goose sequential file name for a new
-// migration in dir: "NNNNN_<name>.sql", where NNNNN is the highest 5-digit
-// number of the files in dir plus one (ADR 0007 §4). It rejects a name that is
-// not snake case, and a name that a migration in dir already has. A missing
-// dir gives "00001_<name>.sql".
+// NextMigrationName returns NNNNN_<name>.sql for a new app migration.
+// The number follows the highest 5-digit version in dir and its sibling kit
+// directory (ADR 0028). It rejects invalid or duplicate names.
+// Missing directories give 00001_<name>.sql.
 func NextMigrationName(dir, name string) (string, error) {
 	const what = "Cannot name the migration"
 	if !snakeName.MatchString(name) {
@@ -44,25 +43,27 @@ func NextMigrationName(dir, name string) (string, error) {
 			Code: ui.ExitUsage,
 		}
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return "", opError(what, err)
-	}
 	highest := 0
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
+	for _, source := range []string{dir, filepath.Join(filepath.Dir(filepath.Clean(dir)), "kit")} {
+		entries, err := os.ReadDir(source)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return "", opError(what, err)
 		}
-		if m := versionedSQL.FindStringSubmatch(e.Name()); m != nil && m[2] == name {
-			return "", &ui.Error{
-				What: what,
-				Why:  fmt.Sprintf("the migration %s already has the name %s", e.Name(), name),
-				Try:  "choose another name, or edit the migration " + e.Name(),
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
 			}
-		}
-		if m := sequentialSQL.FindStringSubmatch(e.Name()); m != nil {
-			n, _ := strconv.Atoi(m[1])
-			highest = max(highest, n)
+			if m := versionedSQL.FindStringSubmatch(e.Name()); m != nil && m[2] == name {
+				return "", &ui.Error{
+					What: what,
+					Why:  fmt.Sprintf("the migration %s already has the name %s", e.Name(), name),
+					Try:  "choose another name, or edit the migration " + e.Name(),
+				}
+			}
+			if m := sequentialSQL.FindStringSubmatch(e.Name()); m != nil {
+				n, _ := strconv.Atoi(m[1])
+				highest = max(highest, n)
+			}
 		}
 	}
 	if highest >= maxMigration {
@@ -192,7 +193,9 @@ func currentVersion(ctx context.Context, o Options, runner run.Runner, root, wha
 	if err != nil {
 		return 0, opError(what, err)
 	}
-	v, err := strconv.ParseInt(strings.TrimSpace(string(res.Stdout)), 10, 64)
+	output := strings.TrimSpace(string(res.Stdout))
+	output = output[strings.LastIndex(output, "\n")+1:]
+	v, err := strconv.ParseInt(strings.TrimSpace(output), 10, 64)
 	if err != nil {
 		return 0, &ui.Error{What: what, Why: fmt.Sprintf("%s printed %q, not a version number", c.String(), bytes.TrimSpace(res.Stdout)), Try: "update the kit in api/go.mod, then retry"}
 	}

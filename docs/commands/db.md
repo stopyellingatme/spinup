@@ -78,7 +78,7 @@ See [Kit migrations](../concepts.md#kit-migrations).
 
 Run `spinup db new <name>` to write an empty migration with a goose `Up` and `Down` section.
 Use a snake case name.
-The number is the highest number in `api/db/migrations/` plus one.
+The number follows the highest number in `api/db/migrations/` and `api/db/kit/`.
 If another migration has the name, the command fails.
 
 ```console

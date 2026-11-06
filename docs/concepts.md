@@ -237,7 +237,8 @@ An app has two sets of migrations, and each set has its own version numbers.
 The app migrations are in `api/db/migrations/`. You own them, and `spinup g resource` and `spinup db new` add to them.
 The kit migrations are in `api/db/kit/`. A module ships them, such as the tables of `auth` and `audit`. They are `seed` files, so an upgrade does not touch them after the first write.
 
-The same number can exist in both sets. For example, `api/db/kit/00005_users_role.sql` and `api/db/migrations/00005_create_orders.sql` do not clash.
+New app migrations follow the highest number in both sets.
+Existing migrations can have the same number in both sets. For example, `api/db/kit/00005_users_role.sql` and `api/db/migrations/00005_create_orders.sql` do not clash.
 The command `migrate up` applies the kit migrations first. The command `migrate status` lists them first, with the prefix `kit`.
 The command `spinup db to <version>` moves the app migrations only. To roll back a kit migration, run `go run ./cmd/api migrate kit to <version>` in `api/`.
 Never write a kit migration that uses a table of your app.

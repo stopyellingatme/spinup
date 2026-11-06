@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path"
 
 	"github.com/pressly/goose/v3/lock"
@@ -24,14 +25,14 @@ func legacyKitProbe(version int64) string {
 	case 6:
 		return "SELECT to_regclass('public.audit_events') IS NOT NULL"
 	case 7:
-		return `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'auth_version')`
+		return `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'auth_version') AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'sessions' AND column_name = 'user_id')`
 	default:
 		return ""
 	}
 }
 
 // adopt moves legacy kit rows in one transaction under the goose advisory lock.
-// Progress is printed after commit so a failed probe reports no adopted rows.
+// Progress goes to standard error after commit, so stdout holds command results.
 func (m *Migrator) adopt(ctx context.Context) error {
 	if m.kitProvider == nil {
 		return nil
@@ -86,7 +87,7 @@ func (m *Migrator) adopt(ctx context.Context) error {
 		return adoptionError(err)
 	}
 	for _, name := range adopted {
-		m.printf("adopted  kit %s\n", name)
+		_, _ = fmt.Fprintf(os.Stderr, "adopted  kit %s\n", name)
 	}
 	return nil
 }

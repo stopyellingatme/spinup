@@ -137,7 +137,8 @@ Run `spinup db migrate up` if the plan mentioned a migration. Then run `spinup d
 ### Upgrade from a version that has no kit migration directory
 
 Older versions put the migrations of the modules (`auth`, `audit`) in `api/db/migrations/`. The upgrade moves them to `api/db/kit/` (ADR 0028) and keeps your own migrations where they are.
-After you merge the branch, run `spinup db migrate up` once in every database. The first run moves the applied rows of the module migrations to their own version table and prints one line for each row:
+After you merge the branch, run `spinup db migrate up` once in every database. The first run moves the applied rows of the module migrations to their own version table.
+It prints one line for each row to standard error:
 
 <!-- doctest: skip -->
 ```console
