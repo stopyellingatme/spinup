@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
+	genrun "github.com/stopyellingatme/spinup/internal/gen/run"
 )
 
 // QueriesDir is the sqlc query directory, relative to the project root.
 const QueriesDir = "api/db/queries"
 
-// Sqlc runs `go tool -modfile=tools.mod sqlc generate` in api/. When
+// Sqlc runs the pinned sqlc tool in api/. When
 // api/db/queries holds no .sql file, sqlc would fail, so Sqlc says so and
 // returns nil.
 func Sqlc(ctx context.Context, o Options, runner run.Runner) error {
@@ -29,5 +30,8 @@ func Sqlc(ctx context.Context, o Options, runner run.Runner) error {
 		return err
 	}
 	c := run.Cmd{Name: "go", Args: []string{"tool", "-modfile=tools.mod", "sqlc", "generate"}, Dir: filepath.Join(root, "api")}
+	if !o.DryRun {
+		c = genrun.ToolCommand(ctx, c.Dir, runner, "sqlc", "generate")
+	}
 	return runStreaming(ctx, o, runner, what, c)
 }

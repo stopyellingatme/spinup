@@ -55,11 +55,9 @@ func generate(ctx context.Context, root string, service services.Service, runner
 		return err
 	}
 
-	result, err := runner.Run(ctx, exec.Cmd{
-		Name: "go",
-		Args: []string{"tool", "-modfile=tools.mod", "oapi-codegen", "-config", filepath.ToSlash(filepath.Join("internal", "services", service.Name, "oapi-codegen.yaml")), filepath.ToSlash(filepath.Join("..", "services", service.Name, service.OpenAPI))},
-		Dir:  filepath.Join(root, "api"),
-	})
+	cmd := run.ToolCommand(ctx, filepath.Join(root, "api"), runner, "oapi-codegen", "-config", filepath.ToSlash(filepath.Join("internal", "services", service.Name, "oapi-codegen.yaml")), filepath.ToSlash(filepath.Join("..", "services", service.Name, service.OpenAPI)))
+	cmd.Stdout, cmd.Stderr = run.PostStepOutput(ctx), run.PostStepOutput(ctx)
+	result, err := runner.Run(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("run oapi-codegen for service %q: %w\n%s%s\nTry: correct the service OpenAPI file, then run spinup g client", service.Name, err, result.Stdout, result.Stderr)
 	}
