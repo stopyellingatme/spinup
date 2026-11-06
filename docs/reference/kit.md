@@ -163,7 +163,20 @@ func create(w http.ResponseWriter, r *http.Request) {
 ```
 
 `WriteProblem` writes `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)) with the request ID.
-`DecodeJSON` rejects unknown fields and extra values. `ProblemFrom` turns its error into a 400 or 413 problem and hides the details of any other error.
+`DecodeJSON` requires exact field names. It rejects unknown fields, duplicate names, invalid UTF-8, and extra values.
+`ProblemFrom` turns its error into a 400 or 413 problem and hides the details of any other error.
+Use `MaxBody` to enforce a size limit.
+
+`CheckJSONBody(r, httpx.BodyRules{Required: required, Known: known})` validates the complete document before another decoder reads it.
+It checks duplicate names at every depth and rejects invalid UTF-8.
+If `Known` contains names, it rejects other names at the top level.
+A non-object root returns 422. Missing or null required fields return 422 with field errors sorted by name.
+
+Invalid JSON returns 400. A body that exceeds the size limit returns 413.
+The body remains readable and retains its original `Close` method.
+
+`RequireJSONFields(r, required)` calls `CheckJSONBody` without a list of known fields.
+It validates JSON syntax even when no field is required. An empty body with empty rules is allowed.
 `WriteAttachment` sends a file download. The middleware are `RequestID`, `Recover`, `AccessLog`, `SecurityHeaders`, and `MaxBody`.
 
 ## auth
