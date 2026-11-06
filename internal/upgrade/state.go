@@ -111,7 +111,7 @@ func writeUpgradeJSON(path string, value any) error {
 		_, err = file.Write(append(data, '\n'))
 	}
 	if err == nil {
-		err = file.Sync()
+		err = vfs.SyncFile(file)
 	}
 	if closeErr := file.Close(); err == nil {
 		err = closeErr
