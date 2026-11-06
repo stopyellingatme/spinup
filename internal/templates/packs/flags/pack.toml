@@ -13,3 +13,8 @@ class = "managed"
 path = "web/src/lib/flags.gen.ts"
 source = "files/web/src/lib/flags.gen.ts"
 class = "managed"
+
+[[files]]
+path = "api/db/kit/00008_feature_flags.sql"
+source = "files/api/db/kit/00008_feature_flags.sql"
+class = "seed"
