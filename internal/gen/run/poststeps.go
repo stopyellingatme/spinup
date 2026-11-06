@@ -1,8 +1,12 @@
 package run
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,7 +22,8 @@ var (
 	stepsMu sync.RWMutex
 	steps   = map[gen.PostStep]postStepRunner{
 		gen.PostSQLC: func(ctx context.Context, root string, _ []string, r exec.Runner) error {
-			return tool(ctx, root, r, "go", "tool", "-modfile=tools.mod", "sqlc", "generate")
+			cmd := ToolCommand(ctx, filepath.Join(root, "api"), r, "sqlc", "generate")
+			return tool(ctx, root, r, cmd.Name, cmd.Args...)
 		},
 		gen.PostGofmt: func(ctx context.Context, root string, files []string, r exec.Runner) error {
 			args := gofmtArgs(files)
@@ -78,8 +83,55 @@ func stepRunners(ordered []gen.PostStep) ([]postStepRunner, error) {
 	return runners, nil
 }
 
+type postStepOutputKey struct{}
+
+// PostStepOutput returns the output buffer for the current post-step.
+// Outside the generator runner, notices go to standard error.
+func PostStepOutput(ctx context.Context) io.Writer {
+	if out, ok := ctx.Value(postStepOutputKey{}).(io.Writer); ok {
+		return out
+	}
+	return os.Stderr
+}
+
+func runPostSteps(ctx context.Context, root string, files []string, ordered []gen.PostStep, runners []postStepRunner, runner exec.Runner, out io.Writer) error {
+	for start := 0; start < len(ordered); {
+		end := start + 1
+		// OpenAPI writes the bundle and API types. sqlc writes the store package.
+		// Later steps can consume those files and must wait for both tools.
+		if ordered[start] == gen.PostOpenAPI && end < len(ordered) && ordered[end] == gen.PostSQLC {
+			end++
+		}
+		outputs := make([]bytes.Buffer, end-start)
+		errs := make([]error, end-start)
+		var wg sync.WaitGroup
+		for i := start; i < end; i++ {
+			stepCtx := context.WithValue(ctx, postStepOutputKey{}, &outputs[i-start])
+			wg.Go(func() {
+				errs[i-start] = runners[i](stepCtx, root, files, runner)
+			})
+		}
+		wg.Wait()
+		var failures []error
+		for i := start; i < end; i++ {
+			if _, err := outputs[i-start].WriteTo(out); err != nil {
+				failures = append(failures, withHint("write generator post-step output", err, "check the output destination"))
+			}
+			if err := errs[i-start]; err != nil {
+				failures = append(failures, fmt.Errorf("generator post-step %q failed: %w\nTry: %s", ordered[i], err, retryStep(ordered[i], files)))
+			}
+		}
+		if err := errors.Join(failures...); err != nil {
+			return err
+		}
+		start = end
+	}
+	return nil
+}
+
 func tool(ctx context.Context, root string, r exec.Runner, name string, args ...string) error {
-	result, err := r.Run(ctx, exec.Cmd{Name: name, Args: args, Dir: filepath.Join(root, "api")})
+	out := PostStepOutput(ctx)
+	result, err := r.Run(ctx, exec.Cmd{Name: name, Args: args, Dir: filepath.Join(root, "api"), Stdout: out, Stderr: out})
 	if err != nil {
 		return fmt.Errorf("%s: %w\n%s%s", name, err, result.Stdout, result.Stderr)
 	}

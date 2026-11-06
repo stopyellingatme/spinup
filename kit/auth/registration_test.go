@@ -189,8 +189,8 @@ func TestOIDCRegistrationRefusal(t *testing.T) {
 	t.Parallel()
 	p := newOIDCTestProvider(t)
 	app := newOIDCTestApp(t, p)
-	app.h.user = func(context.Context, string, string, string, bool) (User, error) {
-		return User{}, fmt.Errorf("OIDC account: %w", errRegistrationClosed)
+	app.h.user = func(context.Context, string, string, string, bool) (User, int64, error) {
+		return User{}, 0, fmt.Errorf("OIDC account: %w", errRegistrationClosed)
 	}
 	cookie, callback := app.start(t, "/account")
 	rec := app.callback(t, cookie, callback)
@@ -221,7 +221,7 @@ func TestOIDCRegistrationModes(t *testing.T) {
 				t.Parallel()
 				f := oidcDBFixture(t, WithRoles(roles), WithRegistration(mode))
 				for i := range 2 {
-					user, err := f.auth.oidcUser(t.Context(), "test", fmt.Sprintf("subject%d", i), fmt.Sprintf("person%d@example.com", i), true)
+					user, _, err := f.auth.oidcUser(t.Context(), "test", fmt.Sprintf("subject%d", i), fmt.Sprintf("person%d@example.com", i), true)
 					if mode == RegistrationClosed || mode == RegistrationFirstUser && i > 0 {
 						if !errors.Is(err, errRegistrationClosed) {
 							t.Fatalf("OIDC creation = %+v, %v", user, err)
@@ -241,7 +241,7 @@ func TestOIDCRegistrationModes(t *testing.T) {
 					}
 					// A known identity can sign in when creation is closed.
 					closed := &Auth{pool: f.pool, roles: roles, registration: RegistrationClosed}
-					known, err := closed.oidcUser(t.Context(), "test", fmt.Sprintf("subject%d", i), "changed@example.com", true)
+					known, _, err := closed.oidcUser(t.Context(), "test", fmt.Sprintf("subject%d", i), "changed@example.com", true)
 					if err != nil || known != user {
 						t.Fatalf("known OIDC identity = %+v, %v", known, err)
 					}
@@ -272,7 +272,7 @@ func TestOIDCLinksExistingAccountWhenRegistrationClosed(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			linked, err := f.auth.oidcUser(t.Context(), "test", "subject", user.Email, true)
+			linked, _, err := f.auth.oidcUser(t.Context(), "test", "subject", user.Email, true)
 			if err != nil || linked != user {
 				t.Fatalf("existing OIDC account = %+v, %v", linked, err)
 			}

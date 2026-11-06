@@ -28,9 +28,7 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 }
 
 func postStep(ctx context.Context, root string, _ []string, runner exec.Runner) error {
-	// The post-step contract has no output stream. Keep notices on stderr so
-	// callers can continue to decode the runner's JSON output on stdout.
-	return generate(ctx, filepath.Join(root, "api"), runner, os.Stderr)
+	return generate(ctx, filepath.Join(root, "api"), runner, run.PostStepOutput(ctx))
 }
 
 func generate(ctx context.Context, apiDir string, runner exec.Runner, notices io.Writer) error {
@@ -51,7 +49,9 @@ func generate(ctx context.Context, apiDir string, runner exec.Runner, notices io
 		}
 		return nil
 	}
-	result, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"tool", "-modfile=tools.mod", "oapi-codegen", "-config", "oapi-codegen.yaml", "openapi/bundle.gen.yaml"}, Dir: apiDir})
+	cmd := run.ToolCommand(ctx, apiDir, runner, "oapi-codegen", "-config", "oapi-codegen.yaml", "openapi/bundle.gen.yaml")
+	cmd.Stdout, cmd.Stderr = notices, notices
+	result, err := runner.Run(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("run oapi-codegen: %w\n%s%s\nTry: correct the tool error, then run spinup g openapi", err, result.Stdout, result.Stderr)
 	}

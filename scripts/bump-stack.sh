@@ -63,7 +63,7 @@ finish() {
   fi
   cp "$1/go.sum" "$3"
   if grep -q '^toolchain ' "$2"; then
-    echo "bump-stack: $2 has a toolchain line; a pinned module needs a newer Go than 1.26.0" >&2
+    echo "bump-stack: $2 has a toolchain line; a pinned module needs a newer Go than 1.27.0" >&2
     exit 1
   fi
 }
@@ -79,7 +79,7 @@ mkdir "$work/tools"
 (
   cd "$work/tools"
   go mod init "$placeholder" >/dev/null 2>&1
-  go mod edit -go=1.26.0
+  go mod edit -go=1.27.0
   for t in "${tools[@]}"; do
     go get -tool "$t@$(pin go_tools "$t")"
   done
@@ -128,7 +128,7 @@ case "$mode" in
     (
       cd "$app"
       go mod init "$placeholder" >/dev/null 2>&1
-      go mod edit -go=1.26.0 -require="$kit_module@$kit_version" -replace="$kit_module=$root/kit"
+      go mod edit -go=1.27.0 -require="$kit_module@$kit_version" -replace="$kit_module=$root/kit"
       {
         echo "package deps"
         echo

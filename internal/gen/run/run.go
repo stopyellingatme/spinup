@@ -88,7 +88,11 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 	if err != nil {
 		return nil, err
 	}
-	changes, err := vfs.Diff(o.Root, plan)
+	compare := vfs.Compare
+	if o.Diff && !o.JSON {
+		compare = vfs.Diff // only the text diff output prints UnifiedDiff
+	}
+	changes, err := compare(o.Root, plan)
 	if err != nil {
 		return nil, withHint("compare generator files", err, "check the project paths and permissions")
 	}
@@ -162,10 +166,8 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 	if err != nil {
 		return result, err
 	}
-	for i, step := range result.PostSteps {
-		if err := runners[i](ctx, o.Root, plan.Paths(), o.Runner); err != nil {
-			return result, fmt.Errorf("generator post-step %q failed: %w\nTry: %s", step, err, retryStep(step, plan.Paths()))
-		}
+	if err := runPostSteps(ctx, o.Root, plan.Paths(), result.PostSteps, runners, o.Runner, commandOut); err != nil {
+		return result, err
 	}
 	if o.JSON {
 		return result, printResult(o.Out, result)

@@ -9,9 +9,9 @@ verified: "2026-10-13"
 
 go:
   toolchain: go1.27.2
-  min: "1.26"          # generated apps declare `go 1.26.0`; CI tests 1.26 and 1.27
+  min: "1.27"          # generated apps declare `go 1.27.0` (encoding/json/v2, ADR 0027); CI tests 1.27
   notes:
-    - "Go 1.27 enables encoding/json v2 by default (GOEXPERIMENT JSONv2=true). Keep the kit error-format golden tests."
+    - "Go 1.27 enables encoding/json v2 by default (GOEXPERIMENT JSONv2=true). The kit imports encoding/json/v2, so GOEXPERIMENT=nojsonv2 is unsupported (ADR 0027). Keep the kit error-format golden tests."
 
 go_modules:
   # CLI

@@ -13,12 +13,20 @@ import (
 
 func init() {
 	required := []string{
-		"title",
 		"done",
 		"priority",
+		"title",
+	}
+	known := []string{
+		"done",
+		"due",
+		"priority",
+		"title",
 	}
 	requiredFields["POST /api/todos"] = required
+	knownFields["POST /api/todos"] = known
 	requiredFields["PUT /api/todos/{id}"] = required
+	knownFields["PUT /api/todos/{id}"] = known
 }
 
 // todoFromStore converts a store row to the API type.
@@ -72,13 +80,20 @@ func (s *Server) ListTodos(ctx context.Context, req gen.ListTodosRequestObject) 
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.Queries.CountTodos(ctx)
-	if err != nil {
-		return nil, err
+	// Each row carries the total. A page past the last row has no row, so
+	// it counts the rows itself.
+	var total int64
+	if len(rows) > 0 {
+		total = rows[0].Total
+	} else if offset > 0 {
+		total, err = s.Queries.CountTodos(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	items := make([]gen.Todo, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, todoFromStore(row))
+		items = append(items, todoFromStore(row.Todo))
 	}
 	return gen.ListTodos200JSONResponse{Items: items, Total: total}, nil
 }

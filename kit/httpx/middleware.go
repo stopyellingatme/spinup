@@ -101,8 +101,9 @@ func Recover(l *slog.Logger) Middleware {
 	}
 }
 
-// AccessLog writes one info record per request with method, path, status, bytes,
-// duration_ms, and request_id. A nil logger uses slog.Default.
+// AccessLog writes one record per request with method, path, status, bytes,
+// duration_ms, and request_id. Successful /healthz and /readyz probes use debug.
+// Other requests use info. A nil logger uses slog.Default.
 func AccessLog(l *slog.Logger) Middleware {
 	if l == nil {
 		l = slog.Default()
@@ -138,7 +139,21 @@ func accessRecord(l *slog.Logger, r *http.Request, response *responseWriter, sta
 			status = http.StatusInternalServerError
 		}
 	}
-	l.InfoContext(r.Context(), "HTTP request", "method", r.Method, "path", r.URL.Path, "status", status, "bytes", response.bytes, "duration_ms", float64(time.Since(start))/float64(time.Millisecond), "request_id", RequestIDFrom(r.Context()))
+	level := slog.LevelInfo
+	if status >= 200 && status < 300 && (r.URL.Path == "/healthz" || r.URL.Path == "/readyz") {
+		level = slog.LevelDebug
+	}
+	if !l.Enabled(r.Context(), level) {
+		return
+	}
+	l.LogAttrs(r.Context(), level, "HTTP request",
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+		slog.Int("status", status),
+		slog.Int64("bytes", response.bytes),
+		slog.Float64("duration_ms", float64(time.Since(start))/float64(time.Millisecond)),
+		slog.String("request_id", RequestIDFrom(r.Context())),
+	)
 }
 
 // SecurityHeaders sets conservative defaults. A handler can replace each header.

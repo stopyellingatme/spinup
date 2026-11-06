@@ -67,7 +67,7 @@ func TestRoleStoreReads(t *testing.T) {
 				if err != nil || !found || user.Role != want {
 					t.Fatalf("userByID: user=%+v found=%v error=%v", user, found, err)
 				}
-				credential, hash, found, err := f.auth.credentialsByEmail(t.Context(), email)
+				credential, _, hash, found, err := f.auth.credentialsByEmail(t.Context(), email)
 				if err != nil || !found || credential != user || hash != "test hash" {
 					t.Fatalf("credentialsByEmail: user=%+v hash=%q found=%v error=%v", credential, hash, found, err)
 				}
@@ -82,7 +82,7 @@ func TestOIDCCustomRoles(t *testing.T) {
 		t.Run(roles.Admin, func(t *testing.T) {
 			t.Parallel()
 			f := oidcDBFixture(t, WithRoles(roles))
-			user, err := f.auth.oidcUser(t.Context(), "test", "subject", "person@example.com", true)
+			user, _, err := f.auth.oidcUser(t.Context(), "test", "subject", "person@example.com", true)
 			if err != nil || user.Role != roles.Default {
 				t.Fatalf("create=%+v, %v", user, err)
 			}
@@ -94,7 +94,7 @@ func TestOIDCCustomRoles(t *testing.T) {
 				t.Fatal(err)
 			}
 			// The identity and users tables both have email columns.
-			joined, err := f.auth.oidcUser(t.Context(), "test", "subject", "changed@example.com", true)
+			joined, _, err := f.auth.oidcUser(t.Context(), "test", "subject", "changed@example.com", true)
 			if err != nil || joined.ID != user.ID || joined.Email != user.Email || joined.Role != roles.Admin {
 				t.Fatalf("join=%+v, %v", joined, err)
 			}
@@ -115,14 +115,14 @@ func TestOIDCJoinEffectiveRole(t *testing.T) {
 			t.Parallel()
 			roles := Roles{Names: []string{"owner", "cook"}, Admin: "owner", Default: tc.fallback}
 			f := oidcDBFixture(t, WithRoles(roles))
-			user, err := f.auth.oidcUser(t.Context(), "test", "subject", "person@example.com", true)
+			user, _, err := f.auth.oidcUser(t.Context(), "test", "subject", "person@example.com", true)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.pool.Exec(t.Context(), `UPDATE users SET role=$1 WHERE id=$2`, tc.stored, user.ID); err != nil {
 				t.Fatal(err)
 			}
-			joined, err := f.auth.oidcUser(t.Context(), "test", "subject", "changed@example.com", true)
+			joined, _, err := f.auth.oidcUser(t.Context(), "test", "subject", "changed@example.com", true)
 			if err != nil || joined.ID != user.ID || joined.Email != user.Email || joined.Role != tc.want {
 				t.Fatalf("joined user = %+v, %v", joined, err)
 			}

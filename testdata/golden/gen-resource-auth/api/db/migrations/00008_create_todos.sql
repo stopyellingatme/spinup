@@ -9,7 +9,7 @@ CREATE TABLE todos (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX todos_user_id_id_idx ON todos (user_id, id);
+CREATE UNIQUE INDEX todos_user_id_id_idx ON todos (user_id, id);
 
 -- +goose Down
 DROP TABLE todos;

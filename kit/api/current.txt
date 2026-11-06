@@ -17,6 +17,8 @@ kit/app func WithMiddleware(...httpx.Middleware) Option
 kit/app func WithMigrationStatus(func(context.Context) ([]devtools.Migration, error)) Option
 kit/app func WithName(string) Option
 kit/app func WithReadiness(string, func(ctx context.Context) error) Option
+kit/app func WithRequestTimeout(time.Duration) Option
+kit/app func WithRequestTimeoutExempt(func(*http.Request) bool) Option
 kit/app func WithRoutes(func(mux *http.ServeMux)) Option
 kit/app func WithSPA(fs.FS) Option
 kit/app func WithShutdown(func(ctx context.Context) error) Option
@@ -254,6 +256,8 @@ kit/deployx func New(Options) http.Handler
 kit/deployx type Info struct
 kit/deployx type Options struct
 kit/deprecation func Warn(*slog.Logger, string, string) bool
+kit/httpx field BodyRules.Known []string
+kit/httpx field BodyRules.Required []string
 kit/httpx field Error.Problem Problem
 kit/httpx field FieldError.Field string
 kit/httpx field FieldError.Message string
@@ -265,6 +269,7 @@ kit/httpx field Problem.Title string
 kit/httpx field Problem.Type string
 kit/httpx func AccessLog(*slog.Logger) Middleware
 kit/httpx func Chain(http.Handler, ...Middleware) http.Handler
+kit/httpx func CheckJSONBody(*http.Request, BodyRules) error
 kit/httpx func DecodeJSON(*http.Request, any) error
 kit/httpx func MaxBody(int64) Middleware
 kit/httpx func ProblemFrom(error) Problem
@@ -277,10 +282,12 @@ kit/httpx func WriteAttachment(http.ResponseWriter, string, string, []byte)
 kit/httpx func WriteJSON(http.ResponseWriter, int, any) error
 kit/httpx func WriteProblem(http.ResponseWriter, *http.Request, Problem)
 kit/httpx ptrmethod Error.Error() string
+kit/httpx type BodyRules struct
 kit/httpx type Error struct
 kit/httpx type FieldError struct
 kit/httpx type Middleware func(http.Handler) http.Handler
 kit/httpx type Problem struct
+kit/jobs const DefaultMaxPayloadBytes = 1024 * 1024
 kit/jobs const DefaultQueue = river.QueueDefault
 kit/jobs const DefaultQueueWorkers = 10
 kit/jobs field Job.Args T
@@ -298,6 +305,7 @@ kit/jobs func RunAt(time.Time) InsertOption
 kit/jobs func UniqueByArgs() InsertOption
 kit/jobs func WithLogger(*slog.Logger) Option
 kit/jobs func WithMaxAttempts(int) Option
+kit/jobs func WithMaxPayloadBytes(int) Option
 kit/jobs func WithMigrateDatabaseURL(string) MigrateOption
 kit/jobs func WithMigrateOutput(io.Writer) MigrateOption
 kit/jobs func WithPollInterval(time.Duration) Option

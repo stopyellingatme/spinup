@@ -11,6 +11,11 @@
       "id": "audit-schema",
       "desc": "Run spinup db migrate before you start the new binary when the audit module is on. Try: run spinup db migrate up.",
       "kind": "manual"
+    },
+    {
+      "id": "auth-version-schema",
+      "desc": "Run spinup db migrate before you start the new binary. Kit auth reads users.auth_version and sessions.user_id (auth migration 00007). Try: run spinup db migrate up.",
+      "kind": "manual"
     }
   ],
   "behaviors": []

@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
+	"github.com/stopyellingatme/spinup/internal/gen/resource/validation"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
@@ -66,6 +68,8 @@ type Spec struct {
 	Audit AuditSpec
 	// Roles are the declared roles that can use the resource.
 	Roles []string
+	// ownerRefs are the ref fields that must refer to rows of the same user.
+	ownerRefs []ownerRef
 }
 
 // Part plans extra files for each resource, such as web pages.
@@ -111,7 +115,7 @@ func registeredParts() []Part {
 // The paths that the built-in parts write, relative to the project root.
 const (
 	serverPath         = "api/internal/handlers/server.go"
-	requiredFieldsPath = "api/internal/handlers/validation.go"
+	requiredFieldsPath = validation.Path
 	routesGenPath      = "api/internal/routes/routes_gen.go"
 )
 
@@ -298,6 +302,9 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 			}
 		}
 	}
+	if spec.ownerRefs, err = planOwnerRefs(spec); err != nil {
+		return nil, err
+	}
 	if err := configureAudit(&spec, in.Flags, config, auditColumns(spec)); err != nil {
 		return nil, err
 	}
@@ -350,6 +357,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		Plan:      plan,
 		PostSteps: steps,
 		Next:      next,
+		Edits:     validationEdits(apiPlan),
 	}, nil
 }
 
@@ -422,6 +430,17 @@ func planAPI(spec Spec, tests bool, declaredRoles []string) (vfs.Plan, error) {
 		return vfs.Plan{}, err
 	}
 	rc := newResourceCode(spec, module, deniedRole(spec.Roles, declaredRoles))
+	server, err := os.ReadFile(filepath.Join(spec.Root, filepath.FromSlash(serverPath)))
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		rc.newServer, rc.boundedOffset = true, true
+	case err != nil:
+		return vfs.Plan{}, fmt.Errorf("read %s: %w\nTry: check the file permissions", serverPath, err)
+	default:
+		// An app owns server.go after the first resource. Only a server.go
+		// with the offset bound passes the generated offset test.
+		rc.boundedOffset = bytes.Contains(server, []byte("maxOffset"))
+	}
 	handlers, err := rc.handlersGo()
 	if err != nil {
 		return vfs.Plan{}, err
@@ -446,9 +465,15 @@ func planAPI(spec Spec, tests bool, declaredRoles []string) (vfs.Plan, error) {
 		}
 		files = append(files, vfs.File{Path: handlersTestPath(spec.Name), Data: test, Class: string(manifest.Scaffold)})
 	}
+	replacement, changed, err := validationReplacement(spec.Root)
+	if err != nil {
+		return vfs.Plan{}, err
+	}
+	if changed {
+		files = append(files, vfs.File{Path: requiredFieldsPath, Data: replacement, Class: string(manifest.Scaffold)})
+	}
 	for _, shared := range []struct{ path, source string }{
 		{serverPath, serverGo},
-		{requiredFieldsPath, requiredFieldsGo},
 	} {
 		if _, err := os.Stat(filepath.Join(spec.Root, filepath.FromSlash(shared.path))); errors.Is(err, os.ErrNotExist) {
 			source, err := withModule(shared.source, module)

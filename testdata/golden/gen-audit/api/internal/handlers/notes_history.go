@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/stopyellingatme/spinup/kit/audit"
 	"github.com/stopyellingatme/spinup/kit/auth"
 	"github.com/stopyellingatme/spinup/kit/httpx"
+	"github.com/stopyellingatme/spinup/kit/logx"
 )
 
 // ListNoteHistory returns the events visible to the signed-in user.
@@ -44,7 +44,7 @@ func (s *Server) ListNoteHistory(ctx context.Context, req gen.ListNoteHistoryReq
 	}
 	events, err := audit.List(ctx, s.DB, filter)
 	if err != nil {
-		slog.ErrorContext(ctx, "read resource history", "error", err)
+		logx.FromContext(ctx).ErrorContext(ctx, "read resource history", "request_id", httpx.RequestIDFrom(ctx), "error", err)
 		return noteHistoryResponse{status: http.StatusInternalServerError, body: httpx.Problem{Type: "about:blank", Title: http.StatusText(http.StatusInternalServerError), Status: http.StatusInternalServerError, Detail: "Cannot read history. Try: check the database schema and retry."}}, nil
 	}
 	if events == nil {

@@ -79,6 +79,8 @@ return a.Run(ctx, os.Args[1:])
 | --- | --- |
 | `WithRoutes(func(*http.ServeMux))` | Adds routes. Call it more than once to add more. |
 | `WithMiddleware(...)` | Adds middleware around every route. |
+| `WithRequestTimeout(duration)` | Limits the request context. The default is 30 seconds. Overrides `REQUEST_TIMEOUT`. |
+| `WithRequestTimeoutExempt(predicate)` | Exempts matching requests from the application deadline. Use it for streaming, SSE, or websocket routes. |
 | `WithReadiness(name, check)` | Adds a check to `/readyz`. A failed check gives 503. Each check has two seconds. |
 | `WithCommand(name, run)` | Adds a command such as `migrate`. See [App binary commands](app-commands.md). |
 | `WithShutdown(func)` | Runs when the server stops, in reverse order. |
@@ -86,6 +88,20 @@ return a.Run(ctx, os.Args[1:])
 | `WithSPA(fs)` | Serves a static web app from the binary. The embed mode uses it. |
 
 `a.Handler()` returns the full handler. Use it in tests.
+
+The request deadline includes middleware, database connection waits, and database work.
+Handlers must honor context cancellation.
+An expired deadline gives a 503 problem if the response has not started.
+The app does not replace a response that has already started.
+Devtools routes under `/_dev` are exempt in development.
+Other routes have no automatic exemption.
+
+`REQUEST_TIMEOUT` accepts a Go duration, such as `10s`.
+An absent, invalid, or nonpositive value uses 30 seconds.
+The app reads this variable directly during `app.New`.
+For settings loaded through `config.Load`, add a duration field and pass its value to `WithRequestTimeout`.
+The server write timeout uses the same configured duration.
+For long-lived responses, configure transport deadlines with `http.NewResponseController` as needed.
 
 ## config
 
@@ -163,8 +179,26 @@ func create(w http.ResponseWriter, r *http.Request) {
 ```
 
 `WriteProblem` writes `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)) with the request ID.
-`DecodeJSON` rejects unknown fields and extra values. `ProblemFrom` turns its error into a 400 or 413 problem and hides the details of any other error.
+`DecodeJSON` requires exact field names. It rejects unknown fields, duplicate names, invalid UTF-8, and extra values.
+`ProblemFrom` turns its error into a 400 or 413 problem and hides the details of any other error.
+Use `MaxBody` to enforce a size limit.
+
+`CheckJSONBody(r, httpx.BodyRules{Required: required, Known: known})` validates the complete document before another decoder reads it.
+It checks duplicate names at every depth and rejects invalid UTF-8.
+If `Known` contains names, it rejects other names at the top level.
+A non-object root returns 422. Missing or null required fields return 422 with field errors sorted by name.
+
+Invalid JSON returns 400. A body that exceeds the size limit returns 413.
+The body remains readable and retains its original `Close` method.
+
+`RequireJSONFields(r, required)` calls `CheckJSONBody` without a list of known fields.
+It validates JSON syntax even when no field is required. An empty body with empty rules is allowed.
 `WriteAttachment` sends a file download. The middleware are `RequestID`, `Recover`, `AccessLog`, `SecurityHeaders`, and `MaxBody`.
+
+`AccessLog` records the method, path, status, bytes, duration, and request ID.
+Successful responses (2xx) from `/healthz` and `/readyz` use the debug level.
+Other responses, including failed probes, use the info level.
+Log writes have no buffer. The default redactor masks secret values before the handler receives each record.
 
 ## auth
 

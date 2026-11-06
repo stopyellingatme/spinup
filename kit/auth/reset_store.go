@@ -23,8 +23,9 @@ func (a *Auth) reserveResetRequest(ctx context.Context, email string, now time.T
 	return err == nil && until.IsZero(), err
 }
 
-// consumeReset updates the password, consumes all reset tokens, removes sessions,
-// and clears lockout in one transaction. A rollback preserves the token.
+// consumeReset updates the password, consumes all reset tokens, increments the
+// auth version (which ends the sessions of the user), and clears lockout in one
+// transaction. A rollback preserves the token.
 func (a *Auth) consumeReset(ctx context.Context, digest []byte, hash string) (int64, error) {
 	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
@@ -50,39 +51,13 @@ func (a *Auth) consumeReset(ctx context.Context, digest []byte, hash string) (in
 	if err := a.rowEvent(ctx, tx, Event{Name: EventPasswordReset, User: user}); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2,updated_at = $3 WHERE id = $1`, id, hash, now); err != nil {
-		return 0, err
+	// The new auth version ends every session of the user, also a login that
+	// read the old version and commits its session after this transaction.
+	// No other session row is read.
+	if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2,updated_at = $3,auth_version = auth_version + 1 WHERE id = $1`, id, hash, now); err != nil {
+		return 0, schemaHint(err)
 	}
 	if _, err := tx.Exec(ctx, `UPDATE password_resets SET used_at = $2 WHERE user_id = $1 AND used_at IS NULL`, id, now); err != nil {
-		return 0, err
-	}
-	// scs encodes auth.user_id in the session data. Decode with its configured codec,
-	// and delete the stored token directly. HashTokenInStore is already applied.
-	rows, err := tx.Query(ctx, `SELECT token,data FROM sessions`)
-	if err != nil {
-		return 0, err
-	}
-	var tokens []string
-	for rows.Next() {
-		var token string
-		var data []byte
-		if err := rows.Scan(&token, &data); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		_, values, err := a.sessions.Codec.Decode(data)
-		if err != nil {
-			rows.Close()
-			return 0, err
-		}
-		if userID, ok := values[sessionUserKey].(int64); ok && userID == id {
-			tokens = append(tokens, token)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE token = ANY($1::text[])`, tokens); err != nil {
 		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM login_attempts WHERE email = $1`, email); err != nil {

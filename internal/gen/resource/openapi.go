@@ -131,6 +131,7 @@ func (w *yamlWriter) problems(words string, codes ...string) {
 		"403": "The signed-in user does not have a required role.",
 		"404": "The " + words + " does not exist.",
 		"409": "The request conflicts with other data.",
+		"413": "The request body exceeds 1 MiB.",
 		"422": "The request has invalid values.",
 	}
 	for _, code := range codes {
@@ -146,6 +147,7 @@ func (w *yamlWriter) problems(words string, codes ...string) {
 
 func (w *yamlWriter) body(indent int, schema string) {
 	w.line(indent, "requestBody:")
+	w.line(indent+1, "description: A JSON object of at most 1 MiB.")
 	w.line(indent+1, "required: true")
 	w.line(indent+1, "content:")
 	w.line(indent+2, "application/json:")
@@ -193,6 +195,7 @@ func pathsYAML(spec Spec) []byte {
 	w.line(5, "type: integer")
 	w.line(5, "format: int32")
 	w.line(5, "minimum: 0")
+	w.line(5, "maximum: 10000")
 	w.line(5, "default: 0")
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("A page of %s in id order.", pluralWords), "application/json", singular+"List")
@@ -205,7 +208,7 @@ func pathsYAML(spec Spec) []byte {
 	w.body(2, singular+"Input")
 	w.line(2, "responses:")
 	w.response("201", fmt.Sprintf("The new %s.", words), "application/json", singular)
-	problems(words, "400", "409", "422")
+	problems(words, "400", "409", "413", "422")
 
 	w.line(0, "/api/%s/{id}:", n.PluralSnake())
 	w.line(1, "parameters:")
@@ -230,7 +233,7 @@ func pathsYAML(spec Spec) []byte {
 	w.body(2, singular+"Input")
 	w.line(2, "responses:")
 	w.response("200", fmt.Sprintf("The updated %s.", words), "application/json", singular)
-	problems(words, "400", "404", "409", "422")
+	problems(words, "400", "404", "409", "413", "422")
 
 	w.line(1, "delete:")
 	w.line(2, "operationId: delete%s", singular)

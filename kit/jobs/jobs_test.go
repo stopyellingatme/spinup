@@ -3,9 +3,11 @@ package jobs_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -40,13 +42,21 @@ func quiet() jobs.Option {
 // migrated returns a pool on a new database with the River tables.
 func migrated(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool := testkit.DB(t)
+	pool := jobsDB(t)
 	var out bytes.Buffer
 	hook := jobs.MigrationHook(jobs.WithMigrateOutput(&out))
 	if err := hook.AfterUp(context.Background(), testkit.URL(t, pool)); err != nil {
 		t.Fatal(err)
 	}
 	return pool
+}
+
+func jobsDB(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	if os.Getenv("DATABASE_URL") == "" {
+		t.Skip("DATABASE_URL is unset. Use the existing PostgreSQL server on port 55433.")
+	}
+	return testkit.DB(t)
 }
 
 // startWorker starts w and stops it when the test ends.
@@ -66,7 +76,7 @@ func startWorker(t *testing.T, w *jobs.Worker) {
 
 func TestMigrationHookAndCommand(t *testing.T) {
 	t.Parallel()
-	pool := testkit.DB(t)
+	pool := jobsDB(t)
 	url := testkit.URL(t, pool)
 	ctx := context.Background()
 
@@ -248,7 +258,7 @@ func TestInsertOptions(t *testing.T) {
 
 func TestInsertWithoutMigrations(t *testing.T) {
 	t.Parallel()
-	pool := testkit.DB(t)
+	pool := jobsDB(t)
 	client, err := jobs.New(pool, quiet())
 	if err != nil {
 		t.Fatal(err)
@@ -256,6 +266,101 @@ func TestInsertWithoutMigrations(t *testing.T) {
 	_, err = client.Insert(context.Background(), greetArgs{})
 	if err == nil || !strings.Contains(err.Error(), "Try: run the River migrations") {
 		t.Fatalf("err = %v, want a hint to run the River migrations", err)
+	}
+}
+
+func TestInsertPayloadLimit(t *testing.T) {
+	t.Parallel()
+	pool := migrated(t)
+	ctx := t.Context()
+	const limit = 128
+	client, err := jobs.New(pool, quiet(), jobs.WithMaxPayloadBytes(limit))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := json.Marshal(greetArgs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	atLimit := greetArgs{Name: strings.Repeat("x", limit-len(base))}
+	overLimit := greetArgs{Name: atLimit.Name + "x"}
+	if _, err := client.Insert(ctx, overLimit); err == nil || !strings.Contains(err.Error(), "\nTry: ") {
+		t.Fatalf("oversized insert error = %v", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := client.InsertTx(ctx, tx, overLimit); err == nil || !strings.Contains(err.Error(), "\nTry: ") {
+		t.Fatalf("oversized transactional insert error = %v", err)
+	}
+	var count int
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM river_job").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("rejected inserts left %d rows: %v", count, err)
+	}
+	if _, err := client.Insert(ctx, atLimit); err != nil {
+		t.Fatalf("insert at the limit: %v", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM river_job").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("accepted insert left %d rows: %v", count, err)
+	}
+}
+
+var payloadDecoded atomic.Bool
+
+type payloadArgs struct {
+	Data string `json:"data"`
+}
+
+func (payloadArgs) Kind() string { return "payload_limit_test" }
+
+func (*payloadArgs) UnmarshalJSON([]byte) error {
+	payloadDecoded.Store(true)
+	return errors.New("unexpected argument decoding")
+}
+
+func TestWorkerPayloadLimitBeforeDecode(t *testing.T) {
+	pool := migrated(t)
+	ctx := t.Context()
+	payloadDecoded.Store(false)
+	client, err := jobs.New(pool, quiet(), jobs.WithMaxPayloadBytes(1024))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := client.Insert(ctx, payloadArgs{Data: strings.Repeat("x", 256)}, jobs.MaxAttempts(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := jobs.NewWorker(pool, quiet(), jobs.WithMaxPayloadBytes(128), jobs.WithPollInterval(50*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs.Register(w, func(context.Context, jobs.Job[payloadArgs]) error {
+		t.Error("oversized job reached the worker function")
+		return nil
+	})
+	startWorker(t, w)
+	deadline := time.NewTimer(waitTimeout)
+	defer deadline.Stop()
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		var state, failures string
+		if err := pool.QueryRow(ctx, "SELECT state, coalesce(errors::text, '') FROM river_job WHERE id = $1", id).Scan(&state, &failures); err != nil {
+			t.Fatal(err)
+		}
+		if state == "discarded" {
+			if payloadDecoded.Load() || !strings.Contains(failures, "exceeding the 128-byte limit") {
+				t.Fatalf("decoded = %v, failures = %s", payloadDecoded.Load(), failures)
+			}
+			return
+		}
+		select {
+		case <-deadline.C:
+			t.Fatalf("job did not fail: %s", state)
+		case <-tick.C:
+		}
 	}
 }
 

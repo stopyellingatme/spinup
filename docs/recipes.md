@@ -43,7 +43,7 @@ A resource is a table with a CRUD API and web pages. Name each field as `name:ty
 ```console
 $ spinup g resource task title:string done:bool --dry-run
 ...
-create api/db/migrations/00007_create_tasks.sql (seed)
+create api/db/migrations/00008_create_tasks.sql (seed)
 ...
 create web/src/routes/tasks/+page.svelte (scaffold)
 ...
@@ -59,7 +59,7 @@ The example adds `priority` to `task`. Start with a migration. See [Write and ap
 
 ```console
 $ spinup db new add_priority --dry-run
-Would create api/db/migrations/00007_add_priority.sql
+Would create api/db/migrations/00008_add_priority.sql
 ```
 
 Fill in the new file:
@@ -137,7 +137,7 @@ Remove `--dry-run` to run the Go tests. Run the web tests with `pnpm test` in `w
 
 ```console
 $ spinup db new add_notes --dry-run
-Would create api/db/migrations/00007_add_notes.sql
+Would create api/db/migrations/00008_add_notes.sql
 $ spinup db migrate up --dry-run
 go run ./cmd/api migrate up
 ```

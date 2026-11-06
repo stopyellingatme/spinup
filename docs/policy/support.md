@@ -66,12 +66,14 @@ You opt in with `behavior_version`. See [Kit compatibility](kit-compat.md) and [
 
 | Item | Supported |
 | --- | --- |
-| Go | 1.26 and 1.27. A generated app declares `go 1.26.0`. CI tests both. |
+| Go | 1.27 or later. A generated app declares `go 1.27.0`. CI tests Go 1.27. |
 | Node | 24. The generated image uses `node:24-bookworm-slim`. |
 | pnpm | The pinned version, through corepack. Bun is an option for the web app. |
 | PostgreSQL for a new app | 16, 17, and 18. The default is 18. Pick it with `--db-version`. |
 | PostgreSQL for `spinup db doctor` | 14 to 18. It warns for 14, which ends on 2026-11-12. It fails for 13 and older. |
 | Operating system | Linux and macOS on amd64 and arm64. Windows runs some commands natively. See [Windows](windows.md). |
+
+`GOEXPERIMENT=nojsonv2` is unsupported. See [ADR 0027](../adr/0027-json-v2.md).
 
 The list of PostgreSQL versions in the [compatibility matrix](../site/compat.md) is the list that checks accept. It is longer than the list for new apps.
 The same data pins the container images. See the [pinned stack](../site/stack.md).

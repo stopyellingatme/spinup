@@ -223,13 +223,14 @@ func TestPostSteps(t *testing.T) {
 			t.Parallel()
 			root := rootForTest(t)
 			fake := &exec.Fake{}
+			sqlc := &exec.Fake{}
 			if !tc.dry && !tc.diff {
 				fake.Expect("openapi-test").Return("bundle output", "", 0)
 				code := 0
 				if tc.fail {
 					code = 1
 				}
-				fake.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("tool stdout", "tool stderr", code)
+				sqlc.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("tool stdout", "tool stderr", code)
 				if !tc.fail {
 					fake.Expect("gofmt", "-w", filepath.Join("internal", "x.go")).Return("", "", 0)
 				}
@@ -241,7 +242,13 @@ func TestPostSteps(t *testing.T) {
 				out.PostSteps = []gen.PostStep{gen.PostGofmt, gen.PostSQLC, gen.PostOpenAPI, gen.PostSQLC}
 				return out, err
 			}
-			result, err := Run(context.Background(), g, nil, nil, Options{Root: root, DryRun: tc.dry, Diff: tc.diff, Runner: fake})
+			runner := runnerFunc(func(ctx context.Context, cmd exec.Cmd) (exec.Result, error) {
+				if cmd.Name == "go" {
+					return sqlc.Run(ctx, cmd)
+				}
+				return fake.Run(ctx, cmd)
+			})
+			result, err := Run(context.Background(), g, nil, nil, Options{Root: root, DryRun: tc.dry, Diff: tc.diff, Runner: runner})
 			if tc.fail {
 				if err == nil || !strings.Contains(err.Error(), "sqlc") || !strings.Contains(err.Error(), "tool stdout") || !strings.Contains(err.Error(), "tool stderr") || !strings.Contains(err.Error(), "Try:") {
 					t.Fatalf("err=%v", err)
@@ -259,12 +266,13 @@ func TestPostSteps(t *testing.T) {
 			if result == nil || !reflect.DeepEqual(result.PostSteps, []gen.PostStep{gen.PostOpenAPI, gen.PostSQLC, gen.PostGofmt}) {
 				t.Fatalf("result=%+v", result)
 			}
-			for _, call := range fake.Calls() {
+			for _, call := range append(fake.Calls(), sqlc.Calls()...) {
 				if call.Dir != filepath.Join(root, "api") {
 					t.Fatalf("Dir=%s", call.Dir)
 				}
 			}
 			fake.AssertDone(t)
+			sqlc.AssertDone(t)
 		})
 	}
 }

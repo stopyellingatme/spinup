@@ -17,13 +17,18 @@ func TestHealthcheckCommand(t *testing.T) {
 	}{{"healthy", http.StatusOK, true}, {"unhealthy", http.StatusServiceUnavailable, false}} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Skipf("listener unavailable: %v", err)
+			}
+			server := &httptest.Server{Listener: listener, Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != "/healthz" {
 					http.NotFound(w, r)
 					return
 				}
 				w.WriteHeader(tc.status)
-			}))
+			})}}
+			server.Start()
 			defer server.Close()
 			_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
 			a := New(WithLogger(discardLogger()), WithAddr(":"+port))
