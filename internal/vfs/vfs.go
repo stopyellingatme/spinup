@@ -72,12 +72,21 @@ func invalidPath(name, reason string) error {
 }
 
 func reservedDevice(base string) bool {
-	switch strings.ToUpper(base) {
-	case "CON", "PRN", "AUX", "NUL":
-		return true
+	switch len(base) {
+	case 3:
+		switch base[0] {
+		case 'c', 'C', 'p', 'P', 'a', 'A', 'n', 'N':
+			return strings.EqualFold(base, "CON") || strings.EqualFold(base, "PRN") ||
+				strings.EqualFold(base, "AUX") || strings.EqualFold(base, "NUL")
+		}
+	case 4:
+		switch base[0] {
+		case 'c', 'C', 'l', 'L':
+			return base[3] >= '1' && base[3] <= '9' &&
+				(strings.EqualFold(base[:3], "COM") || strings.EqualFold(base[:3], "LPT"))
+		}
 	}
-	return len(base) == 4 && base[3] >= '1' && base[3] <= '9' &&
-		(strings.EqualFold(base[:3], "COM") || strings.EqualFold(base[:3], "LPT"))
+	return false
 }
 
 // Add adds a file to the plan.
@@ -206,12 +215,13 @@ func compare(root string, p Plan, includeDiff bool) ([]Change, error) {
 		return nil, err
 	}
 	changes := make([]Change, 0, len(p.Files))
+	checked := make(pathCache)
 	for _, file := range p.Files {
 		clean, err := CleanPath(file.Path)
 		if err != nil {
 			return nil, err
 		}
-		filename, err := safePath(root, clean)
+		filename, err := safePath(root, clean, checked)
 		if err != nil {
 			return nil, err
 		}
@@ -289,6 +299,7 @@ func Apply(root string, p Plan, opts ApplyOptions) ([]Change, error) {
 
 	applied := make([]appliedChange, 0, len(changes))
 	createdDirs := make([]string, 0)
+	checked := make(pathCache)
 	for _, change := range changes {
 		if change.Kind == Unchanged {
 			continue
@@ -299,9 +310,9 @@ func Apply(root string, p Plan, opts ApplyOptions) ([]Change, error) {
 				return changes, applyError(change.Path, err)
 			}
 		}
-		filename, err := safePath(resolved, change.Path)
+		filename, err := safePath(resolved, change.Path, checked)
 		if err == nil && change.Kind != Remove {
-			createdDirs, err = ensureParents(resolved, change.Path, createdDirs)
+			createdDirs, err = ensureParents(resolved, change.Path, createdDirs, checked)
 		}
 		if err == nil {
 			err = applyChange(filename, backupDir, change, &applied)
@@ -309,6 +320,13 @@ func Apply(root string, p Plan, opts ApplyOptions) ([]Change, error) {
 		if err != nil {
 			rollback(resolved, applied, createdDirs)
 			return changes, applyError(change.Path, err)
+		}
+		checked.record(filename, change.Kind == Remove)
+	}
+	if len(applied) != 0 {
+		if err := syncBatch(resolved); err != nil {
+			rollback(resolved, applied, createdDirs)
+			return changes, applyError("flush batch", err)
 		}
 	}
 	return changes, nil
@@ -408,7 +426,7 @@ func rollback(root string, applied []appliedChange, dirs []string) {
 	_ = root
 }
 
-func ensureParents(root, name string, known []string) ([]string, error) {
+func ensureParents(root, name string, known []string, checked pathCache) ([]string, error) {
 	dir := path.Dir(name)
 	if dir == "." {
 		return known, nil
@@ -430,6 +448,7 @@ func ensureParents(root, name string, known []string) ([]string, error) {
 			return known, err
 		}
 		known = append(known, current)
+		checked.record(current, false)
 	}
 	return known, nil
 }
@@ -446,7 +465,8 @@ func copyFile(source, destination string, mode fs.FileMode) error {
 	}
 	err = out.Chmod(mode)
 	if err == nil {
-		err = copyAndSync(out, in)
+		// Backups support rollback after an operation error, not crash recovery.
+		_, err = io.Copy(out, in)
 	}
 	if closeErr := out.Close(); err == nil {
 		err = closeErr
@@ -469,7 +489,7 @@ func resolvedRoot(root string) (string, error) {
 	return filepath.EvalSymlinks(root)
 }
 
-func safePath(root, name string) (string, error) {
+func safePath(root, name string, checked pathCache) (string, error) {
 	clean, err := CleanPath(name)
 	if err != nil {
 		return "", err
@@ -478,7 +498,7 @@ func safePath(root, name string) (string, error) {
 	current := root
 	parts := strings.Split(clean, "/")
 	for i, part := range parts {
-		entries, err := os.ReadDir(current)
+		entries, err := checked.readDir(current)
 		if errors.Is(err, fs.ErrNotExist) {
 			break
 		}
@@ -486,8 +506,8 @@ func safePath(root, name string) (string, error) {
 			return "", fmt.Errorf("inspect directory for %q: %w\nTry: check the target directory and its permissions", name, err)
 		}
 		for _, entry := range entries {
-			if entry.Name() != part && strings.EqualFold(entry.Name(), part) {
-				existing := path.Join(path.Join(parts[:i]...), entry.Name())
+			if entry != part && strings.EqualFold(entry, part) {
+				existing := path.Join(path.Join(parts[:i]...), entry)
 				return "", fmt.Errorf("path %q conflicts with existing entry %q under case folding\nTry: use the existing spelling or rename the entry", name, existing)
 			}
 		}
@@ -535,14 +555,14 @@ func writeAndSync(file *os.File, data []byte, mode fs.FileMode) error {
 	if err := file.Chmod(mode); err != nil {
 		return err
 	}
-	return file.Sync()
+	return SyncFile(file)
 }
 
-func copyAndSync(destination *os.File, source *os.File) error {
-	if _, err := io.Copy(destination, source); err != nil {
-		return err
-	}
-	return destination.Sync()
+// SyncFile flushes a file to the operating system's durable storage interface.
+// On macOS, it uses fsync without a device cache flush. Apply flushes the device
+// cache once per batch. On other systems, it uses os.File.Sync.
+func SyncFile(file *os.File) error {
+	return syncFile(file)
 }
 
 func applyError(name string, err error) error {
