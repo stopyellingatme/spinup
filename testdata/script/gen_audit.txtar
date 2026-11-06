@@ -5,8 +5,8 @@ cd trail
 
 # Auditing follows the module. The API-only flag avoids the web post-step.
 exec spinup g resource note title:string api_token:string --role manager,staff --history-role manager --api-only
-exists api/db/migrations/00008_create_notes.sql
-grep 'audit_row_change.*user_id.*id.*api_token' api/db/migrations/00008_create_notes.sql
+exists api/db/migrations/00002_create_notes.sql
+grep 'audit_row_change.*user_id.*id.*api_token' api/db/migrations/00002_create_notes.sql
 grep 'audit.InTx' api/internal/handlers/notes.go
 exists api/internal/handlers/notes_history.go api/openapi/schemas/audit_event.yaml
 ! exec spinup g audit note
@@ -32,15 +32,15 @@ exec spinup g resource bulletin title:string --shared --api-only
 ! grep 'filter.OwnerID' api/internal/handlers/bulletins_history.go
 
 # The OIDC migration attaches the identity triggers itself in both orders.
-cp $SPINUP_REPO/internal/templates/packs/auth/files/api/db/migrations/00004_oidc_identities.sql api/db/migrations/00004_oidc_identities.sql
+cp $SPINUP_REPO/internal/templates/packs/auth/files/api/db/kit/00004_oidc_identities.sql api/db/kit/00004_oidc_identities.sql
 ! exec spinup g audit user_identities
 stderr 'already attaches its audit trigger'
 
 # An old copy of the OIDC migration needs only an idempotent trigger migration.
-cp $WORK/identities.sql api/db/migrations/00004_oidc_identities.sql
+cp $WORK/identities.sql api/db/kit/00004_oidc_identities.sql
 exec spinup g audit user_identities
-exists api/db/migrations/00012_audit_user_identities.sql
-grep -count=1 'DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;\nCREATE TRIGGER' api/db/migrations/00012_audit_user_identities.sql
+exists api/db/migrations/00006_audit_user_identities.sql
+grep -count=1 'DROP TRIGGER IF EXISTS user_identities_audit ON user_identities;\nCREATE TRIGGER' api/db/migrations/00006_audit_user_identities.sql
 ! exists api/internal/handlers/user_identities_history.go
 ! exec spinup g audit user_identities
 stderr 'already attaches its audit trigger'
