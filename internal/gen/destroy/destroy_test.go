@@ -212,7 +212,8 @@ func TestPostSteps(t *testing.T) {
 	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
 		t.Fatal(err)
 	}
-	fake := &exec.Fake{}
+	// The OpenAPI and sqlc post-steps run at the same time.
+	fake := (&exec.Fake{}).AnyOrder()
 	fake.Expect("go", "tool", "-modfile=tools.mod", "oapi-codegen").Return("", "", 0)
 	fake.Expect("go", "tool", "-modfile=tools.mod", "sqlc", "generate").Return("", "", 0)
 	fake.Expect("gofmt", "-w", filepath.Join("internal", "routes", "routes_gen.go")).Return("", "", 0)

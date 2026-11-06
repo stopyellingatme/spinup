@@ -11,8 +11,18 @@ import (
 // Fake is an ordered, scripted Runner for tests.
 type Fake struct {
 	mu           sync.Mutex
+	anyOrder     bool
 	expectations []*fakeExpectation
 	calls        []Cmd
+}
+
+// AnyOrder lets each call match any pending expectation, not only the next
+// one. Use it when the code under test runs commands concurrently.
+func (f *Fake) AnyOrder() *Fake {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.anyOrder = true
+	return f
 }
 
 // Expect adds an expected command call.
@@ -61,12 +71,22 @@ func (f *Fake) Run(_ context.Context, c Cmd) (Result, error) {
 		f.mu.Unlock()
 		return Result{}, fmt.Errorf("unexpected command: %s", c.String())
 	}
-	expectation := *f.expectations[0]
-	if expectation.name != c.Name || !hasPrefix(c.Args, expectation.argsPrefix) {
+	match := -1
+	for index, candidate := range f.expectations {
+		if candidate.name == c.Name && hasPrefix(c.Args, candidate.argsPrefix) {
+			match = index
+			break
+		}
+		if !f.anyOrder {
+			break
+		}
+	}
+	if match < 0 {
 		f.mu.Unlock()
 		return Result{}, fmt.Errorf("unexpected command: %s", c.String())
 	}
-	f.expectations = f.expectations[1:]
+	expectation := *f.expectations[match]
+	f.expectations = append(f.expectations[:match:match], f.expectations[match+1:]...)
 	f.mu.Unlock()
 
 	result := Result{
