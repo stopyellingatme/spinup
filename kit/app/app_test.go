@@ -104,6 +104,9 @@ func TestReadiness(t *testing.T) {
 			}
 			warnings := 0
 			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				if line == "" {
+					continue // successful probes log at debug level, so there can be no line
+				}
 				var record map[string]any
 				if err := json.Unmarshal([]byte(line), &record); err != nil {
 					t.Fatal(err)
