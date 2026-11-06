@@ -1,0 +1,63 @@
+# Preserve an app migration while the upgrade separates the kit migrations.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.1.0-alpha.419
+mkversion 0.1.0-alpha.420
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --module example.com/demo --modules ci,auth --non-interactive
+cd demo
+# Recreate the legacy layout and lock from the previous template version.
+exec go run ../legacy.go
+cp $SPINUP_REPO/testdata/corpus/kit-migrations/api/db/migrations/00003_create_todos.sql api/db/migrations/00003_create_todos.sql
+exec git add -A
+exec git commit -q -m 'legacy auth layout with app migration 00003'
+
+exec spinup upgrade --plan --offline --to 0.1.0-alpha.420
+stdout 'Move 00002_create_auth.sql to api/db/kit'
+grep '"action": "delete"' .spinup/plan.json
+exists api/db/migrations/00002_create_auth.sql
+! exists api/db/kit/00002_create_auth.sql
+
+exec spinup upgrade --yes --no-verify --offline --to 0.1.0-alpha.420
+stdout 'git merge spinup/upgrade-0.1.0-alpha.420'
+cd .spinup/upgrade/0.1.0-alpha.420
+exists api/db/kit/00002_create_auth.sql api/db/kit/00005_users_role.sql api/db/kit/00007_users_auth_version.sql api/db/kit/embed.go
+exists api/db/migrations/00001_init.sql api/db/migrations/00003_create_todos.sql
+! exists api/db/migrations/00002_create_auth.sql
+! exists api/db/migrations/00005_users_role.sql
+! exists api/db/migrations/00007_users_auth_version.sql
+! grep '"api/db/migrations/00002_create_auth.sql"' spinup.lock
+! grep '"api/db/migrations/00005_users_role.sql"' spinup.lock
+! grep '"api/db/migrations/00007_users_auth_version.sql"' spinup.lock
+grep '"api/db/kit/00002_create_auth.sql"' spinup.lock
+grep '0003_kit_migrations' spinup.lock
+grep '0004_kit_testkit' spinup.lock
+cmp api/db/migrations/00003_create_todos.sql $SPINUP_REPO/testdata/corpus/kit-migrations/api/db/migrations/00003_create_todos.sql
+
+-- legacy.go --
+package main
+
+import (
+ "encoding/json"
+ "os"
+)
+
+func main() {
+ data, err := os.ReadFile("spinup.lock")
+ if err != nil { panic(err) }
+ var lock map[string]any
+ if err := json.Unmarshal(data, &lock); err != nil { panic(err) }
+ lock["template_version"] = "0.1.0-alpha.419"
+ files := lock["files"].(map[string]any)
+ for _, name := range []string{"00002_create_auth.sql", "00005_users_role.sql", "00007_users_auth_version.sql"} {
+  old, next := "api/db/migrations/"+name, "api/db/kit/"+name
+  if err := os.Rename(next, old); err != nil { panic(err) }
+  files[old] = files[next]
+  delete(files, next)
+ }
+ if err := os.Remove("api/db/kit/embed.go"); err != nil { panic(err) }
+ delete(files, "api/db/kit/embed.go")
+ files["api/db/migrations/00003_create_todos.sql"] = map[string]any{"class": "seed"}
+ data, err = json.MarshalIndent(lock, "", "  ")
+ if err != nil { panic(err) }
+ if err := os.WriteFile("spinup.lock", append(data, '\n'), 0o644); err != nil { panic(err) }
+}

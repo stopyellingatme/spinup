@@ -130,7 +130,8 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 			return nil, err
 		}
 		disks[name] = disk
-		if entry, tracked := in.Lock.Files[name]; tracked && !disk.exists {
+		_, rendered := newer.Get(name)
+		if entry, tracked := in.Lock.Files[name]; tracked && !disk.exists && rendered {
 			p.Tombstoned = append(p.Tombstoned, name)
 			if entry.Class == manifest.Managed {
 				p.MissingManaged = append(p.MissingManaged, name)
@@ -173,6 +174,8 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 		switch {
 		case slices.Contains(in.Lock.Tombstones, name):
 			d.Action, d.Reason = ActionKeep, "tombstone"
+		case tracked && !disk.exists && !rendered:
+			d.Action = ActionDelete
 		case tracked && generatorTemplate(entry.Template) && !renderedPackTemplate(older, name, entry.Template):
 			// A generator wrote this file last (ADR 0007 §1). Templates never re-render or
 			// delete it; for a pack file such as routes_gen.go the generator's version wins.
@@ -232,7 +235,7 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 	if err := authUpgradeWarnings(root, p); err != nil {
 		return p, err
 	}
-	return p, migrationClashWarnings(root, p)
+	return p, nil
 }
 
 // planClass preserves an ejected file unless the template changes it to seed.

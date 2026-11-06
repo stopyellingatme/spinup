@@ -102,7 +102,7 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		paths[name] = true
 	}
 	if err := addPlanMigrationPaths(r.Root, paths); err != nil {
-		return nil, fmt.Errorf("inspect project migrations for planning: %w\nTry: check permissions on api/db/migrations", err)
+		return nil, fmt.Errorf("inspect project migrations for planning: %w\nTry: check permissions on api/db/migrations and api/db/kit", err)
 	}
 	for _, version := range versions {
 		to, loadErr := r.Source.Load(ctx, version)
@@ -153,6 +153,16 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err != nil {
 			return nil, err
 		}
+		// Apply Before codemods only in the temporary tree. The real project and lock stay unchanged.
+		shadow := *lock
+		shadow.AppliedMigrations = slices.Clone(lock.AppliedMigrations)
+		lock = &shadow
+		answers = clonePlanAnswers(answers)
+		migrationCtx := &migrate.Ctx{Root: temp, From: lock.TemplateVersion, To: to.Version, Answers: answers, Lock: lock, Runner: r.Exec, Old: from, New: to}
+		if err := r.previewMigrations(migrationCtx, migrate.Before); err != nil {
+			return nil, err
+		}
+		answers = migrationCtx.Answers
 		plan, err := BuildPlan(ctx, PlanInput{Root: temp, Lock: lock, Old: from, New: to, OldAnswers: lock.Answers, NewAnswers: answers, OldPacks: &oldPacks, NewPacks: &newPacks, Merger: r.Merger, ForceManaged: o.ForceManaged})
 		if err != nil {
 			return nil, err
@@ -175,6 +185,9 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err := writePlan(temp, plan); err != nil {
 			return nil, err
 		}
+		if err := r.previewMigrations(migrationCtx, migrate.After); err != nil {
+			return nil, err
+		}
 		lock, err = NextLock(lock, plan, to, answers, newPacks)
 		if err != nil {
 			return nil, err
@@ -189,15 +202,17 @@ func addPlanMigrationPaths(source string, paths map[string]bool) error {
 		return err
 	}
 	defer root.Close()
-	entries, err := fs.ReadDir(root.FS(), "api/db/migrations")
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		paths["api/db/migrations/"+entry.Name()] = true
+	for _, dir := range []string{"api/db/migrations", "api/db/kit"} {
+		entries, err := fs.ReadDir(root.FS(), dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			paths[dir+"/"+entry.Name()] = true
+		}
 	}
 	return nil
 }
@@ -278,6 +293,32 @@ func copyPlanTree(ctx context.Context, source, target string, paths []string) er
 		}
 		if err := os.WriteFile(dest, data, info.Mode().Perm()); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// previewMigrations reports codemods and simulates Before changes in the temporary tree.
+func (r *Runner) previewMigrations(c *migrate.Ctx, stage migrate.Stage) error {
+	pending, err := migrate.Pending(c.From, c.To, c.Lock.AppliedMigrations, stage)
+	if err != nil {
+		return err
+	}
+	for _, m := range pending {
+		changes, planErr := m.Plan(c)
+		for _, change := range changes {
+			if _, err := fmt.Fprintf(r.Out, "Migration %s: %s: %s\n", m.ID, change.Path, change.Desc); err != nil {
+				return fmt.Errorf("print migration plan: %w\nTry: use a writable output", err)
+			}
+		}
+		if planErr != nil {
+			return planErr
+		}
+		if stage == migrate.Before {
+			if err := m.Apply(c); err != nil {
+				return err
+			}
+			c.Lock.AppliedMigrations = append(c.Lock.AppliedMigrations, m.ID)
 		}
 	}
 	return nil
