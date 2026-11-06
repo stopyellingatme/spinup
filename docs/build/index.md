@@ -53,6 +53,7 @@ Read these in order: accounts first, then roles, then the audit trail that recor
 | I want to ... | Read |
 | --- | --- |
 | Send email and password reset links | [Mail](../mail.md) |
+| Turn a feature on or off without a deploy | [Feature flags](flags.md) |
 | Run work after the response | [Background jobs](jobs.md) |
 | Add a worker in Rust, Python, or Node | [Sidecar services](../services.md) |
 | Make PDF files | [PDF reports](../pdf-reports.md) |

@@ -1,0 +1,40 @@
+# A bad declaration fails with the key, the rule, and a Try line. No file changes.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,flags --module example.com/demo --no-git --non-interactive
+cd demo
+exec cp spinup.toml $WORK/original.toml
+exec sh -c 'cat "$WORK/bad-key.toml" >> spinup.toml'
+! exec spinup g flags
+stderr 'the key "NewThing" does not match'
+stderr 'Try: correct \[flags.NewThing\] in spinup.toml and run spinup g flags\.'
+grep 'No flags are declared' api/internal/flags/flags.gen.go
+
+# The doctor reports the same fault.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "warn"'
+stdout 'spinup.toml has invalid flags\.'
+
+# A missing description names the key too.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/no-description.toml" >> spinup.toml'
+! exec spinup g flags
+stderr 'new_checkout'
+stderr 'Try:'
+
+# An app without the module cannot generate flags.
+cd $WORK
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g flags
+stderr 'the app has no flags module'
+stderr 'Try: spinup module add flags'
+
+-- bad-key.toml --
+
+[flags.NewThing]
+description = "A key with upper-case letters"
+
+-- no-description.toml --
+
+[flags.new_checkout]
+public = true

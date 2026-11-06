@@ -1,0 +1,46 @@
+# A flag declaration that is not generated yet shows as drift in the doctor, and spinup g flags fixes it.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,flags --module example.com/demo --no-git --non-interactive
+cd demo
+
+# The new app has the default files, so the checks pass.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "ok"'
+
+# A declaration without a regenerate makes the Go file differ.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "warn"'
+stdout 'api/internal/flags/flags.gen.go does not match \[flags\] in spinup.toml\.'
+stdout '"try": "spinup g flags"'
+
+# The generator writes both files, and the doctor passes.
+exec spinup g flags
+stdout 'Created 0, updated 2 files'
+grep 'NewCheckout = "new_checkout"' api/internal/flags/flags.gen.go
+grep 'export type FlagKey = .new_checkout.;' web/src/lib/flags.gen.ts
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "ok"'
+
+# A second run changes nothing.
+exec spinup g flags
+stdout 'Created 0, updated 0 files'
+
+# A flag past its expires date makes the doctor warn until the table is gone.
+exec sh -c 'cat "$WORK/expired.toml" >> spinup.toml'
+exec spinup g flags
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "warn"'
+stdout 'past their expires date: old_banner \(2020-01-01\)'
+
+-- declaration.toml --
+
+[flags.new_checkout]
+description = "The new checkout flow"
+public = true
+
+-- expired.toml --
+
+[flags.old_banner]
+description = "The old banner"
+expires = "2020-01-01"
