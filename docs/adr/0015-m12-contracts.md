@@ -136,3 +136,11 @@ M12 makes the defaults of a new app match what a senior developer ships. These d
 - **npm pins** (`stackversions.yaml`): `sveltekit-superforms` 3.0.0, `zod` 4.6.5, and `svelte-sonner` 1.2.1. Superforms 3.0.0 breaks the 14-day rule, because it is the only line that supports SvelteKit 3. `formsnap` is not used: 2.0.1 needs superforms 2, which does not support SvelteKit 3.
 - **shadcn-svelte 1.7.0 seed components:** alert-dialog, badge, checkbox, dropdown-menu, pagination, separator, sheet, skeleton, sonner, and table, in `pack.d/shadcn.toml`. `sonner.svelte` uses `theme="system"` instead of `mode-watcher`.
 - **Upgrade path:** the new pack files are new paths, so the upgrade adds them. Edits to scaffold files are 3-way merged. The digest entries use `none`.
+
+## 7. Amendment (2026-11-06): references between owned resources
+
+A reference from one owned resource to another owned resource did not check the owner. A user could point a row at a row of another user, and that row then blocked the delete of the other user's row. Run 20261105-215107 (unit HR1) changed the generator:
+- A new owned table creates `<table>_user_id_id_idx ON <table> (user_id, id)` as a `UNIQUE` index. `id` is already unique, so the index accepts the same rows.
+- A reference between two owned resources becomes a composite foreign key `(ref, user_id) REFERENCES <parent> (id, user_id)`. PostgreSQL checks the owner in the same statement. A row of another user and a missing row both give 422 with a field error on the reference field.
+- When the parent table comes from an older generator, the child migration adds `CREATE UNIQUE INDEX IF NOT EXISTS <parent>_user_id_id_key ON <parent> (user_id, id)` with a `-- spinup:allow-destructive` line. The index build can block writes to the parent while it runs.
+- Existing references are not changed. An app that generated owned-to-owned references before this change must write the migration by hand.

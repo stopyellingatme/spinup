@@ -1,6 +1,6 @@
 # Pinned stack
 
-The stack uses go1.27.2 (generated apps require Go 1.26) and SvelteKit 3.0.1.
+The stack uses go1.27.2 (generated apps require Go 1.27) and SvelteKit 3.0.1.
 
 ## Container images
 
