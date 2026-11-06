@@ -162,10 +162,8 @@ func Run(ctx context.Context, g gen.Generator, args []string, flags *pflag.FlagS
 	if err != nil {
 		return result, err
 	}
-	for i, step := range result.PostSteps {
-		if err := runners[i](ctx, o.Root, plan.Paths(), o.Runner); err != nil {
-			return result, fmt.Errorf("generator post-step %q failed: %w\nTry: %s", step, err, retryStep(step, plan.Paths()))
-		}
+	if err := runPostSteps(ctx, o.Root, plan.Paths(), result.PostSteps, runners, o.Runner, commandOut); err != nil {
+		return result, err
 	}
 	if o.JSON {
 		return result, printResult(o.Out, result)
