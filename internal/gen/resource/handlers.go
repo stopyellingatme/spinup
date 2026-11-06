@@ -301,15 +301,29 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	words, pluralWords := strings.ReplaceAll(n.Snake(), "_", " "), strings.ReplaceAll(n.PluralSnake(), "_", " ")
 	g := &goFile{pkg: "handlers", local: rc.imports()}
 	g.p("func init() {")
-	g.p("required := []string{")
+	var required, known []string
 	for _, f := range rc.fields {
+		known = append(known, f.col)
 		if !f.Nullable {
-			g.p("%q,", f.col)
+			required = append(required, f.col)
 		}
 	}
+	sort.Strings(required)
+	sort.Strings(known)
+	g.p("required := []string{")
+	for _, name := range required {
+		g.p("%q,", name)
+	}
 	g.p("}")
-	g.p("requiredFields[%q] = required", "POST /api/"+n.PluralSnake())
-	g.p("requiredFields[%q] = required", "PUT /api/"+n.PluralSnake()+"/{id}")
+	g.p("known := []string{")
+	for _, name := range known {
+		g.p("%q,", name)
+	}
+	g.p("}")
+	for _, pattern := range []string{"POST /api/" + n.PluralSnake(), "PUT /api/" + n.PluralSnake() + "/{id}"} {
+		g.p("requiredFields[%q] = required", pattern)
+		g.p("knownFields[%q] = known", pattern)
+	}
 	g.p("}")
 	g.p("")
 	withErr := rc.fromStore(g)
@@ -761,6 +775,17 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("}{")
 	g.p("{\"wrong type\", http.MethodPost, %q, `{%q: %s}`, http.StatusUnprocessableEntity},", base, first.col, badSample(first))
 	g.p("{\"not JSON\", http.MethodPost, %q, `{`, http.StatusBadRequest},", base)
+	g.p("{\"body null\", http.MethodPost, %q, `null`, http.StatusUnprocessableEntity},", base)
+	for _, method := range []string{"Post", "Put"} {
+		path := base
+		if method == "Put" {
+			path += "/1"
+		}
+		g.p("{\"%s case variant\", http.Method%s, %q, %q, http.StatusBadRequest},", method, method, path, fmt.Sprintf(`{%q:null}`, strings.ToUpper(first.col)))
+		g.p("{\"%s duplicate name\", http.Method%s, %q, %q, http.StatusBadRequest},", method, method, path, fmt.Sprintf(`{%q:null,%q:null}`, first.col, first.col))
+		g.p("{\"%s unknown member\", http.Method%s, %q, `{\"id\":1}`, http.StatusBadRequest},", method, method, path)
+		g.p("{\"%s invalid UTF-8\", http.Method%s, %q, %q, http.StatusBadRequest},", method, method, path, fmt.Sprintf("{%q:\"\xff\"}", first.col))
+	}
 	g.p("{\"bad id\", http.MethodGet, %q, \"\", http.StatusBadRequest},", base+"/abc")
 	g.p("{\"limit too large\", http.MethodGet, %q, \"\", http.StatusUnprocessableEntity},", base+"?limit=201")
 	g.p("}")
@@ -785,6 +810,7 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 		rc.historyGuardTests(g, base)
 	}
 	rc.requiredFieldsTest(g, base)
+	rc.jsonBodyTest(g, base)
 	if rc.spec.Owned || rc.spec.Shared {
 		rc.authenticationTest(g, base)
 	}
@@ -858,7 +884,6 @@ func (rc resourceCode) requiredFieldsTest(g *goFile, base string) {
 		g.p("}},")
 	}
 	emit("missing all", "{}", required)
-	emit("body null", "null", required)
 	for _, col := range required {
 		emit("missing "+col, body(col, false), []string{col})
 		emit("null "+col, body(col, true), []string{col})

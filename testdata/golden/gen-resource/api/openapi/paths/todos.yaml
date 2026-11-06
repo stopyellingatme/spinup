@@ -52,6 +52,7 @@
     summary: Create a todo
     tags: [todos]
     requestBody:
+      description: A JSON object of at most 1 MiB.
       required: true
       content:
         application/json:
@@ -72,6 +73,12 @@
               $ref: "#/components/schemas/Problem"
       "409":
         description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "413":
+        description: The request body exceeds 1 MiB.
         content:
           application/problem+json:
             schema:
@@ -130,6 +137,7 @@
     summary: Replace a todo
     tags: [todos]
     requestBody:
+      description: A JSON object of at most 1 MiB.
       required: true
       content:
         application/json:
@@ -156,6 +164,12 @@
               $ref: "#/components/schemas/Problem"
       "409":
         description: The request conflicts with other data.
+        content:
+          application/problem+json:
+            schema:
+              $ref: "#/components/schemas/Problem"
+      "413":
+        description: The request body exceeds 1 MiB.
         content:
           application/problem+json:
             schema:

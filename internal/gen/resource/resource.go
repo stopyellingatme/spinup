@@ -17,6 +17,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
+	"github.com/stopyellingatme/spinup/internal/gen/resource/validation"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
@@ -111,7 +112,7 @@ func registeredParts() []Part {
 // The paths that the built-in parts write, relative to the project root.
 const (
 	serverPath         = "api/internal/handlers/server.go"
-	requiredFieldsPath = "api/internal/handlers/validation.go"
+	requiredFieldsPath = validation.Path
 	routesGenPath      = "api/internal/routes/routes_gen.go"
 )
 
@@ -350,6 +351,7 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		Plan:      plan,
 		PostSteps: steps,
 		Next:      next,
+		Edits:     validationEdits(apiPlan),
 	}, nil
 }
 
@@ -446,9 +448,15 @@ func planAPI(spec Spec, tests bool, declaredRoles []string) (vfs.Plan, error) {
 		}
 		files = append(files, vfs.File{Path: handlersTestPath(spec.Name), Data: test, Class: string(manifest.Scaffold)})
 	}
+	replacement, changed, err := validationReplacement(spec.Root)
+	if err != nil {
+		return vfs.Plan{}, err
+	}
+	if changed {
+		files = append(files, vfs.File{Path: requiredFieldsPath, Data: replacement, Class: string(manifest.Scaffold)})
+	}
 	for _, shared := range []struct{ path, source string }{
 		{serverPath, serverGo},
-		{requiredFieldsPath, requiredFieldsGo},
 	} {
 		if _, err := os.Stat(filepath.Join(spec.Root, filepath.FromSlash(shared.path))); errors.Is(err, os.ErrNotExist) {
 			source, err := withModule(shared.source, module)

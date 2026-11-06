@@ -13,12 +13,20 @@ import (
 
 func init() {
 	required := []string{
-		"title",
 		"done",
 		"priority",
+		"title",
+	}
+	known := []string{
+		"done",
+		"due",
+		"priority",
+		"title",
 	}
 	requiredFields["POST /api/todos"] = required
+	knownFields["POST /api/todos"] = known
 	requiredFields["PUT /api/todos/{id}"] = required
+	knownFields["PUT /api/todos/{id}"] = known
 }
 
 // todoFromStore converts a store row to the API type.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strconv"
@@ -221,6 +222,15 @@ func TestNotesRejectsBadInput(t *testing.T) {
 	}{
 		{"wrong type", http.MethodPost, "/api/notes", `{"title": 42}`, http.StatusUnprocessableEntity},
 		{"not JSON", http.MethodPost, "/api/notes", `{`, http.StatusBadRequest},
+		{"body null", http.MethodPost, "/api/notes", `null`, http.StatusUnprocessableEntity},
+		{"Post case variant", http.MethodPost, "/api/notes", "{\"TITLE\":null}", http.StatusBadRequest},
+		{"Post duplicate name", http.MethodPost, "/api/notes", "{\"title\":null,\"title\":null}", http.StatusBadRequest},
+		{"Post unknown member", http.MethodPost, "/api/notes", `{"id":1}`, http.StatusBadRequest},
+		{"Post invalid UTF-8", http.MethodPost, "/api/notes", "{\"title\":\"\xff\"}", http.StatusBadRequest},
+		{"Put case variant", http.MethodPut, "/api/notes/1", "{\"TITLE\":null}", http.StatusBadRequest},
+		{"Put duplicate name", http.MethodPut, "/api/notes/1", "{\"title\":null,\"title\":null}", http.StatusBadRequest},
+		{"Put unknown member", http.MethodPut, "/api/notes/1", `{"id":1}`, http.StatusBadRequest},
+		{"Put invalid UTF-8", http.MethodPut, "/api/notes/1", "{\"title\":\"\xff\"}", http.StatusBadRequest},
 		{"bad id", http.MethodGet, "/api/notes/abc", "", http.StatusBadRequest},
 		{"limit too large", http.MethodGet, "/api/notes?limit=201", "", http.StatusUnprocessableEntity},
 	}
@@ -280,10 +290,6 @@ func TestNotesRequiresFields(t *testing.T) {
 			{Field: "api_token", Message: "is required"},
 			{Field: "title", Message: "is required"},
 		}},
-		{"body null", "null", []httpx.FieldError{
-			{Field: "api_token", Message: "is required"},
-			{Field: "title", Message: "is required"},
-		}},
 		{"missing api_token", "{\"title\": \"title 1\"}", []httpx.FieldError{
 			{Field: "api_token", Message: "is required"},
 		}},
@@ -320,6 +326,76 @@ func TestNotesRequiresFields(t *testing.T) {
 		}
 	}
 }
+
+// TestNotesChecksJSONBody checks the body before the handler decodes it.
+func TestNotesChecksJSONBody(t *testing.T) {
+	t.Parallel()
+	valid := "{\"title\":\"title 1\",\"api_token\":\"api token 1\"}"
+	oversized := valid + strings.Repeat(" ", 1<<20)
+	tests := []struct {
+		name, body    string
+		status        int
+		unknownLength bool
+	}{
+		{"valid", valid, http.StatusNoContent, false},
+		{"valid without Content-Length", valid, http.StatusNoContent, true},
+		{"at limit", valid + strings.Repeat(" ", (1<<20)-len(valid)), http.StatusNoContent, false},
+		{"case variant", "{\"TITLE\":null}", http.StatusBadRequest, false},
+		{"duplicate name", "{\"title\":null,\"title\":null}", http.StatusBadRequest, false},
+		{"unknown member", "{\"id\":1}", http.StatusBadRequest, false},
+		{"invalid UTF-8", "{\"title\":\"\xff\"}", http.StatusBadRequest, false},
+		{"oversized", oversized, http.StatusRequestEntityTooLarge, false},
+		{"oversized without Content-Length", oversized, http.StatusRequestEntityTooLarge, true},
+	}
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		for _, tc := range tests {
+			t.Run(method+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+				called := false
+				next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					called = true
+					data, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if string(data) != tc.body {
+						t.Fatal("the middleware changed the body")
+					}
+					var input gen.NoteInput
+					if err := json.Unmarshal(data, &input); err != nil {
+						t.Fatal(err)
+					}
+					w.WriteHeader(http.StatusNoContent)
+				})
+				mux := http.NewServeMux()
+				mux.Handle("POST /api/notes", handlers.RequireFields(next))
+				mux.Handle("PUT /api/notes/{id}", handlers.RequireFields(next))
+				path := "/api/notes"
+				if method == http.MethodPut {
+					path += "/1"
+				}
+				req := httptest.NewRequest(method, path, strings.NewReader(tc.body))
+				req.Header.Set("Content-Type", "application/json")
+				if tc.unknownLength {
+					req.ContentLength = -1
+					req.TransferEncoding = []string{"chunked"}
+				}
+				rec := httptest.NewRecorder()
+				mux.ServeHTTP(rec, req)
+				if rec.Code != tc.status {
+					t.Fatalf("status %d, want %d: %s", rec.Code, tc.status, rec.Body)
+				}
+				if called != (tc.status == http.StatusNoContent) {
+					t.Fatalf("handler called = %t", called)
+				}
+				if !called && rec.Header().Get("Content-Type") != "application/problem+json" {
+					t.Fatalf("Content-Type = %q", rec.Header().Get("Content-Type"))
+				}
+			})
+		}
+	}
+}
+
 func TestNotesRequiresUser(t *testing.T) {
 	t.Parallel()
 	handler := app.New(app.WithRoutes(func(mux *http.ServeMux) {

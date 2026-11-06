@@ -14,11 +14,17 @@ import (
 
 func init() {
 	required := []string{
-		"title",
 		"api_token",
+		"title",
+	}
+	known := []string{
+		"api_token",
+		"title",
 	}
 	requiredFields["POST /api/notes"] = required
+	knownFields["POST /api/notes"] = known
 	requiredFields["PUT /api/notes/{id}"] = required
+	knownFields["PUT /api/notes/{id}"] = known
 }
 
 // noteFromStore converts a store row to the API type.
