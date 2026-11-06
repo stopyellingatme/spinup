@@ -37,8 +37,10 @@ exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json'
 stdout '^401$'
 exec curl -sS -D limited.headers -o limited.json -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.1' -d '{"email":"a3@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
 stdout '^429$'
-grep '(?i)^retry-after: 3600' limited.headers
-grep 'Try again in 3600 seconds' limited.json
+# The wait is the hour minus the time since the first login (GCRA).
+# Two password hashes can take more than a second on a busy machine, so accept 3500-3600.
+grep '(?i)^retry-after: (3600|35[0-9][0-9])\r?$' limited.headers
+grep 'Try again in (3600|35[0-9][0-9]) seconds' limited.json
 
 # Another client has its own budget.
 exec curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 198.51.100.2' -d '{"email":"b1@example.com","password":"correct horse battery"}' http://127.0.0.1:38439/api/auth/login
