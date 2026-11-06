@@ -30,6 +30,9 @@ const (
 	lockProbeAttempts = 900
 )
 
+// KitVersionTable holds the versions of the kit migrations.
+const KitVersionTable = "spinup_kit_version"
+
 // MigrateOption changes how [NewMigrator] and [MigrateCommand] run migrations.
 type MigrateOption func(*migrateConfig)
 
@@ -39,6 +42,14 @@ type migrateConfig struct {
 	out              io.Writer
 	url              string
 	hooks            []Hook
+	kitFS            fs.FS
+	kitSet           bool
+}
+
+// WithKitMigrations adds a separate version space for the kit SQL files in fsys.
+// The files must be at the root. App migrations keep their own version space.
+func WithKitMigrations(fsys fs.FS) MigrateOption {
+	return func(c *migrateConfig) { c.kitFS, c.kitSet = fsys, true }
 }
 
 // WithMigrationLockTimeout sets lock_timeout on migration connections (default 5s).
@@ -99,9 +110,11 @@ type MigrationStatus struct {
 // A Postgres advisory lock serializes runners, so two processes never
 // migrate the same database at once.
 type Migrator struct {
-	db       *sql.DB
-	provider *goose.Provider // nil when fsys holds no migrations
-	out      io.Writer
+	db          *sql.DB
+	provider    *goose.Provider // nil when fsys holds no migrations
+	kitProvider *goose.Provider
+	prefix      string // empty for app files, "kit " for kit files
+	out         io.Writer
 }
 
 // NewMigrator returns a migrator for the database at url and the *.sql files
@@ -131,24 +144,33 @@ func NewMigrator(url string, fsys fs.FS, opts ...MigrateOption) (*Migrator, erro
 	}
 	sqlDB := stdlib.OpenDB(*connCfg)
 	m := &Migrator{db: sqlDB, out: cfg.out}
-	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, fsys,
-		goose.WithSessionLocker(locker),
-		goose.WithDisableGlobalRegistry(true),
-		goose.WithAllowOutofOrder(true),
-	)
-	switch {
-	case errors.Is(err, goose.ErrNoMigrations):
-		// An app with no migrations yet is valid. Every method reports nothing to do.
-	case err != nil:
-		_ = sqlDB.Close()
-		return nil, &userError{
-			what: what,
-			why:  err.Error(),
-			try:  "check the file names in the migrations directory (NNNNN_name.sql)",
-			err:  err,
+	prepare := func(fsys fs.FS, table string) (*goose.Provider, error) {
+		provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, fsys,
+			goose.WithTableName(table),
+			goose.WithSessionLocker(locker),
+			goose.WithDisableGlobalRegistry(true),
+			goose.WithAllowOutofOrder(true),
+		)
+		if errors.Is(err, goose.ErrNoMigrations) {
+			return nil, nil
 		}
-	default:
-		m.provider = provider
+		if err != nil {
+			return nil, &userError{
+				what: what,
+				why:  err.Error(),
+				try:  "check the file names in the migrations directory (NNNNN_name.sql)",
+				err:  err,
+			}
+		}
+		return provider, nil
+	}
+	m.provider, err = prepare(fsys, "goose_db_version")
+	if err == nil && cfg.kitSet {
+		m.kitProvider, err = prepare(cfg.kitFS, KitVersionTable)
+	}
+	if err != nil {
+		_ = sqlDB.Close()
+		return nil, err
 	}
 	return m, nil
 }
@@ -160,6 +182,9 @@ func (m *Migrator) Close() error {
 
 // Status returns every migration file in version order, with its state.
 func (m *Migrator) Status(ctx context.Context) ([]MigrationStatus, error) {
+	if err := m.adopt(ctx); err != nil {
+		return nil, err
+	}
 	if m.provider == nil {
 		return nil, nil
 	}
@@ -192,7 +217,7 @@ func (m *Migrator) Pending(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// Up applies every pending migration. It writes the plan first, either
+// Up applies every pending app migration. It writes the plan first, either
 // "migrate: no pending migrations" or "migrate: N pending", and then one
 // "applied  <file>" line for each migration it applies. When another runner
 // applied the pending migrations while this one waited on the lock, it writes
@@ -207,13 +232,21 @@ func (m *Migrator) Up(ctx context.Context) error {
 		return nil
 	}
 	m.printf("migrate: %d pending\n", len(pending))
+	return m.applyUp(ctx)
+}
+
+// applyUp applies one space after the caller prints the plan.
+func (m *Migrator) applyUp(ctx context.Context) error {
+	if m.provider == nil {
+		return nil
+	}
 	results, err := m.provider.Up(ctx)
 	var partial *goose.PartialError
 	if errors.As(err, &partial) {
 		results = partial.Applied
 	}
 	for _, r := range results {
-		m.printf("applied  %s\n", path.Base(r.Source.Path))
+		m.printf("applied  %s%s\n", m.prefix, path.Base(r.Source.Path))
 	}
 	if err != nil {
 		return fmt.Errorf("db: apply migrations: %w", err)
@@ -228,6 +261,9 @@ func (m *Migrator) Up(ctx context.Context) error {
 // Down rolls back the most recent migration. It writes "rolled back  <file>",
 // or "migrate: nothing to roll back".
 func (m *Migrator) Down(ctx context.Context) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
 	if m.provider == nil {
 		m.printf("migrate: nothing to roll back\n")
 		return nil
@@ -240,13 +276,16 @@ func (m *Migrator) Down(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("db: roll back migration: %w", err)
 	}
-	m.printf("rolled back  %s\n", path.Base(res.Source.Path))
+	m.printf("rolled back  %s%s\n", m.prefix, path.Base(res.Source.Path))
 	return nil
 }
 
 // Version returns the highest applied migration version, or 0 when no
 // migration is applied.
 func (m *Migrator) Version(ctx context.Context) (int64, error) {
+	if err := m.adopt(ctx); err != nil {
+		return 0, err
+	}
 	if m.provider == nil {
 		return 0, nil
 	}
@@ -260,6 +299,9 @@ func (m *Migrator) Version(ctx context.Context) (int64, error) {
 // Redo rolls back the most recent migration and applies it again. It writes
 // "rolled back  <file>" and "applied  <file>", or "migrate: nothing to redo".
 func (m *Migrator) Redo(ctx context.Context) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
 	if m.provider == nil {
 		m.printf("migrate: nothing to redo\n")
 		return nil
@@ -272,12 +314,12 @@ func (m *Migrator) Redo(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("db: roll back migration: %w", err)
 	}
-	m.printf("rolled back  %s\n", path.Base(res.Source.Path))
+	m.printf("rolled back  %s%s\n", m.prefix, path.Base(res.Source.Path))
 	res, err = m.provider.ApplyVersion(ctx, res.Source.Version, true)
 	if err != nil {
 		return fmt.Errorf("db: apply migration again: %w", err)
 	}
-	m.printf("applied  %s\n", path.Base(res.Source.Path))
+	m.printf("applied  %s%s\n", m.prefix, path.Base(res.Source.Path))
 	return nil
 }
 
@@ -297,6 +339,9 @@ func (m *Migrator) HasVersion(v int64) bool {
 // UpTo applies the pending migrations up to and including version v. It
 // writes one "applied  <file>" line for each migration it applies.
 func (m *Migrator) UpTo(ctx context.Context, v int64) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
 	if m.provider == nil {
 		return nil
 	}
@@ -306,7 +351,7 @@ func (m *Migrator) UpTo(ctx context.Context, v int64) error {
 		results = partial.Applied
 	}
 	for _, r := range results {
-		m.printf("applied  %s\n", path.Base(r.Source.Path))
+		m.printf("applied  %s%s\n", m.prefix, path.Base(r.Source.Path))
 	}
 	if err != nil {
 		return fmt.Errorf("db: apply migrations up to version %d: %w", v, err)
@@ -317,6 +362,9 @@ func (m *Migrator) UpTo(ctx context.Context, v int64) error {
 // DownTo rolls back the applied migrations above version v, newest first.
 // It writes one "rolled back  <file>" line for each migration.
 func (m *Migrator) DownTo(ctx context.Context, v int64) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
 	if m.provider == nil {
 		return nil
 	}
@@ -326,7 +374,7 @@ func (m *Migrator) DownTo(ctx context.Context, v int64) error {
 		results = partial.Applied
 	}
 	for _, r := range results {
-		m.printf("rolled back  %s\n", path.Base(r.Source.Path))
+		m.printf("rolled back  %s%s\n", m.prefix, path.Base(r.Source.Path))
 	}
 	if err != nil {
 		return fmt.Errorf("db: roll back migrations to version %d: %w", v, err)
@@ -336,4 +384,96 @@ func (m *Migrator) DownTo(ctx context.Context, v int64) error {
 
 func (m *Migrator) printf(format string, args ...any) {
 	_, _ = fmt.Fprintf(m.out, format, args...)
+}
+
+// kitSpace shares the database and the provider without repeating adoption.
+func (m *Migrator) kitSpace() *Migrator {
+	return &Migrator{db: m.db, provider: m.kitProvider, out: m.out, prefix: "kit "}
+}
+
+// KitStatus returns the kit files in version order, with their states.
+func (m *Migrator) KitStatus(ctx context.Context) ([]MigrationStatus, error) {
+	if err := m.adopt(ctx); err != nil {
+		return nil, err
+	}
+	return m.kitSpace().Status(ctx)
+}
+
+// KitUp applies all pending kit migrations and prints the plan and progress.
+func (m *Migrator) KitUp(ctx context.Context) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
+	return m.kitSpace().Up(ctx)
+}
+
+// KitDown rolls back the most recent kit migration and prints its name.
+func (m *Migrator) KitDown(ctx context.Context) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
+	return m.kitSpace().Down(ctx)
+}
+
+// KitVersion returns the highest applied kit version, or zero.
+func (m *Migrator) KitVersion(ctx context.Context) (int64, error) {
+	if err := m.adopt(ctx); err != nil {
+		return 0, err
+	}
+	return m.kitSpace().Version(ctx)
+}
+
+// KitUpTo applies pending kit migrations through v and prints their names.
+func (m *Migrator) KitUpTo(ctx context.Context, v int64) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
+	return m.kitSpace().UpTo(ctx, v)
+}
+
+// KitDownTo rolls back kit migrations above v and prints their names.
+func (m *Migrator) KitDownTo(ctx context.Context, v int64) error {
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
+	return m.kitSpace().DownTo(ctx, v)
+}
+
+// KitHasVersion reports whether a kit migration file has version v.
+func (m *Migrator) KitHasVersion(v int64) bool {
+	return m.kitSpace().HasVersion(v)
+}
+
+// upAll prints one plan and applies kit migrations before app migrations.
+func (m *Migrator) upAll(ctx context.Context) error {
+	if m.kitProvider == nil {
+		return m.Up(ctx)
+	}
+	if err := m.adopt(ctx); err != nil {
+		return err
+	}
+	kit := m.kitSpace()
+	kitPending, err := kit.Pending(ctx)
+	if err != nil {
+		return err
+	}
+	appPending, err := m.Pending(ctx)
+	if err != nil {
+		return err
+	}
+	count := len(kitPending) + len(appPending)
+	if count == 0 {
+		m.printf("migrate: no pending migrations\n")
+		return nil
+	}
+	m.printf("migrate: %d pending\n", count)
+	if len(kitPending) > 0 {
+		if err := kit.applyUp(ctx); err != nil {
+			return err
+		}
+	}
+	if len(appPending) > 0 {
+		return m.applyUp(ctx)
+	}
+	return nil
 }

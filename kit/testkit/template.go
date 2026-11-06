@@ -18,6 +18,19 @@ import (
 // templateSalt changes the template names when the build steps change.
 const templateSalt = "spinup-testkit-template-v1"
 
+// DBOption changes how [DBWithMigrations] builds a template database.
+type DBOption func(*dbConfig)
+
+type dbConfig struct {
+	kitFS fs.FS
+}
+
+// WithKitMigrations applies the kit SQL files before the app migrations.
+// Both file systems contribute to the template hash.
+func WithKitMigrations(fsys fs.FS) DBOption {
+	return func(c *dbConfig) { c.kitFS = fsys }
+}
+
 type templateEntry struct {
 	once sync.Once
 	err  error
@@ -34,13 +47,18 @@ var (
 // CREATE DATABASE ... TEMPLATE, which is fast. The database is dropped when
 // the test ends.
 //
-// A template is named for a hash of the migration file names and contents.
+// [WithKitMigrations] applies the kit space first.
+// A template hash includes the file names and contents of both spaces.
 // A finished template stays on the server, so later test runs and other test
 // processes reuse it.
-func DBWithMigrations(t testing.TB, fsys fs.FS) *pgxpool.Pool {
+func DBWithMigrations(t testing.TB, fsys fs.FS, opts ...DBOption) *pgxpool.Pool {
 	t.Helper()
+	cfg := dbConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 	s := getServer(t)
-	hash, err := migrationsHash(fsys)
+	hash, err := migrationsHash(fsys, cfg.kitFS)
 	if err != nil {
 		t.Fatalf("testkit: read migrations: %v", err)
 	}
@@ -54,31 +72,44 @@ func DBWithMigrations(t testing.TB, fsys fs.FS) *pgxpool.Pool {
 	}
 	templatesMu.Unlock()
 
-	e.once.Do(func() { e.err = s.buildTemplate(name, hash, fsys) })
+	e.once.Do(func() { e.err = s.buildTemplate(name, hash, fsys, cfg.kitFS) })
 	if e.err != nil {
 		t.Fatalf("testkit: build template database %s: %v", name, e.err)
 	}
 	return s.newDatabase(t, name)
 }
 
-// migrationsHash returns a hex SHA-256 of the names and contents of the
-// *.sql files at the root of fsys, in name order.
-func migrationsHash(fsys fs.FS) (string, error) {
-	names, err := fs.Glob(fsys, "*.sql") // sorted
-	if err != nil {
-		return "", err
-	}
+// migrationsHash hashes the file names and contents of both migration spaces.
+// Files and spaces have explicit boundaries so neither can alias the other.
+func migrationsHash(fsys, kitFS fs.FS) (string, error) {
 	h := sha256.New()
 	writeField(h, []byte(templateSalt))
+	if err := hashMigrationFiles(h, fsys); err != nil {
+		return "", err
+	}
+	if kitFS != nil {
+		writeField(h, []byte("kit"))
+		if err := hashMigrationFiles(h, kitFS); err != nil {
+			return "", err
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func hashMigrationFiles(w io.Writer, fsys fs.FS) error {
+	names, err := fs.Glob(fsys, "*.sql") // sorted
+	if err != nil {
+		return err
+	}
 	for _, n := range names {
 		data, err := fs.ReadFile(fsys, n)
 		if err != nil {
-			return "", err
+			return err
 		}
-		writeField(h, []byte(n))
-		writeField(h, data)
+		writeField(w, []byte(n))
+		writeField(w, data)
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return nil
 }
 
 // writeField writes a length-prefixed field, so field boundaries cannot shift.
@@ -94,7 +125,7 @@ func writeField(w io.Writer, b []byte) {
 // building the same template at the same time. The build happens in a
 // scratch database that is renamed at the end, so a template that exists is
 // always complete.
-func (s *server) buildTemplate(name, hash string, fsys fs.FS) error {
+func (s *server) buildTemplate(name, hash string, fsys, kitFS fs.FS) error {
 	ctx, cancel := context.WithTimeout(context.Background(), adminTimeout)
 	defer cancel()
 	conn, err := s.admin.Acquire(ctx)
@@ -131,11 +162,14 @@ func (s *server) buildTemplate(name, hash string, fsys fs.FS) error {
 	if err != nil {
 		return err
 	}
-	m, err := db.NewMigrator(buildURL, fsys, db.WithOutput(io.Discard))
+	m, err := db.NewMigrator(buildURL, fsys, db.WithOutput(io.Discard), db.WithKitMigrations(kitFS))
 	if err != nil {
 		return err
 	}
-	upErr := m.Up(ctx)
+	upErr := m.KitUp(ctx)
+	if upErr == nil {
+		upErr = m.Up(ctx)
+	}
 	closeErr := m.Close()
 	if upErr != nil {
 		return upErr
