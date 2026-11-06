@@ -8,7 +8,7 @@ cd todo
 [!env:DATABASE_URL] stop 'a rate limit check needs DATABASE_URL'
 
 exec spinup db migrate up
-stdout 'applied  00002_create_auth\.sql'
+stdout 'applied  kit 00002_create_auth\.sql'
 cd api
 exec go build -o bin/api ./cmd/api
 
@@ -66,6 +66,5 @@ kill -INT server
 wait server
 
 # Roll back so that the next run starts from an empty database.
-cd ..
-exec spinup db to 0 --i-know
-stdout 'rolled back  00002_create_auth\.sql'
+exec go run ./cmd/api migrate kit to 0
+stdout 'rolled back  kit 00002_create_auth\.sql'

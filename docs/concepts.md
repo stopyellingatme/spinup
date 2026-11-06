@@ -231,6 +231,17 @@ $ grep -n 'spinup/kit' api/cmd/api/main.go
 The kit is a separate Go module, `github.com/stopyellingatme/spinup/kit`. Your `api/go.mod` requires one version of it.
 The kit follows a compatibility promise: a deprecated function keeps working for one minor version. See [The kit library](reference/kit.md) and [Kit compatibility](policy/kit-compat.md).
 
+## Kit migrations
+
+An app has two sets of migrations, and each set has its own version numbers.
+The app migrations are in `api/db/migrations/`. You own them, and `spinup g resource` and `spinup db new` add to them.
+The kit migrations are in `api/db/kit/`. A module ships them, such as the tables of `auth` and `audit`. They are `seed` files, so an upgrade does not touch them after the first write.
+
+The same number can exist in both sets. For example, `api/db/kit/00005_users_role.sql` and `api/db/migrations/00005_create_orders.sql` do not clash.
+The command `migrate up` applies the kit migrations first. The command `migrate status` lists them first, with the prefix `kit`.
+The command `spinup db to <version>` moves the app migrations only. To roll back a kit migration, run `go run ./cmd/api migrate kit to <version>` in `api/`.
+Never write a kit migration that uses a table of your app.
+
 ## The .spinup folder
 
 `.spinup/` holds local state for the tools. A new app ignores it in git, so each machine has its own copy.
@@ -345,12 +356,13 @@ Each term below is the name the docs use for that thing.
 | generator | A command of `spinup generate` (`g`) that writes files into your app |
 | journal | A file on the VM that records each step of a deploy, so a stopped deploy can continue |
 | kit | The Go library that your API imports |
+| kit migration | A numbered SQL file in `api/db/kit/` that a module ships, such as the tables of `auth`. It has its own version numbers. |
 | kit version | The version of the kit in `api/go.mod` |
 | lock, spinup.lock | The file that records what spinup wrote, with a hash of each file |
 | managed | The class of a file that spinup owns and replaces on upgrade |
 | Mailpit | A development inbox. It shows the email that your app sends on your machine. |
 | maintenance window | The hours in which risky work on the VM may run. The key is `[maintenance] window`. |
-| migration | A numbered SQL file in `api/db/migrations/` that changes the database |
+| migration | A numbered SQL file in `api/db/migrations/` that changes the database. A kit migration is a different kind. |
 | module | An optional template pack that you turn on, such as `auth` or `jobs` |
 | OpenAPI file | The description of your API in `api/openapi/`. The client and the API reference page read it. |
 | pack | A set of template files. The core packs are `base`, `api`, and `web`. |

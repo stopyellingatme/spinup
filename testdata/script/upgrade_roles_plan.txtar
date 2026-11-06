@@ -5,16 +5,17 @@ env SPINUP_TEMPLATES_DIR=$WORK/templates
 exec spinup new demo --module example.com/demo --modules ci,auth --non-interactive
 cd demo
 exec go run ../oldlock.go spinup.lock
-rm api/db/migrations/00005_users_role.sql api/internal/roles/roles.gen.go
+rm api/db/kit/00005_users_role.sql api/internal/roles/roles.gen.go
 cp ../widgets.sql api/db/migrations/00005_widgets.sql
 exec sh -c 'cat ../auth.toml >> spinup.toml'
 exec git add -A
 exec git commit -q -m 'existing app with custom auth and migration'
 
-# The preview finds an untracked migration before the upgrade starts.
+# The app 00005 and the kit 00005 live in separate version spaces (ADR 0028), so the preview shows no clash.
 exec spinup upgrade --plan --offline
-stdout 'Warning: migration version 5 is also used by 00005_widgets.sql'
-stdout 'Applied migration: keep version 5\. Try: rename 00005_users_role.sql to the next free number before you run spinup db migrate\.'
+! stdout 'Warning: migration version'
+! stdout 'Applied migration'
+stdout 'api/db/kit/00005_users_role.sql'
 stdout 'Try: run spinup g roles after the upgrade\.'
 exists .spinup/plan.json
 ! exists .spinup/upgrade/0.0.1
@@ -45,7 +46,7 @@ func main() {
  var lock map[string]any
  if err := json.Unmarshal(data, &lock); err != nil { panic(err) }
  files := lock["files"].(map[string]any)
- delete(files, "api/db/migrations/00005_users_role.sql")
+ delete(files, "api/db/kit/00005_users_role.sql")
  delete(files, "api/internal/roles/roles.gen.go")
  data, err = json.MarshalIndent(lock, "", "  ")
  if err != nil { panic(err) }

@@ -6,9 +6,9 @@ env PATH=$WORK/tools:$PATH
 # New audit apps include auth and the exact kit wiring.
 exec spinup new audited --modules auth,audit --module example.com/audited --non-interactive
 cd audited
-exists api/db/migrations/00002_create_auth.sql
-exists api/db/migrations/00005_users_role.sql
-exists api/db/migrations/00006_audit_events.sql
+exists api/db/kit/00002_create_auth.sql
+exists api/db/kit/00005_users_role.sql
+exists api/db/kit/00006_audit_events.sql
 exists web/src/lib/components/app/history-list.svelte
 grep 'auth.WithEvents\(authsink.New\(pool\)\)' api/cmd/api/main.go
 grep 'auth.WithActorContext\(authsink.ActorContext\)' api/cmd/api/main.go
@@ -29,9 +29,9 @@ cd retrofit
 exec spinup module add audit --yes --non-interactive
 stdout 'Adding required modules: auth'
 stdout 'git merge spinup/module-audit'
-exists .spinup/upgrade/0.0.0-dev/api/db/migrations/00006_audit_events.sql
+exists .spinup/upgrade/0.0.0-dev/api/db/kit/00006_audit_events.sql
 exists .spinup/upgrade/0.0.0-dev/web/src/lib/components/app/history-list.svelte
-! exists api/db/migrations/00006_audit_events.sql
+! exists api/db/kit/00006_audit_events.sql
 ! grep 'audit.Command' api/cmd/api/main.go
 grep '^modules = .*audit.*auth' .spinup/upgrade/0.0.0-dev/spinup.toml
 exec git status --porcelain

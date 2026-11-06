@@ -87,27 +87,34 @@ If it fails, the message says if the server is down or answered with another sta
 
 ## migrate
 
-Runs the SQL migrations in `api/db/migrations/`. It takes one subcommand.
+Runs the SQL migrations of the app. It takes one subcommand.
+The app migrations are in `api/db/migrations/`. The kit migrations are in `api/db/kit/`.
+The two directories have separate version numbers. See [Kit migrations](../concepts.md#kit-migrations).
 
 | Subcommand | What it does | Example |
 | --- | --- | --- |
-| `up` | Applies every pending migration. | `migrate up` |
-| `down` | Rolls back the last migration. | `migrate down` |
-| `status` | Lists each migration as `applied` or `pending`. | `migrate status` |
-| `redo` | Rolls back the last migration and applies it again. | `migrate redo` |
-| `to <version>` | Moves up or down to one version. | `migrate to 3` |
-| `version` | Prints the highest applied version. It prints `0` when none is applied. | `migrate version` |
+| `up` | Applies every pending migration. It applies the kit migrations first. | `migrate up` |
+| `down` | Rolls back the last app migration. | `migrate down` |
+| `status` | Lists each migration as `applied` or `pending`. It lists the kit migrations first. | `migrate status` |
+| `redo` | Rolls back the last app migration and applies it again. | `migrate redo` |
+| `to <version>` | Moves the app migrations up or down to one version. | `migrate to 3` |
+| `version` | Prints the highest applied app version. It prints `0` when none is applied. | `migrate version` |
+| `kit <subcommand>` | Runs `up`, `down`, `status`, `to <version>`, or `version` on the kit migrations only. | `migrate kit to 0` |
 
 <!-- doctest: skip -->
 ```console
 $ go run ./cmd/api migrate status
+applied  kit 00002_create_auth.sql
+pending  kit 00003_password_resets.sql
+applied  kit 00005_users_role.sql
 applied  00001_init.sql
-applied  00002_create_auth.sql
-pending  00003_password_resets.sql
 $ go run ./cmd/api migrate up
 migrate: 1 pending
-applied  00003_password_resets.sql
+applied  kit 00003_password_resets.sql
 ```
+
+The kit lines show the prefix `kit`. A kit migration and an app migration can have the same number.
+The command `migrate kit` is the way to roll back a kit migration. The commands `spinup db migrate` and `spinup db to` work on the app migrations only.
 
 A lock in PostgreSQL stops two runners from migrating at the same time.
 With the jobs module, `migrate up` also runs the job queue migrations.

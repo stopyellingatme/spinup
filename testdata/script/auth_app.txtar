@@ -5,7 +5,7 @@ stdout 'from packs base, api, ci, web, auth'
 cd todo
 
 # The files of ADR 0008 §3 and their classes.
-exists api/db/migrations/00002_create_auth.sql
+exists api/db/kit/00002_create_auth.sql
 exists web/src/lib/server/auth.ts web/src/lib/server/auth.test.ts
 exists web/src/routes/login/+page.svelte web/src/routes/login/+page.server.ts
 exists web/src/routes/register/+page.svelte web/src/routes/register/+page.server.ts
@@ -13,7 +13,7 @@ exists web/src/routes/logout/+page.server.ts
 ! exists web/src/routes/logout/+page.svelte
 exists web/src/routes/account/+page.svelte web/src/routes/account/+page.server.ts
 exec cat spinup.lock
-stdout '"api/db/migrations/00002_create_auth.sql": \{\n[[:space:]]+"class": "seed"'
+stdout '"api/db/kit/00002_create_auth.sql": \{\n[[:space:]]+"class": "seed"'
 stdout '"web/src/lib/server/auth.ts": \{\n[[:space:]]+"class": "managed"'
 stdout '"web/src/routes/login/\+page.server.ts": \{\n[[:space:]]+"class": "scaffold"'
 
@@ -46,7 +46,7 @@ cd todo
 # With a database: the migration applies, the app tests pass, and the API registers, signs in,
 # and signs out a user. The real environment wins over .env.
 [env:DATABASE_URL] exec spinup db migrate up
-[env:DATABASE_URL] stdout 'applied  00002_create_auth\.sql'
+[env:DATABASE_URL] stdout 'applied  kit 00002_create_auth\.sql'
 [env:DATABASE_URL] cd api
 [env:DATABASE_URL] exec go test -count=1 ./...
 [env:DATABASE_URL] exec go build -o bin/api ./cmd/api
@@ -74,6 +74,5 @@ cd todo
 [env:DATABASE_URL] wait server
 
 # Roll back so that the next run starts from an empty database.
-[env:DATABASE_URL] cd ..
-[env:DATABASE_URL] exec spinup db to 0 --i-know
-[env:DATABASE_URL] stdout 'rolled back  00002_create_auth\.sql'
+[env:DATABASE_URL] exec go run ./cmd/api migrate kit to 0
+[env:DATABASE_URL] stdout 'rolled back  kit 00002_create_auth\.sql'
