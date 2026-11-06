@@ -4,7 +4,11 @@
 # and builds this file once per run. The build needs the network for apk.
 FROM [[ image "docker-dind" ]]
 
-RUN apk add --no-cache bash curl openssh-server python3 sudo
+# Upgrade the packages of the image first. The pinned image can hold an older
+# release of a package (openssh-client-common) than the current Alpine repository.
+# Without the upgrade, apk cannot install the newer packages that depend on it.
+RUN apk upgrade --no-cache \
+ && apk add --no-cache bash curl openssh-server python3 sudo
 
 # The deploy user has UID 1000 (the default of DEPLOY_UID) and is in the docker group.
 # dockerd gives its socket to the docker group when the group exists.
