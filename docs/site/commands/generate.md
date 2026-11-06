@@ -37,6 +37,7 @@ spinup generate <kind> [args...]
 - [`spinup generate client`](generate-client.md) — Generate TypeScript types from OpenAPI
 - [`spinup generate component`](generate-component.md) — Add shadcn-svelte components to the web app (needs the network)
 - [`spinup generate dashboard`](generate-dashboard.md) — Add a custom Grafana dashboard
+- [`spinup generate flags`](generate-flags.md) — Generate the app flag set
 - [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
 - [`spinup generate job`](generate-job.md) — Add a background job (River) to api/internal/jobs
 - [`spinup generate mailer`](generate-mailer.md) — Add a typed mailer and email templates

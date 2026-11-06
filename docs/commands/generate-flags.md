@@ -20,9 +20,24 @@ The command has no arguments or flags.
 It writes Go constants and a TypeScript union of public keys.
 It also writes the administrator role from `[auth]`.
 
-<!-- doctest: skip -->
+```console
+$ spinup new flagapp --module example.com/flagapp --modules ci,auth,flags --no-git --non-interactive
+...
+$ cd flagapp
+$ printf '\n[flags.new_checkout]\ndescription = "The new checkout flow"\npublic = true\n' >> spinup.toml
+$ spinup g flags
+Created 0, updated 2 files
+$ grep -n "NewCheckout" api/internal/flags/flags.gen.go
+...
+$ cat web/src/lib/flags.gen.ts
+...
+```
+
+If nothing changed, the command writes nothing.
+
 ```console
 $ spinup g flags
+Created 0, updated 0 files
 ```
 
 The `flags-drift` doctor check warns if either generated file differs from the declarations.
