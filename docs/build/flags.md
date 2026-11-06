@@ -21,7 +21,8 @@ ok	flags-drift	generated flags match [flags] in spinup.toml
 
 A flag is a boolean. A change reaches every running process within 10 seconds.
 The process that made the change sees it at once.
-If the database is down, every flag has its declared `default`.
+Before the first successful load, every flag has its declared `default`.
+If the database goes down later, each process keeps its last snapshot until a refresh succeeds.
 
 ## Declare a flag
 

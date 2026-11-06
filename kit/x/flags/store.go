@@ -77,6 +77,7 @@ type Store struct {
 	mu            sync.Mutex
 	lastErr       error
 	started       bool
+	synced        bool
 	cancel        context.CancelFunc
 	done          chan struct{}
 }
@@ -292,9 +293,19 @@ func (s *Store) update(ctx context.Context, key, sql string, args ...any) error 
 		return err
 	}
 	return s.write(ctx, func(tx pgx.Tx) error {
+		if err := s.ensureRow(ctx, tx, key); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, sql, append([]any{key}, args...)...)
 		return err
 	})
+}
+
+// ensureRow inserts the declared row for key when it is missing, so a write
+// never succeeds without effect after a failed Sync.
+func (s *Store) ensureRow(ctx context.Context, tx pgx.Tx, key string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO feature_flags (key, enabled) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`, key, s.flags.Declared()[key].Default)
+	return err
 }
 
 // Enable turns on the global switch for key.
@@ -375,6 +386,9 @@ func (s *Store) userWrite(ctx context.Context, key, email string, fn func(pgx.Tx
 			}
 			return err
 		}
+		if err := s.ensureRow(ctx, tx, key); err != nil {
+			return err
+		}
 		return fn(tx, id)
 	})
 }
@@ -438,13 +452,23 @@ func (s *Store) Start(ctx context.Context, interval time.Duration) error {
 	s.mu.Unlock()
 	timeout := min(interval, 5*time.Second)
 	initialCtx, initialCancel := context.WithTimeout(runCtx, timeout)
-	if _, err := s.Sync(initialCtx); err != nil {
-		s.logger.WarnContext(initialCtx, "flags: cannot sync the declared flags", "error", err)
-	}
+	s.syncOnce(initialCtx)
 	initialCancel()
 	s.refreshWithTimeout(runCtx, timeout)
 	go s.run(runCtx, interval, timeout)
 	return nil
+}
+
+// syncOnce runs Sync and records success. The runner retries a failed Sync on
+// each tick until it succeeds.
+func (s *Store) syncOnce(ctx context.Context) {
+	if _, err := s.Sync(ctx); err != nil {
+		s.logger.WarnContext(ctx, "flags: cannot sync the declared flags", "error", err)
+		return
+	}
+	s.mu.Lock()
+	s.synced = true
+	s.mu.Unlock()
 }
 
 func (s *Store) refreshWithTimeout(ctx context.Context, timeout time.Duration) {
@@ -463,6 +487,14 @@ func (s *Store) run(ctx context.Context, interval, timeout time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.mu.Lock()
+			synced := s.synced
+			s.mu.Unlock()
+			if !synced {
+				syncCtx, cancel := context.WithTimeout(ctx, timeout)
+				s.syncOnce(syncCtx)
+				cancel()
+			}
 			s.refreshWithTimeout(ctx, timeout)
 		}
 	}

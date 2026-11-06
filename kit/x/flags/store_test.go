@@ -607,3 +607,21 @@ func TestStoreLoggerAndRolesCopy(t *testing.T) {
 		t.Fatalf("custom logger: %v, %s", err, logs.String())
 	}
 }
+
+func TestStoreWriteWithoutSyncCreatesRow(t *testing.T) {
+	pool := flagDB(t, false)
+	s, _, _ := storeFixture(t, pool)
+	ctx := t.Context()
+	storeExec(t, pool, `INSERT INTO users (email, password_hash) VALUES ('z@example.com', 'hash')`)
+	const key = "new_checkout"
+	if err := s.Enable(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetUser(ctx, key, "z@example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	var enabled bool
+	if err := pool.QueryRow(ctx, `SELECT enabled FROM feature_flags WHERE key = $1`, key).Scan(&enabled); err != nil || !enabled {
+		t.Fatalf("enabled = %v, err = %v", enabled, err)
+	}
+}

@@ -74,7 +74,7 @@
 						<input type="hidden" name="key" value={flag.key} />
 						<label class="flex items-center gap-2 text-sm font-medium">
 							<input type="checkbox" name="enabled" class={box} checked={flag.enabled} />
-							On for everyone who matches a rule below
+							On for everyone, signed-out visitors included
 						</label>
 						<fieldset class="grid gap-2">
 							<legend class="text-sm font-medium">Roles</legend>
