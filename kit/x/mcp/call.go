@@ -16,6 +16,8 @@ func errorResult(text string) *sdkmcp.CallToolResult {
 }
 
 func (s *Server) call(ctx context.Context, req sdkmcp.Request, next sdkmcp.MethodHandler) (res sdkmcp.Result, err error) {
+	ctx, release := toolContext(ctx)
+	defer release()
 	name := ""
 	if params, ok := req.GetParams().(*sdkmcp.CallToolParamsRaw); ok && params != nil {
 		name = params.Name
@@ -64,4 +66,27 @@ func (s *Server) call(ctx context.Context, req sdkmcp.Request, next sdkmcp.Metho
 		return errorResult(fmt.Sprintf("The result is too large (%d bytes, limit %d). Try: ask for a smaller page with limit.", len(data), s.cfg.MaxResultBytes)), nil
 	}
 	return result, nil
+}
+
+// toolContext preserves SDK values and cancellation, and restores the HTTP deadline.
+// Older protocols suppress transport cancellation in the SDK.
+func toolContext(ctx context.Context) (context.Context, func()) {
+	request, ok := ctx.Value(requestContextKey{}).(context.Context)
+	if !ok {
+		return ctx, func() {}
+	}
+	ctx, cancel := context.WithCancelCause(ctx)
+	stop := context.AfterFunc(request, func() { cancel(context.Cause(request)) })
+	if err := request.Err(); err != nil {
+		cancel(context.Cause(request))
+	}
+	deadlineCancel := func() {}
+	if deadline, ok := request.Deadline(); ok {
+		ctx, deadlineCancel = context.WithDeadline(ctx, deadline)
+	}
+	return ctx, func() {
+		stop()
+		deadlineCancel()
+		cancel(nil)
+	}
 }

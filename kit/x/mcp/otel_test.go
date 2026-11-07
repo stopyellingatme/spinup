@@ -128,7 +128,7 @@ func TestProtocolAndRequestID(t *testing.T) {
 	registerTestTool(s, ToolDef{Name: "read", Description: "Read", ReadOnly: true})
 	// Test the request metadata path without an HTTP transport.
 	req := &sdkmcp.CallToolRequest{Params: &sdkmcp.CallToolParamsRaw{Name: "read", Meta: sdkmcp.Meta{sdkmcp.MetaKeyProtocolVersion: "2026-07-28"}}}
-	ctx := context.WithValue(requestContext(apikeys.ScopeRead, "staff"), bodyKey{}, &observedBody{raw: []byte(`{"id":"call-id"}`)})
+	ctx := context.WithValue(requestContext(apikeys.ScopeRead, "staff"), requestIDsKey{}, readRequestIDs([]byte(`{"id":"call-id"}`)))
 	_, err := s.call(ctx, req, func(context.Context, string, sdkmcp.Request) (sdkmcp.Result, error) {
 		return &sdkmcp.CallToolResult{}, nil
 	})

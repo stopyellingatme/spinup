@@ -1,8 +1,12 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	"fmt"
+	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -18,6 +22,7 @@ import (
 var keyFrom = apikeys.KeyFrom
 
 type commandListKey struct{}
+type requestContextKey struct{}
 
 // Routes registers the MCP endpoint and the public metadata endpoint.
 func (s *Server) Routes(publicOrigin string) func(*http.ServeMux) {
@@ -37,12 +42,30 @@ func (s *Server) Routes(publicOrigin string) func(*http.ServeMux) {
 			httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusUnauthorized, Detail: "The MCP endpoint needs an API key. Try: send Authorization: Bearer <key>."})
 			return
 		}
-		if r.Body != nil {
-			body := &observedBody{ReadCloser: r.Body, limit: s.cfg.MaxBodyBytes}
-			r = r.WithContext(context.WithValue(r.Context(), bodyKey{}, body))
-			r.Body = body
+		ctx := context.WithValue(r.Context(), requestContextKey{}, r.Context())
+		if r.Method == http.MethodPost {
+			reader := r.Body
+			if reader == nil {
+				reader = http.NoBody
+			}
+			defer func() { _ = reader.Close() }()
+			limit := s.cfg.MaxBodyBytes
+			if limit < math.MaxInt64 {
+				limit++
+			}
+			body, err := io.ReadAll(io.LimitReader(reader, limit))
+			if int64(len(body)) > s.cfg.MaxBodyBytes {
+				httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusRequestEntityTooLarge, Detail: fmt.Sprintf("The request body is larger than %d bytes. Try: send a smaller request.", s.cfg.MaxBodyBytes)})
+				return
+			}
+			if err != nil || !jsontext.Value(body).IsValid() {
+				httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusBadRequest, Detail: "The request body is not valid JSON. Try: send one JSON-RPC message without duplicate names."})
+				return
+			}
+			ctx = context.WithValue(ctx, requestIDsKey{}, parseRequestIDs(body))
+			r.Body = io.NopCloser(bytes.NewReader(body))
 		}
-		sdkHandler.ServeHTTP(w, r)
+		sdkHandler.ServeHTTP(w, r.WithContext(ctx))
 	})
 	return func(mux *http.ServeMux) {
 		mux.Handle(Path, handler)
