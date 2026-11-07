@@ -99,6 +99,9 @@ func (s *Service) effective(rows []subscriptionRow) (Plan, string) {
 }
 
 func (s *Service) sync(ctx context.Context, customer, eventID string) error {
+	if s.client == nil {
+		return ErrNotConfigured
+	}
 	source := audit.SourceAPI
 	if a, ok := audit.ActorFrom(ctx); ok && a.Source != "" {
 		source = a.Source

@@ -277,13 +277,17 @@ func newError(format string, args ...any) error {
 	return fmt.Errorf("billing: cannot create the service: "+format, args...)
 }
 
+// ErrNotConfigured reports a service with no Stripe client (STRIPE_SECRET_KEY is
+// not set). The routes that need Stripe answer 503, and a sync fails with it.
+var ErrNotConfigured = errors.New("billing: Stripe is not configured, because STRIPE_SECRET_KEY is not set.\nTry: set STRIPE_SECRET_KEY and restart the API and the worker")
+
 // New validates cfg and the options. It does not reach Stripe or the database.
+// A nil client is allowed, so the app starts (and migrates) without Stripe
+// secrets. Then the routes that need Stripe answer 503, and a sync and a usage
+// pass fail with ErrNotConfigured.
 func New(pool *pgxpool.Pool, cfg Config, client *stripe.Client, opts ...Option) (*Service, error) {
 	if pool == nil {
 		return nil, newError("the database pool is nil\nTry: pass the pool from db.Open.")
-	}
-	if client == nil {
-		return nil, newError("the Stripe client is nil\nTry: build the client with stripe.New(STRIPE_SECRET_KEY).")
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -322,8 +326,11 @@ func New(pool *pgxpool.Pool, cfg Config, client *stripe.Client, opts ...Option) 
 			return nil, newError("plan %q: the role %q is the default role, and a plan cannot grant it\nTry: grant another role.", p.Name, p.Role)
 		}
 	}
-	if o.reporter == nil {
+	if o.reporter == nil && client != nil {
 		o.reporter = MeterReporter{Client: client}
+	}
+	if o.reporter == nil {
+		o.reporter = notConfigured{}
 	}
 	return &Service{pool: pool, cfg: cfg, client: client, logger: o.logger, now: o.now, jobs: o.jobs, keys: o.keys, roles: o.roles,
 		origin: origin, secrets: o.secrets, reporter: o.reporter, warned: map[string]bool{}}, nil
@@ -385,6 +392,11 @@ type MeterReporter struct {
 }
 
 // Report sends the event with CreateMeterEvent.
+// notConfigured is the reporter of a service with no Stripe client.
+type notConfigured struct{}
+
+func (notConfigured) Report(context.Context, stripe.MeterEvent) error { return ErrNotConfigured }
+
 func (m MeterReporter) Report(ctx context.Context, e stripe.MeterEvent) error {
 	if m.Client == nil {
 		return errors.New("billing: cannot report usage: the Stripe client is nil\nTry: set MeterReporter.Client")

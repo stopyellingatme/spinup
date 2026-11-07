@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -271,5 +272,29 @@ func TestPlansRouteChunksLookupKeys(t *testing.T) {
 	}
 	if len(sizes) != 2 || sizes[0] != 10 || sizes[1] != 5 {
 		t.Fatalf("lookup key batches = %v, want [10 5]", sizes)
+	}
+}
+
+// TestNotConfigured covers a service with no Stripe client (STRIPE_SECRET_KEY
+// is not set): the app starts, GET /api/me/billing works from the database,
+// and the routes that need Stripe answer 503.
+func TestNotConfigured(t *testing.T) {
+	f := newFixture(t, fixtureOptions{noClient: true})
+	_, cookie := f.register("plain@example.com")
+	expect(t, f.do(call{method: "GET", path: SessionPrefix, cookie: cookie}), http.StatusOK)
+	for _, c := range []call{
+		{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_monthly"}`, cookie: cookie},
+		{method: "POST", path: SessionPrefix + "/portal", body: `{}`, cookie: cookie},
+		{method: "POST", path: SessionPrefix + "/sync", body: `{"session_id":"cs_test_1"}`, cookie: cookie},
+		{method: "GET", path: "/api/billing/plans"},
+	} {
+		w := f.do(c)
+		expect(t, w, http.StatusServiceUnavailable)
+		if !strings.Contains(w.Body.String(), "STRIPE_SECRET_KEY") {
+			t.Errorf("%s %s: body = %s", c.method, c.path, w.Body.String())
+		}
+	}
+	if err := f.svc.Sync(t.Context(), "cus_none"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("Sync = %v", err)
 	}
 }

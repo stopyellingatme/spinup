@@ -80,7 +80,6 @@ func TestNew(t *testing.T) {
 	roles := testRoles()
 	cases := map[string]func() (*Service, error){
 		"nil pool":   func() (*Service, error) { return New(nil, testConfig(), client, ok...) },
-		"nil client": func() (*Service, error) { return New(pool, testConfig(), nil, ok...) },
 		"bad config": func() (*Service, error) { return New(pool, Config{}, client, ok...) },
 		"no origin":  func() (*Service, error) { return New(pool, testConfig(), client, WithRoles(roles)) },
 		"origin path": func() (*Service, error) {

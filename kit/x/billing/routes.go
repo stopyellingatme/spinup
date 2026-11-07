@@ -179,6 +179,9 @@ func (s *Service) hasLiveSubscription(ctx context.Context, userID int64) (bool, 
 }
 
 func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
+	if !s.configured(w, r) {
+		return
+	}
 	var in struct {
 		Price string `json:"price"`
 	}
@@ -246,6 +249,9 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) portal(w http.ResponseWriter, r *http.Request) {
+	if !s.configured(w, r) {
+		return
+	}
 	var in struct{}
 	if !decodeBody(w, r, &in, nil, []string{}) {
 		return
@@ -272,6 +278,9 @@ func (s *Service) portal(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) syncRoute(w http.ResponseWriter, r *http.Request) {
+	if !s.configured(w, r) {
+		return
+	}
 	var in struct {
 		SessionID string `json:"session_id"`
 	}
@@ -384,6 +393,9 @@ type planJSON struct {
 }
 
 func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
+	if !s.configured(w, r) {
+		return
+	}
 	ctx := r.Context()
 	prices, err := s.catalog(ctx)
 	if err != nil {
@@ -412,4 +424,13 @@ func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
 	_ = httpx.WriteJSON(w, http.StatusOK, struct {
 		Plans []planJSON `json:"plans"`
 	}{out})
+}
+
+// configured answers 503 when the service has no Stripe client.
+func (s *Service) configured(w http.ResponseWriter, r *http.Request) bool {
+	if s.client != nil {
+		return true
+	}
+	problem(w, r, http.StatusServiceUnavailable, "Billing is not configured on this server. Try: set STRIPE_SECRET_KEY and restart the API.")
+	return false
 }

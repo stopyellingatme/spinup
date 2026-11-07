@@ -174,6 +174,24 @@ It skips an app without the mcp module. It reports the first missing call.
 
 **Fix:** add the line that `Try:` shows. See [MCP server](../build/mcp.md).
 
+### billing-drift
+
+The files `api/internal/billing/billing.gen.go` and `web/src/lib/billing.gen.ts` come from the `[billing]` table in `spinup.toml`.
+It skips an app without the billing module. It warns when:
+
+- `spinup.toml` has an invalid `[billing]` table.
+- A generated file is missing or differs from `spinup.toml`.
+
+**Fix:** run `spinup g billing`. See [Billing with Stripe](../build/billing.md).
+
+### billing-wired
+
+The billing module needs wiring in `api/cmd/api/main.go` and `api/cmd/worker/main.go`: `kitbilling.New` with `WithJobs`, `WithWebhookSecrets`, and `WithPublicOrigin`, `Routes` and the `billing` command in the API, and `Register` in the worker.
+With the apikeys module, it also checks `apikeys.WithSessionOnly` and `kitbilling.WithAPIKeys`. With the deploy pack, it checks the two Stripe secrets in `deploy/compose.yml`.
+It skips an app without the billing module. It reports the first missing line.
+
+**Fix:** add the line that `Try:` shows. See [Billing with Stripe](../build/billing.md).
+
 ### flags-drift
 
 The files `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts` come from the `[flags.KEY]` tables in `spinup.toml`.

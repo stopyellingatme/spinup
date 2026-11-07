@@ -70,8 +70,10 @@ func newWorker(pool *pgxpool.Pool, logger *slog.Logger) (*jobs.Worker, error) {
 		return nil, err
 	}
 	jobsapp.Register(w, jobsapp.Deps{DB: pool})
+	// Without STRIPE_SECRET_KEY the worker still starts. Then the billing sync
+	// jobs fail and River retries them (ADR 0032).
 	var billingEnv struct {
-		SecretKey     string `env:"STRIPE_SECRET_KEY" required:"true"`
+		SecretKey     string `env:"STRIPE_SECRET_KEY"`
 		WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
 		APIBase       string `env:"STRIPE_API_BASE"`
 		PublicOrigin  string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
@@ -79,13 +81,18 @@ func newWorker(pool *pgxpool.Pool, logger *slog.Logger) (*jobs.Worker, error) {
 	if err := config.Load(&billingEnv); err != nil {
 		return nil, err
 	}
-	var stripeOptions []stripe.Option
-	if billingEnv.APIBase != "" {
-		stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase))
-	}
-	stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
-	if err != nil {
-		return nil, err
+	var stripeClient *stripe.Client
+	if billingEnv.SecretKey != "" {
+		var stripeOptions []stripe.Option
+		if billingEnv.APIBase != "" {
+			stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase))
+		}
+		stripeClient, err = stripe.New(billingEnv.SecretKey, stripeOptions...)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logger.Warn("billing: STRIPE_SECRET_KEY is not set, so the billing jobs fail. Try: set STRIPE_SECRET_KEY, then restart the worker.")
 	}
 	jobsClient, err := jobs.New(pool, jobs.WithLogger(logger))
 	if err != nil {

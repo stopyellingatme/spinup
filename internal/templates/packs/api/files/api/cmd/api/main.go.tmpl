@@ -159,16 +159,23 @@ func run() (err error) {
  }
 [[- end ]]
 [[- if has "billing" .modules ]]
+ // Without STRIPE_SECRET_KEY the app still starts (and migrates). Then the
+ // billing routes that need Stripe answer 503 (ADR 0032).
  var billingEnv struct {
-  SecretKey string `env:"STRIPE_SECRET_KEY" required:"true"`
-  WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET" required:"true"`
+  SecretKey string `env:"STRIPE_SECRET_KEY"`
+  WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
   APIBase string `env:"STRIPE_API_BASE"`
  }
  if err := config.Load(&billingEnv); err != nil { return err }
- var stripeOptions []stripe.Option
- if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
- stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
- if err != nil { return err }
+ var stripeClient *stripe.Client
+ if billingEnv.SecretKey != "" {
+  var stripeOptions []stripe.Option
+  if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
+  stripeClient, err = stripe.New(billingEnv.SecretKey, stripeOptions...)
+  if err != nil { return err }
+ } else {
+  slog.Warn("billing: STRIPE_SECRET_KEY is not set, so the billing routes answer 503. Try: set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET, then restart the API and the worker.")
+ }
  jobsClient, err := jobs.New(pool)
  if err != nil { return err }
  billingSvc, err := kitbilling.New(pool, appbilling.Config, stripeClient,

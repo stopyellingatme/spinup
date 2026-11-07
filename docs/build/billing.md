@@ -53,20 +53,23 @@ These are the main edits in `api/cmd/api/main.go`. Put this block after `auth.Ne
 
 ```go
 var billingEnv struct {
-	SecretKey     string `env:"STRIPE_SECRET_KEY" required:"true"`
-	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET" required:"true"`
+	SecretKey     string `env:"STRIPE_SECRET_KEY"`
+	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
 	APIBase       string `env:"STRIPE_API_BASE"`
 }
 if err := config.Load(&billingEnv); err != nil {
 	return err
 }
-var stripeOptions []stripe.Option
-if billingEnv.APIBase != "" {
-	stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase))
-}
-stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
-if err != nil {
-	return err
+var stripeClient *stripe.Client // nil without a key: the billing routes answer 503
+if billingEnv.SecretKey != "" {
+	var stripeOptions []stripe.Option
+	if billingEnv.APIBase != "" {
+		stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase))
+	}
+	stripeClient, err = stripe.New(billingEnv.SecretKey, stripeOptions...)
+	if err != nil {
+		return err
+	}
 }
 jobsClient, err := jobs.New(pool)
 if err != nil {
@@ -211,16 +214,16 @@ $ stripe listen --forward-to localhost:5173/api/billing/webhook
 Put the key and the printed secret in `.env` as `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`, and run `spinup dev`.
 The `jobs` worker must run, because the worker syncs the plan after each event.
 
-This example makes an account and prints its billing state. It needs an empty database in `DATABASE_URL`. The key values are placeholders, because these commands do not call Stripe:
+This example makes an account and prints its billing state. It needs an empty database in `DATABASE_URL`. These commands do not call Stripe, so they need no Stripe secrets. Without `STRIPE_SECRET_KEY`, the API starts, logs a warning, and the billing routes that need Stripe answer 503:
 
 <!-- doctest: requires-env DATABASE_URL -->
 ```console
-$ STRIPE_SECRET_KEY=sk_test_docs STRIPE_WEBHOOK_SECRET=whsec_docs spinup db migrate up
+$ spinup db migrate up
 ...
 $ cd api
-$ printf 'docs password 1\n' | STRIPE_SECRET_KEY=sk_test_docs STRIPE_WEBHOOK_SECRET=whsec_docs go run ./cmd/api user create --email ada@example.com --role staff --password-stdin
+$ printf 'docs password 1\n' | go run ./cmd/api user create --email ada@example.com --role staff --password-stdin
 ...
-$ STRIPE_SECRET_KEY=sk_test_docs STRIPE_WEBHOOK_SECRET=whsec_docs go run ./cmd/api billing status ada@example.com
+$ go run ./cmd/api billing status ada@example.com
 ...
 customer	none
 entitlement	free	status=-	features=basic

@@ -23,17 +23,20 @@ Next: in api/cmd/api/main.go and api/cmd/worker/main.go, import:
  "github.com/stopyellingatme/spinup/kit/config"
  "github.com/stopyellingatme/spinup/kit/jobs"
  "log/slog"
-Next: in main.go, load the Stripe secrets with kit/config:
+Next: in main.go, load the Stripe secrets with kit/config. Without a key, the API starts and the billing routes answer 503:
  var billingEnv struct {
-  SecretKey string ` + "`env:\"STRIPE_SECRET_KEY\" required:\"true\"`" + `
-  WebhookSecret string ` + "`env:\"STRIPE_WEBHOOK_SECRET\" required:\"true\"`" + `
+  SecretKey string ` + "`env:\"STRIPE_SECRET_KEY\"`" + `
+  WebhookSecret string ` + "`env:\"STRIPE_WEBHOOK_SECRET\"`" + `
   APIBase string ` + "`env:\"STRIPE_API_BASE\"`" + `
  }
  if err := config.Load(&billingEnv); err != nil { return err }
- var stripeOptions []stripe.Option
- if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
- stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
- if err != nil { return err }
+ var stripeClient *stripe.Client
+ if billingEnv.SecretKey != "" {
+  var stripeOptions []stripe.Option
+  if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
+  stripeClient, err = stripe.New(billingEnv.SecretKey, stripeOptions...)
+  if err != nil { return err }
+ }
  jobsClient, err := jobs.New(pool)
  if err != nil { return err }
 Next: after web.PublicOrigin and keyStore exist, construct the service:
@@ -53,16 +56,19 @@ Next: add these options to app.New:
  app.WithCommand("billing", billingSvc.Command()),
 Next: in api/cmd/worker/main.go, add this code before returning w from newWorker:
  var billingEnv struct {
-  SecretKey string ` + "`" + `env:"STRIPE_SECRET_KEY" required:"true"` + "`" + `
+  SecretKey string ` + "`" + `env:"STRIPE_SECRET_KEY"` + "`" + `
   WebhookSecret string ` + "`" + `env:"STRIPE_WEBHOOK_SECRET"` + "`" + `
   APIBase string ` + "`" + `env:"STRIPE_API_BASE"` + "`" + `
   PublicOrigin string ` + "`" + `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"` + "`" + `
  }
  if err := config.Load(&billingEnv); err != nil { return nil, err }
- var stripeOptions []stripe.Option
- if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
- stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
- if err != nil { return nil, err }
+ var stripeClient *stripe.Client
+ if billingEnv.SecretKey != "" {
+  var stripeOptions []stripe.Option
+  if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
+  stripeClient, err = stripe.New(billingEnv.SecretKey, stripeOptions...)
+  if err != nil { return nil, err }
+ }
  jobsClient, err := jobs.New(pool, jobs.WithLogger(logger))
  if err != nil { return nil, err }
  // With the apikeys module, also add these lines:

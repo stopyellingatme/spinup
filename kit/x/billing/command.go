@@ -91,6 +91,10 @@ func (s *Service) check(ctx context.Context, out io.Writer) error {
 		}
 		_, _ = fmt.Fprintf(out, "%s  %s\n", state, fmt.Sprintf(format, args...))
 	}
+	if s.client == nil {
+		line(false, "Stripe key: STRIPE_SECRET_KEY is not set")
+		return fmt.Errorf("billing check: %d checks failed.\nTry: set STRIPE_SECRET_KEY, then run billing check again", failed)
+	}
 	if err := s.client.CheckKey(ctx); err != nil {
 		line(false, "Stripe key: %s", firstLine(err))
 	} else {

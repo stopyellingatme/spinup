@@ -143,6 +143,7 @@ type fixture struct {
 type fixtureOptions struct {
 	audit       bool
 	noJobs      bool
+	noClient    bool
 	sessionOnly bool
 	cfg         *Config
 	opts        []Option
@@ -187,7 +188,11 @@ func newFixture(t *testing.T, fo fixtureOptions) *fixture {
 		opts = append(opts, WithJobs(jc))
 	}
 	opts = append(opts, fo.opts...)
-	f.svc, err = New(f.pool, cfg, f.client, opts...)
+	client := f.client
+	if fo.noClient {
+		client = nil
+	}
+	f.svc, err = New(f.pool, cfg, client, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
