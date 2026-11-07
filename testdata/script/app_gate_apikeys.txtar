@@ -1,0 +1,181 @@
+# App gate: the apikeys module (ADR 0030). An app with auth and apikeys builds, migrates, and serves.
+# A user gets a read key and a write key. The scope, the sign-in routes, the minute limit, the
+# plan change, the revoke, and the cookie route for new keys run against a real server.
+# The gate needs a database and curl.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to call the API'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gateapikeys --modules auth,apikeys --module example.com/gateapikeys --no-git --non-interactive
+cd gateapikeys
+exists api/db/kit/00009_api_keys.sql
+
+# Declare two plans. The default plan "tiny" allows 3 requests a minute and 5 a day.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g apikeys
+grep 'Prefix: +"gate",' api/internal/apikeys/apikeys.gen.go
+grep 'DefaultPlan: +"tiny",' api/internal/apikeys/apikeys.gen.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "ok"'
+stdout '(?s)"id": "apikeys-wired",\s+"status": "ok"'
+
+# Type-check the web app: the keys page, the admin page, and the generated role.
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+cd ..
+
+# Build, vet, and test the API.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+exec go build -o $WORK/gateapikeys-api ./cmd/api
+cd ..
+
+# Apply the migrations, including the kit space. A second run is a no-op.
+exec spinup db migrate up
+exec spinup db migrate status
+stdout 'kit 00009_api_keys\.sql'
+! stdout '^pending'
+
+# Make one account with the manager role.
+cd api
+stdin $WORK/password.txt
+exec $WORK/gateapikeys-api user create --email ada@example.com --role manager --password-stdin
+
+# Create a read key and a write key. The command prints each token once.
+exec $WORK/gateapikeys-api apikeys create ada@example.com --name reader --scope read
+stdout '^gate_[A-Za-z0-9_-]{43}$'
+stdout 'This token cannot be shown again\.'
+cp stdout read.out
+exec $WORK/gateapikeys-api apikeys create ada@example.com --name writer --scope write
+stdout '^gate_[A-Za-z0-9_-]{43}$'
+cp stdout write.out
+exec $WORK/gateapikeys-api apikeys list
+stdout 'ada@example.com\s+tiny\s+0'
+
+# Start the server with a flush time of one second.
+env PORT=38438
+env APIKEYS_FLUSH=1s
+exec $WORK/gateapikeys-api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38438/healthz
+stdout '^200$'
+exec curl -sS -o ready.json -w '%{http_code}' http://127.0.0.1:38438/readyz
+stdout '^200$'
+grep '"apikeys":\s*"ok"' ready.json
+
+# Call 1 of 3 for the minute. The read key asks who it is. The answer carries the day budget.
+exec sh -c 'curl -sS -D read1.headers -o read1.json -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38438/api/session'
+stdout '^200$'
+grep 'ada@example.com' read1.json
+grep '(?i)^ratelimit-limit: 5' read1.headers
+grep '(?i)^ratelimit-remaining: 4' read1.headers
+
+# A bad token and a token without the prefix answer 401 and use no budget.
+exec sh -c 'curl -sS -D bad.headers -o bad.json -w "%{http_code}" -H "Authorization: Bearer gate_notarealtoken" http://127.0.0.1:38438/api/session'
+stdout '^401$'
+grep '(?i)^www-authenticate: Bearer error="invalid_token"' bad.headers
+grep 'The API key is not valid\.' bad.json
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer other_notarealtoken" http://127.0.0.1:38438/api/session'
+stdout '^401$'
+
+# The refusals come before the quota, so they use no budget.
+# The write key cannot manage keys.
+exec sh -c 'curl -sS -o forbidden-keys.json -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/me/keys'
+stdout '^403$'
+grep 'An API key cannot manage keys or call admin routes\.' forbidden-keys.json
+# The manager role does not open the admin routes for a key.
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/admin/apikeys'
+stdout '^403$'
+# A key cannot call the sign-in routes.
+exec sh -c 'curl -sS -o forbidden-auth.json -w "%{http_code}" -X POST -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/auth/logout'
+stdout '^403$'
+grep 'An API key cannot call the sign-in routes\.' forbidden-auth.json
+# A read key cannot use another method than GET or HEAD.
+exec sh -c 'curl -sS -o forbidden-read.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "{}" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38438/api/notes'
+stdout '^403$'
+grep 'This API key is read-only\.' forbidden-read.json
+
+# The minute limit is 3 for the user, and both keys share it. Call 1 used one token.
+# Call 2 (the write key) and call 3 (the read key) pass. The day budget shows 5 - 3 = 2.
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/session'
+stdout '^200$'
+exec sh -c 'curl -sS -D read3.headers -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38438/api/session'
+stdout '^200$'
+grep '(?i)^ratelimit-limit: 5' read3.headers
+grep '(?i)^ratelimit-remaining: 2' read3.headers
+# Call 4 is over the minute limit. The answer names the plan and has a Retry-After header.
+exec sh -c 'curl -sS -D limited.headers -o limited.json -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/session'
+stdout '^429$'
+grep '(?i)^retry-after: [0-9]+' limited.headers
+grep '(?i)^ratelimit-limit: 5' limited.headers
+grep 'The tiny plan allows 3 requests a minute\. Try again in [0-9]+ seconds\.' limited.json
+
+# Wait for a flush. The counts show three accepted calls: two with the read key, one with the write key.
+exec sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do $WORK/gateapikeys-api apikeys usage ada@example.com --json | grep -q "\"count\":2" && exit 0; sleep 1; done; echo "the usage was not flushed"; exit 1'
+exec $WORK/gateapikeys-api apikeys usage ada@example.com --json
+stdout '"key_id":1,"day":"[0-9]{4}-[0-9]{2}-[0-9]{2}","count":2'
+stdout '"key_id":2,"day":"[0-9]{4}-[0-9]{2}-[0-9]{2}","count":1'
+exec $WORK/gateapikeys-api apikeys list --email ada@example.com
+stdout 'ada@example.com\s+tiny\s+3'
+
+# The pro plan lifts the limit. The server reads the plan on each key request.
+# The old minute state needs a moment to drain, so allow a few tries.
+exec $WORK/gateapikeys-api apikeys plan ada@example.com pro
+stdout 'updated ada@example.com\s+pro'
+exec sh $WORK/lift.sh write.out
+grep '(?i)^ratelimit-limit: 1000' pro.headers
+
+# Revoke the read key. The next call with it answers 401. The write key still works.
+exec $WORK/gateapikeys-api apikeys revoke 1
+stdout 'revoked 1'
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38438/api/session'
+stdout '^401$'
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 write.out)" http://127.0.0.1:38438/api/session'
+stdout '^200$'
+
+# A signed-in browser session makes a new key. The request needs the Origin header of the web app.
+exec curl -sS -c ada.jar -H 'Content-Type: application/json' -d '{"email":"ada@example.com","password":"gate password 1"}' http://127.0.0.1:38438/api/auth/login
+exec curl -sS -b ada.jar -o created.json -w '%{http_code}' -X POST -H 'Origin: http://127.0.0.1:38438' -H 'Content-Type: application/json' -d '{"name":"from the page","scope":"read","expires_in_days":30}' http://127.0.0.1:38438/api/me/keys
+stdout '^201$'
+grep '"token":"gate_[A-Za-z0-9_-]{43}"' created.json
+exec curl -sS -b ada.jar http://127.0.0.1:38438/api/me/keys
+stdout '"plan":\{"name":"pro","per_minute":100,"per_day":1000\}'
+kill server
+cd ..
+
+-- declaration.toml --
+
+[apikeys]
+prefix = "gate"
+default_plan = "tiny"
+
+[apikeys.plans.tiny]
+per_minute = 3
+per_day = 5
+
+[apikeys.plans.pro]
+per_minute = 100
+per_day = 1000
+
+-- password.txt --
+gate password 1
+-- lift.sh --
+# Call the API with the key in the file $1 until the answer is 200. Five tries, one second apart.
+for i in 1 2 3 4 5; do
+  code=$(curl -sS -D pro.headers -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(head -n 1 "$1")" http://127.0.0.1:38438/api/session)
+  [ "$code" = 200 ] && exit 0
+  sleep 1
+done
+echo "the pro plan did not lift the limit: $code"
+exit 1
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"

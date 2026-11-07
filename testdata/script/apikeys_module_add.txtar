@@ -1,0 +1,52 @@
+# The apikeys migration lives in api/db/kit, so it clashes with no app migration (ADR 0028).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+# An app with auth and its own migrations.
+exec spinup new retrofit --modules auth --module example.com/retrofit --non-interactive
+cd retrofit
+exec spinup db new add_notes
+exec spinup db new add_labels
+exec sh -c 'ls api/db/migrations > $WORK/before.txt'
+exec cat $WORK/before.txt
+stdout '_add_notes\.sql'
+stdout '_add_labels\.sql'
+! exists api/db/kit/00009_api_keys.sql
+exec git add -A
+exec git commit -m 'Add two migrations'
+
+# module add writes to a review branch. The kit file is in the kit space, and the next steps print.
+exec spinup module add apikeys --yes --non-interactive
+stdout 'git merge spinup/module-apikeys'
+stdout 'Next: declare plans in spinup.toml'
+stdout 'Next: run spinup g apikeys\.'
+stdout 'keyStore, err := apikeys.NewStore\(pool, appapikeys.Config\)'
+stdout 'auth.WithBearer\(keyStore\)'
+stdout 'app.WithMiddleware\(keyStore.Middleware\(\)\),'
+stdout 'Next: run spinup db migrate before starting the new binary\.'
+stdout 'apikeys-drift and apikeys-wired'
+exists .spinup/upgrade/0.0.0-dev/api/db/kit/00009_api_keys.sql
+exists .spinup/upgrade/0.0.0-dev/api/internal/apikeys/apikeys.gen.go
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/settings/api-keys/+page.svelte
+! exists .spinup/upgrade/0.0.0-dev/api/db/migrations/00009_api_keys.sql
+grep '^modules = .*apikeys' .spinup/upgrade/0.0.0-dev/spinup.toml
+
+# The app migrations do not change, and the main checkout stays clean.
+exec sh -c 'ls api/db/migrations > $WORK/after.txt'
+exec diff $WORK/before.txt $WORK/after.txt
+! exists api/db/kit/00009_api_keys.sql
+exec git status --porcelain
+! stdout .
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0

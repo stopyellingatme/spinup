@@ -90,7 +90,7 @@ The file `spinup.lock` is different. spinup writes it, and you do not edit it.
 | `modules` | list of strings | `["ci", "deploy"]` for a new app | The optional modules that are on. Change it with `spinup module add`, not by hand. |
 | `default_env` | string | none | The environment that a command uses when you leave out `--env`. It must name an `[env.*]` table. |
 
-The modules are `audit`, `auth`, `backups`, `ci`, `deploy`, `flags`, `jobs`, `mail`, `monitoring`, `secrets`, and `tofu`.
+The modules are `apikeys`, `audit`, `auth`, `backups`, `ci`, `deploy`, `flags`, `jobs`, `mail`, `monitoring`, `secrets`, and `tofu`.
 Run `spinup module list` to see which are on.
 
 ```toml
@@ -135,6 +135,45 @@ roles = ["admin", "front_desk", "viewer"]
 admin_role = "admin"
 default_role = "viewer"
 ```
+
+## [apikeys]
+
+The settings of the [API keys module](../build/api-keys.md). You can leave out the table.
+After you change it, run `spinup g apikeys` to rewrite `api/internal/apikeys/apikeys.gen.go` and `web/src/lib/apikeys.gen.ts`.
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `prefix` | string | `key` | The start of each token. It matches `^[a-z][a-z0-9]{1,15}$`. |
+| `default_plan` | string | `free` | The plan of a user with no plan row. It must name a declared plan. |
+| `max_keys` | integer | `10` | The most keys that a user can have. The range is 1 to 100. |
+
+## [apikeys.plans.NAME]
+
+Use one table for each plan. A plan name matches `^[a-z][a-z0-9_]{0,31}$`. The app has 1 to 16 plans.
+Without any plan table, the app has one plan, `free`, with 60 requests a minute and 1000 a day.
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `per_minute` | integer | none | The requests each minute for all keys of a user, from 1 to 100000. |
+| `per_day` | integer | none | The requests each UTC day for all keys of a user, from 1 to 100000000. It is at least `per_minute`. |
+
+An unknown key in either table is an error.
+
+```toml
+[apikeys]
+prefix = "todo"
+default_plan = "free"
+
+[apikeys.plans.free]
+per_minute = 60
+per_day = 1000
+
+[apikeys.plans.pro]
+per_minute = 600
+per_day = 100000
+```
+
+The environment variable `APIKEYS_FLUSH` sets how often each API process writes its day counts to the database. The default is `5s`. See [App binary commands](app-commands.md#settings-from-the-environment).
 
 ## [flags.KEY]
 
