@@ -275,6 +275,7 @@ CREATE TABLE billing_usage_reports (
     user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     day date NOT NULL,
     reported bigint NOT NULL DEFAULT 0,
+    pending bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
 );
 ```
@@ -290,13 +291,13 @@ CREATE TABLE billing_usage_reports (
 8.3. The handled types are `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`, `invoice.paid`, and `invoice.payment_failed`. Another type answers 200 with no row and no job.
 8.4. For a handled type, one transaction runs `INSERT INTO billing_events ... ON CONFLICT (event_id) DO NOTHING`. When the insert adds a row, it also runs `jobs.InsertTx(SyncArgs{customer, event_id}, Queue(jobs.DefaultQueue), MaxAttempts(20))`. Then the route answers 200. A repeated event answers 200 with no new job.
 8.5. A database error answers 500, so Stripe retries.
-8.6. The route sets `Cache-Control: no-store`. It is not under `/api/me/`, so the apikeys middleware does not apply to it, and a Bearer header has no effect.
+8.6. The route sets `Cache-Control: no-store`. It is not under `/api/me/`, so the session-only rule does not apply to it. Stripe sends no `Authorization` header. A request with a Bearer header goes through the auth and apikeys middleware like any other route, so a bad key answers 401 before the signature check.
 
 ### 9. Sync and plan rules
 
 9.1. `Sync(customer)` runs in one transaction with `pg_advisory_xact_lock(hashtext('billing:' || customer))`.
 9.2. It finds the user through `billing_customers`. An unknown customer is a warning, the event row gets `error = 'unknown customer'`, and the job succeeds.
-9.3. It calls `ListSubscriptions(customer)` after it takes the lock, so the last sync always writes the newest state. It upserts each subscription. It sets `plan` from the first item price whose lookup key a plan declares. It deletes the local rows of this customer that Stripe did not return.
+9.3. It calls `ListSubscriptions(customer)` after it takes the lock, so the last sync always writes the newest state. A subscription embeds its first 10 items, so the client reads `/v1/subscription_items` for a subscription with more. It upserts each subscription. It sets `plan` from the first item price whose lookup key a plan declares. It deletes the local rows of this customer that Stripe did not return.
 9.4. The effective plan is the highest-ranked plan of a subscription with status `active`, `trialing`, or `past_due`. With no such subscription, the effective plan is `default_plan`. The other statuses (`incomplete`, `incomplete_expired`, `unpaid`, `canceled`, `paused`) give no plan.
 9.5. When the effective plan or its features change, the sync:
 - upserts `billing_entitlements`
@@ -342,8 +343,10 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 - Compare each day with `billing_usage_reports.reported`. Skip the days with no increase.
 - Send one meter event: `event_name = meter`, `customer`, `value = total - reported`, `identifier = apikeys:<user id>:<day>:<total>`, `timestamp` = the end of that day, or now for today.
 - Then upsert `reported = total`.
-13.3. A failed send stops the pass for that user and fails the job, so River retries. The identifier makes a retry safe (Stripe dedupes it).
-13.4. Usage that the apikeys store has not flushed yet goes in the next pass.
+13.3. Each send has a checkpoint. The pass commits the new total as `pending`, sends the delta with the identifier of that total, and then commits it as `reported`. When a pass stops between the send and the second commit, the next pass sends the same event again (value `pending - reported`, the same identifier), and Stripe dedupes it. Then it sends the new delta.
+13.4. A session advisory lock for each user (`pg_try_advisory_lock`) keeps two passes (the periodic job and `billing report-usage`) from sending the same delta. A pass skips a user whose lock another pass holds.
+13.5. A failed send stops the pass for that user and fails the job, so River retries.
+13.6. Usage that the apikeys store has not flushed yet goes in the next pass.
 
 ### 14. The app command `billing`
 
