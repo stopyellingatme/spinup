@@ -74,4 +74,8 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/apikeysdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/apikeyswired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/apikeys"
+
+	// MCP server (ADR 0031)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/mcpwired"
+	_ "github.com/stopyellingatme/spinup/internal/gen/mcp"
 )
