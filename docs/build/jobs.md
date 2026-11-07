@@ -118,7 +118,12 @@ Pass insert options after the arguments:
 | `jobs.Priority(n)` | 1 is the highest and the default, 4 is the lowest. | `jobs.Priority(3)` |
 | `jobs.RunAt(t)` | Run at time `t` or later. | `jobs.RunAt(time.Now().Add(time.Hour))` |
 | `jobs.MaxAttempts(n)` | Give up after `n` tries. | `jobs.MaxAttempts(5)` |
-| `jobs.UniqueByArgs()` | Skip the insert if the same kind with the same arguments waits or runs. | `jobs.UniqueByArgs()` |
+| `jobs.UniqueByArgs()` | Skip the insert if the same kind with the same arguments waits, runs, or completed in the last 24 hours. | `jobs.UniqueByArgs()` |
+
+River keeps a completed job for 24 hours, and `UniqueByArgs` counts it.
+So a unique job with the same arguments does not run again during that time.
+Use `UniqueByArgs` for work that must run once, such as a fetch of one document.
+For work that must run again when new data arrives, insert without it, or put a changing value such as a date in the arguments.
 
 ## Run a job on a schedule
 

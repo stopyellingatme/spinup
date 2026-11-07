@@ -198,8 +198,11 @@ func MaxAttempts(n int) InsertOption {
 }
 
 // UniqueByArgs skips the insert when a job of the same kind with the same
-// args is already waiting or running. The insert then returns the ID of the
-// job that exists.
+// args is waiting, running, or completed. The insert then returns the ID of the
+// job that exists. River keeps a completed job for 24 hours, so for that time
+// the same args do not run again. Use it to run work once (such as fetching one
+// document). Do not use it for work that must run again after new data arrives:
+// put a changing value, such as a date, in the args, or insert without it.
 func UniqueByArgs() InsertOption {
 	return func(o *river.InsertOpts) { o.UniqueOpts.ByArgs = true }
 }
