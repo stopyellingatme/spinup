@@ -176,6 +176,12 @@ func (f *Fake) checkout(form url.Values) (any, *apiError) {
 	if len(items) == 0 {
 		return nil, invalid("parameter_missing", "line_items[0][price]", "Missing required param: line_items[0][price]")
 	}
+	// Stripe needs one billing interval and one currency for all items of a subscription.
+	for i, item := range items[1:] {
+		if !sameCycle(items[0], item) {
+			return nil, invalid("parameter_invalid", fmt.Sprintf("line_items[%d][price]", i+1), "All prices of a subscription must have the same billing interval, interval count and currency")
+		}
+	}
 	if !validURL(form.Get("success_url")) || !validURL(form.Get("cancel_url")) {
 		return nil, invalid("url_invalid", "success_url", "HTTP success and cancel URLs are required")
 	}
@@ -316,4 +322,16 @@ func (f *Fake) meterEvent(form url.Values) (any, *apiError) {
 		f.meterEvents = append(f.meterEvents, event)
 	}
 	return map[string]any{"object": "billing.meter_event", "event_name": event.EventName, "identifier": identifier, "timestamp": stamp.Unix(), "payload": map[string]string{"stripe_customer_id": customer, "value": strconv.FormatInt(value, 10)}}, nil
+}
+
+// sameCycle reports whether two recurring prices have the same interval,
+// interval count (0 means 1) and currency.
+func sameCycle(a, b stripe.Price) bool {
+	count := func(r *stripe.Recurring) int {
+		if r.IntervalCount <= 0 {
+			return 1
+		}
+		return r.IntervalCount
+	}
+	return a.Recurring.Interval == b.Recurring.Interval && count(a.Recurring) == count(b.Recurring) && a.Currency == b.Currency
 }

@@ -28,6 +28,7 @@ func TestCommandCheck(t *testing.T) {
 		"ok    price pro_yearly (price_pro_y, every 1 year, licensed)\n" +
 		"ok    price pro_overage (price_pro_o, every 1 month, metered)\n" +
 		"ok    price team_monthly (price_team_m, every 1 month, metered)\n" +
+		"warn  plan pro: no metered price has the interval and currency of pro_yearly, so Checkout refuses pro_yearly\n" +
 		"warn  plan team: has a metered price but no meter, so no usage is reported\n" +
 		"ok    meter api_calls (mtr_1)\n" +
 		"ok    webhook secret (1 set)\n"
@@ -125,5 +126,18 @@ func TestCommandUsage(t *testing.T) {
 	}
 	if f.svc.Command() == nil {
 		t.Fatal("Command returned nil")
+	}
+}
+
+func TestCommandCheckMeteredCycleMustMatchALicensedPrice(t *testing.T) {
+	cfg := testConfig()
+	cfg.Plans[1].Prices = []string{"pro_yearly", "pro_overage"}
+	f := newFixture(t, fixtureOptions{cfg: &cfg})
+	out, err := f.command("check")
+	if err == nil {
+		t.Fatalf("check passed:\n%s", out)
+	}
+	if want := "FAIL  plan pro: no metered price has the interval and currency of a licensed price."; !strings.Contains(out, want) {
+		t.Fatalf("output has no %q:\n%s", want, out)
 	}
 }

@@ -341,10 +341,10 @@ func TestCheckoutRejectsMeteredPriceOfLicensedPlan(t *testing.T) {
 func TestCheckoutCarriesTheMeteredPrice(t *testing.T) {
 	f := meteredFixture(t)
 	uid, cookie := f.register("both@example.com")
-	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_yearly"}`, cookie: cookie})
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_monthly"}`, cookie: cookie})
 	expect(t, w, http.StatusOK)
 	prices, quantities := f.checkoutItems()
-	if !slices.Equal(prices, []string{"price_pro_y", "price_pro_o"}) || !slices.Equal(quantities, []string{"1", ""}) {
+	if !slices.Equal(prices, []string{"price_pro_m", "price_pro_o"}) || !slices.Equal(quantities, []string{"1", ""}) {
 		t.Fatalf("items = %v, quantities = %v", prices, quantities)
 	}
 	url, _ := decode(t, w)["url"].(string)
@@ -356,7 +356,7 @@ func TestCheckoutCarriesTheMeteredPrice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(subs) != 1 || subs[0].ID != subID || len(subs[0].Items) != 2 || subs[0].Items[0].Price.LookupKey != "pro_yearly" || subs[0].Items[1].Price.LookupKey != "pro_overage" {
+	if len(subs) != 1 || subs[0].ID != subID || len(subs[0].Items) != 2 || subs[0].Items[0].Price.LookupKey != "pro_monthly" || subs[0].Items[1].Price.LookupKey != "pro_overage" {
 		t.Fatalf("subscriptions = %+v", subs)
 	}
 	f.drain()
@@ -364,7 +364,7 @@ func TestCheckoutCarriesTheMeteredPrice(t *testing.T) {
 		t.Fatalf("entitlement = %+v, want the pro plan", e)
 	}
 	var lookupKey string
-	if err := f.pool.QueryRow(t.Context(), `SELECT price_lookup_key FROM billing_subscriptions WHERE id=$1`, subID).Scan(&lookupKey); err != nil || lookupKey != "pro_yearly" {
+	if err := f.pool.QueryRow(t.Context(), `SELECT price_lookup_key FROM billing_subscriptions WHERE id=$1`, subID).Scan(&lookupKey); err != nil || lookupKey != "pro_monthly" {
 		t.Fatalf("stored lookup key = %q, %v: the licensed item decides", lookupKey, err)
 	}
 	// The usage pass still sends meter events for the plan.
@@ -378,6 +378,44 @@ func TestCheckoutCarriesTheMeteredPrice(t *testing.T) {
 	}
 	if got := f.fake.MeterEvents(); len(got) != 1 || got[0].Value != 5 || got[0].EventName != "api_calls" {
 		t.Fatalf("meter events = %+v", got)
+	}
+}
+
+func TestCheckoutRefusesALicensedPriceWithAnotherMeteredCycle(t *testing.T) {
+	f := meteredFixture(t)
+	_, cookie := f.register("yearly@example.com")
+	// pro_yearly is yearly and pro_overage is monthly: Stripe refuses mixed intervals.
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_yearly"}`, cookie: cookie})
+	expect(t, w, http.StatusServiceUnavailable)
+	if !strings.Contains(w.Body.String(), "another billing interval") || !strings.Contains(w.Body.String(), "Try:") {
+		t.Fatalf("body = %s", w.Body)
+	}
+	if n := f.requests("/v1/checkout/sessions"); n != 0 {
+		t.Fatalf("%d Checkout sessions, want 0", n)
+	}
+}
+
+func TestCheckoutDoesNotBuyAMeteredPriceWhenTheLicensedPriceIsMissing(t *testing.T) {
+	cfg := testConfig()
+	// pro_gone is declared but Stripe has no active price for it.
+	cfg.Plans[1].Prices = []string{"pro_gone", "pro_overage"}
+	f := newFixture(t, fixtureOptions{cfg: &cfg})
+	_, cookie := f.register("catalog@example.com")
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_overage"}`, cookie: cookie})
+	expect(t, w, http.StatusServiceUnavailable)
+	if n := f.requests("/v1/checkout/sessions"); n != 0 {
+		t.Fatalf("%d Checkout sessions, want 0", n)
+	}
+}
+
+func TestCheckoutBuysAPureUsagePlanThroughItsMeteredPrice(t *testing.T) {
+	f := meteredFixture(t)
+	_, cookie := f.register("usage@example.com")
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"team_monthly"}`, cookie: cookie})
+	expect(t, w, http.StatusOK)
+	prices, quantities := f.checkoutItems()
+	if !slices.Equal(prices, []string{"price_team_m"}) || !slices.Equal(quantities, []string{""}) {
+		t.Fatalf("items = %v, quantities = %v", prices, quantities)
 	}
 }
 

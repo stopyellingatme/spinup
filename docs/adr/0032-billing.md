@@ -104,6 +104,7 @@ type CustomerParams struct { Email, Name string; Metadata map[string]string }
 type CheckoutParams struct {
 	Customer, Price, ClientReferenceID, SuccessURL, CancelURL string
 	TrialDays int; AutomaticTax, AllowPromotionCodes bool; Metadata map[string]string
+	Metered bool; MeteredPrices []string // section 21.4
 }
 type CheckoutSession struct { ID, URL, Customer, ClientReferenceID, Status, PaymentStatus, Subscription string }
 type PortalSession struct { ID, URL string }
@@ -412,7 +413,9 @@ The dogfood app jostar found two gaps. A plan with a meter declares a licensed b
 21.5. `stripefake` accepts `line_items[N][price]` and `line_items[N][quantity]` for N from 0. The items must be numbered with no gap, a price can appear once, a licensed item needs quantity 1, and a metered item has no quantity. `CompleteCheckout` puts every item on the subscription, in the order of the request. The session is `no_payment_required` only when it has a trial or all items are metered.
 21.6. Sync (section 9). The plan of a subscription comes from its licensed item whose lookup key a plan declares. Only when no licensed item matches does the first metered item decide. A subscription with both items is one plan, and the stored lookup key is the licensed one.
 21.7. `billing check` fails a plan that has a `meter` and no metered price among its declared prices. It prints a `warn` line, with no failure, for a plan that has a metered price and no `meter`, because no usage is reported to bill.
-21.8. A metered price should have the same interval as the licensed price. Stripe can refuse a subscription that mixes intervals.
+21.8. Stripe needs one interval, interval count, and currency for all items of a subscription. The route adds only the metered prices that match the chosen price in these three fields. When the plan has metered prices and none match, it answers 503 with a `Try:` line and sends no session. `stripefake` rejects mixed items like Stripe. `billing check` fails a plan if no metered price matches any licensed price, and warns about each licensed price without a match.
+21.9. The pure usage exception (21.3) uses the declared configuration. A plan is a pure usage plan only when every declared price is active in Stripe and metered. If a declared price is missing from Stripe and no licensed price is present, the metered key answers 503, not a checkout.
+21.10. This amendment supersedes section 4.5 (the line items), section 9.3 (the plan comes from the licensed item first), and section 10.1 (the accepted prices).
 
 ## Consequences
 

@@ -121,6 +121,30 @@ func (s *Service) check(ctx context.Context, out io.Writer) error {
 				hasMetered := slices.ContainsFunc(prices, func(price stripe.Price) bool {
 					return slices.Contains(p.Prices, price.LookupKey) && isMetered(price)
 				})
+				var metered, licensed []stripe.Price
+				for _, price := range prices {
+					switch {
+					case !slices.Contains(p.Prices, price.LookupKey) || price.Recurring == nil:
+					case isMetered(price):
+						metered = append(metered, price)
+					default:
+						licensed = append(licensed, price)
+					}
+				}
+				matches := func(l stripe.Price) bool {
+					return slices.ContainsFunc(metered, func(m stripe.Price) bool { return sameCycle(l, m) })
+				}
+				if len(metered) > 0 && len(licensed) > 0 {
+					if !slices.ContainsFunc(licensed, matches) {
+						line(false, "plan %s: no metered price has the interval and currency of a licensed price. Checkout refuses the plan. Add a metered price with the same interval and currency", p.Name)
+					} else {
+						for _, l := range licensed {
+							if !matches(l) {
+								_, _ = fmt.Fprintf(out, "warn  plan %s: no metered price has the interval and currency of %s, so Checkout refuses %s\n", p.Name, l.LookupKey, l.LookupKey)
+							}
+						}
+					}
+				}
 				switch {
 				case p.Meter != "" && !hasMetered:
 					line(false, "plan %s: has the meter %s but no metered price. Add a metered price on that meter and declare its lookup key in prices", p.Name, p.Meter)

@@ -218,26 +218,55 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	plan, _ := s.cfg.planOfPrice(in.Price)
 	chosenMetered := isMetered(price)
-	var meteredIDs []string
-	licensedInPlan := false
+	// The declared configuration decides the roles, not the Stripe catalog.
+	// A plan is a pure usage plan only when every declared price is active and metered.
+	pureMetered, missing, hasLicensed := true, false, false
+	var metered []stripe.Price
 	for _, key := range plan.Prices {
 		other, ok := prices[key]
-		switch {
-		case !ok:
-			if key != in.Price {
-				s.warnOnce(ctx, "price:"+key, "billing: a declared price lookup key is not an active Stripe price. Try: run billing check.", "lookup_key", key)
-			}
-		case !isMetered(other):
-			licensedInPlan = true
-		case key != in.Price:
-			meteredIDs = append(meteredIDs, other.ID)
+		if !ok {
+			pureMetered, missing = false, true
+			s.warnOnce(ctx, "price:"+key, "billing: a declared price lookup key is not an active Stripe price. Try: run billing check.", "lookup_key", key)
+			continue
+		}
+		if isMetered(other) {
+			metered = append(metered, other)
+		} else {
+			pureMetered, hasLicensed = false, true
 		}
 	}
-	if chosenMetered && licensedInPlan {
+	var meteredIDs []string
+	switch {
+	case chosenMetered && pureMetered:
+		// A pure usage plan: the metered price is the only way to buy it.
+		// Other metered prices of the plan join when they share its cycle.
+		for _, other := range metered {
+			if other.ID != price.ID && sameCycle(price, other) {
+				meteredIDs = append(meteredIDs, other.ID)
+			}
+		}
+	case chosenMetered:
+		// The plan declares a licensed price, or one is missing from Stripe.
+		if missing && !hasLicensed {
+			problem(w, r, http.StatusServiceUnavailable, "A price of the plan is not available now. Try: retry later, or ask the operator to run billing check.")
+			return
+		}
 		w.Header().Set("Cache-Control", "no-store")
 		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusBadRequest, Detail: "The price is a metered price. A metered price is not bought alone when the plan has a licensed price. Try: select a licensed price of the plan from GET /api/billing/plans.",
 			Errors: []httpx.FieldError{{Field: "price", Message: "Use a licensed price lookup key."}}})
 		return
+	default:
+		// A licensed price. Stripe needs one interval and currency for all items.
+		for _, other := range metered {
+			if sameCycle(price, other) {
+				meteredIDs = append(meteredIDs, other.ID)
+			}
+		}
+		if len(metered) > 0 && len(meteredIDs) == 0 {
+			s.warnOnce(ctx, "cycle:"+in.Price, "billing: no metered price of the plan has the interval and currency of the licensed price. Try: add a metered price with the same interval and currency, then run billing check.", "lookup_key", in.Price)
+			problem(w, r, http.StatusServiceUnavailable, "The price cannot be bought now, because the metered price of the plan has another billing interval or currency. Try: ask the operator to run billing check.")
+			return
+		}
 	}
 	customer, err := s.ensureCustomer(ctx, u.ID)
 	if err != nil {
@@ -462,4 +491,19 @@ func (s *Service) configured(w http.ResponseWriter, r *http.Request) bool {
 // isMetered reports whether the price bills reported usage.
 func isMetered(p stripe.Price) bool {
 	return p.Recurring != nil && p.Recurring.UsageType == "metered"
+}
+
+// sameCycle reports whether two prices have the same interval, interval count
+// (0 means 1) and currency. Stripe needs this for all items of a subscription.
+func sameCycle(a, b stripe.Price) bool {
+	if a.Recurring == nil || b.Recurring == nil {
+		return false
+	}
+	count := func(r *stripe.Recurring) int {
+		if r.IntervalCount <= 0 {
+			return 1
+		}
+		return r.IntervalCount
+	}
+	return a.Recurring.Interval == b.Recurring.Interval && count(a.Recurring) == count(b.Recurring) && a.Currency == b.Currency
 }

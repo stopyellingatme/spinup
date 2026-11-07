@@ -550,6 +550,29 @@ func TestFidelityCheckoutLineItems(t *testing.T) {
 		})
 	}
 	expectCode(t, raw(t, f, "POST", "/v1/checkout/sessions", base(), nil), 200, "")
+	for name, price := range map[string]stripe.Price{
+		"a different interval":       {ID: "price_m_year", LookupKey: "m_year", Active: true, Recurring: &stripe.Recurring{Interval: "year", IntervalCount: 1, UsageType: "metered", Meter: "mtr_1"}},
+		"a different interval count": {ID: "price_m_3", LookupKey: "m_3", Active: true, Recurring: &stripe.Recurring{Interval: "month", IntervalCount: 3, UsageType: "metered", Meter: "mtr_1"}},
+		"a different currency":       {ID: "price_m_eur", LookupKey: "m_eur", Currency: "eur", Active: true, Recurring: &stripe.Recurring{Interval: "month", IntervalCount: 1, UsageType: "metered", Meter: "mtr_1"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mixed := New(Options{Secret: "whsec_test", Prices: []stripe.Price{
+				{ID: "price_licensed", LookupKey: "pro", Active: true, Recurring: &stripe.Recurring{Interval: "month", IntervalCount: 1, UsageType: "licensed"}}, price}})
+			mc, err := stripe.New("sk_test_key", stripe.WithBaseURL("http://stripe.fake"), stripe.WithHTTPClient(&http.Client{Transport: mixed.Transport()}), stripe.WithRetries(0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			cid := customer(t, mc)
+			form := base()
+			form.Set("customer", cid)
+			form.Set("line_items[1][price]", price.ID)
+			rec := raw(t, mixed, "POST", "/v1/checkout/sessions", form, nil)
+			expectCode(t, rec, 400, "")
+			if !strings.Contains(rec.Body.String(), "same billing interval") {
+				t.Fatalf("body = %s", rec.Body)
+			}
+		})
+	}
 	session, err := c.CreateCheckoutSession(t.Context(), stripe.CheckoutParams{Customer: id, Price: "price_licensed", MeteredPrices: []string{"price_metered"},
 		SuccessURL: "https://app/success", CancelURL: "https://app/cancel", ClientReferenceID: "7"}, "")
 	if err != nil {
