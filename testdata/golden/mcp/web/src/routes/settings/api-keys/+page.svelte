@@ -269,7 +269,33 @@
 			</form>
 		</Card.Content>
 	</Card.Root>
-
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Connect an AI client</Card.Title>
+			<Card.Description>Use a key with an AI client. Do not share this key.</Card.Description>
+		</Card.Header>
+		<Card.Content class="grid gap-4">
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Endpoint</p>
+				<Input readonly value="__PUBLIC_ORIGIN__/api/mcp" aria-label="MCP endpoint" class="font-mono" />
+			</div>
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Claude Code</p>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>claude mcp add --transport http &lt;app&gt; __PUBLIC_ORIGIN__/api/mcp --header "Authorization: Bearer &lt;key&gt;"</code></pre>
+			</div>
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Cursor mcp.json</p>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>{`{
+  "mcpServers": {
+    "<app>": {
+      "url": "__PUBLIC_ORIGIN__/api/mcp",
+      "headers": { "Authorization": "Bearer <key>" }
+    }
+  }
+}`}</code></pre>
+			</div>
+		</Card.Content>
+	</Card.Root>
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Use in the last 30 days</Card.Title>

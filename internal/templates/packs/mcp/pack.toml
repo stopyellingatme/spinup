@@ -1,0 +1,24 @@
+name = "mcp"
+description = "A stateless Model Context Protocol server for typed API tools."
+requires = ["auth", "apikeys"]
+
+[[files]]
+path = "api/internal/mcp/server.go"
+source = "files/api/internal/mcp/server.go"
+class = "scaffold"
+
+[[files]]
+path = "api/internal/mcp/tools_gen.go"
+source = "files/api/internal/mcp/tools_gen.go"
+class = "managed"
+
+[[files]]
+path = "api/internal/mcp/whoami.go"
+source = "files/api/internal/mcp/whoami.go"
+class = "seed"
+
+[[files]]
+path = "web/src/routes/.well-known/oauth-protected-resource/[...path]/+server.ts"
+when = "frontend_mode != 'embed'"
+source = "files/web/src/routes/.well-known/oauth-protected-resource/[...path]/+server.ts"
+class = "managed"
