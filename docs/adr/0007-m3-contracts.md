@@ -61,3 +61,7 @@ These are additions. Existing apps need no codemod.
 - `Worker.Periodic` keeps its signature. The API baseline `kit/api/current.txt` lists `Worker.Periodic(time.Duration, Args)`, and `docs/policy/kit-compat.md` fails the guard for a changed line. A variadic option would change that line. A new method is an addition.
 
 The job must guard against a repeat run, because each start of the leader inserts one more job. No codemod is needed.
+
+## 9. Amendment (2026-11-07): wiring for an app without a resource
+
+`spinup g openapi` does not write `routes_gen.go`. Only `spinup g resource` writes it, because the wiring needs the `Server` type, `RequestError`, and `ResponseError` of `api/internal/handlers/`, and the resource generator owns that package. Once `routes_gen.go` has the wiring, it registers every operation of the generated interface, so a hand-written path needs only a `Server` method. An app with no resource keeps an empty `registerGenerated`. For that app, `docs/commands/generate-openapi.md` gives the handler and the wiring (`gen.NewStrictHandlerWithOptions`, the problem error handlers, and `auth.Required`) for `api/internal/routes/`. The test `TestDocumentedWiringCompiles` compiles the code blocks of that page. The api pack `go.mod.tmpl` and `go.sum` already list `github.com/oapi-codegen/runtime` and `github.com/apapsch/go-jsonmerge/v2`. `TestCompileGeneratedApp` builds a generated app with `-mod=readonly` to keep it so.
