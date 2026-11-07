@@ -1,0 +1,48 @@
+# spinup module add mcp on an app with auth and apikeys (ADR 0031 §12).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+exec spinup new retrofit --modules auth,apikeys --module example.com/retrofit --non-interactive
+cd retrofit
+! exists api/internal/mcp/server.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "skip"'
+
+# module add writes to a review branch and prints the next steps.
+exec spinup module add mcp --yes --non-interactive
+stdout 'git merge spinup/module-mcp'
+stdout 'Next: create a key for the MCP client:'
+stdout 'claude mcp add --transport http <app> <url>/api/mcp --header "Authorization: Bearer <key>"'
+stdout 'spinup g mcp tool <name>'
+stdout 'A read key can call only read-only tools\.'
+exists .spinup/upgrade/0.0.0-dev/api/internal/mcp/server.go
+exists .spinup/upgrade/0.0.0-dev/api/internal/mcp/tools_gen.go
+exists .spinup/upgrade/0.0.0-dev/api/internal/mcp/whoami.go
+exists '.spinup/upgrade/0.0.0-dev/web/src/routes/.well-known/oauth-protected-resource/[...path]/+server.ts'
+grep '^modules = .*mcp' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep 'apikeys.WithRPCPath\(kitmcp.Path\)' .spinup/upgrade/0.0.0-dev/api/cmd/api/main.go
+grep 'app.WithRoutes\(mcpServer.Routes\(web.PublicOrigin\)\),' .spinup/upgrade/0.0.0-dev/api/cmd/api/main.go
+
+# The main checkout stays clean until the merge.
+! exists api/internal/mcp/server.go
+exec git status --porcelain
+! stdout .
+
+# After the merge, the doctor check finds the wiring.
+exec git merge spinup/module-mcp
+exists api/internal/mcp/server.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "ok"'
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0
