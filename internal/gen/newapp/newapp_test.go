@@ -95,7 +95,7 @@ func TestGenerateAndApply(t *testing.T) {
 			t.Fatalf("next steps omit %q:\n%s", want, out.String())
 		}
 	}
-	if strings.Contains(out.String(), "pnpm --dir web install") {
+	if strings.Contains(out.String(), "cd web && pnpm install") {
 		t.Fatalf("API-only next steps install web dependencies:\n%s", out.String())
 	}
 	if _, err := Generate(context.Background(), o, nil); err == nil {
@@ -115,7 +115,7 @@ func TestApplyPrintsWebNextSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"pnpm --dir web install",
+		"cd web && pnpm install",
 		"App      http://localhost:5173",
 		"API      http://localhost:8080",
 		"Mailpit  http://localhost:8025",
@@ -134,7 +134,7 @@ func TestNextStepsIncludeWebInstallForEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps := nextSteps(result, o.Name)
-	if !slices.Contains(steps, "pnpm --dir web install") {
+	if !slices.Contains(steps, "cd web && pnpm install") {
 		t.Fatalf("embed next steps omit web dependencies: %q", steps)
 	}
 }

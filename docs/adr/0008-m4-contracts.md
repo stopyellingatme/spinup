@@ -41,11 +41,11 @@ The M4 units run in parallel. These decisions fix the contracts between them. AD
 
 ## 4. Client generation (unit M4.2)
 
-`spinup g client` and the `client` post-step run `pnpm --dir web exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts` when the app has a web pack and a bundle. The resource generator requests `client` when the web pack is present (unit M4.6). The `client-drift` doctor check compares a fresh generation with the file on disk.
+`spinup g client` and the `client` post-step run `pnpm exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts` when the app has a web pack and a bundle. The resource generator requests `client` when the web pack is present (unit M4.6). The `client-drift` doctor check compares a fresh generation with the file on disk.
 
 ## 5. Dev loop (unit M4.4)
 
-`spinup dev`: `doctor --quick` checks, `docker compose -f deploy/compose.dev.yml up -d --wait` (with `--lgtm`, also `grafana/otel-lgtm`), migrations through the app binary, `go tool -modfile=tools.mod air` in `api/` (the api pack gains a managed `api/.air.toml` through `pack.d/air.toml`), and `pnpm --dir web dev` with `API_URL` and `PUBLIC_ORIGIN` set. Busy ports move to free ones, recorded in `.spinup/dev.json`. A change in `api/db/queries/*.sql` runs sqlc; a change in `api/openapi/**/*.yaml` runs the `openapi` and `client` post-steps.
+`spinup dev`: `doctor --quick` checks, `docker compose -f deploy/compose.dev.yml up -d --wait` (with `--lgtm`, also `grafana/otel-lgtm`), migrations through the app binary, `go tool -modfile=tools.mod air` in `api/` (the api pack gains a managed `api/.air.toml` through `pack.d/air.toml`), and `pnpm dev` with `API_URL` and `PUBLIC_ORIGIN` set. Busy ports move to free ones, recorded in `.spinup/dev.json`. A change in `api/db/queries/*.sql` runs sqlc; a change in `api/openapi/**/*.yaml` runs the `openapi` and `client` post-steps.
 
 ## 6. Devtools (unit M4.5)
 

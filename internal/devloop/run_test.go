@@ -302,12 +302,12 @@ func TestRunInstallsMissingWebDependencies(t *testing.T) {
 		nodeModules bool
 		want        exec.Cmd
 	}{
-		{name: "pnpm", web: true, want: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "install", "--frozen-lockfile"}}},
+		{name: "pnpm", web: true, want: exec.Cmd{Name: "pnpm", Args: []string{"install", "--frozen-lockfile"}}},
 		{name: "bun", web: true, manager: "bun", want: exec.Cmd{Name: "bun", Args: []string{"install", "--frozen-lockfile"}}},
 		{name: "present dependencies", web: true, nodeModules: true},
 		{name: "no web", web: true, noWeb: true},
 		{name: "API only"},
-		{name: "embed", web: true, embed: true, want: exec.Cmd{Name: "pnpm", Args: []string{"--dir", "web", "install", "--frozen-lockfile"}}},
+		{name: "embed", web: true, embed: true, want: exec.Cmd{Name: "pnpm", Args: []string{"install", "--frozen-lockfile"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -340,8 +340,8 @@ func TestRunInstallsMissingWebDependencies(t *testing.T) {
 			for _, command := range fake.commands {
 				if command.Name == tc.want.Name && reflect.DeepEqual(command.Args, tc.want.Args) {
 					found = true
-					if tc.want.Name == "pnpm" && command.Dir != root {
-						t.Fatalf("pnpm install directory = %q, want %q", command.Dir, root)
+					if tc.want.Name == "pnpm" && command.Dir != filepath.Join(root, "web") {
+						t.Fatalf("pnpm install directory = %q, want web", command.Dir)
 					}
 					if tc.want.Name == "bun" && command.Dir != filepath.Join(root, "web") {
 						t.Fatalf("bun install directory = %q, want web", command.Dir)

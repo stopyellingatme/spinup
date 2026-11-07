@@ -60,8 +60,8 @@ Use `--dry-run` to see the steps:
 
 ```console
 $ spinup build --dry-run
-pnpm --dir web install --frozen-lockfile
-pnpm --dir web build
+cd web && pnpm install --frozen-lockfile
+cd web && pnpm build
 Copy web/build to api/internal/webdist/dist, replacing old assets
 go build -tags embedweb -trimpath -ldflags '-X main.version=dev' -o bin/api ./cmd/api
 ```

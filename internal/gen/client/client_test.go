@@ -73,10 +73,10 @@ func TestGenerate(t *testing.T) {
 			var want [][]string
 			if tt.skip == "" {
 				if !tt.modules {
-					want = append(want, []string{"--dir", "web", "install", "--frozen-lockfile"})
+					want = append(want, []string{"install", "--frozen-lockfile"})
 				}
 				if tt.failure != "install" {
-					want = append(want, []string{"--dir", "web", "exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", "src/lib/api/schema.d.ts"})
+					want = append(want, []string{"exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", "src/lib/api/schema.d.ts"})
 				}
 				for _, args := range want {
 					e := fake.Expect("pnpm", args...)
@@ -104,7 +104,7 @@ func TestGenerate(t *testing.T) {
 				t.Fatalf("calls = %+v", calls)
 			}
 			for i, c := range calls {
-				if c.Dir != root || c.Name != "pnpm" || !reflect.DeepEqual(c.Args, want[i]) {
+				if c.Dir != filepath.Join(root, "web") || c.Name != "pnpm" || !reflect.DeepEqual(c.Args, want[i]) {
 					t.Fatalf("command = %+v", c)
 				}
 			}
@@ -141,7 +141,7 @@ func TestRegisteredPostStepAndPreview(t *testing.T) {
 			}
 			var fake exec.Fake
 			if !preview {
-				fake.Expect("pnpm", "--dir", "web", "exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", "src/lib/api/schema.d.ts")
+				fake.Expect("pnpm", "exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o", "src/lib/api/schema.d.ts")
 			}
 			g := gen.Generator{Name: "client-post-test", Run: func(context.Context, gen.Input) (*gen.Output, error) {
 				return &gen.Output{PostSteps: []gen.PostStep{gen.PostClient}}, nil
@@ -177,13 +177,10 @@ func TestVariants(t *testing.T) {
 				}
 				write(t, root, "api/openapi/bundle.gen.yaml", "openapi: 3.0.3\n")
 				var fake exec.Fake
-				name, prefix := pm, []string{"--dir", "web"}
-				install := append(append([]string{}, prefix...), "install", "--frozen-lockfile")
-				if pm == "bun" {
-					install = []string{"install", "--frozen-lockfile"}
-				}
+				name := pm
+				install := []string{"install", "--frozen-lockfile"}
 				fake.Expect(pm, install...)
-				execPrefix := append(append([]string{}, prefix...), "exec")
+				execPrefix := []string{"exec"}
 				if pm == "bun" {
 					name = "bunx"
 					execPrefix = []string{"--no-install"}
@@ -198,10 +195,7 @@ func TestVariants(t *testing.T) {
 				}
 				fake.AssertDone(t)
 				for _, call := range fake.Calls() {
-					wantDir := root
-					if pm == "bun" {
-						wantDir = filepath.Join(root, "web")
-					}
+					wantDir := filepath.Join(root, "web")
 					if call.Dir != wantDir {
 						t.Fatalf("command directory = %s, want %s", call.Dir, wantDir)
 					}
