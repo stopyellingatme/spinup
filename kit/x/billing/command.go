@@ -117,6 +117,17 @@ func (s *Service) check(ctx context.Context, out io.Writer) error {
 					line(true, "price %s (%s, every %d %s, %s)", key, prices[i].ID, prices[i].Recurring.IntervalCount, prices[i].Recurring.Interval, usageType(prices[i].Recurring.UsageType))
 				}
 			}
+			for _, p := range s.cfg.Plans {
+				hasMetered := slices.ContainsFunc(prices, func(price stripe.Price) bool {
+					return slices.Contains(p.Prices, price.LookupKey) && isMetered(price)
+				})
+				switch {
+				case p.Meter != "" && !hasMetered:
+					line(false, "plan %s: has the meter %s but no metered price. Add a metered price on that meter and declare its lookup key in prices", p.Name, p.Meter)
+				case p.Meter == "" && hasMetered:
+					_, _ = fmt.Fprintf(out, "warn  plan %s: has a metered price but no meter, so no usage is reported\n", p.Name)
+				}
+			}
 		}
 	}
 	var meters []string

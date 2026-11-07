@@ -4,12 +4,15 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stopyellingatme/spinup/kit/x/billing/stripe"
 	"github.com/stopyellingatme/spinup/kit/x/billing/stripe/stripefake"
 )
 
@@ -93,7 +96,7 @@ func TestCheckout(t *testing.T) {
 	if n := f.requests("/v1/customers"); n != 1 {
 		t.Fatalf("%d customer creations, want 1", n)
 	}
-	// A metered price has no quantity.
+	// A plan of metered prices only is bought through its metered price, with no quantity.
 	expect(t, checkout(`{"price":"team_monthly"}`), http.StatusOK)
 	// A declared price that Stripe does not have is unavailable.
 	expect(t, checkout(`{"price":"pro_gone"}`), http.StatusServiceUnavailable)
@@ -296,5 +299,101 @@ func TestNotConfigured(t *testing.T) {
 	}
 	if err := f.svc.Sync(t.Context(), "cus_none"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("Sync = %v", err)
+	}
+}
+
+// meteredFixture returns a fixture whose pro plan has a meter and a metered price.
+func meteredFixture(t *testing.T) *fixture {
+	t.Helper()
+	cfg := testConfig()
+	cfg.Plans[1].Prices = []string{"pro_monthly", "pro_yearly", "pro_overage"}
+	return newFixture(t, fixtureOptions{cfg: &cfg})
+}
+
+// checkoutItems returns the line item prices of the last Checkout session request.
+func (f *fixture) checkoutItems() (prices []string, quantities []string) {
+	var form url.Values
+	for _, r := range f.fake.Requests() {
+		if r.Path == "/v1/checkout/sessions" {
+			form = r.Form
+		}
+	}
+	for i := 0; form.Has("line_items[" + strconv.Itoa(i) + "][price]"); i++ {
+		prices = append(prices, form.Get("line_items["+strconv.Itoa(i)+"][price]"))
+		quantities = append(quantities, form.Get("line_items["+strconv.Itoa(i)+"][quantity]"))
+	}
+	return prices, quantities
+}
+
+func TestCheckoutRejectsMeteredPriceOfLicensedPlan(t *testing.T) {
+	f := meteredFixture(t)
+	_, cookie := f.register("metered-alone@example.com")
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_overage"}`, cookie: cookie})
+	expect(t, w, http.StatusBadRequest)
+	if !strings.Contains(w.Body.String(), "Try: select a licensed price of the plan") {
+		t.Fatalf("body = %s", w.Body)
+	}
+	if n := f.requests("/v1/checkout/sessions"); n != 0 {
+		t.Fatalf("%d Checkout sessions, want 0", n)
+	}
+}
+
+func TestCheckoutCarriesTheMeteredPrice(t *testing.T) {
+	f := meteredFixture(t)
+	uid, cookie := f.register("both@example.com")
+	w := f.do(call{method: "POST", path: SessionPrefix + "/checkout", body: `{"price":"pro_yearly"}`, cookie: cookie})
+	expect(t, w, http.StatusOK)
+	prices, quantities := f.checkoutItems()
+	if !slices.Equal(prices, []string{"price_pro_y", "price_pro_o"}) || !slices.Equal(quantities, []string{"1", ""}) {
+		t.Fatalf("items = %v, quantities = %v", prices, quantities)
+	}
+	url, _ := decode(t, w)["url"].(string)
+	subID, err := f.fake.CompleteCheckout(url[strings.LastIndex(url, "/")+1:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	subs, err := f.client.ListSubscriptions(t.Context(), f.customer(uid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 1 || subs[0].ID != subID || len(subs[0].Items) != 2 || subs[0].Items[0].Price.LookupKey != "pro_yearly" || subs[0].Items[1].Price.LookupKey != "pro_overage" {
+		t.Fatalf("subscriptions = %+v", subs)
+	}
+	f.drain()
+	if e := f.entitlement(uid); e.Plan != "pro" || e.Status != "active" {
+		t.Fatalf("entitlement = %+v, want the pro plan", e)
+	}
+	var lookupKey string
+	if err := f.pool.QueryRow(t.Context(), `SELECT price_lookup_key FROM billing_subscriptions WHERE id=$1`, subID).Scan(&lookupKey); err != nil || lookupKey != "pro_yearly" {
+		t.Fatalf("stored lookup key = %q, %v: the licensed item decides", lookupKey, err)
+	}
+	// The usage pass still sends meter events for the plan.
+	k, _, err := f.keys.Create(t.Context(), uid, apikeysInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.addUsage(k.ID, testStart, 5)
+	if err := f.svc.ReportUsage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.fake.MeterEvents(); len(got) != 1 || got[0].Value != 5 || got[0].EventName != "api_calls" {
+		t.Fatalf("meter events = %+v", got)
+	}
+}
+
+func TestSyncMapsAMeteredItemOrderToThePlan(t *testing.T) {
+	f := meteredFixture(t)
+	item := func(key, id string, usage string) stripe.SubscriptionItem {
+		return stripe.SubscriptionItem{Price: stripe.Price{ID: id, LookupKey: key, Recurring: &stripe.Recurring{UsageType: usage}}}
+	}
+	// The metered item comes first, and the licensed item still decides.
+	row := f.svc.rowOf(stripe.Subscription{ID: "sub_1", Status: "active", Items: []stripe.SubscriptionItem{item("pro_overage", "p1", "metered"), item("pro_monthly", "p2", "licensed")}})
+	if row.plan != "pro" || row.lookupKey != "pro_monthly" {
+		t.Fatalf("row = %+v", row)
+	}
+	// A plan of metered prices only maps through its metered item.
+	row = f.svc.rowOf(stripe.Subscription{ID: "sub_2", Status: "active", Items: []stripe.SubscriptionItem{item("team_monthly", "p3", "metered")}})
+	if row.plan != "team" || row.lookupKey != "team_monthly" {
+		t.Fatalf("row = %+v", row)
 	}
 }

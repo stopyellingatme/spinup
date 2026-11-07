@@ -216,6 +216,29 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 		problem(w, r, http.StatusServiceUnavailable, "The price is not available now. Try: retry later, or ask the operator to run billing check.")
 		return
 	}
+	plan, _ := s.cfg.planOfPrice(in.Price)
+	chosenMetered := isMetered(price)
+	var meteredIDs []string
+	licensedInPlan := false
+	for _, key := range plan.Prices {
+		other, ok := prices[key]
+		switch {
+		case !ok:
+			if key != in.Price {
+				s.warnOnce(ctx, "price:"+key, "billing: a declared price lookup key is not an active Stripe price. Try: run billing check.", "lookup_key", key)
+			}
+		case !isMetered(other):
+			licensedInPlan = true
+		case key != in.Price:
+			meteredIDs = append(meteredIDs, other.ID)
+		}
+	}
+	if chosenMetered && licensedInPlan {
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusBadRequest, Detail: "The price is a metered price. A metered price is not bought alone when the plan has a licensed price. Try: select a licensed price of the plan from GET /api/billing/plans.",
+			Errors: []httpx.FieldError{{Field: "price", Message: "Use a licensed price lookup key."}}})
+		return
+	}
 	customer, err := s.ensureCustomer(ctx, u.ID)
 	if err != nil {
 		var se *stripe.Error
@@ -237,7 +260,8 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 		AutomaticTax:        s.cfg.AutomaticTax,
 		AllowPromotionCodes: s.cfg.AllowPromotionCodes,
 		Metadata:            map[string]string{"user_id": user},
-		Metered:             price.Recurring != nil && price.Recurring.UsageType == "metered",
+		Metered:             chosenMetered,
+		MeteredPrices:       meteredIDs,
 	}, "")
 	if err != nil {
 		s.stripeFailed(w, r, "create the Checkout session", err)
@@ -433,4 +457,9 @@ func (s *Service) configured(w http.ResponseWriter, r *http.Request) bool {
 	}
 	problem(w, r, http.StatusServiceUnavailable, "Billing is not configured on this server. Try: set STRIPE_SECRET_KEY and restart the API.")
 	return false
+}
+
+// isMetered reports whether the price bills reported usage.
+func isMetered(p stripe.Price) bool {
+	return p.Recurring != nil && p.Recurring.UsageType == "metered"
 }

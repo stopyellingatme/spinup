@@ -26,6 +26,9 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams, id
 	if !p.Metered {
 		form.Set("line_items[0][quantity]", "1")
 	}
+	for i, id := range p.MeteredPrices {
+		form.Set("line_items["+strconv.Itoa(i+1)+"][price]", id)
+	}
 	if p.TrialDays > 0 {
 		form.Set("subscription_data[trial_period_days]", strconv.Itoa(p.TrialDays))
 	}

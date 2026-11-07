@@ -517,3 +517,57 @@ func TestHandlerRejectsBodyReadFailure(t *testing.T) {
 	f.Handler().ServeHTTP(rec, req)
 	expectCode(t, rec, http.StatusBadRequest, "invalid_request")
 }
+
+func TestFidelityCheckoutLineItems(t *testing.T) {
+	f, c, _ := fixture(t)
+	id := customer(t, c)
+	base := func() url.Values {
+		return url.Values{"mode": {"subscription"}, "ui_mode": {"hosted_page"}, "customer": {id}, "success_url": {"https://app"}, "cancel_url": {"https://app"},
+			"line_items[0][price]": {"price_licensed"}, "line_items[0][quantity]": {"1"}, "line_items[1][price]": {"price_metered"}}
+	}
+	for name, edit := range map[string]func(url.Values){
+		"quantity on a metered item": func(v url.Values) { v.Set("line_items[1][quantity]", "1") },
+		"licensed item no quantity":  func(v url.Values) { v.Set("line_items[1][price]", "price_licensed"); v.Del("line_items[1][quantity]") },
+		"duplicate price": func(v url.Values) {
+			v.Set("line_items[1][price]", "price_licensed")
+			v.Set("line_items[1][quantity]", "1")
+		},
+		"missing price":            func(v url.Values) { v.Set("line_items[1][price]", "price_missing") },
+		"inactive price":           func(v url.Values) { v.Set("line_items[1][price]", "price_inactive") },
+		"gap in the items":         func(v url.Values) { v.Set("line_items[3][price]", "price_metered") },
+		"quantity without a price": func(v url.Values) { v.Del("line_items[1][price]"); v.Set("line_items[1][quantity]", "1") },
+		"no items": func(v url.Values) {
+			v.Del("line_items[0][price]")
+			v.Del("line_items[0][quantity]")
+			v.Del("line_items[1][price]")
+		},
+		"unknown item field": func(v url.Values) { v.Set("line_items[1][tax_rates][]", "txr_1") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			form := base()
+			edit(form)
+			expectCode(t, raw(t, f, "POST", "/v1/checkout/sessions", form, nil), 400, "")
+		})
+	}
+	expectCode(t, raw(t, f, "POST", "/v1/checkout/sessions", base(), nil), 200, "")
+	session, err := c.CreateCheckoutSession(t.Context(), stripe.CheckoutParams{Customer: id, Price: "price_licensed", MeteredPrices: []string{"price_metered"},
+		SuccessURL: "https://app/success", CancelURL: "https://app/cancel", ClientReferenceID: "7"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subID, err := f.CompleteCheckout(session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subs, err := c.ListSubscriptions(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 1 || subs[0].ID != subID || len(subs[0].Items) != 2 || subs[0].Items[0].Price.ID != "price_licensed" || subs[0].Items[1].Price.ID != "price_metered" {
+		t.Fatalf("subscription = %+v", subs)
+	}
+	done, err := c.GetCheckoutSession(t.Context(), session.ID)
+	if err != nil || done.PaymentStatus != "paid" {
+		t.Fatalf("a session with a licensed item is paid: %+v %v", done, err)
+	}
+}

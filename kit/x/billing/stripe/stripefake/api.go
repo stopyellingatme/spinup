@@ -1,8 +1,10 @@
 package stripefake
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -41,7 +43,7 @@ func allowed(endpoint, key string) bool {
 	case "customer":
 		return key == "email" || key == "name" || metadataKey(key)
 	case "checkout":
-		return slices.Contains([]string{"mode", "ui_mode", "customer", "line_items[0][price]", "line_items[0][quantity]", "client_reference_id", "success_url", "cancel_url", "subscription_data[trial_period_days]", "automatic_tax[enabled]", "allow_promotion_codes"}, key) || metadataKey(key)
+		return lineItemKey.MatchString(key) || slices.Contains([]string{"mode", "ui_mode", "customer", "client_reference_id", "success_url", "cancel_url", "subscription_data[trial_period_days]", "automatic_tax[enabled]", "allow_promotion_codes"}, key) || metadataKey(key)
 	case "portal":
 		return key == "customer" || key == "return_url"
 	case "subscriptions":
@@ -55,6 +57,9 @@ func allowed(endpoint, key string) bool {
 	}
 	return false
 }
+
+// lineItemKey matches line_items[N][price] and line_items[N][quantity].
+var lineItemKey = regexp.MustCompile(`^line_items\[(0|[1-9][0-9]?)\]\[(price|quantity)\]$`)
 
 func metadataKey(key string) bool {
 	if !strings.HasPrefix(key, "metadata[") || !strings.HasSuffix(key, "]") {
@@ -123,28 +128,53 @@ func (f *Fake) checkout(form url.Values) (any, *apiError) {
 	if _, ok := f.customers[form.Get("customer")]; !ok {
 		return nil, missing("customer")
 	}
-	var price stripe.Price
-	found := false
-	for _, p := range f.o.Prices {
-		if p.ID == form.Get("line_items[0][price]") {
-			price = p
-			found = true
+	var items []stripe.Price
+	for i := 0; ; i++ {
+		field := fmt.Sprintf("line_items[%d][price]", i)
+		id, ok := form[field]
+		if !ok {
+			// Items must be numbered from 0 with no gap.
+			for key := range form {
+				if m := lineItemKey.FindStringSubmatch(key); m != nil {
+					if n, _ := strconv.Atoi(m[1]); n >= i {
+						return nil, invalid("parameter_missing", field, "Missing required param: "+field)
+					}
+				}
+			}
 			break
 		}
-	}
-	if !found {
-		return nil, missing("price")
-	}
-	if !price.Active || price.Recurring == nil {
-		return nil, invalid("parameter_invalid", "line_items[0][price]", "An active recurring price is required")
-	}
-	quantity, provided := form["line_items[0][quantity]"]
-	if price.Recurring.UsageType == "metered" {
-		if provided {
-			return nil, invalid("parameter_invalid", "line_items[0][quantity]", "A metered price must not have a quantity")
+		var price stripe.Price
+		found := false
+		for _, p := range f.o.Prices {
+			if len(id) == 1 && p.ID == id[0] {
+				price, found = p, true
+				break
+			}
 		}
-	} else if len(quantity) != 1 || quantity[0] != "1" {
-		return nil, invalid("parameter_invalid", "line_items[0][quantity]", "A licensed price requires quantity 1")
+		if !found {
+			return nil, missing("price")
+		}
+		if !price.Active || price.Recurring == nil {
+			return nil, invalid("parameter_invalid", field, "An active recurring price is required")
+		}
+		qfield := fmt.Sprintf("line_items[%d][quantity]", i)
+		quantity, provided := form[qfield]
+		if price.Recurring.UsageType == "metered" {
+			if provided {
+				return nil, invalid("parameter_invalid", qfield, "A metered price must not have a quantity")
+			}
+		} else if len(quantity) != 1 || quantity[0] != "1" {
+			return nil, invalid("parameter_invalid", qfield, "A licensed price requires quantity 1")
+		}
+		for _, other := range items {
+			if other.ID == price.ID {
+				return nil, invalid("parameter_invalid", field, "A price can appear only once in the line items")
+			}
+		}
+		items = append(items, price)
+	}
+	if len(items) == 0 {
+		return nil, invalid("parameter_missing", "line_items[0][price]", "Missing required param: line_items[0][price]")
 	}
 	if !validURL(form.Get("success_url")) || !validURL(form.Get("cancel_url")) {
 		return nil, invalid("url_invalid", "success_url", "HTTP success and cancel URLs are required")
@@ -163,7 +193,7 @@ func (f *Fake) checkout(form url.Values) (any, *apiError) {
 		}
 	}
 	id := f.id("cs_test_")
-	state := &checkoutState{session: stripe.CheckoutSession{ID: id, URL: "https://checkout.stripe.fake/c/pay/" + id, Customer: form.Get("customer"), ClientReferenceID: form.Get("client_reference_id"), Status: "open", PaymentStatus: "unpaid"}, price: price, trialDays: trial, metadata: metadataValues(form)}
+	state := &checkoutState{session: stripe.CheckoutSession{ID: id, URL: "https://checkout.stripe.fake/c/pay/" + id, Customer: form.Get("customer"), ClientReferenceID: form.Get("client_reference_id"), Status: "open", PaymentStatus: "unpaid"}, prices: items, trialDays: trial, metadata: metadataValues(form)}
 	f.sessions[id] = state
 	return sessionObject(state), nil
 }

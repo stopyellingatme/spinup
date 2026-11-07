@@ -318,7 +318,7 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 | `POST /api/me/billing/sync` | `{"session_id": "cs_..."}` | the same body as `GET /api/me/billing` |
 | `GET /api/billing/plans` | | `{plans: [{name, features, prices: [{lookup_key, currency, unit_amount, interval, interval_count, usage_type, product_name}]}]}` |
 
-10.1. Checkout: the price must be a declared lookup key (400 otherwise). A user with a subscription in `active`, `trialing`, or `past_due` gets 409 with "Try: open the billing portal to change the plan." The route creates the customer when it is missing (idempotency key `customer:<user id>`, metadata `user_id`). The session has `client_reference_id = <user id>`, metadata `user_id`, `success_url = <origin>/settings/billing?session_id={CHECKOUT_SESSION_ID}`, and `cancel_url = <origin>/pricing`.
+10.1. Checkout: the price must be a declared lookup key (400 otherwise). Section 21 sets the price roles: a licensed price, and the metered prices of its plan as extra line items. A user with a subscription in `active`, `trialing`, or `past_due` gets 409 with "Try: open the billing portal to change the plan." The route creates the customer when it is missing (idempotency key `customer:<user id>`, metadata `user_id`). The session has `client_reference_id = <user id>`, metadata `user_id`, `success_url = <origin>/settings/billing?session_id={CHECKOUT_SESSION_ID}`, and `cancel_url = <origin>/pricing`.
 10.2. Portal: 409 when the user has no customer. The return URL is `<origin>/settings/billing`.
 10.3. Sync: the session must have `client_reference_id` equal to the user ID and the user's customer. Otherwise the route answers 404. Then it runs `Sync` and answers the entitlement.
 10.4. Plans: public, `Cache-Control: public, max-age=300`. The service caches the Stripe prices for 5 minutes. When Stripe fails and there is no cache, the route answers 503. A declared lookup key that Stripe does not return is left out and logged once.
@@ -400,6 +400,19 @@ Every user-facing error says what failed and why, and ends with a `Try:` line. A
 ### 20. Docs
 
 `docs/build/billing.md`: enable the module, the Stripe Dashboard steps (products, prices with lookup keys, a meter, the webhook endpoint at `2026-10-28.endive`, the portal settings), the secrets, local work with `stripe listen --forward-to localhost:5173/api/billing/webhook`, gates in Go and Svelte, the role and apikeys rules, usage metering, and the limits. Add the module to the module table of the concepts page.
+
+### 21. Amendment (2026-11-07): metered prices at Checkout
+
+The dogfood app jostar found two gaps. A plan with a meter declares a licensed base price and a metered price (docs section "Set up Stripe", step 3). Checkout sent one price, so the subscription had no metered item (finding 17). The route also accepted the metered price alone, which bought the plan with no base fee (finding 18).
+
+21.1. Price roles. A price is licensed or metered, from the `usage_type` that Stripe returns. The module reads it from the Stripe price, so the `spinup.toml` declaration is unchanged.
+21.2. The checkout route (section 10.1) accepts a licensed price of a plan. A metered price of a plan that also has a licensed price answers 400 with "Try: select a licensed price of the plan from GET /api/billing/plans."
+21.3. Exception: a plan whose prices are all metered (a pure usage plan) is bought through its metered price. This is supported because the plan has no licensed price to charge, and a user can pay only through the usage. The line item has no quantity.
+21.4. `stripe.CheckoutParams` gains `MeteredPrices []string`. `CreateCheckoutSession` sends `Price` as `line_items[0]` (quantity 1, or none when `Metered`), and `MeteredPrices[i]` as `line_items[i+1][price]` with no quantity, because Stripe rejects a quantity on a metered price. The existing fields keep their meaning. The route fills `MeteredPrices` with every other active metered price of the chosen plan. A declared price that Stripe does not have is logged once and left out.
+21.5. `stripefake` accepts `line_items[N][price]` and `line_items[N][quantity]` for N from 0. The items must be numbered with no gap, a price can appear once, a licensed item needs quantity 1, and a metered item has no quantity. `CompleteCheckout` puts every item on the subscription, in the order of the request. The session is `no_payment_required` only when it has a trial or all items are metered.
+21.6. Sync (section 9). The plan of a subscription comes from its licensed item whose lookup key a plan declares. Only when no licensed item matches does the first metered item decide. A subscription with both items is one plan, and the stored lookup key is the licensed one.
+21.7. `billing check` fails a plan that has a `meter` and no metered price among its declared prices. It prints a `warn` line, with no failure, for a plan that has a metered price and no `meter`, because no usage is reported to bill.
+21.8. A metered price should have the same interval as the licensed price. Stripe can refuse a subscription that mixes intervals.
 
 ## Consequences
 
