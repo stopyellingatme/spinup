@@ -155,9 +155,13 @@ type Options struct {
 	Prices        []stripe.Price // the catalog, with lookup keys and products
 	Meters        []stripe.Meter
 	Now           func() time.Time
+	Deliver       *http.Client  // sends the webhooks; default http.DefaultClient
 }
-func New(o Options) *Fake  // starts an httptest server
-func (f *Fake) URL() string
+func New(o Options) *Fake           // does not listen
+func (f *Fake) Handler() http.Handler
+func (f *Fake) Transport() http.RoundTripper // in process, for tests without sockets
+func (f *Fake) Start() (url string, err error) // listens on 127.0.0.1 (httptest server)
+func (f *Fake) URL() string         // empty before Start
 func (f *Fake) Close()
 func (f *Fake) CompleteCheckout(sessionID string) (subscriptionID string, err error)
 func (f *Fake) SetStatus(subscriptionID, status string) error // active, past_due, unpaid, canceled, paused, trialing
