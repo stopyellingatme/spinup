@@ -307,93 +307,177 @@ func releaseDirs(dir string, files []releaseFile) []string {
 
 // migration is a goose migration file.
 type migration struct {
+	// Space is kit or app. An empty space denotes an app migration.
+	Space   string
 	Version int64
 	Name    string
 }
 
 var migrationName = regexp.MustCompile(`^([0-9]+)_.*\.sql$`)
 
-// migrations lists api/db/migrations/*.sql in version order. A missing directory gives none.
+// migrations lists kit files first, then app files, in version order.
+// A missing directory gives no migrations for that space.
 func migrations(root string) ([]migration, error) {
-	entries, err := os.ReadDir(filepath.Join(root, "api", "db", "migrations"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read api/db/migrations: %w\nTry: check the migrations directory", err)
-	}
 	var out []migration
-	for _, e := range entries {
-		m := migrationName.FindStringSubmatch(e.Name())
-		if e.IsDir() || m == nil {
+	for _, space := range []string{"kit", "app"} {
+		dir := "api/db/kit"
+		if space == "app" {
+			dir = "api/db/migrations"
+		}
+		entries, err := os.ReadDir(filepath.Join(root, dir))
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
-		v, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("read %s: %w\nTry: check the migrations directory", dir, err)
 		}
-		out = append(out, migration{Version: v, Name: e.Name()})
-	}
-	slices.SortFunc(out, func(a, b migration) int {
-		if a.Version != b.Version {
+		var files []migration
+		for _, e := range entries {
+			m := migrationName.FindStringSubmatch(e.Name())
+			if e.IsDir() || m == nil {
+				continue
+			}
+			v, err := strconv.ParseInt(m[1], 10, 64)
+			if err != nil {
+				continue
+			}
+			files = append(files, migration{Space: space, Version: v, Name: e.Name()})
+		}
+		slices.SortFunc(files, func(a, b migration) int {
 			if a.Version < b.Version {
 				return -1
 			}
-			return 1
-		}
-		return strings.Compare(a.Name, b.Name)
-	})
+			if a.Version > b.Version {
+				return 1
+			}
+			return strings.Compare(a.Name, b.Name)
+		})
+		out = append(out, files...)
+	}
 	return out, nil
 }
 
-// migrationVersion returns the highest version, or "" when there is no migration.
+// migrationVersion records both spaces as one tagged list when kit files exist.
+// Apps without kit files keep their highest app version for compatibility.
 func migrationVersion(ms []migration) string {
+	if slices.ContainsFunc(ms, func(m migration) bool { return m.Space == "kit" }) {
+		var names []string
+		for _, m := range ms {
+			names = append(names, m.label(true))
+		}
+		return strings.Join(names, ", ")
+	}
 	if len(ms) == 0 {
 		return ""
 	}
 	return strconv.FormatInt(ms[len(ms)-1].Version, 10)
 }
 
-// pendingMigrations returns every migration absent from the complete applied set.
-func pendingMigrations(ms []migration, applied []int64) []string {
-	set := make(map[int64]bool, len(applied))
+func (m migration) label(tagged bool) string {
+	if !tagged {
+		return m.Name
+	}
+	space := m.Space
+	if space == "" {
+		space = "app"
+	}
+	return space + " " + m.Name
+}
+
+// pendingMigrations compares each space after projecting legacy kit adoption.
+func pendingMigrations(ms []migration, applied, kitApplied []int64) []string {
+	kitApplied = projectKitAdoption(ms, applied, kitApplied)
+	tagged := slices.ContainsFunc(ms, func(m migration) bool { return m.Space == "kit" })
+	appSet, kitSet := map[int64]bool{}, map[int64]bool{}
 	for _, version := range applied {
-		set[version] = true
+		appSet[version] = true
+	}
+	for _, version := range kitApplied {
+		kitSet[version] = true
 	}
 	var out []string
 	for _, m := range ms {
-		if !set[m.Version] {
-			out = append(out, m.Name)
+		versions := appSet
+		if m.Space == "kit" {
+			versions = kitSet
+		}
+		if !versions[m.Version] {
+			out = append(out, m.label(tagged))
 		}
 	}
 	return out
 }
 
+// ProjectKitAdoption projects legacy kit rows before the first kit migration run.
+// A nil kitApplied means that the kit version table does not exist.
+// Versions 2–7 remain app-owned when an app file has the same version.
+func ProjectKitAdoption(root string, applied, kitApplied []int64) ([]int64, error) {
+	if kitApplied != nil {
+		return kitApplied, nil
+	}
+	ms, err := migrations(root)
+	if err != nil {
+		return nil, err
+	}
+	return projectKitAdoption(ms, applied, kitApplied), nil
+}
+
+func projectKitAdoption(ms []migration, applied, kitApplied []int64) []int64 {
+	if kitApplied != nil {
+		return kitApplied
+	}
+	appVersions := map[int64]bool{}
+	for _, m := range ms {
+		if m.Space != "kit" {
+			appVersions[m.Version] = true
+		}
+	}
+	var projected []int64
+	for _, version := range applied {
+		if version >= 2 && version <= 7 && !appVersions[version] {
+			projected = append(projected, version)
+		}
+	}
+	return projected
+}
+
 const (
 	gooseTableQuery   = "SELECT CASE WHEN to_regclass('public.goose_db_version') IS NULL THEN '-1' ELSE '0' END"
 	gooseAppliedQuery = "SELECT version_id FROM goose_db_version WHERE is_applied ORDER BY version_id"
+	kitTableQuery     = "SELECT CASE WHEN to_regclass('public.spinup_kit_version') IS NULL THEN '-1' ELSE '0' END"
+	kitAppliedQuery   = "SELECT version_id FROM spinup_kit_version WHERE is_applied ORDER BY version_id"
 )
 
 // AppliedMigrations returns all applied goose versions on the VM, in version order.
 // A database without the goose table gives an empty set.
 func AppliedMigrations(ctx context.Context, r remote.Runner, app string) ([]int64, error) {
+	return appliedMigrations(ctx, r, app, gooseTableQuery, gooseAppliedQuery, "goose_db_version")
+}
+
+// AppliedKitMigrations returns all applied kit versions on the VM.
+// A missing spinup_kit_version table gives nil. An existing table gives a non-nil set.
+func AppliedKitMigrations(ctx context.Context, r remote.Runner, app string) ([]int64, error) {
+	return appliedMigrations(ctx, r, app, kitTableQuery, kitAppliedQuery, "spinup_kit_version")
+}
+
+func appliedMigrations(ctx context.Context, r remote.Runner, app, tableQuery, appliedQuery, table string) ([]int64, error) {
 	psql := []string{"docker", "compose", "-p", app, "exec", "-T", "postgres", "psql", "-U", "app", "-d", "app", "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c"}
-	result, err := r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseTableQuery)})
+	result, err := r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), tableQuery)})
 	if err != nil {
-		return nil, fmt.Errorf("query the goose table: %w\nTry: check postgres on the VM", err)
+		return nil, fmt.Errorf("query the %s table: %w\nTry: check postgres on the VM", table, err)
 	}
 	if strings.TrimSpace(string(result.Stdout)) == "-1" {
 		return nil, nil
 	}
-	result, err = r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), gooseAppliedQuery)})
+	result, err = r.Run(ctx, remote.Cmd{Argv: append(append([]string(nil), psql...), appliedQuery)})
 	if err != nil {
 		return nil, fmt.Errorf("query the applied migrations: %w\nTry: check postgres on the VM", err)
 	}
-	var applied []int64
+	applied := []int64{}
 	for _, value := range strings.Fields(string(result.Stdout)) {
 		version, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("parse the applied migration version %q: %w\nTry: inspect goose_db_version on the VM", value, err)
+			return nil, fmt.Errorf("parse the applied migration version %q: %w\nTry: inspect %s on the VM", value, err, table)
 		}
 		applied = append(applied, version)
 	}
@@ -403,7 +487,7 @@ func AppliedMigrations(ctx context.Context, r remote.Runner, app string) ([]int6
 // pendingOnVM checks every applied version on an existing deployment.
 // Without a running database, every local migration is potentially pending.
 func (f *flow) pendingOnVM(ctx context.Context, cur *Release) ([]string, error) {
-	var applied []int64
+	var applied, kitApplied []int64
 	if cur != nil {
 		result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"docker", "compose", "-p", f.l.app, "ps", "--status", "running", "-q", "postgres"}})
 		if err != nil {
@@ -414,9 +498,15 @@ func (f *flow) pendingOnVM(ctx context.Context, cur *Release) ([]string, error) 
 			if err != nil {
 				return nil, err
 			}
+			if slices.ContainsFunc(f.l.migrations, func(m migration) bool { return m.Space == "kit" }) {
+				kitApplied, err = AppliedKitMigrations(ctx, f.vm, f.l.app)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
-	return pendingMigrations(f.l.migrations, applied), nil
+	return pendingMigrations(f.l.migrations, applied, kitApplied), nil
 }
 
 // readRemoteFileScript prints a file when it exists. A missing file prints nothing.

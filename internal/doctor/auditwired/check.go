@@ -42,29 +42,38 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 	if !hasWiring(main) {
 		return warn("api/cmd/api/main.go lacks audit.Command( or authsink. wiring", `add auth.WithEvents(authsink.New(pool)), auth.WithActorContext(authsink.ActorContext), and app.WithCommand("audit", audit.Command(pool)) with the audit and authsink imports`)
 	}
-	dir := filepath.Join(c.Root, "api/db/migrations")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return warn("cannot read api/db/migrations", "restore the migrations directory and check its permissions")
-	}
-	var identities, trigger bool
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+	var identities, trigger, foundDir bool
+	for _, migrationDir := range []string{"api/db/kit", "api/db/migrations"} {
+		dir := filepath.Join(c.Root, migrationDir)
+		entries, err := os.ReadDir(dir)
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
 		if err != nil {
-			return warn("cannot read api/db/migrations/"+entry.Name(), "check the migration file permissions")
+			return warn("cannot read "+migrationDir, "restore the migrations directory and check its permissions")
 		}
-		// Only the Up section describes the installed schema. Ignore SQL comments.
-		up, _, _ := strings.Cut(string(data), "-- +goose Down")
-		sql := sqlComments.ReplaceAllString(up, " ")
-		identities = identities || identityTable.MatchString(sql)
-		// The audit pack attaches user_identities only when the table exists when
-		// its migration runs. That attach depends on the order of the migrations,
-		// so it does not count. Auth 00004 attaches the triggers itself since ADR
-		// 0025 decision 3.9. An older copy of 00004 does not.
-		trigger = trigger || (identityTrigger.MatchString(sql) && !identityGuard.MatchString(sql))
+		foundDir = true
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				return warn("cannot read "+migrationDir+"/"+entry.Name(), "check the migration file permissions")
+			}
+			// Only the Up section describes the installed schema. Ignore SQL comments.
+			up, _, _ := strings.Cut(string(data), "-- +goose Down")
+			sql := sqlComments.ReplaceAllString(up, " ")
+			identities = identities || identityTable.MatchString(sql)
+			// The audit pack attaches user_identities only when the table exists when
+			// its migration runs. That attach depends on the order of the migrations,
+			// so it does not count. Auth 00004 attaches the triggers itself since ADR
+			// 0025 decision 3.9. An older copy of 00004 does not.
+			trigger = trigger || (identityTrigger.MatchString(sql) && !identityGuard.MatchString(sql))
+		}
+	}
+	if !foundDir {
+		return warn("cannot read api/db/migrations", "restore the migrations directory and check its permissions")
 	}
 	if identities && !trigger {
 		return warn("user_identities can lack its audit trigger: the migration that creates it does not attach one, and the audit migration attaches it only when the table already exists",

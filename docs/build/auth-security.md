@@ -57,7 +57,7 @@ authn, err := auth.New(pool,
 - With an idle timeout, the browser cookie can expire before the server session, because server-side calls do not refresh the browser cookie.
 
 {: .note }
-The auth version and the session user come from the migration `api/db/migrations/00007_users_auth_version.sql`. `spinup upgrade` adds it to an older app. Run `spinup db migrate up` before you start the new API. Without the migration, each request with a session gets 500, and the API log says `Try: run spinup db migrate up`. A session from before the migration keeps working. It costs one more query until it ends.
+The auth version and the session user come from the migration `api/db/kit/00007_users_auth_version.sql`. `spinup upgrade` adds it to an older app. Run `spinup db migrate up` before you start the new API. Without the migration, each request with a session gets 500, and the API log says `Try: run spinup db migrate up`. A session from before the migration keeps working. It costs one more query until it ends.
 
 If `SPINUP_ENV` is not set, the API assumes `production`. Cookies stay `Secure`, and the `/_dev` routes stay off.
 The generated `Dockerfile.api` sets `SPINUP_ENV=production`. `spinup dev` and `.env.example` select `dev`.

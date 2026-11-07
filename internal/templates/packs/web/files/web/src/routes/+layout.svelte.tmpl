@@ -6,6 +6,9 @@
 [[- if has "auth" .modules ]]
 	import UserMenu from '#lib/components/app/user-menu.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
+[[- if has "flags" .modules ]]
+	import { adminRole } from '#lib/flags.gen.js';
+[[- end ]]
 [[- end ]]
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import { nav } from '#lib/nav.gen.js';
@@ -38,7 +41,14 @@
 	<TopBar appName="[[ .app_name ]]" items={nav} pathname={page.url.pathname} menu={shell}>
 		{#snippet actions()}
 			{#if data.user}
+				[[- if has "flags" .modules ]]
+				<UserMenu
+					email={data.user.email}
+					links={data.user.role === adminRole ? [{ href: '/admin/flags', label: 'Feature flags' }] : []}
+				/>
+[[- else ]]
 				<UserMenu email={data.user.email} />
+[[- end ]]
 			{:else}
 				<Button href="/login" variant="ghost" size="sm">Sign in</Button>
 			{/if}

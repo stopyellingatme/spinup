@@ -52,7 +52,7 @@ class = "scaffold"
 
 [[files]]
 path = "web/src/app.d.ts"
-source = "files/web/src/app.d.ts"
+source = "files/web/src/app.d.ts.tmpl"
 class = "scaffold"
 
 [[files]]
@@ -63,7 +63,7 @@ class = "scaffold"
 [[files]]
 path = "web/src/hooks.server.ts"
 when = "frontend_mode != 'embed'"
-source = "files/web/src/hooks.server.ts"
+source = "files/web/src/hooks.server.ts.tmpl"
 class = "scaffold"
 
 [[files]]
@@ -92,7 +92,7 @@ class = "scaffold"
 [[files]]
 path = "web/src/routes/+layout.server.ts"
 when = "frontend_mode != 'embed'"
-source = "files/web/src/routes/+layout.server.ts"
+source = "files/web/src/routes/+layout.server.ts.tmpl"
 class = "scaffold"
 
 [[files]]

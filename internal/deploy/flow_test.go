@@ -656,7 +656,7 @@ func TestReleaseHelpers(t *testing.T) {
 	if got := ids(kept); !reflect.DeepEqual(got, []string{"new", "a", "b", "c", "d"}) || !reflect.DeepEqual(ids(pruned), []string{"e"}) {
 		t.Fatalf("kept %v pruned %v", got, ids(pruned))
 	}
-	if got := pendingMigrations([]migration{{1, "1_a.sql"}, {2, "2_b.sql"}, {10, "10_c.sql"}}, []int64{1, 2}); !reflect.DeepEqual(got, []string{"10_c.sql"}) {
+	if got := pendingMigrations([]migration{{Version: 1, Name: "1_a.sql"}, {Version: 2, Name: "2_b.sql"}, {Version: 10, Name: "10_c.sql"}}, []int64{1, 2}, nil); !reflect.DeepEqual(got, []string{"10_c.sql"}) {
 		t.Fatalf("pending = %v", got)
 	}
 	if repository("ghcr.io:443/acme/app:tag") != "ghcr.io:443/acme/app" || repository("localhost:5000/app") != "localhost:5000/app" {

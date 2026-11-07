@@ -55,7 +55,7 @@ Add `audit` to `--modules`, as the example above shows. Nothing else is needed.
 1. Run `spinup upgrade` so the app is current.
 2. Run `spinup module add audit --yes --non-interactive`. The command adds `auth` too, if the app lacks it.
    It makes a branch, so inspect the branch before you merge it. Use `--dry-run` to see the plan first.
-3. Read each warning about migration versions. See [Migration numbers](#migration-numbers).
+3. Read each warning in the plan. See [Migration numbers](#migration-numbers) for the number of the audit migration.
 4. Edit `api/cmd/api/main.go` by hand. This file is yours, so the module cannot change it. The command prints these steps after `Next:`.
 
    ```go
@@ -75,16 +75,16 @@ Add `audit` to `--modules`, as the example above shows. Nothing else is needed.
 5. Run `spinup db migrate up`, then restart the app.
 6. Run `spinup doctor`. The `audit-wired` check confirms the wiring. It reads files only and needs no database.
 
-The module adds the migration `00006_audit_events.sql` and the component `history-list.svelte`.
+The module adds the kit migration `api/db/kit/00006_audit_events.sql` and the component `history-list.svelte`.
 
 {: .note }
 If `audit-wired` warns that `user_identities` has no triggers, run `spinup g audit user_identities`. This happens only in an app whose OIDC migration came from an older spinup version.
 
 ### Migration numbers
 
-The audit migration is number 6.
-If one of your own migrations already has number 6, rename it to the next free number before you apply anything.
-If your migration is already applied, keep its number and rename the new audit migration instead.
+The audit migration is a kit migration with the number 6. It lives in `api/db/kit/`.
+The kit migrations have their own version numbers, so your own migration number 6 in `api/db/migrations/` does not clash with it.
+The command `spinup db migrate up` applies the kit migration first.
 Never rename an applied migration.
 
 ## Audit a resource

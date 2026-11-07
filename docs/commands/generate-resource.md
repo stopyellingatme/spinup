@@ -186,7 +186,7 @@ Next: cd api && go test ./internal/handlers/...
 ## Add an empty migration
 
 `spinup g migration` writes an empty goose migration.
-Its number is the highest number in `api/db/migrations` plus one.
+Its number follows the highest number in `api/db/migrations` and `api/db/kit`.
 The name must be in snake case.
 
 ```console

@@ -199,16 +199,20 @@ $ spinup cache warm
 
 If the message says `no merge base`, run `spinup cache warm <version>` with the old version from the message. See [cache](commands/cache.md).
 
-### Two migrations have the same number
+### A kit migration is in api/db/migrations
 
-**Warning:** `api/db/migrations/00002_create_auth.sql uses migration version 2, also used by 00002_create_tasks.sql`
+**Message:** `Manual step: 00008_users_role.sql is a renamed kit migration`
 
-A module adds numbered migrations. If your app has a migration with the same number, the order is not clear.
-**Fix:** follow the `Try:` line. If your migration is not applied yet, rename it to the next free number.
-If you applied it, keep its number and rename the migration of the module instead.
+Older versions of spinup put the migrations of a module in `api/db/migrations/`. Now they live in `api/db/kit/`, with their own version numbers.
+The upgrade moves the files by itself (codemod `0003_kit_migrations`).
+The upgrade stops if you renamed a module migration, because the database holds its old number.
+**Fix:** follow the `Try:` line. Move the file to `api/db/kit/` under its own number. In every database, run `UPDATE goose_db_version SET version_id = <pack number> WHERE version_id = <your number>` once. Then rename the file to the name of the module and run `spinup upgrade` again.
+
+If `migrate up` says `row <V> in goose_db_version is not kit migration <file>`, an app migration was renumbered after it ran.
+**Fix:** renumber the row by hand with `UPDATE goose_db_version SET version_id = <app number> WHERE version_id = <V>`. Then run `spinup db migrate up` again.
 
 {: .tip }
-Add modules such as `auth` before you generate resources. Then the numbers do not clash.
+A kit migration and an app migration can have the same number. This is not an error.
 
 ### The checks fail after an upgrade
 

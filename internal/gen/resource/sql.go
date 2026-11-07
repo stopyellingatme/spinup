@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/db/ops"
@@ -165,6 +164,8 @@ func migrationsDir(root string) string {
 type tableDef struct {
 	// File is the migration file name.
 	File string
+	// Kit reports whether the statement belongs to the kit space.
+	Kit bool
 	// Body is the text between the parentheses of the statement.
 	Body string
 }
@@ -172,35 +173,45 @@ type tableDef struct {
 // findTable returns the migration that creates table, or false when no
 // migration in root creates it. Only the Up section of each file counts.
 func findTable(root, table string) (tableDef, bool, error) {
-	dir := migrationsDir(root)
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return tableDef{}, false, nil
-	}
+	paths, err := migrationPaths(root)
 	if err != nil {
-		return tableDef{}, false, fmt.Errorf("read %s: %w\nTry: check the directory permissions", ops.MigrationsDir, err)
+		return tableDef{}, false, err
 	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
 	create := regexp.MustCompile(`(?is)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?` + regexp.QuoteMeta(table) + `"?\s*\(`)
-	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(dir, name))
+	for _, path := range paths {
+		data, err := os.ReadFile(filepath.Join(root, path))
 		if err != nil {
-			return tableDef{}, false, fmt.Errorf("read %s/%s: %w\nTry: check the file permissions", ops.MigrationsDir, name, err)
+			return tableDef{}, false, fmt.Errorf("read %s: %w\nTry: check the file permissions", path, err)
 		}
 		up := upSection(string(data))
 		loc := create.FindStringIndex(up)
 		if loc == nil {
 			continue
 		}
-		return tableDef{File: name, Body: parenBody(up[loc[1]:])}, true, nil
+		return tableDef{File: filepath.Base(path), Kit: filepath.ToSlash(filepath.Dir(path)) == "api/db/kit", Body: parenBody(up[loc[1]:])}, true, nil
 	}
 	return tableDef{}, false, nil
+}
+
+// migrationPaths lists SQL files in kit order, then app order.
+// Missing directories are empty. os.ReadDir sorts each directory by name.
+func migrationPaths(root string) ([]string, error) {
+	var paths []string
+	for _, dir := range []string{"api/db/kit", ops.MigrationsDir} {
+		entries, err := os.ReadDir(filepath.Join(root, dir))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w\nTry: check the directory permissions", dir, err)
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+				paths = append(paths, filepath.Join(dir, entry.Name()))
+			}
+		}
+	}
+	return paths, nil
 }
 
 var gooseDown = regexp.MustCompile(`(?m)^--\s*\+goose\s+Down\b`)

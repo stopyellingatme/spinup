@@ -5,7 +5,8 @@ parent: Command guides
 
 # db lint — check migrations
 
-`spinup db lint` reads the `Up` section of each migration in `api/db/migrations`.
+`spinup db lint` reads the `Up` section of each migration in `api/db/kit` and `api/db/migrations`.
+It checks kit migrations first and uses one table history for both directories.
 It rejects changes that break the old version of your app while a new version rolls out.
 `spinup deploy` runs the same check before it deploys.
 

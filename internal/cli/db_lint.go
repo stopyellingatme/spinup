@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/stopyellingatme/spinup/internal/db/lint"
+	"github.com/stopyellingatme/spinup/internal/deploy"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -65,7 +66,7 @@ func newDBLint(app *App) *cobra.Command {
 
 func dbLint(root string, files []string) ([]lint.Finding, error) {
 	if len(files) == 0 {
-		return lint.LintDir(filepath.Join(root, "api", "db", "migrations"))
+		return deploy.LintMigrations(root)
 	}
 	paths := make([]string, 0, len(files))
 	for _, file := range files {

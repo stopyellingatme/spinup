@@ -9,7 +9,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/project"
 )
 
-const roleMigrationPath = "api/db/migrations/00005_users_role.sql"
+const roleMigrationPath = "api/db/kit/00005_users_role.sql"
 
 func TestAuthUpgradeWarnings(t *testing.T) {
 	t.Parallel()
@@ -18,7 +18,7 @@ func TestAuthUpgradeWarnings(t *testing.T) {
 		rolesExist, noAuth            bool
 	}{
 		{name: "old auth app"},
-		{name: "app migration", migration: "00005_widgets.sql", want: "Applied migration: keep version 5. Try: rename 00005_users_role.sql to the next free number before you run spinup db migrate."},
+		{name: "app migration", migration: "00005_widgets.sql"},
 		{name: "other version", migration: "00004_widgets.sql"},
 		{name: "same migration", migration: "00005_users_role.sql"},
 		{name: "custom auth", config: "[auth]\nroles = ['owner', 'cook']\nadmin_role = 'owner'\ndefault_role = 'cook'\n", want: "Try: run spinup g roles after the upgrade."},
@@ -72,7 +72,6 @@ func TestAuthUpgradeWarningErrors(t *testing.T) {
 	}{
 		{name: "invalid configuration", path: project.ConfigFile, data: "[auth", want: "correct spinup.toml"},
 		{name: "configuration directory", path: project.ConfigFile, directory: true, want: "check permissions on spinup.toml"},
-		{name: "migration directory is a file", path: "api/db/migrations", data: "not a directory", want: "check permissions on api/db/migrations"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -93,60 +92,6 @@ func TestAuthUpgradeWarningErrors(t *testing.T) {
 			err = authUpgradeWarnings(dir, plan)
 			if err == nil || !strings.Contains(err.Error(), "\nTry: "+tc.want) {
 				t.Fatalf("error = %v", err)
-			}
-		})
-	}
-}
-
-func TestAuthUpgradeWarningOrder(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	for _, name := range []string{"00005_z.sql", "00005_a.sql"} {
-		writePlanFile(t, root, "api/db/migrations/"+name, "-- app migration", 0o644)
-	}
-	dir, err := os.OpenRoot(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dir.Close()
-	plan := &Plan{Files: []FileDecision{{Path: roleMigrationPath, Action: ActionCreate}}}
-	if err := authUpgradeWarnings(dir, plan); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(plan.Files[0].Reason, "00005_a.sql, 00005_z.sql") {
-		t.Fatal(plan.Files[0].Reason)
-	}
-}
-
-func TestMigrationClashWarnings(t *testing.T) {
-	t.Parallel()
-	const auditMigration = "api/db/migrations/00006_audit_events.sql"
-	for _, tc := range []struct {
-		name, existing, reason, want string
-	}{
-		{name: "todo shape", existing: "00003_create_todos.sql"},
-		{name: "clash", existing: "00006_create_notes.sql", want: "also used by 00006_create_notes.sql"},
-		{name: "reason kept", existing: "00006_create_notes.sql", reason: "earlier reason", want: "earlier reason"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			dir := t.TempDir()
-			writePlanFile(t, dir, "api/db/migrations/"+tc.existing, "-- app migration\n", 0o644)
-			root, err := os.OpenRoot(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = root.Close() }()
-			plan := &Plan{Files: []FileDecision{{Path: auditMigration, Action: ActionCreate, Reason: tc.reason}}}
-			if err := migrationClashWarnings(root, plan); err != nil {
-				t.Fatal(err)
-			}
-			got := plan.Files[0].Reason
-			if tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
-				t.Fatalf("reason = %q, want %q", got, tc.want)
-			}
-			if tc.want != "" && tc.reason == "" && !strings.Contains(got, "Try:") {
-				t.Errorf("reason has no Try: line: %q", got)
 			}
 		})
 	}

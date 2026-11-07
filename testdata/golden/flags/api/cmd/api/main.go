@@ -1,0 +1,107 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	appflags "example.com/todo/api/internal/flags"
+	"github.com/stopyellingatme/spinup/kit/x/flags"
+
+	kitmigrations "example.com/todo/api/db/kit"
+	"example.com/todo/api/db/migrations"
+	"example.com/todo/api/internal/roles"
+	"example.com/todo/api/internal/routes"
+	"example.com/todo/api/openapi"
+	"github.com/stopyellingatme/spinup/kit/app"
+	"github.com/stopyellingatme/spinup/kit/auth"
+	"github.com/stopyellingatme/spinup/kit/config"
+	"github.com/stopyellingatme/spinup/kit/db"
+	"github.com/stopyellingatme/spinup/kit/telemetry"
+)
+
+var version = "dev"
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() (err error) {
+	var cfg config.Base
+	if err := config.Load(&cfg); err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	shutdown, err := telemetry.Setup(ctx, telemetry.Options{ServiceName: "todo-api", ServiceVersion: version, Environment: cfg.Env})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		err = errors.Join(err, shutdown(shutdownCtx))
+	}()
+	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithMaxConns(cfg.DatabaseMaxConns))
+	if err != nil {
+		return err
+	}
+	// The web app posts its form actions from PUBLIC_ORIGIN, so the CSRF check trusts it.
+	var web struct {
+		PublicOrigin string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
+	}
+	if err := config.Load(&web); err != nil {
+		return err
+	}
+	authn, err := auth.New(pool,
+		auth.WithRoles(roles.Set),
+		auth.WithRegistration(auth.RegistrationMode(os.Getenv("AUTH_REGISTRATION"))),
+		auth.WithSecureCookie(cfg.Env != "dev"),
+		auth.WithTrustedOrigins(web.PublicOrigin),
+	)
+	if err != nil {
+		return err
+	}
+	var flagsEnv struct {
+		Refresh time.Duration `env:"FLAGS_REFRESH" default:"10s"`
+	}
+	if err := config.Load(&flagsEnv); err != nil {
+		return err
+	}
+	flagsProvider, err := flags.New(flags.WithDeclared(appflags.Set))
+	if err != nil {
+		return err
+	}
+	flagStore := flags.NewStore(pool, flagsProvider, roles.Set)
+	if err := flagStore.Start(ctx, flagsEnv.Refresh); err != nil {
+		return err
+	}
+	a := app.New(
+		app.WithName("todo"),
+		app.WithVersion(version),
+		app.WithConfig(cfg),
+		app.WithAPIDocs(openapi.FS),
+		app.WithRoutes(func(mux *http.ServeMux) { routes.Register(mux, routes.Deps{DB: pool}) }),
+		app.WithMiddleware(authn.Middleware()),
+		app.WithMiddleware(flagsProvider.Middleware()),
+		app.WithRoutes(authn.Routes),
+		app.WithCommand("user", auth.UserCommand(authn)),
+		app.WithRoutes(flagStore.Routes(authn)),
+		app.WithCommand("flags", flagStore.Command()),
+		app.WithReadiness("flags", flagStore.Ready),
+		app.WithReadiness("db", pool.Ping),
+		app.WithCommand("migrate", db.MigrateCommand(migrations.FS, db.WithDatabaseURL(cfg.DatabaseURL), db.WithKitMigrations(kitmigrations.FS))),
+		app.WithShutdown(func(context.Context) error { pool.Close(); return nil }),
+		app.WithShutdown(authn.Close),
+		app.WithShutdown(flagStore.Close),
+	)
+	return a.Run(ctx, os.Args[1:])
+}

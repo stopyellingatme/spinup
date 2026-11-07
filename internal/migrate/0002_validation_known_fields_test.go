@@ -28,7 +28,7 @@ func TestValidationKnownFieldsMigration(t *testing.T) {
 	if m.Stage != migrate.After || m.Since != "0.1.0-alpha.419" {
 		t.Fatalf("migration stage = %d, since = %s", m.Stage, m.Since)
 	}
-	pending, err := migrate.Pending("0.1.0-alpha.418", "0.1.0-alpha.419", nil, migrate.After)
+	pending, err := migrate.Pending("0.1.0-alpha.418", "0.1.0-alpha.419", []string{migrate.KitTestkitID}, migrate.After)
 	if err != nil {
 		t.Fatal(err)
 	}

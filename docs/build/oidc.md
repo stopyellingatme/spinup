@@ -17,12 +17,16 @@ If the app already has the `auth` module without OIDC, `spinup module add auth -
 $ spinup new todo --module example.com/todo --modules auth --auth-oidc --no-git --non-interactive
 ...
 $ cd todo
-$ ls api/db/migrations
-00001_init.sql
+$ ls api/db/migrations api/db/kit
+api/db/kit:
 00002_create_auth.sql
 00004_oidc_identities.sql
 00005_users_role.sql
 00007_users_auth_version.sql
+embed.go
+
+api/db/migrations:
+00001_init.sql
 embed.go
 $ grep OidcButtons web/src/routes/login/+page.svelte
 	import OidcButtons from '#lib/components/OidcButtons.svelte';
@@ -30,7 +34,7 @@ $ grep OidcButtons web/src/routes/login/+page.svelte
 ```
 
 The `auth_oidc` question defaults to false.
-The migration `00004` lets a user have no password, and it creates the table `user_identities`.
+The kit migration `00004` in `api/db/kit/` lets a user have no password, and it creates the table `user_identities`.
 It follows `00003_password_resets.sql`, which exists only when the mail module is on.
 Existing migrations stay unchanged.
 

@@ -58,11 +58,27 @@ $ spinup db status --dry-run
 go run ./cmd/api migrate status
 ```
 
+The list has two parts. The kit migrations come first, with the prefix `kit`. Then come the migrations of your app.
+The two parts have separate version numbers, so a kit migration and an app migration can have the same number.
+
+<!-- doctest: skip -->
+```console
+$ spinup db status
+applied  kit 00002_create_auth.sql
+applied  kit 00005_users_role.sql
+applied  00001_init.sql
+applied  00003_create_todos.sql
+```
+
+The commands `spinup db new`, `spinup db redo`, and `spinup db to` work on the app migrations only.
+To roll back a kit migration, run the app binary in `api/`: `go run ./cmd/api migrate kit down`.
+See [Kit migrations](../concepts.md#kit-migrations).
+
 ## Create a migration
 
 Run `spinup db new <name>` to write an empty migration with a goose `Up` and `Down` section.
 Use a snake case name.
-The number is the highest number in `api/db/migrations/` plus one.
+The number follows the highest number in `api/db/migrations/` and `api/db/kit/`.
 If another migration has the name, the command fails.
 
 ```console

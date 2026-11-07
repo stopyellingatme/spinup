@@ -190,7 +190,7 @@ A stored role that the app no longer declares keeps its text, and `HasRole` is f
 ## Add roles to an existing app
 
 `spinup upgrade` adds the role column and the role files to an app that has the `auth` module.
-It creates `api/db/migrations/00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
+It creates `api/db/kit/00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
 It does not change `spinup.toml`.
 
 1. Run `spinup upgrade --plan`. Read the notes. Then run `spinup upgrade --yes`.

@@ -134,6 +134,22 @@ $ spinup db migrate up
 
 Run `spinup db migrate up` if the plan mentioned a migration. Then run `spinup dev` or your tests.
 
+### Upgrade from a version that has no kit migration directory
+
+Older versions put the migrations of the modules (`auth`, `audit`) in `api/db/migrations/`. The upgrade moves them to `api/db/kit/` (ADR 0028) and keeps your own migrations where they are.
+After you merge the branch, run `spinup db migrate up` once in every database. The first run moves the applied rows of the module migrations to their own version table.
+It prints one line for each row to standard error:
+
+<!-- doctest: skip -->
+```console
+$ spinup db migrate up
+adopted  kit 00002_create_auth.sql
+migrate: no pending migrations
+```
+
+No migration runs twice. If you renamed a module migration, the upgrade stops with a manual step. See [A kit migration is in api/db/migrations](troubleshooting.md#a-kit-migration-is-in-apidbmigrations).
+Deploy runs `migrate up` before it starts the new binary, so a deploy does the same move.
+
 ### Upgrade flags
 
 | Flag | Use it to ... | Example |

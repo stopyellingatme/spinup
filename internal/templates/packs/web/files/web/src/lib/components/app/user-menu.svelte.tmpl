@@ -5,12 +5,24 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 
+[[- if has "flags" .modules ]]
+	let {
+		email,
+		links = []
+	}: {
+		/** The email address of the signed-in user. */
+		email: string;
+		/** More links under Account, for example the admin pages of a module. */
+		links?: { href: string; label: string }[];
+	} = $props();
+[[- else ]]
 	let {
 		email
 	}: {
 		/** The email address of the signed-in user. */
 		email: string;
 	} = $props();
+[[- end ]]
 
 	let logout: HTMLFormElement | undefined = $state();
 </script>
@@ -39,6 +51,15 @@
 				</a>
 			{/snippet}
 		</DropdownMenu.Item>
+[[- if has "flags" .modules ]]
+		{#each links as link (link.href)}
+			<DropdownMenu.Item>
+				{#snippet child({ props })}
+					<a {...props} href={link.href}>{link.label}</a>
+				{/snippet}
+			</DropdownMenu.Item>
+		{/each}
+[[- end ]]
 		<DropdownMenu.Item onSelect={() => logout?.requestSubmit()}>
 			<LogOutIcon aria-hidden="true" />
 			Sign out

@@ -1,0 +1,28 @@
+# Generate the flags module and compile its operator command without a database.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,flags --module example.com/demo --no-git --non-interactive
+cd demo
+exists api/db/kit/00008_feature_flags.sql
+exists api/internal/roles/roles.gen.go
+exists api/internal/flags/flags.gen.go
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g flags
+grep 'NewCheckout = "new_checkout"' api/internal/flags/flags.gen.go
+# Other doctor checks can fail when Docker or local ports are unavailable.
+# Assert the flags checks independently.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "flags-drift",\s+"status": "ok"'
+stdout '(?s)"id": "flags-wired",\s+"status": "ok"'
+cd api
+exec go build -o $WORK/demo-api ./cmd/api
+[env:DATABASE_URL] exec $WORK/demo-api migrate up
+[env:DATABASE_URL] exec $WORK/demo-api flags list
+[env:DATABASE_URL] stdout 'new_checkout +off'
+[env:DATABASE_URL] exec $WORK/demo-api flags list --json
+[env:DATABASE_URL] stdout '"key":"new_checkout"'
+
+-- declaration.toml --
+
+[flags.new_checkout]
+description = "The new checkout flow"
+public = true

@@ -7,7 +7,7 @@
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new gateaudit --modules auth,audit --module example.com/gateaudit --no-git --non-interactive
 cd gateaudit
-exists api/db/migrations/00006_audit_events.sql
+exists api/db/kit/00006_audit_events.sql
 
 # The resource has a trigger in its create migration, a History endpoint, and writes in audit.InTx.
 # api_token is redacted by name. The web pages need no post-step here, so the gate skips them.
@@ -27,7 +27,7 @@ cd ..
 # Apply the migrations. The tests may have used the same database, so a second run is a no-op.
 exec spinup db migrate up
 exec spinup db migrate status
-stdout '00006_audit_events\.sql'
+stdout 'kit 00006_audit_events\.sql'
 stdout '00008_create_work_orders\.sql'
 ! stdout '^pending'
 

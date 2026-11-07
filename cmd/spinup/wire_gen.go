@@ -64,4 +64,9 @@ import (
 	// Audit trail (ADR 0025)
 	_ "github.com/stopyellingatme/spinup/internal/doctor/auditwired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/audit"
+
+	// Feature flags (ADR 0029)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/flagsdrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/flagswired"
+	_ "github.com/stopyellingatme/spinup/internal/gen/flags"
 )

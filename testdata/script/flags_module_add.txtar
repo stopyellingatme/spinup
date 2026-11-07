@@ -1,0 +1,49 @@
+# The flags migration lives in api/db/kit, so it clashes with no app migration (ADR 0028).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+# An app with auth and its own migrations.
+exec spinup new retrofit --modules auth --module example.com/retrofit --non-interactive
+cd retrofit
+exec spinup db new add_notes
+exec spinup db new add_labels
+exec sh -c 'ls api/db/migrations > $WORK/before.txt'
+exec cat $WORK/before.txt
+stdout '_add_notes\.sql'
+stdout '_add_labels\.sql'
+! exists api/db/kit/00008_feature_flags.sql
+exec git add -A
+exec git commit -m 'Add two migrations'
+
+# module add writes to a review branch. The kit file is in the kit space, and the next steps print.
+exec spinup module add flags --yes --non-interactive
+stdout 'git merge spinup/module-flags'
+stdout 'Next: declare a flag in spinup.toml'
+stdout 'Next: run spinup g flags to write api/internal/flags/flags.gen.go and web/src/lib/flags.gen.ts\.'
+stdout 'flags.NewStore\(pool, flagsProvider, roles.Set\)'
+stdout 'app.WithMiddleware\(flagsProvider.Middleware\(\)\),'
+stdout 'Next: run spinup db migrate up before starting the new binary\.'
+stdout 'flags-drift and flags-wired'
+exists .spinup/upgrade/0.0.0-dev/api/db/kit/00008_feature_flags.sql
+! exists .spinup/upgrade/0.0.0-dev/api/db/migrations/00008_feature_flags.sql
+grep '^modules = .*flags' .spinup/upgrade/0.0.0-dev/spinup.toml
+
+# The app migrations do not change, and the main checkout stays clean.
+exec sh -c 'ls api/db/migrations > $WORK/after.txt'
+exec diff $WORK/before.txt $WORK/after.txt
+! exists api/db/kit/00008_feature_flags.sql
+exec git status --porcelain
+! stdout .
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0

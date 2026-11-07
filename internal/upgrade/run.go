@@ -508,6 +508,9 @@ func writePlan(work string, plan *Plan) error {
 		switch file.Action {
 		case ActionDelete:
 			err = root.Remove(file.Path)
+			if errors.Is(err, os.ErrNotExist) {
+				err = nil
+			}
 		case ActionOverwrite, ActionMerge, ActionConflict, ActionCreate, ActionRename:
 			err = root.MkdirAll(filepath.Dir(file.Path), 0755)
 			if err == nil {

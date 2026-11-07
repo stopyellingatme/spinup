@@ -3,7 +3,7 @@ env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new todo --module example.com/todo --modules ci,auth,mail --no-git --non-interactive
 cd todo
 exists api/internal/mail/mailers.go api/cmd/api/reset.go
-exists api/db/migrations/00003_password_resets.sql
+exists api/db/kit/00003_password_resets.sql
 exists web/src/routes/reset/+page.svelte web/src/routes/reset/[token]/+page.svelte
 exec spinup g mailer welcome name:string --dry-run
 stdout 'create api/internal/mail/welcome_gen.go \(managed\)'

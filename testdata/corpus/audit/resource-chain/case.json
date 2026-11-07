@@ -1,16 +1,7 @@
 {
-  "reasons": {
-    "api/db/migrations/00005_users_role.sql": [
-      "migration version 5 is also used by 00005_create_orders.sql",
-      "Try: rename your migration to the next free number"
-    ],
-    "api/db/migrations/00006_audit_events.sql": [
-      "uses migration version 6, also used by 00006_create_bulletins.sql",
-      "Try: rename the app migration to the next free number"
-    ]
-  },
   "order": [
-    "api/db/migrations/00005_users_role.sql",
-    "api/db/migrations/00006_audit_events.sql"
-  ]
+    "api/db/kit/00005_users_role.sql",
+    "api/db/kit/00006_audit_events.sql"
+  ],
+  "no_warning": true
 }

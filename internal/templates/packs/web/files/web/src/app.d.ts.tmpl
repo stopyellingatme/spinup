@@ -13,6 +13,10 @@ declare global {
 		}
 		interface Locals {
 			user: User | null;
+[[- if has "flags" .modules ]]
+			/** The public flags of this request, as GET /api/flags returns them. hooks.server.ts always sets them. */
+			flags?: Record<string, boolean>;
+[[- end ]]
 		}
 		// interface Error {}
 		// interface PageData {}

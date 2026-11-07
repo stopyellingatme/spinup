@@ -545,7 +545,7 @@ func TestRunFailurePrintsRecovery(t *testing.T) {
 }
 func TestSnapshotIncludesAllTablesAndMigrationState(t *testing.T) {
 	t.Parallel()
-	for _, want := range []string{"id, version_id, is_applied", "pg_tables", "count(*)", "%I.%I", "ORDER BY schemaname, tablename", "\\gexec"} {
+	for _, want := range []string{"id, version_id, is_applied", "to_regclass('public.spinup_kit_version') IS NOT NULL", "FROM spinup_kit_version ORDER BY id", "pg_tables", "count(*)", "%I.%I", "ORDER BY schemaname, tablename", "\\gexec"} {
 		if !strings.Contains(snapshotSQL, want) {
 			t.Fatal(want)
 		}

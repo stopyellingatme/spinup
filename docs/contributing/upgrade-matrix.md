@@ -100,7 +100,7 @@ App owners find the same steps in [Roles](../build/roles.md).
 The roles cases are in `testdata/corpus/roles/`.
 They use a small synthetic tree and the real Git merger.
 They check existing users, an app migration at version 5, a `main.go` conflict, and custom roles.
-The upgrade creates `00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
+The upgrade creates `api/db/kit/00005_users_role.sql` and `api/internal/roles/roles.gen.go`.
 It preserves app files and `spinup.toml`.
 
 Run the roles checks. `AuthUpgradeWarnings` tests the plan warnings, and `RolesUpgradeCorpus` runs the roles corpus:
@@ -111,21 +111,18 @@ make script RUN='upgrade_roles_*'
 ```
 
 The script compiles the API without a database.
-With `DATABASE_URL`, it applies version 5 after version 4.
-It also applies a new version 4 after version 5.
+With `DATABASE_URL`, it applies the kit migration 5 and then the app migration 4.
+It then resets the app migrations and checks that the kit migrations stay applied.
 It checks that existing sessions read the default role.
 It uses a recorder and needs no HTTP listener.
 Set `DATABASE_URL` to run the database checks.
 
-If another `00005_*.sql` exists, the plan warns about the duplicate version.
-Rename the app migration to the next free number before you migrate.
-Check applied versions before you rename an applied migration.
+The kit migrations and the app migrations have separate version numbers (ADR 0028).
+An app migration `00005_*.sql` does not clash with `api/db/kit/00005_users_role.sql`, and the plan shows no warning.
 The kit accepts a pending migration below the highest applied version.
 
 The plan stores each warning in the reason for the new file.
 The JSON report also includes this reason.
-The preview copies only tracked and rendered paths, so it can miss an app migration outside those paths.
-The applied plan reads the complete worktree and reports the collision.
 
 If `[auth]` exists without `roles.gen.go`, the plan creates the default file and prints a note.
 Run `spinup g roles` after the upgrade.
@@ -187,24 +184,24 @@ App owners find the user guide in [Audit trail](../audit.md).
 
 The audit cases are in `testdata/corpus/audit/`.
 They use the same small synthetic tree and the real Git merger as the roles cases.
-The new template adds `00005_users_role.sql`, `00006_audit_events.sql`, and the audit wiring in `main.go`.
+The new template adds `api/db/kit/00005_users_role.sql`, `api/db/kit/00006_audit_events.sql`, and the audit wiring in `main.go`.
 Each case checks the plan, the written files, and the doctor check `audit-wired`.
 
 | Case | App state | Expected result |
 | --- | --- | --- |
 | `main-conflict` | The app changed the `auth.New` line of `main.go` | The plan reports a conflict on `api/cmd/api/main.go`. After you keep the app version, `audit-wired` warns. After you add the wiring, it passes. |
-| `migration-clash` | The app owns `00006_create_notes.sql` | The reason of `00006_audit_events.sql` names the clash and has a `Try:` line. |
-| `resource-chain` | The app has resource migrations 00003 to 00006 | Both pack migrations get a clash warning. 00005 names `00005_create_orders.sql`. 00006 names `00006_create_bulletins.sql`. |
-| `todo-shape` | The app has migrations 00001 to 00003, with no mail and no OIDC | The plan creates 00005, then 00006. The plan has no warning. |
+| `migration-clash` | The app owns `00006_create_notes.sql` | The plan creates the kit migrations 00005, then 00006. The plan has no warning, because the kit has its own numbers. |
+| `resource-chain` | The app has resource migrations 00003 to 00006 | The plan creates the kit migrations 00005, then 00006. The plan has no warning. |
+| `todo-shape` | The app has migrations 00001 to 00003, with no mail and no OIDC | The plan creates the kit migrations 00005, then 00006. The plan has no warning. |
 
-A test also runs `module add audit` on an app with a clash.
-It checks the clash warning in the preview and the `Next:` lines for `main.go`.
+A test also runs `module add audit` on an app with an app migration of the same number.
+It checks that the preview has no clash warning, and it checks the `Next:` lines for `main.go`.
 The `Next:` lines come from `modules.AuditNextSteps`.
 
-Run the audit checks. `AuditUpgradeCorpus` runs the cases above, `AuditModuleAddNextSteps` tests the `Next:` lines, and `MigrationClashWarnings` tests the clash warning:
+Run the audit checks. `AuditUpgradeCorpus` runs the cases above, and `AuditModuleAddNextSteps` tests the `Next:` lines:
 
 ```sh
-go test -race ./internal/upgrade/... -run 'AuditUpgradeCorpus|AuditModuleAddNextSteps|MigrationClashWarnings'
+go test -race ./internal/upgrade/... -run 'AuditUpgradeCorpus|AuditModuleAddNextSteps'
 make script RUN=audit_module
 make script RUN=gen_audit
 SPINUP_APP_GATE=1 make script RUN=app_gate_audit
@@ -212,10 +209,25 @@ SPINUP_APP_GATE=1 make script RUN=app_gate_pdf
 ```
 
 The planner never renames a migration, because the app may have applied it.
-Rename the app migration to the next free number before you migrate.
-If the app migration is already applied, keep its version and rename the new pack migration.
-The audit pack and the `api` pack need no codemod.
+The audit pack and the `api` pack need no codemod for a new app.
 They add new files, and the 3-way merge handles the `main.go` change.
+
+## Upgrade an app to the kit migration directory
+
+The codemod `0003_kit_migrations` moves the pack migrations from `api/db/migrations/` to `api/db/kit/` (ADR 0028).
+It runs before the plan, so the plan sees the kit paths on disk.
+The packs `api`, `auth`, and `audit` record this codemod in `internal/templates/packs.digest`.
+The codemod `0004_kit_testkit` rewrites the `testkit.DBWithMigrations` call in the test files of `api/`.
+
+Run the checks:
+
+```sh
+go test -race ./internal/migrate/... ./internal/upgrade/...
+make script RUN=upgrade_kit_migrations
+```
+
+The script moves a legacy app to the kit layout.
+The corpus app in `testdata/corpus/kit-migrations/` has an app migration `00003_create_todos.sql`, and the script checks that this file stays.
 
 ## See also
 

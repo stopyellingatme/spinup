@@ -148,6 +148,25 @@ The audit trail needs `audit.Command` and `authsink` in `api/cmd/api/main.go`. I
 It skips an app without the audit module.
 **Fix:** add the wiring that [Audit trail](../audit.md) shows. For the trigger, run `spinup g audit user_identities` and then `spinup db migrate up`.
 
+### flags-drift
+
+The files `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts` come from the `[flags.KEY]` tables in `spinup.toml`.
+It skips an app without the flags module. It warns when:
+
+- `spinup.toml` has an invalid flag table.
+- A generated file is missing or differs from `spinup.toml`.
+- A flag has an `expires` date before today (UTC).
+
+**Fix:** run `spinup g flags`. For an expired flag, remove its table and its uses, run `spinup g flags`, and then run `flags prune --yes`. See [Feature flags](../build/flags.md).
+
+### flags-wired
+
+The flags module needs wiring in `api/cmd/api/main.go`: `flags.New` with `flags.WithDeclared`, `Start`, the middleware after the auth middleware, `Routes`, the `flags` command, and `Close`.
+It skips an app without the flags module. It reports the first missing call.
+If the app also has the audit module, it warns when the audit functions did not exist when the flags migration ran.
+
+**Fix:** add the line that `Try:` shows. For the audit triggers, see [Feature flags](../build/flags.md#the-audit-trail).
+
 ### lock-valid
 
 `spinup.lock` records what spinup rendered. The check parses it.

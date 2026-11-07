@@ -451,3 +451,61 @@ func TestDoctor(t *testing.T) {
 		})
 	}
 }
+
+func TestNextMigrationNameIncludesKit(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name          string
+		files         map[string]string
+		want, wantErr string
+	}{
+		{name: "legacy auth before adoption", files: map[string]string{"api/db/migrations/00001_init.sql": "", "api/db/kit/00002_create_auth.sql": "", "api/db/kit/00007_users_auth_version.sql": ""}, want: "00008_create_notes.sql"},
+		{name: "app ahead of kit", files: map[string]string{"api/db/migrations/00012_app.sql": "", "api/db/kit/00007_auth.sql": ""}, want: "00013_create_notes.sql"},
+		{name: "missing app directory", files: map[string]string{"api/db/kit/00007_auth.sql": ""}, want: "00008_create_notes.sql"},
+		{name: "kit limit", files: map[string]string{"api/db/kit/99999_last.sql": ""}, wantErr: "reached 99999"},
+		{name: "duplicate kit name", files: map[string]string{"api/db/kit/00007_create_notes.sql": ""}, wantErr: "already has the name create_notes"},
+		{name: "unreadable kit", files: map[string]string{"api/db/kit": "not a directory"}, wantErr: "not a directory"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := newProject(t, "", tc.files)
+			got, err := NextMigrationName(filepath.Join(root, MigrationsDir), "create_notes")
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(errorText(err), tc.wantErr) {
+					t.Fatalf("name = %q, error = %v", got, err)
+				}
+			} else if err != nil || got != tc.want {
+				t.Fatalf("name = %q, error = %v, want %q", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCurrentVersionLastLine(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		output string
+		want   int64
+		fail   bool
+	}{
+		{output: "adopted  kit 00002_create_auth.sql\n3\n\n", want: 3},
+		{output: "adopted  kit 00002_create_auth.sql\n \n 0 \n \n", want: 0},
+		{output: "3\ninvalid\n", fail: true},
+		{output: "\n \n", fail: true},
+	} {
+		t.Run(tc.output, func(t *testing.T) {
+			t.Parallel()
+			fake := &run.Fake{}
+			fake.Expect("go", "run", "./cmd/api", "migrate", "version").Return(tc.output, "", 0)
+			got, err := currentVersion(t.Context(), Options{}, fake, t.TempDir(), "Cannot read the version")
+			if tc.fail {
+				if err == nil || !strings.Contains(errorText(err), "not a version number") {
+					t.Fatalf("version = %d, error = %v", got, err)
+				}
+			} else if err != nil || got != tc.want {
+				t.Fatalf("version = %d, error = %v", got, err)
+			}
+			fake.AssertDone(t)
+		})
+	}
+}

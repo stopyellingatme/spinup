@@ -1,0 +1,45 @@
+name = "flags"
+description = "Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page."
+# The rules use the user and the role of kit/auth, and the admin page needs the web app.
+requires = ["auth"]
+
+# spinup g flags rewrites both files from the [flags] tables of spinup.toml (ADR 0029).
+[[files]]
+path = "api/internal/flags/flags.gen.go"
+source = "files/api/internal/flags/flags.gen.go"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/flags.gen.ts"
+source = "files/web/src/lib/flags.gen.ts"
+class = "managed"
+
+[[files]]
+path = "api/db/kit/00008_feature_flags.sql"
+source = "files/api/db/kit/00008_feature_flags.sql"
+class = "seed"
+
+[[files]]
+path = "web/src/lib/flags.ts"
+source = "files/web/src/lib/flags.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/server/flags.ts"
+source = "files/web/src/lib/server/flags.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/routes/admin/flags/+page.server.ts"
+source = "files/web/src/routes/admin/flags/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/flags/+page.svelte"
+source = "files/web/src/routes/admin/flags/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/flags/schema.ts"
+source = "files/web/src/routes/admin/flags/schema.ts"
+class = "scaffold"
