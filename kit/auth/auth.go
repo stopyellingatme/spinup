@@ -385,8 +385,11 @@ func (a *Auth) Middleware() httpx.Middleware {
 				return
 			}
 			if a.bearer != nil {
-				scheme, token, found := strings.Cut(r.Header.Get("Authorization"), " ")
-				if found && strings.EqualFold(scheme, "Bearer") {
+				// A bare "Bearer" (HTTP parsing trims the trailing space) still takes
+				// the Bearer branch, so an empty token answers 401 and never falls
+				// back to the cookie session (ADR 0030 decision 6.2).
+				scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+				if strings.EqualFold(scheme, "Bearer") {
 					a.serveBearer(w, r, next, token)
 					return
 				}

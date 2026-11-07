@@ -148,6 +148,7 @@ func TestBearerErrors(t *testing.T) {
 		detail             string
 	}{
 		{"empty token", "/api/session", "Bearer ", nil, 401, 0, "The API key is not valid."},
+		{"bare scheme", "/api/session", "Bearer", nil, 401, 0, "The API key is not valid."},
 		{"invalid token", "/api/session", "Bearer key_secret", ErrBearerInvalid, 401, 1, "The API key is not valid."},
 		{"wrapped invalid token", "/api/session", "Bearer key_secret", fmt.Errorf("lookup: %w", ErrBearerInvalid), 401, 1, "The API key is not valid."},
 		{"store failure", "/api/session", "Bearer key_secret", errors.New("store unavailable"), 500, 1, ""},
