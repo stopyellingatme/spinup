@@ -21,6 +21,11 @@
       "id": "flags-schema",
       "desc": "Run spinup db migrate before you start the new binary when the flags module is on. Try: run spinup db migrate up.",
       "kind": "manual"
+    },
+    {
+      "id": "apikeys-schema",
+      "desc": "Run spinup db migrate before you start the new binary when the apikeys module is on. Try: run spinup db migrate up.",
+      "kind": "manual"
     }
   ],
   "behaviors": []
