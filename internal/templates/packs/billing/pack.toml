@@ -1,0 +1,43 @@
+name = "billing"
+description = "Subscriptions, feature gates, and API key usage with Stripe Checkout and the Customer Portal."
+requires = ["auth", "jobs"]
+
+[[files]]
+path = "api/db/kit/00010_billing.sql"
+source = "files/api/db/kit/00010_billing.sql"
+class = "seed"
+
+[[files]]
+path = "api/internal/billing/billing.gen.go"
+source = "files/api/internal/billing/billing.gen.go"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/billing.gen.ts"
+source = "files/web/src/lib/billing.gen.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/server/billing.ts"
+source = "files/web/src/lib/server/billing.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/routes/pricing/+page.server.ts"
+source = "files/web/src/routes/pricing/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/pricing/+page.svelte"
+source = "files/web/src/routes/pricing/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/settings/billing/+page.server.ts"
+source = "files/web/src/routes/settings/billing/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/settings/billing/+page.svelte"
+source = "files/web/src/routes/settings/billing/+page.svelte"
+class = "scaffold"

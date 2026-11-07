@@ -40,6 +40,10 @@ services:
       SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+[[- if has "billing" .modules ]]
+      STRIPE_SECRET_KEY_FILE: /run/secrets/STRIPE_SECRET_KEY
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET
+[[- end ]]
 [[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: [[ .app_name ]]-api
@@ -85,6 +89,10 @@ services:
       SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+[[- if has "billing" .modules ]]
+      STRIPE_SECRET_KEY_FILE: /run/secrets/STRIPE_SECRET_KEY
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET
+[[- end ]]
 [[- if and (has "monitoring" .modules) $monitoring (ne $monitoring "none") ]]
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: [[ .app_name ]]-worker
@@ -162,6 +170,10 @@ services:
       SPINUP_BEHAVIOR_VERSION: ${SPINUP_BEHAVIOR_VERSION:-1}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?spinup deploy sets PUBLIC_ORIGIN}
       DATABASE_URL_FILE: /run/secrets/DATABASE_URL
+[[- if has "billing" .modules ]]
+      STRIPE_SECRET_KEY_FILE: /run/secrets/STRIPE_SECRET_KEY
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET
+[[- end ]]
     volumes:
       - /opt/[[ .app_name ]]/secrets:/run/secrets:ro
     networks:

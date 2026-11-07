@@ -11,6 +11,16 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+[[ if has "billing" .modules ]]
+ appbilling "[[ .module ]]/api/internal/billing"
+ "[[ .module ]]/api/internal/roles"
+ kitbilling "github.com/stopyellingatme/spinup/kit/x/billing"
+ "github.com/stopyellingatme/spinup/kit/x/billing/stripe"
+[[- if has "apikeys" .modules ]]
+ appapikeys "[[ .module ]]/api/internal/apikeys"
+ "github.com/stopyellingatme/spinup/kit/x/apikeys"
+[[- end ]]
+[[- end ]]
 	jobsapp "[[ .module ]]/api/internal/jobs"
 [[- if has "mail" .modules ]]
 	mailapp "[[ .module ]]/api/internal/mail"
@@ -78,6 +88,37 @@ func newWorker(pool *pgxpool.Pool, logger *slog.Logger) (*jobs.Worker, error) {
 		return nil, err
 	}
 	mailers.Register(w)
+[[- end ]]
+[[- if has "billing" .modules ]]
+ var billingEnv struct {
+  SecretKey string `env:"STRIPE_SECRET_KEY" required:"true"`
+  WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
+  APIBase string `env:"STRIPE_API_BASE"`
+  PublicOrigin string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
+ }
+ if err := config.Load(&billingEnv); err != nil { return nil, err }
+ var stripeOptions []stripe.Option
+ if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
+ stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
+ if err != nil { return nil, err }
+ jobsClient, err := jobs.New(pool, jobs.WithLogger(logger))
+ if err != nil { return nil, err }
+[[- if has "apikeys" .modules ]]
+ keyStore, err := apikeys.NewStore(pool, appapikeys.Config, apikeys.WithSessionOnly(kitbilling.SessionPrefix))
+ if err != nil { return nil, err }
+[[- end ]]
+ billingSvc, err := kitbilling.New(pool, appbilling.Config, stripeClient,
+  kitbilling.WithJobs(jobsClient),
+  kitbilling.WithRoles(roles.Set),
+  kitbilling.WithPublicOrigin(billingEnv.PublicOrigin),
+  kitbilling.WithWebhookSecrets(billingEnv.WebhookSecret),
+  kitbilling.WithLogger(logger),
+[[- if has "apikeys" .modules ]]
+  kitbilling.WithAPIKeys(keyStore),
+[[- end ]]
+ )
+ if err != nil { return nil, err }
+ billingSvc.Register(w)
 [[- end ]]
 	return w, nil
 }

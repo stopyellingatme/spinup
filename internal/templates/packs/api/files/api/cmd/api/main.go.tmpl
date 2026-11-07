@@ -4,6 +4,9 @@ import (
  "context"
  "errors"
  "fmt"
+[[- if has "billing" .modules ]]
+ "log/slog"
+[[- end ]]
  "net/http"
  "os"
  "os/signal"
@@ -22,6 +25,12 @@ import (
 [[- if has "mcp" .modules ]]
  appmcp "[[ .module ]]/api/internal/mcp"
  kitmcp "github.com/stopyellingatme/spinup/kit/x/mcp"
+[[- end ]]
+
+[[- if has "billing" .modules ]]
+ appbilling "[[ .module ]]/api/internal/billing"
+ kitbilling "github.com/stopyellingatme/spinup/kit/x/billing"
+ "github.com/stopyellingatme/spinup/kit/x/billing/stripe"
 [[- end ]]
 
 [[ if has "auth" .modules ]] kitmigrations "[[ .module ]]/api/db/kit"
@@ -98,7 +107,7 @@ func run() (err error) {
  if err := config.Load(&apikeysEnv); err != nil {
   return err
  }
- keyStore, err := apikeys.NewStore(pool, appapikeys.Config[[ if has "mcp" .modules ]], apikeys.WithRPCPath(kitmcp.Path)[[ end ]])
+ keyStore, err := apikeys.NewStore(pool, appapikeys.Config[[ if has "billing" .modules ]], apikeys.WithSessionOnly(kitbilling.SessionPrefix)[[ end ]][[ if has "mcp" .modules ]], apikeys.WithRPCPath(kitmcp.Path)[[ end ]])
  if err != nil {
   return err
  }
@@ -149,6 +158,31 @@ func run() (err error) {
   return err
  }
 [[- end ]]
+[[- if has "billing" .modules ]]
+ var billingEnv struct {
+  SecretKey string `env:"STRIPE_SECRET_KEY" required:"true"`
+  WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET" required:"true"`
+  APIBase string `env:"STRIPE_API_BASE"`
+ }
+ if err := config.Load(&billingEnv); err != nil { return err }
+ var stripeOptions []stripe.Option
+ if billingEnv.APIBase != "" { stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase)) }
+ stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
+ if err != nil { return err }
+ jobsClient, err := jobs.New(pool)
+ if err != nil { return err }
+ billingSvc, err := kitbilling.New(pool, appbilling.Config, stripeClient,
+  kitbilling.WithJobs(jobsClient),
+  kitbilling.WithRoles(roles.Set),
+  kitbilling.WithPublicOrigin(web.PublicOrigin),
+  kitbilling.WithWebhookSecrets(billingEnv.WebhookSecret),
+  kitbilling.WithLogger(slog.Default()),
+[[- if has "apikeys" .modules ]]
+  kitbilling.WithAPIKeys(keyStore),
+[[- end ]]
+ )
+ if err != nil { return err }
+[[- end ]]
  a := app.New(
   app.WithName([[ quote .app_name ]]),
   app.WithVersion(version),
@@ -181,6 +215,10 @@ func run() (err error) {
   app.WithRoutes(keyStore.Routes(authn)),
   app.WithCommand("apikeys", keyStore.Command()),
   app.WithReadiness("apikeys", keyStore.Ready),
+[[- end ]]
+[[- if has "billing" .modules ]]
+  app.WithRoutes(billingSvc.Routes(authn)),
+  app.WithCommand("billing", billingSvc.Command()),
 [[- end ]]
 [[- if has "mcp" .modules ]]
   app.WithRoutes(mcpServer.Routes(web.PublicOrigin)),
