@@ -11,7 +11,7 @@ Run migrations through the application API
 ## Use
 
 ```text
-spinup db migrate [up|down|status] [flags]
+spinup db migrate [up|down|status] | migrate kit up|down|status|to <version>|version [flags]
 ```
 
 ## Flags
@@ -41,4 +41,7 @@ spinup db migrate down --i-know
 
 # List applied and pending migrations
 spinup db migrate status
+
+# List the kit migrations of the auth and audit modules (ADR 0028)
+spinup db migrate kit status
 ```

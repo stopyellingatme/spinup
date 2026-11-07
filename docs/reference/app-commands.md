@@ -115,7 +115,7 @@ applied  kit 00003_password_resets.sql
 ```
 
 The kit lines show the prefix `kit`. A kit migration and an app migration can have the same number.
-The command `migrate kit` is the way to roll back a kit migration. The commands `spinup db migrate` and `spinup db to` work on the app migrations only.
+The command `migrate kit` is the way to roll back a kit migration. From the project, `spinup db migrate kit ...` runs it for you. The commands `spinup db migrate <up|down|status>` and `spinup db to` work on the app migrations only.
 
 A lock in PostgreSQL stops two runners from migrating at the same time.
 With the jobs module, `migrate up` also runs the job queue migrations.

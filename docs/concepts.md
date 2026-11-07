@@ -240,7 +240,7 @@ The kit migrations are in `api/db/kit/`. A module ships them, such as the tables
 New app migrations follow the highest number in both sets.
 Existing migrations can have the same number in both sets. For example, `api/db/kit/00005_users_role.sql` and `api/db/migrations/00005_create_orders.sql` do not clash.
 The command `migrate up` applies the kit migrations first. The command `migrate status` lists them first, with the prefix `kit`.
-The command `spinup db to <version>` moves the app migrations only. To roll back a kit migration, run `go run ./cmd/api migrate kit to <version>` in `api/`.
+The command `spinup db to <version>` moves the app migrations only. To roll back a kit migration, run `spinup db migrate kit to <version> --i-know`.
 Never write a kit migration that uses a table of your app.
 
 ## The .spinup folder

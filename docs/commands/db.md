@@ -71,7 +71,15 @@ applied  00003_create_todos.sql
 ```
 
 The commands `spinup db new`, `spinup db redo`, and `spinup db to` work on the app migrations only.
-To roll back a kit migration, run the app binary in `api/`: `go run ./cmd/api migrate kit down`.
+Run `spinup db migrate kit <up|down|status|to <version>|version>` for the kit migrations.
+A rollback (`down` or `to`) needs `--i-know`.
+
+```console
+$ spinup db migrate kit status --dry-run
+go run ./cmd/api migrate kit status
+$ spinup db migrate kit to 5 --i-know --dry-run
+go run ./cmd/api migrate kit to 5
+```
 See [Kit migrations](../concepts.md#kit-migrations).
 
 ## Create a migration

@@ -186,3 +186,53 @@ func TestMigrateErrorMovesEmbeddedTry(t *testing.T) {
 		t.Fatalf("Why = %q, Try = %q", uiErr.Why, uiErr.Try)
 	}
 }
+
+func TestMigrateKit(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, sub, version string
+		know               bool
+		args               []string
+		wantErr            string
+	}{
+		{name: "up", sub: "up", args: []string{"migrate", "kit", "up"}},
+		{name: "status", sub: "status", args: []string{"migrate", "kit", "status"}},
+		{name: "version", sub: "version", args: []string{"migrate", "kit", "version"}},
+		{name: "down", sub: "down", know: true, args: []string{"migrate", "kit", "down"}},
+		{name: "to", sub: "to", version: "5", know: true, args: []string{"migrate", "kit", "to", "5"}},
+		{name: "down guard", sub: "down", wantErr: "Try: spinup db migrate kit down --i-know"},
+		{name: "to guard", sub: "to", version: "5", wantErr: "Try: spinup db migrate kit to 5 --i-know"},
+		{name: "to without version", sub: "to", know: true, wantErr: "Try: spinup db migrate kit to <version> --i-know"},
+		{name: "bad version", sub: "to", version: "five", know: true, wantErr: "Try: spinup db migrate kit to <version> --i-know"},
+		{name: "version on up", sub: "up", version: "5", wantErr: "Try: spinup db migrate --help"},
+		{name: "no subcommand", wantErr: "Try: spinup db migrate --help"},
+		{name: "redo", sub: "redo", wantErr: "Try: spinup db migrate --help"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "spinup.toml"), []byte("[app]\nname='todo'\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			fake := &run.Fake{}
+			if tc.wantErr == "" {
+				fake.Expect("go", append([]string{"run", "./cmd/api"}, tc.args...)...).Return("", "", 0)
+			}
+			var out bytes.Buffer
+			err := Migrate(context.Background(), Options{Dir: root, Kit: true, Sub: tc.sub, Version: tc.version, IKnow: tc.know, Out: &out, ErrOut: &out}, fake)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(errorText(err), tc.wantErr) {
+					t.Fatalf("error=%v", errorText(err))
+				}
+				if len(fake.Calls()) != 0 {
+					t.Fatal("ran a refused command")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			fake.AssertDone(t)
+		})
+	}
+}
