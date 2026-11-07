@@ -15,6 +15,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stopyellingatme/spinup/kit/audit"
 	"github.com/stopyellingatme/spinup/kit/auth"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 func testStore(t *testing.T, now *time.Time) *Store {
@@ -305,5 +309,86 @@ func TestMiddlewareRPCPathCountsQuota(t *testing.T) {
 	}
 	if w := call(); w.Code != http.StatusTooManyRequests {
 		t.Fatalf("second: %d", w.Code)
+	}
+}
+
+func TestWithSessionOnlyOption(t *testing.T) {
+	var o storeOptions
+	WithSessionOnly("/api/billing/", "")(&o)
+	WithSessionOnly("/api/other")(&o)
+	if len(o.only) != 2 || o.only[0] != "/api/billing/" || o.only[1] != "/api/other" {
+		t.Fatalf("only = %v", o.only)
+	}
+}
+
+func TestMiddlewareSessionOnly(t *testing.T) {
+	for _, tc := range []struct {
+		name, method, path string
+		key                bool
+		prefixes           []string
+		status             int
+	}{
+		{"key on prefix", "GET", "/api/billing/checkout", true, []string{"/api/billing/"}, 403},
+		{"key on prefix post", "POST", "/api/billing/portal", true, []string{"/api/billing/"}, 403},
+		{"no key on prefix", "GET", "/api/billing/checkout", false, []string{"/api/billing/"}, 204},
+		{"key off prefix", "GET", "/api/notes", true, []string{"/api/billing/"}, 204},
+		{"second prefix", "GET", "/api/other/x", true, []string{"/api/billing/", "/api/other"}, 403},
+		{"empty prefix ignored", "GET", "/api/notes", true, []string{""}, 204},
+		{"no prefixes", "GET", "/api/billing/checkout", true, nil, 204},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+			s := testStore(t, &now)
+			var o storeOptions
+			WithSessionOnly(tc.prefixes...)(&o)
+			s.sessionOnly = o.only
+			s.days[userDay{1, utcDay(now)}] = &dayUsage{}
+			r := httptest.NewRequestWithContext(t.Context(), tc.method, tc.path, nil)
+			if tc.key {
+				r = r.WithContext(requestContext(r.Context(), testRequest()))
+			}
+			w := httptest.NewRecorder()
+			s.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })).ServeHTTP(w, r)
+			if w.Code != tc.status {
+				t.Fatalf("status = %d, want %d, body=%s", w.Code, tc.status, w.Body)
+			}
+			if tc.status == 403 && !strings.Contains(w.Body.String(), "An API key cannot call this route. Try: sign in with a browser session.") {
+				t.Fatalf("body = %s", w.Body)
+			}
+		})
+	}
+}
+
+func TestMiddlewareSessionOnlyMetric(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	previous := otel.GetMeterProvider()
+	otel.SetMeterProvider(provider)
+	t.Cleanup(func() { otel.SetMeterProvider(previous); _ = provider.Shutdown(t.Context()) })
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	s := testStore(t, &now)
+	s.sessionOnly = []string{"/api/billing/"}
+	r := httptest.NewRequestWithContext(requestContext(t.Context(), testRequest()), "GET", "/api/billing/portal", nil)
+	s.Middleware()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(httptest.NewRecorder(), r)
+	var data metricdata.ResourceMetrics
+	if err := reader.Collect(t.Context(), &data); err != nil {
+		t.Fatal(err)
+	}
+	var forbidden int64
+	for _, scope := range data.ScopeMetrics {
+		for _, m := range scope.Metrics {
+			sum, ok := m.Data.(metricdata.Sum[int64])
+			if !ok || m.Name != "apikeys.requests" {
+				continue
+			}
+			for _, point := range sum.DataPoints {
+				if v, _ := point.Attributes.Value(attribute.Key("outcome")); v.AsString() == "forbidden" {
+					forbidden += point.Value
+				}
+			}
+		}
+	}
+	if forbidden != 1 {
+		t.Fatalf("forbidden = %d", forbidden)
 	}
 }

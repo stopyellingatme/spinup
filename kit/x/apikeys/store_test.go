@@ -480,3 +480,53 @@ func TestStoreFlushLoop(t *testing.T) {
 		}
 	}
 }
+
+func TestStoreSetPlanForUser(t *testing.T) {
+	pool := keyDB(t, false)
+	id := keyUser(t, pool, "forplan@example.com")
+	cfg := testConfig()
+	cfg.Plans["pro"] = Plan{PerMinute: 600, PerDay: 100000}
+	s := dbStore(t, pool, cfg)
+	ctx := t.Context()
+	if s.DefaultPlan() != cfg.DefaultPlan {
+		t.Fatalf("DefaultPlan = %q", s.DefaultPlan())
+	}
+	run := func(plan string, userID int64, commit bool) error {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if err := s.SetPlanForUser(ctx, tx, userID, plan); err != nil {
+			return err
+		}
+		if !commit {
+			return tx.Rollback(ctx)
+		}
+		return tx.Commit(ctx)
+	}
+	if err := run("pro", id, false); err != nil {
+		t.Fatal(err)
+	}
+	if name, _, err := s.PlanOf(ctx, id); err != nil || name != cfg.DefaultPlan {
+		t.Fatalf("after rollback: %s %v", name, err)
+	}
+	if err := run("pro", id, true); err != nil {
+		t.Fatal(err)
+	}
+	if name, _, err := s.PlanOf(ctx, id); err != nil || name != "pro" {
+		t.Fatalf("after commit: %s %v", name, err)
+	}
+	if err := run("free", id, true); err != nil {
+		t.Fatal(err)
+	}
+	if name, _, err := s.PlanOf(ctx, id); err != nil || name != "free" {
+		t.Fatalf("after update: %s %v", name, err)
+	}
+	if err := run("missing", id, true); !errors.Is(err, ErrUnknownPlan) {
+		t.Fatalf("unknown plan: %v", err)
+	}
+	if err := run("pro", 999999, true); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("unknown user: %v", err)
+	}
+}

@@ -136,6 +136,11 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 			return err
 		}
 	}
+	if slices.Contains(selection.Added, "billing") {
+		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.BillingNextSteps(), "<module>", cfg.App.Module)); err != nil {
+			return err
+		}
+	}
 	if slices.Contains(selection.Added, "mcp") {
 		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.MCPNextSteps(), "<module>", cfg.App.Module)); err != nil {
 			return err

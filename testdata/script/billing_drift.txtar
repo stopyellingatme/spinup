@@ -1,0 +1,31 @@
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,jobs,billing --module example.com/demo --no-git --non-interactive
+cd demo
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "ok"'
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "warn"'
+stdout 'api/internal/billing/billing.gen.go'
+stdout 'web/src/lib/billing.gen.ts'
+stdout '"try": "run spinup g billing"'
+exec spinup g billing
+stdout 'Created 0, updated 2 files'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "ok"'
+exec sh -c 'cat "$WORK/bad.toml" >> spinup.toml'
+! exec spinup g billing
+stderr 'must have 1 to 8 prices'
+stderr 'Try: correct \[billing\]'
+-- declaration.toml --
+
+[billing]
+[[billing.plans]]
+name = "free"
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+features = ["reports"]
+-- bad.toml --
+[[billing.plans]]
+name = "bad"

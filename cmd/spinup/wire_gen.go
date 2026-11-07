@@ -78,4 +78,9 @@ import (
 	// MCP server (ADR 0031)
 	_ "github.com/stopyellingatme/spinup/internal/doctor/mcpwired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/mcp"
+
+	// Billing (ADR 0032)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/billingdrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/billingwired"
+	_ "github.com/stopyellingatme/spinup/internal/gen/billing"
 )

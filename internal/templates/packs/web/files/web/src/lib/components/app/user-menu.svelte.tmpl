@@ -60,6 +60,13 @@
 			</DropdownMenu.Item>
 		{/each}
 [[- end ]]
+[[- if has "billing" .modules ]]
+  <DropdownMenu.Item>
+   {#snippet child({ props })}
+    <a {...props} href="/settings/billing">Billing</a>
+   {/snippet}
+  </DropdownMenu.Item>
+[[- end ]]
 		<DropdownMenu.Item onSelect={() => logout?.requestSubmit()}>
 			<LogOutIcon aria-hidden="true" />
 			Sign out

@@ -35,6 +35,7 @@ spinup generate <kind> [args...]
 - [`spinup generate alert`](generate-alert.md) — Add a custom Prometheus alert rule
 - [`spinup generate apikeys`](generate-apikeys.md) — Generate the app API key configuration
 - [`spinup generate audit`](generate-audit.md) — Attach audit triggers and add resource history
+- [`spinup generate billing`](generate-billing.md) — Generate the app billing configuration
 - [`spinup generate client`](generate-client.md) — Generate TypeScript types from OpenAPI
 - [`spinup generate component`](generate-component.md) — Add shadcn-svelte components to the web app (needs the network)
 - [`spinup generate dashboard`](generate-dashboard.md) — Add a custom Grafana dashboard

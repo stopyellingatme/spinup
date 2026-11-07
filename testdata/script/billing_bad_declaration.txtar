@@ -1,0 +1,91 @@
+# A bad [billing] declaration fails with the rule and a Try line. No file changes (ADR 0032 §3.2).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,jobs,billing --module example.com/demo --no-git --non-interactive
+cd demo
+exec cp spinup.toml $WORK/original.toml
+exec cp api/internal/billing/billing.gen.go $WORK/original.gen.go
+
+# An unknown key.
+exec sh -c 'cat "$WORK/unknown-key.toml" >> spinup.toml'
+! exec spinup g billing
+stderr 'unknown key "color"'
+stderr 'Try: correct \[billing\] in spinup.toml and run spinup g billing\.'
+cmp api/internal/billing/billing.gen.go $WORK/original.gen.go
+
+# A default plan that no plan declares.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/missing-default.toml" >> spinup.toml'
+! exec spinup g billing
+stderr 'default_plan "gold" is not a declared plan \(declared: free, pro\)'
+stderr 'Try: correct \[billing\] in spinup.toml and run spinup g billing\.'
+
+# A paid plan without prices, and a price on two plans.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/prices.toml" >> spinup.toml'
+! exec spinup g billing
+stderr 'plan "pro" must have 1 to 8 prices \(it has 0\)'
+stderr 'plan "team": the price lookup key "pro_monthly" is also on plan "plus"'
+
+# A role that [auth] does not declare, and a meter without the apikeys module.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/role-meter.toml" >> spinup.toml'
+! exec spinup g billing
+stderr 'plan "pro": the role "gold" is not an \[auth\] role'
+stderr 'plan "pro" sets meter, and the app does not have the apikeys module'
+cmp api/internal/billing/billing.gen.go $WORK/original.gen.go
+
+# The doctor reports the same fault.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "warn"'
+
+# An app without the module cannot generate billing.
+cd $WORK
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g billing
+stderr 'the app has no billing module'
+stderr 'Try: spinup module add billing'
+
+-- unknown-key.toml --
+
+[billing]
+color = "blue"
+
+-- missing-default.toml --
+
+[billing]
+default_plan = "gold"
+
+[[billing.plans]]
+name = "free"
+
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+
+-- prices.toml --
+
+[[billing.plans]]
+name = "free"
+
+[[billing.plans]]
+name = "pro"
+
+[[billing.plans]]
+name = "plus"
+prices = ["pro_monthly"]
+
+[[billing.plans]]
+name = "team"
+prices = ["pro_monthly"]
+
+-- role-meter.toml --
+
+[[billing.plans]]
+name = "free"
+
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+role = "gold"
+meter = "api_calls"
