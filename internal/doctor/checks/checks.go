@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stopyellingatme/spinup/internal/devkit"
 	"path/filepath"
 	"strings"
 
@@ -85,9 +86,7 @@ func kitVersion(ctx context.Context, c *doctor.Context) doctor.Result {
 		return skip()
 	}
 	version, _ := c.Deps["cli_version"].(string)
-	if version == "dev" || version == "0.0.0-dev" {
-		return doctor.Result{Status: doctor.Skip, Message: "development CLI"}
-	}
+	dev := devkit.IsDev(version)
 	runner, ok := c.Deps["runner"].(exec.Runner)
 	if !ok {
 		return doctor.Result{Status: doctor.Warn, Message: "kit check requires an exec.Runner", Try: "run spinup doctor with a configured runner"}
@@ -109,6 +108,10 @@ func kitVersion(ctx context.Context, c *doctor.Context) doctor.Result {
 		if r.Old.Path == kit && r.New.Version == "" {
 			return doctor.Result{Status: doctor.Skip, Message: "kit uses a local replace"}
 		}
+	}
+	if dev {
+		// A development CLI renders the checkout templates, and the released kit can lack their packages.
+		return doctor.Result{Status: doctor.Warn, Message: "development CLI and api/go.mod pins the released kit without a local replace, so go build can fail", Try: "go mod edit -replace=" + kit + "=" + strings.TrimPrefix(devkit.Hint(), devkit.EnvReplace+"=") + " (in api/), then go mod tidy"}
 	}
 	for _, r := range mod.Require {
 		if r.Path == kit {

@@ -508,3 +508,25 @@ func TestCatalogReturnsIndependentPacks(t *testing.T) {
 		t.Fatal("catalog calls share mutable packs")
 	}
 }
+
+func TestDevBuildWithoutKitReplaceWarns(t *testing.T) {
+	t.Parallel()
+	gen := func(version, kit string) []string {
+		o := Options{Name: "todo", Dir: t.TempDir(), APIOnly: true, Version: version, KitReplace: kit, Answers: map[string]any{"modules": "", "module": "example.com/todo"}}
+		r, err := Generate(context.Background(), o, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Warnings
+	}
+	got := gen("dev", "")
+	if len(got) != 1 || !strings.Contains(got[0], "SPINUP_KIT_REPLACE=") || !strings.Contains(got[0], "Try:") {
+		t.Fatalf("warnings=%q", got)
+	}
+	if w := gen("dev", t.TempDir()); len(w) != 0 {
+		t.Fatalf("replace set: %q", w)
+	}
+	if w := gen("0.1.0-alpha.419", ""); len(w) != 0 {
+		t.Fatalf("release build: %q", w)
+	}
+}

@@ -225,8 +225,11 @@ This check only warns.
 ### kit-version
 
 The CLI and the kit must share the major and minor version. Patch versions can differ.
-The check skips a development build of the CLI and an app that points the kit at a local folder.
-**Fix:** run `spinup upgrade`. See [Support policy](../policy/support.md).
+The check skips an app that points the kit at a local folder.
+A development build of the CLI renders the templates of its checkout. These templates can import kit packages that the released kit lacks.
+If a development CLI finds no local kit folder in `api/go.mod`, the check warns.
+**Fix for a release build:** run `spinup upgrade`.
+**Fix for a development build:** set `SPINUP_KIT_REPLACE=<checkout>/kit` when you run `spinup new`. In an existing app, run `go mod edit -replace` in `api/`, as the `Try:` line shows. See [Support policy](../policy/support.md).
 
 ### client-drift
 

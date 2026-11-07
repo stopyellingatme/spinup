@@ -81,7 +81,8 @@ func TestKitVersion(t *testing.T) {
 		{"local", "0.3.0", `{"Replace":[{"Old":{"Path":"github.com/stopyellingatme/spinup/kit"},"New":{"Path":"../kit"}}]}`, doctor.Skip},
 		{"missing", "0.2.0", `{}`, doctor.Warn},
 		{"malformed", "0.2.0", `bad`, doctor.Warn},
-		{"development", "0.0.0-dev", "", doctor.Skip},
+		{"development", "dev", `{"Require":[{"Path":"github.com/stopyellingatme/spinup/kit","Version":"v0.1.0-alpha.418"}]}`, doctor.Warn},
+		{"development local", "dev", `{"Replace":[{"Old":{"Path":"github.com/stopyellingatme/spinup/kit"},"New":{"Path":"../kit"}}]}`, doctor.Skip},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

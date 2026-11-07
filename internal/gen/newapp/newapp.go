@@ -4,6 +4,7 @@ package newapp
 import (
 	"context"
 	"fmt"
+	"github.com/stopyellingatme/spinup/internal/devkit"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -216,6 +217,9 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 				plan.Files[i].Data = manifest.Normalize(append(plan.Files[i].Data, []byte("\nreplace "+kitModule+" => "+quoteModulePath(replace)+"\n")...))
 			}
 		}
+	}
+	if replace == "" && devkit.IsDev(o.Version) {
+		warnings = append(warnings, "this is a development build of spinup, and api/go.mod pins the released kit, which can lack the packages that these templates import, so go build can fail\nTry: "+devkit.Hint()+" spinup new "+o.Name+" ...")
 	}
 	lock := manifest.New()
 	lock.CLIVersion = o.Version
