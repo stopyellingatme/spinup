@@ -307,6 +307,22 @@ The create, update, and delete handlers use `audit.InTx`, so the trail records w
 The history route has the limits and the paging that [generate audit](generate-audit.md#read-the-history) describes.
 For a table that already exists, use [`spinup g audit`](generate-audit.md).
 
+## Add MCP tools
+
+With the `mcp` module, `--mcp` also writes `api/internal/mcp/<plural>_tools.go`.
+It has five tools: `list_<plural>`, `get_<name>`, `create_<name>`, `update_<name>`, and `delete_<name>`.
+The list and get tools are read-only. The delete tool is marked destructive.
+
+<!-- doctest: skip -->
+```console
+$ spinup g resource note body:text --mcp
+```
+
+Each tool calls the same handler as the REST route, so ownership, validation, and the audit trail stay the same.
+The tools get the `--role` list of the resource.
+Without the `mcp` module, the generator fails and tells you to run `spinup module add mcp`.
+See [generate mcp](generate-mcp.md) and [MCP server](../build/mcp.md).
+
 ## Reserved names
 
 The names `doc`, `docs`, `openapi`, and `openapis` belong to the API reference page.

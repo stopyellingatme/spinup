@@ -42,6 +42,7 @@ Run `spinup g <kind> --help` for the arguments and flags of one generator.
 | Add an email template and sender | `spinup g mailer welcome name:string` | [Mailers](generate-mailer.md) |
 | Regenerate the role constants | `spinup g roles` | [Roles](generate-roles.md) |
 | Add an audit trail to a table | `spinup g audit task` | [Audit](generate-audit.md) |
+| Add a typed tool for AI clients | `spinup g mcp tool lookup_order` | [MCP tools](generate-mcp.md) |
 | Add a Rust, Python, or Node service | `spinup g service ocr --lang rust` | [Services](generate-service.md) |
 | Add a Grafana dashboard | `spinup g dashboard service-health` | [Dashboards](generate-dashboard.md) |
 | Add a Prometheus alert | `spinup g alert HighErrors --expr 'up == 0'` | [Alerts](generate-alert.md) |
