@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -60,13 +61,24 @@ func Tool[In, Out any](s *Server, def ToolDef, h func(context.Context, In) (Out,
 	if _, exists := s.tools[def.Name]; exists {
 		panic("mcp: the tool name " + def.Name + " is already registered." + hint)
 	}
-	sdkmcp.AddTool(s.sdk, &sdkmcp.Tool{Name: def.Name, Title: def.Title, Description: def.Description, Annotations: annotations(def)},
-		func(ctx context.Context, _ *sdkmcp.CallToolRequest, in In) (*sdkmcp.CallToolResult, Out, error) {
+	schemas := stringSchemas(reflect.TypeFor[In](), reflect.TypeFor[Out]())
+	inputSchema := toolSchema[In](schemas, true)
+	outputSchema := toolSchema[Out](schemas, false)
+	sdkmcp.AddTool(s.sdk, &sdkmcp.Tool{Name: def.Name, Title: def.Title, Description: def.Description, Annotations: annotations(def), InputSchema: inputSchema, OutputSchema: outputSchema},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, in In) (*sdkmcp.CallToolResult, any, error) {
 			actor, _ := audit.ActorFrom(ctx)
 			key, _ := keyFrom(ctx)
 			actor.Reason = fmt.Sprintf("api_key:%d mcp:%s", key.Key.ID, def.Name)
 			ctx = audit.WithActor(ctx, actor)
 			out, err := h(ctx, in)
+			var value any = out
+			// The SDK normally substitutes the element zero for a nil output pointer.
+			// Explicit schemas require us to preserve that behavior here.
+			if err == nil && reflect.TypeFor[Out]().Kind() == reflect.Pointer && reflect.ValueOf(out).IsNil() {
+				if zero := reflect.Zero(reflect.TypeFor[Out]().Elem()).Interface(); zero != nil {
+					value = zero
+				}
+			}
 			if err != nil {
 				var safe *toolError
 				if errors.As(err, &safe) {
@@ -78,7 +90,7 @@ func Tool[In, Out any](s *Server, def ToolDef, h func(context.Context, In) (Out,
 					err = &toolError{message: failedText}
 				}
 			}
-			return nil, out, err
+			return nil, value, err
 		})
 	s.tools[def.Name] = def
 }
