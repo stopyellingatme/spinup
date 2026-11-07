@@ -362,6 +362,8 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 15.6. The doctor check `billing-wired` parses `api/cmd/api/main.go` and `api/cmd/worker/main.go`. It checks `billing.New`, `.Routes`, `.Register`, `WithSessionOnly` when the app has apikeys, the two compose secrets, and the audit triggers when audit is on.
 15.7. The doctor check `billing-drift` compares the generated files with a fresh render of `[billing]`.
 
+15.8. The billing routes stay outside the app OpenAPI document, like the auth and apikeys routes. The kit serves them, and oapi-codegen would otherwise ask the app for handlers. The web pages call them through `web/src/lib/server/billing.ts`.
+
 ### 16. Generated files
 
 | Path | Class | Content |
@@ -418,7 +420,7 @@ Files: `kit/x/apikeys/store.go`, `kit/x/apikeys/middleware.go`, and their tests.
 Files: `kit/x/billing/*.go`, `internal/templates/packs/billing/files/api/db/kit/00010_billing.sql`. Check: `T ./kit/x/billing/...` with `DATABASE_URL`. Sections 6 to 10, 12 to 14, 19.2.
 
 ### P1: pack and wiring (after K3)
-Files: `internal/templates/packs/billing/**` except the migration, the `has "billing"` blocks in the api pack `main.go.tmpl`, the jobs pack worker, `deploy/compose.yml.tmpl`, the web pack layout, user menu, and `openapi.yaml.tmpl`, `internal/modules/billing.go`, `internal/upgrade/module.go`, `internal/templates/golden_billing_test.go`, `testdata/golden/billing/**`, the golden trees that change, `internal/templates/packs.digest`. Check: `G billing`, `G apikeys`, `G deploy`, `G api`, `T ./internal/modules/... ./internal/upgrade/... ./internal/templates/...`. Sections 15.2 to 15.5, 16.
+Files: `internal/templates/packs/billing/**` except the migration, the `has "billing"` blocks in the api pack `main.go.tmpl`, the jobs pack worker, `deploy/compose.yml.tmpl`, the web pack layout and user menu, `internal/modules/billing.go`, `internal/upgrade/module.go`, `internal/templates/golden_billing_test.go`, `testdata/golden/billing/**`, the golden trees that change, `internal/templates/packs.digest`. Check: `G billing`, `G apikeys`, `G deploy`, `G api`, `T ./internal/modules/... ./internal/upgrade/... ./internal/templates/...`. Sections 15.2 to 15.5, 16.
 
 ### G1: generator and drift (after P1)
 Files: `internal/gen/billing/**`, `internal/doctor/billingdrift/**`, `testdata/script/billing_drift.txtar`. Check: `T ./internal/gen/billing/... ./internal/doctor/billingdrift/...`, `S billing_drift`. Sections 15.7, 16.
