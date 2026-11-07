@@ -452,3 +452,7 @@ Check: `make doctest`, `make script RUN='apikeys_*'`, `SPINUP_APP_GATE=1 make sc
 
 ### Main loop after the units
 `internal/templates/packs.digest`, `docs/site/**`, `CHANGELOG.md`, the full gate.
+
+## Amendment (2026-11-07): a prefix change keeps existing keys
+
+Section 4.4 is replaced. `AuthenticateBearer` rejects a token that is not `<prefix>_<secret>`, with no query. The prefix must match `^[a-z][a-z0-9]{1,15}$`. The secret must have 43 `base64.RawURLEncoding` characters. The configured `prefix` is used only to mint new keys. The lookup uses `sha256(token)` of the whole token, so the prefix is part of the key identity. A key keeps working after a prefix change. A token with a valid secret and a different prefix has a different digest and is rejected. No migration is needed.

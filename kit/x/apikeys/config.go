@@ -18,7 +18,7 @@ type Plan struct {
 
 // Config is the [apikeys] table of spinup.toml, as spinup g apikeys writes it.
 type Config struct {
-	// Prefix starts each token: <prefix>_<secret>.
+	// Prefix starts each new token: <prefix>_<secret>. Existing keys keep their own prefix.
 	Prefix string
 	// DefaultPlan is the plan of a user with no plan row.
 	DefaultPlan string

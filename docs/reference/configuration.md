@@ -143,7 +143,7 @@ After you change it, run `spinup g apikeys` to rewrite `api/internal/apikeys/api
 
 | Key | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `prefix` | string | `key` | The start of each token. It matches `^[a-z][a-z0-9]{1,15}$`. |
+| `prefix` | string | `key` | The start of each new token. It matches `^[a-z][a-z0-9]{1,15}$`. Existing keys keep their old prefix and keep working. |
 | `default_plan` | string | `free` | The plan of a user with no plan row. It must name a declared plan. |
 | `max_keys` | integer | `10` | The most keys that a user can have. The range is 1 to 100. |
 

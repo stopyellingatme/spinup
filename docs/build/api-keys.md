@@ -113,7 +113,7 @@ per_day = 100000
 
 | Key | Default | What it does |
 | --- | --- | --- |
-| `prefix` | `key` | The start of each token. It has 2 to 16 lower-case letters and digits. |
+| `prefix` | `key` | The start of each new token. It has 2 to 16 lower-case letters and digits. A change does not affect existing keys: they keep their old prefix and keep working. |
 | `default_plan` | `free` | The plan of a user who has no plan row. It must be a declared plan. |
 | `max_keys` | `10` | The most keys a user can have. The range is 1 to 100. |
 | `plans.<name>.per_minute` | none | Requests each minute, from 1 to 100000. |

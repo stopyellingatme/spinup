@@ -19,6 +19,22 @@ func newToken(prefix string) (token string, hash [32]byte, display string, err e
 	return token, sha256.Sum256([]byte(token)), prefix + "_" + secret[:6], nil
 }
 
+// wellFormedToken reports whether token is <prefix>_<secret>. The prefix must
+// match the allowed prefix syntax. The secret must have 43 base64url characters.
+func wellFormedToken(token string) bool {
+	prefix, secret, ok := strings.Cut(token, "_")
+	if !ok || !prefixPattern.MatchString(prefix) || len(secret) != 43 {
+		return false
+	}
+	for i := 0; i < len(secret); i++ {
+		c := secret[i]
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func validateCreate(in CreateInput) error {
 	switch {
 	case !utf8.ValidString(in.Name) || utf8.RuneCountInString(in.Name) < 1 || utf8.RuneCountInString(in.Name) > 64 || strings.ContainsAny(in.Name, "\r\n\v\f\u0085\u2028\u2029\x00"):

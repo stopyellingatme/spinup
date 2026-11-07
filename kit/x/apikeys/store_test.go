@@ -92,6 +92,34 @@ func TestNewStoreConfig(t *testing.T) {
 	}
 }
 
+func TestPrefixChangeKeepsKeys(t *testing.T) {
+	pool := keyDB(t, false)
+	id := keyUser(t, pool, "owner@example.com")
+	ctx := t.Context()
+	a := testConfig()
+	a.Prefix = "alpha"
+	k, token, err := dbStore(t, pool, a).Create(ctx, id, CreateInput{Name: "old", Scope: ScopeRead})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := testConfig()
+	b.Prefix = "beta"
+	s := dbStore(t, pool, b)
+	if _, _, err := s.AuthenticateBearer(ctx, token); err != nil {
+		t.Fatalf("old key after prefix change: %v", err)
+	}
+	if _, nt, err := s.Create(ctx, id, CreateInput{Name: "new", Scope: ScopeRead}); err != nil || !strings.HasPrefix(nt, "beta_") {
+		t.Fatalf("new token %q: %v", nt, err)
+	}
+	secret := strings.TrimPrefix(token, "alpha_")
+	for _, bad := range []string{"beta_" + secret, "ALPHA_" + secret, "alpha-" + secret, "alpha_" + secret[1:], "alpha_" + secret + "x", "_" + secret, "a_" + secret, "alpha_" + strings.Repeat("!", 43), "alpha", ""} {
+		if _, _, err := s.AuthenticateBearer(ctx, bad); !errors.Is(err, auth.ErrBearerInvalid) {
+			t.Fatalf("%q: %v", bad, err)
+		}
+	}
+	_ = k
+}
+
 func TestStoreKeys(t *testing.T) {
 	pool := keyDB(t, false)
 	id := keyUser(t, pool, "owner@example.com")

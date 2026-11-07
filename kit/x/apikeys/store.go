@@ -158,8 +158,7 @@ func scanKey(row pgx.Row) (k Key, err error) {
 
 // AuthenticateBearer reads the key and its user in one query, without a token cache.
 func (s *Store) AuthenticateBearer(ctx context.Context, token string) (context.Context, auth.User, error) {
-	secret, ok := strings.CutPrefix(token, s.cfg.Prefix+"_")
-	if !ok || len(secret) != 43 {
+	if !wellFormedToken(token) {
 		return ctx, auth.User{}, auth.ErrBearerInvalid
 	}
 	hash := sha256.Sum256([]byte(token))
