@@ -90,7 +90,8 @@ type wireItem struct {
 type wireSubscription struct {
 	Subscription
 	Items struct {
-		Data []wireItem `json:"data"`
+		Data    []wireItem `json:"data"`
+		HasMore bool       `json:"has_more"`
 	} `json:"items"`
 }
 
@@ -103,7 +104,16 @@ func (c *Client) ListSubscriptions(ctx context.Context, customer string) ([]Subs
 	result := make([]Subscription, 0, len(rows))
 	for _, row := range rows {
 		sub := row.Subscription
-		for _, item := range row.Items.Data {
+		items := row.Items.Data
+		if row.Items.HasMore {
+			// A subscription embeds its first 10 items. Read them all, so that a
+			// declared price on a later item still selects its plan.
+			items, err = list(ctx, c, "/v1/subscription_items", url.Values{"subscription": {sub.ID}}, func(i wireItem) string { return i.ID })
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, item := range items {
 			price, err := item.Price.value()
 			if err != nil {
 				return nil, decodeError("/v1/subscriptions")

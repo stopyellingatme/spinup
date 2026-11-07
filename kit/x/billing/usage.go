@@ -81,8 +81,33 @@ func usageError(err error) error {
 }
 
 // reportUser sends the usage of one user and records each sent day.
+//
+// Each send has a checkpoint. The pass first commits the target total as
+// pending, then sends the delta with an identifier that names the target, and
+// then commits the target as reported. When the pass stops between the send and
+// the second commit, the next pass sends the same event again, and Stripe
+// dedupes it by its identifier. A session advisory lock for each user keeps two
+// passes (the periodic job and billing report-usage) from sending the same delta.
 func (s *Service) reportUser(ctx context.Context, u meteredUser, from, today, now time.Time) (int, error) {
-	rows, err := s.pool.Query(ctx, `SELECT g.day, sum(g.count)::bigint, COALESCE(max(r.reported), 0)::bigint
+	conn, err := s.pool.Acquire(ctx)
+	if err != nil {
+		return 0, usageError(err)
+	}
+	defer conn.Release()
+	var locked bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtext('billing-usage:' || $1::bigint))`, u.id).Scan(&locked); err != nil {
+		return 0, usageError(err)
+	}
+	if !locked {
+		s.logger.InfoContext(ctx, "billing: another usage pass is sending the usage of this user", "user_id", u.id)
+		return 0, nil
+	}
+	defer func() {
+		if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(hashtext('billing-usage:' || $1::bigint))`, u.id); err != nil {
+			s.logger.WarnContext(ctx, "billing: cannot release the usage lock", "user_id", u.id, "error", err)
+		}
+	}()
+	rows, err := conn.Query(ctx, `SELECT g.day, sum(g.count)::bigint, COALESCE(max(r.reported), 0)::bigint, COALESCE(max(r.pending), 0)::bigint
 FROM api_key_usage g
 JOIN api_keys k ON k.id = g.key_id
 LEFT JOIN billing_usage_reports r ON r.user_id = k.user_id AND r.day = g.day
@@ -92,12 +117,12 @@ GROUP BY g.day ORDER BY g.day`, u.id, from.Format(time.DateOnly), today.Format(t
 		return 0, usageError(err)
 	}
 	type dayRow struct {
-		day             time.Time
-		total, reported int64
+		day                      time.Time
+		total, reported, pending int64
 	}
 	days, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (dayRow, error) {
 		var d dayRow
-		err := row.Scan(&d.day, &d.total, &d.reported)
+		err := row.Scan(&d.day, &d.total, &d.reported, &d.pending)
 		return d, err
 	})
 	if err != nil {
@@ -105,25 +130,41 @@ GROUP BY g.day ORDER BY g.day`, u.id, from.Format(time.DateOnly), today.Format(t
 	}
 	sent := 0
 	for _, d := range days {
-		if d.total <= d.reported {
-			continue
-		}
 		day := time.Date(d.day.Year(), d.day.Month(), d.day.Day(), 0, 0, 0, 0, time.UTC)
 		stamp := day.Add(24*time.Hour - time.Second)
 		if day.Equal(today) {
 			stamp = now
 		}
 		label := day.Format(time.DateOnly)
-		event := stripe.MeterEvent{EventName: u.meter, Customer: u.customer, Value: d.total - d.reported,
-			Identifier: fmt.Sprintf("apikeys:%d:%s:%d", u.id, label, d.total), Timestamp: stamp}
-		if err := s.reporter.Report(ctx, event); err != nil {
-			return sent, tryLine(fmt.Errorf("billing: cannot report the usage of user %d on %s: %w", u.id, label, err), "check the Stripe key and the meter, then run billing report-usage again")
+		send := func(from, target int64) error {
+			event := stripe.MeterEvent{EventName: u.meter, Customer: u.customer, Value: target - from,
+				Identifier: fmt.Sprintf("apikeys:%d:%s:%d", u.id, label, target), Timestamp: stamp}
+			if err := s.reporter.Report(ctx, event); err != nil {
+				return tryLine(fmt.Errorf("billing: cannot report the usage of user %d on %s: %w", u.id, label, err), "check the Stripe key and the meter, then run billing report-usage again")
+			}
+			if _, err := conn.Exec(ctx, `UPDATE billing_usage_reports SET reported = $3 WHERE user_id = $1 AND day = $2::date AND reported < $3`, u.id, label, target); err != nil {
+				return usageError(err)
+			}
+			sent++
+			return nil
 		}
-		if _, err := s.pool.Exec(ctx, `INSERT INTO billing_usage_reports(user_id,day,reported) VALUES($1,$2::date,$3)
-ON CONFLICT (user_id, day) DO UPDATE SET reported = GREATEST(billing_usage_reports.reported, excluded.reported)`, u.id, label, d.total); err != nil {
+		// A pending target that was not confirmed: send the same event again.
+		if d.pending > d.reported {
+			if err := send(d.reported, d.pending); err != nil {
+				return sent, err
+			}
+			d.reported = d.pending
+		}
+		if d.total <= d.reported {
+			continue
+		}
+		if _, err := conn.Exec(ctx, `INSERT INTO billing_usage_reports(user_id, day, reported, pending) VALUES($1, $2::date, $3, $4)
+ON CONFLICT (user_id, day) DO UPDATE SET pending = GREATEST(billing_usage_reports.pending, excluded.pending)`, u.id, label, d.reported, d.total); err != nil {
 			return sent, usageError(err)
 		}
-		sent++
+		if err := send(d.reported, d.total); err != nil {
+			return sent, err
+		}
 	}
 	return sent, nil
 }

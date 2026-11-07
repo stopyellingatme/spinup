@@ -97,6 +97,46 @@ func TestReportUsage(t *testing.T) {
 	if last := got[len(got)-1]; len(got) != 4 || last.Value != 1 || last.Identifier != fmt.Sprintf("apikeys:%d:2026-11-07:8", uid) {
 		t.Fatalf("retry events = %+v", got)
 	}
+	// A pass that stopped after a send and before its checkpoint left a pending
+	// target. The next pass sends that event again first (Stripe dedupes it by
+	// its identifier), and then the new delta.
+	f.addUsage(k1.ID, today, 2)
+	if _, err := f.pool.Exec(t.Context(), `UPDATE billing_usage_reports SET pending=9 WHERE user_id=$1 AND day='2026-11-07'`, uid); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ReportUsage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	got = f.fake.MeterEvents()
+	if len(got) != 6 || got[4].Identifier != fmt.Sprintf("apikeys:%d:2026-11-07:9", uid) || got[4].Value != 1 ||
+		got[5].Identifier != fmt.Sprintf("apikeys:%d:2026-11-07:10", uid) || got[5].Value != 1 {
+		t.Fatalf("pending events = %+v", got)
+	}
+	// Another pass that holds the lock of the user: this pass sends nothing.
+	f.addUsage(k1.ID, today, 5)
+	conn, err := f.pool.Acquire(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(t.Context(), `SELECT pg_advisory_lock(hashtext('billing-usage:' || $1::bigint))`, uid); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ReportUsage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.fake.MeterEvents()); n != 6 {
+		t.Fatalf("a locked user got %d events, want 6", n)
+	}
+	if _, err := conn.Exec(t.Context(), `SELECT pg_advisory_unlock(hashtext('billing-usage:' || $1::bigint))`, uid); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ReportUsage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got = f.fake.MeterEvents(); len(got) != 7 || got[6].Value != 5 {
+		t.Fatalf("after the unlock = %+v", got)
+	}
 }
 
 type failingReporter struct{ calls int }

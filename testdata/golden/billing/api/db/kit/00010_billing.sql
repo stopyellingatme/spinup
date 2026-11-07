@@ -47,6 +47,8 @@ CREATE TABLE billing_usage_reports (
     user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     day date NOT NULL,
     reported bigint NOT NULL DEFAULT 0,
+    -- The total of a send that is not confirmed yet (ADR 0032 section 13.3).
+    pending bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
 );
 

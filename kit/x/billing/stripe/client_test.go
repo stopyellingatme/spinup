@@ -175,6 +175,20 @@ func TestPaginationAndWireShapes(t *testing.T) {
 	if item.CurrentPeriodEnd != 123 || item.Price.Product.ID != "prod_1" || item.Price.Recurring.Meter != "mtr_1" {
 		t.Fatal(item)
 	}
+	// More than the 10 embedded items: the client reads the item list.
+	c = testClient(t, func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/v1/subscription_items" {
+			if r.URL.Query().Get("subscription") != "sub_9" {
+				t.Error(r.URL.Query())
+			}
+			return answer(200, `{"data":[{"id":"si_1","price":{"id":"price_a","lookup_key":"a"}},{"id":"si_11","price":{"id":"price_pro","lookup_key":"pro_monthly"}}],"has_more":false}`), nil
+		}
+		return answer(200, `{"data":[{"id":"sub_9","items":{"data":[{"id":"si_1","price":{"id":"price_a","lookup_key":"a"}}],"has_more":true}}],"has_more":false}`), nil
+	})
+	subs, err = c.ListSubscriptions(t.Context(), "cus_1")
+	if err != nil || len(subs) != 1 || len(subs[0].Items) != 2 || subs[0].Items[1].Price.LookupKey != "pro_monthly" {
+		t.Fatalf("item pages = %+v, %v", subs, err)
+	}
 	pages = 0
 	c = testClient(t, func(r *http.Request) (*http.Response, error) {
 		pages++
