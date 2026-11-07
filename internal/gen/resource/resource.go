@@ -39,6 +39,7 @@ func init() {
   spinup g resource invoice total:decimal due:date --api-only`,
 		Usage: "<name> <field:type>...",
 		Flags: func(fs *pflag.FlagSet) {
+			fs.Bool("mcp", false, "generate typed MCP tools (requires the mcp module)")
 			fs.Bool("api-only", false, "skip the parts that other packs register, such as web pages")
 			fs.Bool("no-tests", false, "skip the handler test file")
 			fs.Bool("shared", false, "share rows between signed-in users (requires auth)")
@@ -353,12 +354,16 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	if len(spec.Roles) > 0 && !spec.Shared {
 		next = append(next, "a role guard does not share owned rows. Try: add --shared to share rows between users.")
 	}
-	return &gen.Output{
+	out := &gen.Output{
 		Plan:      plan,
 		PostSteps: steps,
 		Next:      next,
 		Edits:     validationEdits(apiPlan),
-	}, nil
+	}
+	if Bool(in.Flags, "mcp") {
+		return addMCP(spec, in, out)
+	}
+	return out, nil
 }
 
 // loadResourceConfig reads the project configuration or supplies its defaults

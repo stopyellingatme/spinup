@@ -1,0 +1,19 @@
+# A typed tool updates the managed registration file.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys,mcp --module example.com/demo --no-git --non-interactive
+cd demo
+exec spinup g mcp tool lookup_order --write
+exists api/internal/mcp/lookup_order.go api/internal/mcp/tools_gen.go
+grep '// spinup:mcp-tool registerLookupOrder' api/internal/mcp/lookup_order.go
+grep 'ReadOnly: +false' api/internal/mcp/lookup_order.go
+grep 'registerLookupOrder\(s, d\)' api/internal/mcp/tools_gen.go
+! exec spinup g mcp tool lookup_order --write
+stderr 'Try: pass --force'
+exec spinup g mcp tool lookup_order --destructive --force
+cd api
+exec go build ./...
+cd $WORK
+exec spinup new plain --api-only --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g mcp tool lookup_order
+stderr 'Try: spinup module add mcp'
