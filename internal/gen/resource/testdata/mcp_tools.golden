@@ -1,0 +1,159 @@
+package mcp
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"example.com/demo/api/internal/gen"
+	"example.com/demo/api/internal/handlers"
+	"github.com/jackc/pgx/v5"
+	"github.com/stopyellingatme/spinup/kit/httpx"
+	kitmcp "github.com/stopyellingatme/spinup/kit/x/mcp"
+)
+
+type notesListIn struct {
+	Limit  int32 `json:"limit,omitempty" jsonschema:"Page size, default 50, maximum 200"`
+	Offset int32 `json:"offset,omitempty" jsonschema:"Number of records to skip"`
+}
+type notesListOut struct {
+	Items []gen.Note `json:"items"`
+	Total int64      `json:"total"`
+}
+type notesIDIn struct {
+	ID int64 `json:"id"`
+}
+type notesUpdateIn struct {
+	ID int64 `json:"id"`
+	gen.NoteInput
+}
+type notesDeleteOut struct {
+	Deleted bool `json:"deleted"`
+}
+
+// spinup:mcp-tool registerNotesTools
+func registerNotesTools(s *kitmcp.Server, d Deps) {
+	server := handlers.NewServer(d.DB)
+	kitmcp.Tool(s, kitmcp.ToolDef{
+		Name: "list_notes", Description: "List notes.",
+		ReadOnly: true, Destructive: false, Idempotent: false, Roles: []string{"manager"},
+	}, func(ctx context.Context, in notesListIn) (notesListOut, error) {
+		limit := in.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		if in.Limit < 0 || in.Limit > 200 || in.Offset < 0 || in.Offset > 10000 {
+			return notesListOut{}, kitmcp.ToolError("The page is invalid. Try: use limit from 1 to 200 and offset from 0 to 10000.")
+		}
+		response, err := server.ListNotes(ctx, gen.ListNotesRequestObject{
+			Params: gen.ListNotesParams{Limit: &limit, Offset: &in.Offset},
+		})
+		if err != nil {
+			return notesListOut{}, notesToolError(err)
+		}
+		switch result := response.(type) {
+		case gen.ListNotes200JSONResponse:
+			return notesListOut(result), nil
+		case gen.ListNotes422ApplicationProblemPlusJSONResponse:
+			return notesListOut{}, notesToolDetail(result.Detail)
+		default:
+			return notesListOut{}, fmt.Errorf("unexpected ListNotes response %T", response)
+		}
+	})
+	kitmcp.Tool(s, kitmcp.ToolDef{
+		Name: "get_note", Description: "Get note.",
+		ReadOnly: true, Destructive: false, Idempotent: false, Roles: []string{"manager"},
+	}, func(ctx context.Context, in notesIDIn) (gen.Note, error) {
+		response, err := server.GetNote(ctx, gen.GetNoteRequestObject{
+			Id: in.ID,
+		})
+		if err != nil {
+			return gen.Note{}, notesToolError(err)
+		}
+		switch result := response.(type) {
+		case gen.GetNote200JSONResponse:
+			return gen.Note(result), nil
+		case gen.GetNote404ApplicationProblemPlusJSONResponse:
+			return gen.Note{}, notesToolDetail(result.Detail)
+		default:
+			return gen.Note{}, fmt.Errorf("unexpected GetNote response %T", response)
+		}
+	})
+	kitmcp.Tool(s, kitmcp.ToolDef{
+		Name: "create_note", Description: "Create note.",
+		ReadOnly: false, Destructive: false, Idempotent: false, Roles: []string{"manager"},
+	}, func(ctx context.Context, in gen.NoteInput) (gen.Note, error) {
+		response, err := server.CreateNote(ctx, gen.CreateNoteRequestObject{
+			Body: &in,
+		})
+		if err != nil {
+			return gen.Note{}, notesToolError(err)
+		}
+		switch result := response.(type) {
+		case gen.CreateNote201JSONResponse:
+			return gen.Note(result), nil
+		case gen.CreateNote422ApplicationProblemPlusJSONResponse:
+			return gen.Note{}, notesToolDetail(result.Detail)
+		default:
+			return gen.Note{}, fmt.Errorf("unexpected CreateNote response %T", response)
+		}
+	})
+	kitmcp.Tool(s, kitmcp.ToolDef{
+		Name: "update_note", Description: "Update note.",
+		ReadOnly: false, Destructive: false, Idempotent: true, Roles: []string{"manager"},
+	}, func(ctx context.Context, in notesUpdateIn) (gen.Note, error) {
+		response, err := server.UpdateNote(ctx, gen.UpdateNoteRequestObject{
+			Id: in.ID, Body: &in.NoteInput,
+		})
+		if err != nil {
+			return gen.Note{}, notesToolError(err)
+		}
+		switch result := response.(type) {
+		case gen.UpdateNote200JSONResponse:
+			return gen.Note(result), nil
+		case gen.UpdateNote404ApplicationProblemPlusJSONResponse:
+			return gen.Note{}, notesToolDetail(result.Detail)
+		case gen.UpdateNote422ApplicationProblemPlusJSONResponse:
+			return gen.Note{}, notesToolDetail(result.Detail)
+		default:
+			return gen.Note{}, fmt.Errorf("unexpected UpdateNote response %T", response)
+		}
+	})
+	kitmcp.Tool(s, kitmcp.ToolDef{
+		Name: "delete_note", Description: "Delete note.",
+		ReadOnly: false, Destructive: true, Idempotent: true, Roles: []string{"manager"},
+	}, func(ctx context.Context, in notesIDIn) (notesDeleteOut, error) {
+		response, err := server.DeleteNote(ctx, gen.DeleteNoteRequestObject{
+			Id: in.ID,
+		})
+		if err != nil {
+			return notesDeleteOut{}, notesToolError(err)
+		}
+		switch result := response.(type) {
+		case gen.DeleteNote204Response:
+			return notesDeleteOut{Deleted: true}, nil
+		case gen.DeleteNote404ApplicationProblemPlusJSONResponse:
+			return notesDeleteOut{}, notesToolDetail(result.Detail)
+		default:
+			return notesDeleteOut{}, fmt.Errorf("unexpected DeleteNote response %T", response)
+		}
+	})
+}
+
+func notesToolDetail(detail *string) error {
+	if detail == nil {
+		return kitmcp.ToolError("The request failed. Try: check the arguments.")
+	}
+	return kitmcp.ToolError("%s Try: check the arguments.", *detail)
+}
+
+func notesToolError(err error) error {
+	var problem *httpx.Error
+	if errors.As(err, &problem) && (problem.Problem.Status == 404 || problem.Problem.Status == 422) {
+		return notesToolDetail(&problem.Problem.Detail)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return kitmcp.ToolError("The record does not exist. Try: use an existing id.")
+	}
+	return err
+}
