@@ -118,7 +118,12 @@ Pass insert options after the arguments:
 | `jobs.Priority(n)` | 1 is the highest and the default, 4 is the lowest. | `jobs.Priority(3)` |
 | `jobs.RunAt(t)` | Run at time `t` or later. | `jobs.RunAt(time.Now().Add(time.Hour))` |
 | `jobs.MaxAttempts(n)` | Give up after `n` tries. | `jobs.MaxAttempts(5)` |
-| `jobs.UniqueByArgs()` | Skip the insert if the same kind with the same arguments waits or runs. | `jobs.UniqueByArgs()` |
+| `jobs.UniqueByArgs()` | Skip the insert if the same kind with the same arguments waits, runs, or completed in the last 24 hours. | `jobs.UniqueByArgs()` |
+
+River keeps a completed job for 24 hours, and `UniqueByArgs` counts it.
+So a unique job with the same arguments does not run again during that time.
+Use `UniqueByArgs` for work that must run once, such as a fetch of one document.
+For work that must run again when new data arrives, insert without it, or put a changing value such as a date in the arguments.
 
 ## Run a job on a schedule
 
@@ -146,6 +151,40 @@ River's default is 25 attempts. After the last attempt, River discards the job.
 The function gets `job.Attempt`, which starts at 1.
 A job can run more than once, so write it to be safe to repeat.
 For example, check whether the email went out before you send it again.
+
+## Stop retries
+
+Some input can never succeed, for example a file that is not valid XML.
+Retries only waste time. Return `jobs.Cancel(err)` to end the job at once.
+River sets the state to `cancelled` and never runs the job again, even when attempts remain.
+
+```go
+if err := parse(job.Args.Path); err != nil {
+	return jobs.Cancel(err) // errors.Is and errors.As still find err
+}
+```
+
+If you pass `nil`, the job is still cancelled, with a generic message.
+
+## Time limit
+
+River cancels the context of a job after one minute.
+This is the default for every job. A job that needs more time must raise the limit.
+Set a new default for all jobs in `newWorker`:
+
+```go
+jobs.NewWorker(pool, jobs.WithJobTimeout(15*time.Minute))
+```
+
+A negative value means no limit. Zero keeps the default of one minute.
+To change the limit of one job kind, add a `Timeout` method to its arguments:
+
+```go
+func (BackfillArgs) Timeout() time.Duration { return 30 * time.Minute }
+```
+
+The method replaces the default for that kind. It has the same rules: zero is the default, and a negative value is no limit.
+When the limit passes, the function must stop. Check `ctx.Done()` in long loops.
 
 ## Queues and limits
 
@@ -235,6 +274,7 @@ It needs `DATABASE_URL`.
 | `jobs: insert a "..." job` with a missing table | The River migrations are not applied. | Run `spinup db migrate up`. |
 | Jobs stay `available` | No worker runs, or the job is on a queue the worker does not take. | Start the worker. Check the queue names. |
 | The worker logs `no job is registered` | The `jobs` package has no job yet. | Run `spinup g job <name>`. |
+| A job stops after one minute | The default time limit of a job is one minute. | Set `jobs.WithJobTimeout`, or add a `Timeout` method to the job arguments. |
 | A job is cancelled at shutdown | It ran longer than `SHUTDOWN_TIMEOUT`. | Make it check `ctx.Done()`, or raise the timeout. |
 
 ## See also

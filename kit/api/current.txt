@@ -300,12 +300,14 @@ kit/httpx type Error struct
 kit/httpx type FieldError struct
 kit/httpx type Middleware func(http.Handler) http.Handler
 kit/httpx type Problem struct
+kit/jobs const DefaultJobTimeout = river.JobTimeoutDefault
 kit/jobs const DefaultMaxPayloadBytes = 1024 * 1024
 kit/jobs const DefaultQueue = river.QueueDefault
 kit/jobs const DefaultQueueWorkers = 10
 kit/jobs field Job.Args T
 kit/jobs field Job.Attempt int
 kit/jobs field Job.ID int64
+kit/jobs func Cancel(error) error
 kit/jobs func MaxAttempts(int) InsertOption
 kit/jobs func MigrateCommand(...MigrateOption) func(ctx context.Context, args []string) error
 kit/jobs func MigrationHook(...MigrateOption) db.Hook
@@ -316,6 +318,7 @@ kit/jobs func Queue(string) InsertOption
 kit/jobs func Register[T Args](*Worker, func(ctx context.Context, job Job[T]) error)
 kit/jobs func RunAt(time.Time) InsertOption
 kit/jobs func UniqueByArgs() InsertOption
+kit/jobs func WithJobTimeout(time.Duration) Option
 kit/jobs func WithLogger(*slog.Logger) Option
 kit/jobs func WithMaxAttempts(int) Option
 kit/jobs func WithMaxPayloadBytes(int) Option
@@ -324,6 +327,7 @@ kit/jobs func WithMigrateOutput(io.Writer) MigrateOption
 kit/jobs func WithPollInterval(time.Duration) Option
 kit/jobs func WithQueue(string, int) Option
 kit/jobs imethod Args.Kind() string
+kit/jobs imethod Timeouter.Timeout() time.Duration
 kit/jobs ptrmethod Client.Insert(context.Context, Args, ...InsertOption) (int64, error)
 kit/jobs ptrmethod Client.InsertTx(context.Context, pgx.Tx, Args, ...InsertOption) (int64, error)
 kit/jobs ptrmethod Worker.Kinds() []string
@@ -336,6 +340,7 @@ kit/jobs type InsertOption func(*river.InsertOpts)
 kit/jobs type Job[T Args] struct
 kit/jobs type MigrateOption func(*migrateConfig)
 kit/jobs type Option func(*config)
+kit/jobs type Timeouter interface
 kit/jobs type Worker struct
 kit/logx field Options.AddSource bool
 kit/logx field Options.Format string
