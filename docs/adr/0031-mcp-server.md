@@ -207,7 +207,7 @@ Every user-facing error says what failed and why and ends with a `Try:` line. Th
 
 ### 14. Docs
 
-`docs/modules/mcp.md`: enable the module, write a tool, the generators, connect Claude Code, Claude, and Cursor, the scope and role rules, the limits (no OAuth, no ChatGPT, no streams). Add the module to the module table of the concepts page.
+`docs/build/mcp.md`: enable the module, write a tool, the generators, connect Claude Code, Claude, and Cursor, the scope and role rules, the limits (no OAuth, no ChatGPT, no streams). Add the module to the module table of the concepts page.
 
 ## Consequences
 
@@ -234,7 +234,7 @@ Files: `internal/templates/packs/mcp/**`, the `has "mcp"` blocks in `packs/api/f
 Files: `internal/gen/mcp/**`, the `--mcp` flag in `internal/gen/resource/`, `testdata/script/mcp_tool.txtar`, `testdata/script/mcp_resource.txtar`. Check: `T ./internal/gen/mcp/... ./internal/gen/resource/...`, `S mcp_tool`, `S mcp_resource`. Section 10.
 
 ### D1: doctor, docs, scripts, gate (after P1, G1)
-Files: `internal/doctor/mcpwired/**`, `docs/modules/mcp.md`, the concepts module table, `testdata/script/mcp_module.txtar`, `mcp_module_add.txtar`, `mcp_wired.txtar`, `app_gate_mcp.txtar`. Check: `T ./internal/doctor/mcpwired/...`, `make doctest`, `S mcp_*`. Sections 9.6, 13.3, 13.4, 14.
+Files: `internal/doctor/mcpwired/**`, `docs/build/mcp.md`, the concepts module table, `testdata/script/mcp_module.txtar`, `mcp_module_add.txtar`, `mcp_wired.txtar`, `app_gate_mcp.txtar`. Check: `T ./internal/doctor/mcpwired/...`, `make doctest`, `S mcp_*`. Sections 9.6, 13.3, 13.4, 14.
 
 ### Main loop after the units
 Merge, the final gate (`make build lint test golden script doctest`, `app_gate_mcp`, `app_gate_apikeys`, `make vuln`), and a dogfood check with Claude Code against the todo app.

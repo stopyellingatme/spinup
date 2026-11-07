@@ -13,7 +13,7 @@ type Deps struct {
 
 // New creates the MCP server and registers the application tools.
 func New(d Deps) (*kitmcp.Server, error) {
-	s, err := kitmcp.New(kitmcp.Config{Name: "[[ .app_name ]]", Version: d.Version})
+	s, err := kitmcp.New(kitmcp.Config{Name: "todo", Version: d.Version})
 	if err != nil {
 		return nil, err
 	}

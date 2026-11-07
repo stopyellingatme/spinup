@@ -4,17 +4,17 @@ requires = ["auth", "apikeys"]
 
 [[files]]
 path = "api/internal/mcp/server.go"
-source = "files/api/internal/mcp/server.go"
+source = "files/api/internal/mcp/server.go.tmpl"
 class = "scaffold"
 
 [[files]]
 path = "api/internal/mcp/tools_gen.go"
-source = "files/api/internal/mcp/tools_gen.go"
+source = "files/api/internal/mcp/tools_gen.go.tmpl"
 class = "managed"
 
 [[files]]
 path = "api/internal/mcp/whoami.go"
-source = "files/api/internal/mcp/whoami.go"
+source = "files/api/internal/mcp/whoami.go.tmpl"
 class = "seed"
 
 [[files]]

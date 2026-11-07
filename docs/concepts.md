@@ -80,7 +80,7 @@ tofu        off    deploy        OpenTofu infrastructure for a Hetzner Cloud VM.
 | --- | --- | --- |
 | `auth` | Accounts, sign-in, and sessions | [Accounts and sign-in](auth.md) |
 | `audit` | A history of who changed each record | [Audit trail](audit.md) |
-| `mcp` | An MCP endpoint for AI clients, with typed tools and API key access | [MCP server](modules/mcp.md) |
+| `mcp` | An MCP endpoint for AI clients, with typed tools and API key access | [MCP server](build/mcp.md) |
 | `jobs` | Background jobs and a worker process | [Background jobs](build/jobs.md) |
 | `mail` | Typed emails and a development inbox | [Mail](mail.md) |
 | `ci` | GitHub Actions workflows | [Generated CI](ci.md) |
