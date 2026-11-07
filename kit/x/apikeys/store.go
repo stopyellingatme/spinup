@@ -54,6 +54,7 @@ type Store struct {
 	cfg          Config
 	logger       *slog.Logger
 	now          func() time.Time
+	rpcPath      string
 	counter      metric.Int64Counter
 	mu           sync.Mutex
 	warned       map[string]bool
@@ -76,6 +77,7 @@ var _ auth.Bearer = (*Store)(nil)
 type storeOptions struct {
 	logger *slog.Logger
 	now    func() time.Time
+	rpc    string
 }
 
 // StoreOption configures NewStore.
@@ -86,6 +88,10 @@ func WithLogger(l *slog.Logger) StoreOption { return func(o *storeOptions) { o.l
 
 // WithClock selects the clock used for expiry and quota calculations.
 func WithClock(now func() time.Time) StoreOption { return func(o *storeOptions) { o.now = now } }
+
+// WithRPCPath lets a read key send POST to path (an exact match). The handler
+// at path must enforce the read scope itself. The quotas still apply.
+func WithRPCPath(path string) StoreOption { return func(o *storeOptions) { o.rpc = path } }
 
 // NewStore validates cfg without accessing the database or starting a loop.
 func NewStore(pool *pgxpool.Pool, cfg Config, opts ...StoreOption) (*Store, error) {
@@ -106,7 +112,7 @@ func NewStore(pool *pgxpool.Pool, cfg Config, opts ...StoreOption) (*Store, erro
 		o.now = time.Now
 	}
 	cfg.Plans = maps.Clone(cfg.Plans)
-	s := &Store{pool: pool, cfg: cfg, logger: o.logger, now: o.now, warned: map[string]bool{}, minute: map[int64]int64{}, days: map[userDay]*dayUsage{}, pending: map[keyDay]int64{}, lastErr: &storeError{message: "apikeys: usage has not been flushed.\nTry: start the store and check the database connection."}}
+	s := &Store{pool: pool, cfg: cfg, logger: o.logger, now: o.now, rpcPath: o.rpc, warned: map[string]bool{}, minute: map[int64]int64{}, days: map[userDay]*dayUsage{}, pending: map[keyDay]int64{}, lastErr: &storeError{message: "apikeys: usage has not been flushed.\nTry: start the store and check the database connection."}}
 	s.initCounter()
 	return s, nil
 }

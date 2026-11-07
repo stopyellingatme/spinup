@@ -40,7 +40,8 @@ func (s *Store) Middleware() httpx.Middleware {
 				problem(w, r, http.StatusForbidden, "An API key cannot manage keys or call admin routes.")
 				return
 			}
-			if req.Key.Scope == ScopeRead && r.Method != http.MethodGet && r.Method != http.MethodHead {
+			rpc := s.rpcPath != "" && r.Method == http.MethodPost && r.URL.Path == s.rpcPath
+			if req.Key.Scope == ScopeRead && r.Method != http.MethodGet && r.Method != http.MethodHead && !rpc {
 				s.record(r.Context(), req.PlanName, "forbidden")
 				problem(w, r, http.StatusForbidden, "This API key is read-only. Try: create a key with the write scope.")
 				return

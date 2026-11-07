@@ -240,3 +240,70 @@ func TestMiddlewareWithoutActorAndRoundedRetry(t *testing.T) {
 		t.Fatalf("rounded retry: %d %v calls=%d", w.Code, w.Header(), calls)
 	}
 }
+
+func TestMiddlewareRPCPath(t *testing.T) {
+	for _, tc := range []struct {
+		name, method, path, rpc string
+		status                  int
+	}{
+		{"post on the path", "POST", "/api/mcp", "/api/mcp", 204},
+		{"get on the path", "GET", "/api/mcp", "/api/mcp", 204},
+		{"put on the path", "PUT", "/api/mcp", "/api/mcp", 403},
+		{"delete on the path", "DELETE", "/api/mcp", "/api/mcp", 403},
+		{"longer path", "POST", "/api/mcp/x", "/api/mcp", 403},
+		{"other path", "POST", "/api/notes", "/api/mcp", 403},
+		{"empty option", "POST", "/api/mcp", "", 403},
+		{"keys path first", "POST", "/api/me/keys", "/api/me/keys", 403},
+		{"admin path first", "POST", "/api/admin/x", "/api/admin/x", 403},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+			s := testStore(t, &now)
+			s.rpcPath = tc.rpc
+			s.days[userDay{1, utcDay(now)}] = &dayUsage{base: 42}
+			r := httptest.NewRequestWithContext(t.Context(), tc.method, tc.path, nil)
+			r = r.WithContext(requestContext(r.Context(), testRequest()))
+			w := httptest.NewRecorder()
+			s.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })).ServeHTTP(w, r)
+			if w.Code != tc.status {
+				t.Fatalf("status = %d, want %d, body=%s", w.Code, tc.status, w.Body)
+			}
+		})
+	}
+}
+
+func TestWithRPCPathSetsStorePath(t *testing.T) {
+	now := time.Now()
+	s := testStore(t, &now)
+	if s.rpcPath != "" {
+		t.Fatal("default path is not empty")
+	}
+	var o storeOptions
+	WithRPCPath("/api/mcp")(&o)
+	if o.rpc != "/api/mcp" {
+		t.Fatalf("rpc = %q", o.rpc)
+	}
+}
+
+func TestMiddlewareRPCPathCountsQuota(t *testing.T) {
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	s := testStore(t, &now)
+	s.rpcPath = "/api/mcp"
+	s.days[userDay{1, utcDay(now)}] = &dayUsage{}
+	req := testRequest()
+	req.Plan = Plan{PerMinute: 1, PerDay: 10}
+	h := s.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	call := func() *httptest.ResponseRecorder {
+		r := httptest.NewRequestWithContext(t.Context(), "POST", "/api/mcp", nil)
+		r = r.WithContext(requestContext(r.Context(), req))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	if w := call(); w.Code != 204 || w.Header().Get("RateLimit-Remaining") != "9" {
+		t.Fatalf("first: %d %v", w.Code, w.Header())
+	}
+	if w := call(); w.Code != http.StatusTooManyRequests {
+		t.Fatalf("second: %d", w.Code)
+	}
+}
