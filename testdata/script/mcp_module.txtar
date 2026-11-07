@@ -1,0 +1,57 @@
+# Generate the mcp module (ADR 0031 §9). The files, the main.go wiring, and the doctor check.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys,mcp --module example.com/demo --no-git --non-interactive
+cd demo
+exists api/internal/mcp/server.go
+exists api/internal/mcp/tools_gen.go
+exists api/internal/mcp/whoami.go
+exists 'web/src/routes/.well-known/oauth-protected-resource/[...path]/+server.ts'
+grep '^modules = .*mcp' spinup.toml
+grep 'func New\(d Deps\) \(\*kitmcp.Server, error\)' api/internal/mcp/server.go
+grep 'registerWhoami\(s\)' api/internal/mcp/server.go
+grep 'registerGenerated\(s, d\)' api/internal/mcp/server.go
+grep 'Name: +"whoami",' api/internal/mcp/whoami.go
+grep 'ReadOnly: +true,' api/internal/mcp/whoami.go
+
+# The main.go lines of §9.2.
+grep 'appmcp "example.com/demo/api/internal/mcp"' api/cmd/api/main.go
+grep 'kitmcp "github.com/stopyellingatme/spinup/kit/x/mcp"' api/cmd/api/main.go
+grep 'apikeys.NewStore\(pool, appapikeys.Config, apikeys.WithRPCPath\(kitmcp.Path\)\)' api/cmd/api/main.go
+grep 'mcpServer, err := appmcp.New\(appmcp.Deps\{DB: pool, Version: version\}\)' api/cmd/api/main.go
+grep 'app.WithRoutes\(mcpServer.Routes\(web.PublicOrigin\)\),' api/cmd/api/main.go
+grep 'app.WithCommand\("mcp", mcpServer.Command\(\)\),' api/cmd/api/main.go
+
+# The settings page shows the connection card.
+grep 'Connect an AI client' web/src/routes/settings/api-keys/+page.svelte
+
+# Other doctor checks can fail when Docker or local ports are unavailable.
+# Assert the mcp check independently.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "ok"'
+stdout '(?s)"id": "apikeys-wired",\s+"status": "ok"'
+
+# The API compiles, and the app command lists the whoami tool without a database.
+cd api
+exec go build -o $WORK/demo-api ./cmd/api
+exec $WORK/demo-api mcp tools
+stdout '"name": ?"whoami"'
+! exec $WORK/demo-api mcp
+cd $WORK
+
+# An app without the module skips the check.
+exec spinup new plain --modules auth,apikeys --module example.com/plain --no-git --non-interactive
+cd plain
+! exists api/internal/mcp/server.go
+! grep 'WithRPCPath' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "skip",\s+"message": "no mcp module"'
+cd $WORK
+
+# The module requires apikeys and auth, the same as apikeys requires auth.
+! exec spinup new nokeys --modules auth,mcp --module example.com/nokeys --no-git --non-interactive
+stderr 'pack "mcp" requires missing pack "apikeys"'
+stderr 'Try: select the required module with --modules'
+! exists nokeys/spinup.toml
+! exec spinup new noauth --modules apikeys --module example.com/noauth --no-git --non-interactive
+stderr 'pack "apikeys" requires missing pack "auth"'
+stderr 'Try: select the required module with --modules'

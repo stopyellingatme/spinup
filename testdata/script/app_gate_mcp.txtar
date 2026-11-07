@@ -1,0 +1,167 @@
+# App gate: the mcp module (ADR 0031 §13.4). An app with auth, apikeys, and mcp builds, migrates,
+# and serves. A read key and a write key call the MCP endpoint. The Origin check, the credential
+# check, the scope filter, the tool calls, and the metadata route run against a real server.
+# The gate needs a database and curl.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to call the API'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gatemcp --modules auth,apikeys,mcp --module example.com/gatemcp --no-git --non-interactive
+cd gatemcp
+exists api/internal/mcp/server.go
+
+# A resource with MCP tools: list_notes, get_note, create_note, update_note, delete_note.
+exec spinup g resource Note body:text --mcp
+exists api/internal/mcp/notes_tools.go
+grep 'registerNotesTools\(s, d\)' api/internal/mcp/tools_gen.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-wired",\s+"status": "ok"'
+stdout '(?s)"id": "mcp-wired",\s+"status": "ok"'
+
+# Type-check the web app: the keys page with the connection card, and the metadata route.
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+cd ..
+
+# Build, vet, and test the API.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+exec go build -o $WORK/gatemcp-api ./cmd/api
+cd ..
+
+# The app command lists every tool without a database.
+exec $WORK/gatemcp-api mcp tools
+stdout '"name": ?"whoami"'
+stdout '"name": ?"create_note"'
+stdout '"name": ?"delete_note"'
+
+# Apply the migrations, including the kit space.
+exec spinup db migrate up
+
+# Make one account, then a read key and a write key.
+cd api
+stdin $WORK/password.txt
+exec $WORK/gatemcp-api user create --email ada@example.com --role staff --password-stdin
+exec $WORK/gatemcp-api apikeys create ada@example.com --name reader --scope read
+stdout '^key_[A-Za-z0-9_-]{43}$'
+cp stdout read.out
+exec $WORK/gatemcp-api apikeys create ada@example.com --name writer --scope write
+stdout '^key_[A-Za-z0-9_-]{43}$'
+cp stdout write.out
+
+# Start the server. PUBLIC_ORIGIN is the only allowed Origin and the base of the metadata.
+env PORT=38458
+env PUBLIC_ORIGIN=http://127.0.0.1:38458
+exec $WORK/gatemcp-api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38458/healthz
+stdout '^200$'
+
+# initialize answers 200 with JSON.
+exec sh $WORK/mcp.sh read.out '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"gate","version":"1"}}}' init.json
+stdout '^200$'
+grep '(?i)^content-type: application/json' init.json.headers
+grep '"serverInfo":\{[^}]*"name":"gatemcp"' init.json
+
+# tools/list with the read key lists only the read-only tools, and the list is private.
+exec sh $WORK/mcp.sh read.out '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' read-list.json
+stdout '^200$'
+grep '"cacheScope":"private"' read-list.json
+grep '"name":"whoami"' read-list.json
+grep '"name":"list_notes"' read-list.json
+grep '"name":"get_note"' read-list.json
+! grep '"name":"create_note"' read-list.json
+! grep '"name":"update_note"' read-list.json
+! grep '"name":"delete_note"' read-list.json
+
+# tools/list with the write key lists every tool.
+exec sh $WORK/mcp.sh write.out '{"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}' write-list.json
+stdout '^200$'
+grep '"cacheScope":"private"' write-list.json
+grep '"name":"whoami"' write-list.json
+grep '"name":"list_notes"' write-list.json
+grep '"name":"get_note"' write-list.json
+grep '"name":"create_note"' write-list.json
+grep '"name":"update_note"' write-list.json
+grep '"name":"delete_note"' write-list.json
+
+# whoami names the user and the key.
+exec sh $WORK/mcp.sh read.out '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"whoami","arguments":{}}}' whoami.json
+stdout '^200$'
+grep '"email":"ada@example.com"' whoami.json
+grep '"key_name":"reader"' whoami.json
+grep '"key_scope":"read"' whoami.json
+
+# A read key cannot call a write tool: JSON-RPC code -32602.
+exec sh $WORK/mcp.sh read.out '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"create_note","arguments":{"body":"from the read key"}}}' read-create.json
+grep '"code":-32602' read-create.json
+grep 'The tool create_note is not available for this key\. Try: use a key with the write scope\.' read-create.json
+
+# The write key creates a note. The read key then lists it.
+exec sh $WORK/mcp.sh write.out '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"create_note","arguments":{"body":"from the write key"}}}' write-create.json
+stdout '^200$'
+grep '"structuredContent":\{[^}]*"body":"from the write key"' write-create.json
+! grep '"isError":true' write-create.json
+exec sh $WORK/mcp.sh read.out '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_notes","arguments":{}}}' read-notes.json
+stdout '^200$'
+grep '"body":"from the write key"' read-notes.json
+grep '"total":1' read-notes.json
+
+# WithRPCPath is an exact path: a read key still cannot POST to a REST route.
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "{\"body\":\"x\"}" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38458/api/notes'
+stdout '^403$'
+
+# No key answers 401 with the metadata URL.
+exec sh $WORK/mcp.sh none '{"jsonrpc":"2.0","id":8,"method":"tools/list","params":{}}' nokey.json
+stdout '^401$'
+grep '(?i)^www-authenticate: Bearer resource_metadata="http://127.0.0.1:38458/.well-known/oauth-protected-resource/api/mcp"' nokey.json.headers
+grep 'The MCP endpoint needs an API key\. Try: send Authorization: Bearer \\u003ckey\\u003e\.' nokey.json
+
+# A foreign Origin answers 403. The public origin passes.
+exec sh -c 'curl -sS -o evil.json -w "%{http_code}" -X POST -H "Origin: https://evil.example" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2025-11-25" -H "Authorization: Bearer $(head -n 1 write.out)" -d "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/list\",\"params\":{}}" http://127.0.0.1:38458/api/mcp'
+stdout '^403$'
+exec sh -c 'curl -sS -o same.json -w "%{http_code}" -X POST -H "Origin: http://127.0.0.1:38458" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2025-11-25" -H "Authorization: Bearer $(head -n 1 write.out)" -d "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/list\",\"params\":{}}" http://127.0.0.1:38458/api/mcp'
+stdout '^200$'
+
+# GET on the endpoint answers 405: the server sends no streams.
+exec sh -c 'curl -sS -o /dev/null -w "%{http_code}" -H "Accept: application/json, text/event-stream" -H "Authorization: Bearer $(head -n 1 read.out)" http://127.0.0.1:38458/api/mcp'
+stdout '^405$'
+
+# The RFC 9728 document needs no credential.
+exec curl -sS -D meta.headers -o meta.json -w '%{http_code}' http://127.0.0.1:38458/.well-known/oauth-protected-resource/api/mcp
+stdout '^200$'
+grep '(?i)^content-type: application/json' meta.headers
+grep '(?i)^cache-control: public, max-age=3600' meta.headers
+grep '"resource":"http://127.0.0.1:38458/api/mcp"' meta.json
+grep '"resource_name":"gatemcp"' meta.json
+grep '"bearer_methods_supported":\["header"\]' meta.json
+! grep 'authorization_servers' meta.json
+kill server
+cd ..
+
+-- password.txt --
+gate password 1
+-- mcp.sh --
+# POST one JSON-RPC message to the MCP endpoint and print the status code.
+# $1 is the key file, or "none". $2 is the body. $3 is the output file. The headers go to $3.headers.
+if [ "$1" = none ]; then
+  key="X-No-Key: 1"
+else
+  key="Authorization: Bearer $(head -n 1 "$1")"
+fi
+exec curl -sS -D "$3.headers" -o "$3" -w '%{http_code}' -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-11-25' \
+  -H "$key" -d "$2" http://127.0.0.1:38458/api/mcp
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"
