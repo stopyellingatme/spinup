@@ -1,0 +1,65 @@
+# Generate the billing module and compile the API and the worker (ADR 0032 §16).
+# With a database, the operator command checks the Stripe fake.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,jobs,deploy,billing --module example.com/demo --no-git --non-interactive
+cd demo
+exists api/db/kit/00010_billing.sql
+exists api/internal/billing/billing.gen.go
+exists web/src/lib/billing.gen.ts
+exists web/src/lib/server/billing.ts
+exists web/src/routes/pricing/+page.svelte
+exists web/src/routes/pricing/+page.server.ts
+exists web/src/routes/settings/billing/+page.svelte
+exists web/src/routes/settings/billing/+page.server.ts
+grep 'STRIPE_SECRET_KEY_FILE: /run/secrets/STRIPE_SECRET_KEY' deploy/compose.yml
+grep 'kitbilling.New\(pool, appbilling.Config, stripeClient,' api/cmd/api/main.go
+grep 'billingSvc.Register\(w\)' api/cmd/worker/main.go
+
+# A change to [billing] changes both generated files.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g billing
+stdout 'Created 0, updated 2 files'
+grep '"pro_monthly"' api/internal/billing/billing.gen.go
+grep '"export"' api/internal/billing/billing.gen.go
+grep 'export const plans = \[''free'', ''pro''\] as const;' web/src/lib/billing.gen.ts
+grep 'export type Feature = ''basic'' \| ''export'';' web/src/lib/billing.gen.ts
+grep 'export function hasFeature' web/src/lib/billing.gen.ts
+
+# A second run changes nothing.
+exec spinup g billing
+stdout 'Created 0, updated 0 files'
+
+# Other doctor checks can fail when Docker or local ports are unavailable.
+# Assert the billing checks independently.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "ok"'
+stdout '(?s)"id": "billing-wired",\s+"status": "ok"'
+
+# The API and the worker compile with the service.
+cd api
+exec go build -o $WORK/demo-api ./cmd/api
+exec go build -o $WORK/demo-worker ./cmd/worker
+
+# With a database, the billing command checks the key, the prices, and the webhook secret.
+# The fake sends no webhooks here, so the webhook URL is a closed port. The binary loads the
+# Stripe secrets at start, so the fake starts before the migration.
+[env:DATABASE_URL] stripefake start whsec_module http://127.0.0.1:9/api/billing/webhook
+[env:DATABASE_URL] exec $WORK/demo-api migrate up
+[env:DATABASE_URL] exec $WORK/demo-api billing check
+[env:DATABASE_URL] stdout '^ok  '
+[env:DATABASE_URL] stdout 'pro_monthly'
+[env:DATABASE_URL] ! stdout '^FAIL'
+
+-- declaration.toml --
+
+[billing]
+default_plan = "free"
+
+[[billing.plans]]
+name = "free"
+features = ["basic"]
+
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+features = ["basic", "export"]

@@ -65,6 +65,7 @@ apikeys     off    auth          API keys: Bearer tokens for each user, with rea
 audit       off    auth          An audit trail: database triggers record who changed a record, and when, with a History page and an operator command.
 auth        off    web           Accounts with kit auth: register, log in, log out, and PostgreSQL sessions, with login pages.
 backups     off    deploy        Continuous PostgreSQL backups with pgBackRest: full, differential, and WAL to encrypted S3-compatible storage.
+billing     off    auth,jobs     Subscriptions, feature gates, and API key usage with Stripe Checkout and the Customer Portal.
 ci          on     -             Build, test, deploy, verify backups, and propose upgrades with GitHub Actions.
 deploy      on     api           Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments.
 flags       off    auth          Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page.
@@ -82,6 +83,7 @@ tofu        off    deploy        OpenTofu infrastructure for a Hetzner Cloud VM.
 | `audit` | A history of who changed each record | [Audit trail](audit.md) |
 | `mcp` | An MCP endpoint for AI clients, with typed tools and API key access | [MCP server](build/mcp.md) |
 | `jobs` | Background jobs and a worker process | [Background jobs](build/jobs.md) |
+| `billing` | Stripe subscriptions, feature gates, and metered API calls | [Billing with Stripe](build/billing.md) |
 | `mail` | Typed emails and a development inbox | [Mail](mail.md) |
 | `ci` | GitHub Actions workflows | [Generated CI](ci.md) |
 | `deploy` | Production Compose files and environments | [Deploy to your own server](deploy.md) |

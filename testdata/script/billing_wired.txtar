@@ -1,0 +1,63 @@
+# The doctor check billing-wired finds a main file or a Compose file that lost a line (ADR 0032 §15.6).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,jobs,deploy,apikeys,billing --module example.com/demo --no-git --non-interactive
+cd demo
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "ok"'
+exec cp api/cmd/api/main.go $WORK/api.go
+exec cp api/cmd/worker/main.go $WORK/worker.go
+exec cp deploy/compose.yml $WORK/compose.yml
+
+# Delete the WithSessionOnly option. The check warns and names the missing line.
+exec sh -c 'sed "s/, apikeys.WithSessionOnly(kitbilling.SessionPrefix)//" $WORK/api.go > api/cmd/api/main.go'
+! grep 'WithSessionOnly' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick 2>/dev/null || test "$?" -eq 1'
+stdout 'warn\tbilling-wired\tapi/cmd/api/main.go lacks apikeys.WithSessionOnly inside apikeys.NewStore\.'
+stdout 'Try: add apikeys.WithSessionOnly\(kitbilling.SessionPrefix\) as an option of apikeys.NewStore'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "warn"'
+
+# Delete the Routes line. The check names that line.
+exec sh -c 'grep -v "billingSvc.Routes" $WORK/api.go > api/cmd/api/main.go'
+exec sh -c 'spinup doctor --quick 2>/dev/null || test "$?" -eq 1'
+stdout 'warn\tbilling-wired\tapi/cmd/api/main.go lacks billingSvc.Routes inside app.New\.'
+stdout 'Try: add app.WithRoutes\(billingSvc.Routes\(authn\)\),'
+
+# Delete the webhook secret option. Without it the API does not serve the webhook.
+exec sh -c 'grep -v "kitbilling.WithWebhookSecrets" $WORK/api.go > api/cmd/api/main.go'
+exec sh -c 'spinup doctor --quick 2>/dev/null || test "$?" -eq 1'
+stdout 'warn\tbilling-wired\tapi/cmd/api/main.go lacks kitbilling.WithWebhookSecrets inside kitbilling.New\.'
+stdout 'Try: add kitbilling.WithWebhookSecrets\(billingEnv.WebhookSecret\) as an option of kitbilling.New'
+
+# Delete Register from the worker. The check names that line.
+exec cp $WORK/api.go api/cmd/api/main.go
+exec sh -c 'grep -v "billingSvc.Register" $WORK/worker.go > api/cmd/worker/main.go'
+exec sh -c 'spinup doctor --quick 2>/dev/null || test "$?" -eq 1'
+stdout 'warn\tbilling-wired\tapi/cmd/worker/main.go lacks billingSvc.Register\.'
+stdout 'Try: add billingSvc.Register\(w\) before newWorker returns w'
+
+# Delete the webhook secret from the Compose file.
+exec cp $WORK/worker.go api/cmd/worker/main.go
+exec sh -c 'grep -v "STRIPE_WEBHOOK_SECRET_FILE" $WORK/compose.yml > deploy/compose.yml'
+exec sh -c 'spinup doctor --quick 2>/dev/null || test "$?" -eq 1'
+stdout 'warn\tbilling-wired\tdeploy/compose.yml lacks STRIPE_WEBHOOK_SECRET_FILE in the api service\.'
+stdout 'Try: add STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET to services.api.environment'
+
+# Restore the files. The check is ok again.
+exec cp $WORK/compose.yml deploy/compose.yml
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "ok"'
+
+# With the audit module, the kit migration attaches the triggers, so the check stays ok.
+cd $WORK
+exec spinup new audited --modules auth,jobs,audit,billing --module example.com/audited --no-git --non-interactive
+cd audited
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "ok"'
+
+# An app without the module skips the check.
+cd $WORK
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "skip"'

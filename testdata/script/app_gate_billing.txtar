@@ -1,0 +1,266 @@
+# App gate: the billing module (ADR 0032). An app with auth, jobs, apikeys, and billing builds,
+# migrates, and serves. The in-memory Stripe fake stands in for Stripe. A user subscribes through
+# Checkout, the worker syncs the plan, the role, and the apikeys plan, and a cancel takes them back.
+# Replayed and badly signed webhooks, the usage pass, and the session-only routes run against a real
+# server. The gate needs a database, psql, and curl.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to call the API'
+[!exec:psql] skip 'psql is required to count the webhook rows'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gatebilling --modules auth,jobs,apikeys,billing --module example.com/gatebilling --no-git --non-interactive
+cd gatebilling
+exists api/db/kit/00010_billing.sql
+
+# Declare the roles, the apikeys plans, and the billing plans. Then generate the files.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g roles
+exec spinup g apikeys
+exec spinup g billing
+stdout 'Created 0, updated 2 files'
+grep 'Role: +"pro"' api/internal/billing/billing.gen.go
+grep 'Meter: +"api_calls"' api/internal/billing/billing.gen.go
+
+# A tiny route behind the export feature: 402 on the free plan, 200 on the pro plan.
+exec cp $WORK/export_gate.go api/cmd/api/export_gate.go
+exec sh -c 'sed "s/app.WithRoutes(billingSvc.Routes(authn)),/& app.WithRoutes(exportRoutes(billingSvc)),/" api/cmd/api/main.go > main.tmp && mv main.tmp api/cmd/api/main.go'
+grep 'exportRoutes\(billingSvc\)' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-drift",\s+"status": "ok"'
+stdout '(?s)"id": "billing-wired",\s+"status": "ok"'
+stdout '(?s)"id": "apikeys-wired",\s+"status": "ok"'
+
+# Type-check the web app: the pricing page, the billing page, and the generated names.
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+cd ..
+
+# Build, vet, and test the API and the worker.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+exec go build -o $WORK/gate-api ./cmd/api
+exec go build -o $WORK/gate-worker ./cmd/worker
+cd ..
+
+# Start the Stripe fake. It sends its signed events to the API. The command sets STRIPE_API_BASE,
+# STRIPE_SECRET_KEY, and STRIPE_WEBHOOK_SECRET, which the binaries load at start.
+stripefake start whsec_gate http://127.0.0.1:38468/api/billing/webhook
+
+# Apply the migrations, including the kit space and River.
+exec spinup db migrate up
+exec spinup db migrate status
+stdout 'kit 00010_billing\.sql'
+! stdout '^pending'
+
+# The operator check passes against the fake.
+cd api
+exec $WORK/gate-api billing check
+stdout '^ok    Stripe key'
+stdout '^ok    price pro_monthly \(price_pro_monthly, every 1 month, licensed\)'
+stdout '^ok    meter api_calls \(mtr_api_calls\)'
+! stdout '^FAIL'
+
+# An administrator account, made by the operator.
+stdin $WORK/password.txt
+exec $WORK/gate-api user create --email root@example.com --role admin --password-stdin
+
+# Start the API with a flush time of one second, and the worker.
+env PORT=38468
+env APIKEYS_FLUSH=1s
+exec $WORK/gate-api &server&
+exec $WORK/gate-worker &worker&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38468/healthz
+stdout '^200$'
+
+# Sign up a user. The user starts on the default plan with the default role.
+exec curl -sS -c ada.jar -o register.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"ada@example.com","password":"gate password 1"}' http://127.0.0.1:38468/api/auth/register
+stdout '^201$'
+exec curl -sS -b ada.jar http://127.0.0.1:38468/api/me/billing
+stdout '"plan":"free"'
+stdout '"has_customer":false'
+exec $WORK/gate-api user list
+stdout 'ada@example.com\s+member'
+
+# The public plans list comes from the fake catalog.
+exec curl -sS -D plans.headers -o plans.json -w '%{http_code}' http://127.0.0.1:38468/api/billing/plans
+stdout '^200$'
+grep '(?i)^cache-control: public, max-age=300' plans.headers
+grep '"name":"pro"' plans.json
+grep '"lookup_key":"pro_monthly"' plans.json
+grep '"unit_amount":1500' plans.json
+
+# The export gate refuses the free plan with 402.
+exec curl -sS -b ada.jar -o export-free.json -w '%{http_code}' http://127.0.0.1:38468/api/export
+stdout '^402$'
+grep 'plan_required' export-free.json
+grep '"feature":"export"' export-free.json
+
+# An undeclared price answers 400. The declared price gives a fake Checkout URL.
+exec curl -sS -b ada.jar -o bad-price.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"price":"gold"}' http://127.0.0.1:38468/api/me/billing/checkout
+stdout '^400$'
+exec curl -sS -b ada.jar -o checkout.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"price":"pro_monthly"}' http://127.0.0.1:38468/api/me/billing/checkout
+stdout '^200$'
+grep '"url":"https://checkout.stripe.fake/c/pay/cs_test_1"' checkout.json
+
+# Complete the Checkout. The fake sends two events, and the worker syncs the customer.
+stripefake complete cs_test_1
+stdout '^sub_1$'
+exec sh $WORK/poll.sh ada.jar '"plan":"pro"'
+exec curl -sS -b ada.jar http://127.0.0.1:38468/api/me/billing
+stdout '"plan":"pro"'
+stdout '"status":"active"'
+stdout '"has_customer":true'
+stdout '"features":\["basic","export"\]'
+exec $WORK/gate-api user list
+stdout 'ada@example.com\s+pro'
+exec $WORK/gate-api apikeys list --email ada@example.com
+stdout 'ada@example.com\s+pro\s+0'
+exec $WORK/gate-api billing status ada@example.com
+stdout 'subscription\s+sub_1\s+active\s+pro\s+pro_monthly'
+stdout 'entitlement\s+pro\s+status=active\s+features=basic,export'
+exec curl -sS -b ada.jar -o export-pro.json -w '%{http_code}' http://127.0.0.1:38468/api/export
+stdout '^200$'
+grep 'exported' export-pro.json
+
+# Stripe sends an event again. The route answers 200, and no second row or job appears.
+stripefake events
+stdout '^evt_1 checkout.session.completed cus_1$'
+stdout '^evt_2 customer.subscription.created cus_1$'
+stripefake resend evt_1
+exec psql $DATABASE_URL -tAc 'SELECT count(*) FROM billing_events'
+stdout '^2$'
+exec psql $DATABASE_URL -tAc 'SELECT count(*) FROM river_job WHERE kind = ''billing.sync_customer'''
+stdout '^2$'
+
+# A bad signature answers 400 and adds no row.
+exec curl -sS -o bad-signature.json -w '%{http_code}' -H 'Stripe-Signature: t=1,v1=00' -H 'Content-Type: application/json' -d '{"id":"evt_forged","type":"invoice.paid","data":{"object":{"customer":"cus_1"}}}' http://127.0.0.1:38468/api/billing/webhook
+stdout '^400$'
+exec curl -sS -o no-signature.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"id":"evt_forged","type":"invoice.paid"}' http://127.0.0.1:38468/api/billing/webhook
+stdout '^400$'
+exec psql $DATABASE_URL -tAc 'SELECT count(*) FROM billing_events'
+stdout '^2$'
+
+# Three API key calls go to the meter. The first pass sends one event, a second pass sends none.
+exec $WORK/gate-api apikeys create ada@example.com --name meter --scope read
+cp stdout key.out
+exec sh $WORK/calls.sh key.out 3
+exec sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do $WORK/gate-api apikeys usage ada@example.com --json | grep -q "\"count\":3" && exit 0; sleep 1; done; echo "the usage was not flushed"; exit 1'
+exec $WORK/gate-api billing report-usage
+stdout '^sent 1 meter events$'
+stripefake meter-events
+stdout '^api_calls cus_1 apikeys:[0-9]+:[0-9]{4}-[0-9]{2}-[0-9]{2}:3 3$'
+exec $WORK/gate-api billing report-usage
+stdout '^sent 0 meter events$'
+stripefake meter-events
+stdout -count=1 '^api_calls '
+
+# A key cannot call the billing routes. The answer is 403 and uses no budget.
+exec sh -c 'curl -sS -o key-billing.json -w "%{http_code}" -H "Authorization: Bearer $(head -n 1 key.out)" http://127.0.0.1:38468/api/me/billing'
+stdout '^403$'
+
+# Cancel the subscription. The user goes back to the default plan, role, and apikeys plan.
+stripefake status sub_1 canceled
+exec sh $WORK/poll.sh ada.jar '"plan":"free"'
+exec $WORK/gate-api user list
+stdout 'ada@example.com\s+member'
+exec $WORK/gate-api apikeys list --email ada@example.com
+stdout 'ada@example.com\s+free\s'
+exec curl -sS -b ada.jar -o export-again.json -w '%{http_code}' http://127.0.0.1:38468/api/export
+stdout '^402$'
+
+# An administrator subscribes. The plan changes, and the admin role stays.
+exec curl -sS -c root.jar -o login.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"root@example.com","password":"gate password 1"}' http://127.0.0.1:38468/api/auth/login
+stdout '^200$'
+exec curl -sS -b root.jar -o checkout-root.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"price":"pro_monthly"}' http://127.0.0.1:38468/api/me/billing/checkout
+stdout '^200$'
+grep 'cs_test_2' checkout-root.json
+stripefake complete cs_test_2
+stdout '^sub_2$'
+exec sh $WORK/poll.sh root.jar '"plan":"pro"'
+exec $WORK/gate-api user list
+stdout 'root@example.com\s+admin'
+kill server
+kill worker
+cd ..
+
+-- declaration.toml --
+
+[auth]
+roles = ["admin", "member", "pro"]
+admin_role = "admin"
+default_role = "member"
+
+[apikeys]
+prefix = "gate"
+default_plan = "free"
+
+[apikeys.plans.free]
+per_minute = 60
+per_day = 1000
+
+[apikeys.plans.pro]
+per_minute = 600
+per_day = 100000
+
+[billing]
+default_plan = "free"
+
+[[billing.plans]]
+name = "free"
+features = ["basic"]
+apikeys_plan = "free"
+
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+features = ["basic", "export"]
+apikeys_plan = "pro"
+role = "pro"
+meter = "api_calls"
+
+-- export_gate.go --
+package main
+
+import (
+	"net/http"
+
+	kitbilling "github.com/stopyellingatme/spinup/kit/x/billing"
+)
+
+// exportRoutes adds a route that only the export feature opens (the billing app gate).
+func exportRoutes(s *kitbilling.Service) func(*http.ServeMux) {
+	return func(m *http.ServeMux) {
+		m.Handle("GET /api/export", s.Require("export")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("exported\n"))
+		})))
+	}
+}
+-- password.txt --
+gate password 1
+-- poll.sh --
+# Read GET /api/me/billing with the cookie jar $1 until the body matches $2. Thirty tries.
+for i in $(seq 1 30); do
+  body=$(curl -sS -b "$1" http://127.0.0.1:38468/api/me/billing)
+  case "$body" in *"$2"*) exit 0 ;; esac
+  sleep 1
+done
+echo "the billing summary did not match $2: $body"
+exit 1
+-- calls.sh --
+# Call GET /api/session with the key in the file $1, $2 times. Each call must answer 200.
+for i in $(seq 1 "$2"); do
+  code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(head -n 1 "$1")" http://127.0.0.1:38468/api/session)
+  [ "$code" = 200 ] || { echo "call $i answered $code"; exit 1; }
+done
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"
