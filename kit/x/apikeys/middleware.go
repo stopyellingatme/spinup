@@ -40,6 +40,11 @@ func (s *Store) Middleware() httpx.Middleware {
 				problem(w, r, http.StatusForbidden, "An API key cannot manage keys or call admin routes.")
 				return
 			}
+			if s.sessionOnlyPath(r.URL.Path) {
+				s.record(r.Context(), req.PlanName, "forbidden")
+				problem(w, r, http.StatusForbidden, "An API key cannot call this route. Try: sign in with a browser session.")
+				return
+			}
 			rpc := s.rpcPath != "" && r.Method == http.MethodPost && r.URL.Path == s.rpcPath
 			if req.Key.Scope == ScopeRead && r.Method != http.MethodGet && r.Method != http.MethodHead && !rpc {
 				s.record(r.Context(), req.PlanName, "forbidden")
@@ -97,4 +102,13 @@ func (s *Store) Middleware() httpx.Middleware {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func (s *Store) sessionOnlyPath(path string) bool {
+	for _, p := range s.sessionOnly {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
 }
