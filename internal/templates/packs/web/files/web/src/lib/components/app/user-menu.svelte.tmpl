@@ -5,7 +5,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 
-[[- if has "flags" .modules ]]
+[[- if or (has "flags" .modules) (has "apikeys" .modules) ]]
 	let {
 		email,
 		links = []
@@ -51,7 +51,7 @@
 				</a>
 			{/snippet}
 		</DropdownMenu.Item>
-[[- if has "flags" .modules ]]
+[[- if or (has "flags" .modules) (has "apikeys" .modules) ]]
 		{#each links as link (link.href)}
 			<DropdownMenu.Item>
 				{#snippet child({ props })}

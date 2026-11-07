@@ -18,3 +18,38 @@ class = "managed"
 path = "api/db/kit/00009_api_keys.sql"
 source = "files/api/db/kit/00009_api_keys.sql"
 class = "seed"
+
+[[files]]
+path = "web/src/lib/server/apikeys.ts"
+source = "files/web/src/lib/server/apikeys.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/routes/settings/api-keys/+page.server.ts"
+source = "files/web/src/routes/settings/api-keys/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/settings/api-keys/+page.svelte"
+source = "files/web/src/routes/settings/api-keys/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/settings/api-keys/schema.ts"
+source = "files/web/src/routes/settings/api-keys/schema.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/apikeys/+page.server.ts"
+source = "files/web/src/routes/admin/apikeys/+page.server.ts"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/apikeys/+page.svelte"
+source = "files/web/src/routes/admin/apikeys/+page.svelte"
+class = "scaffold"
+
+[[files]]
+path = "web/src/routes/admin/apikeys/schema.ts"
+source = "files/web/src/routes/admin/apikeys/schema.ts"
+class = "scaffold"

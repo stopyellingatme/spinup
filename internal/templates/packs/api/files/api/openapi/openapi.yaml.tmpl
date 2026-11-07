@@ -33,3 +33,10 @@ components:
                 type: string
               message:
                 type: string
+[[- if has "apikeys" .modules ]]
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: "An API key from /settings/api-keys. Send Authorization: Bearer <key>."
+[[- end ]]

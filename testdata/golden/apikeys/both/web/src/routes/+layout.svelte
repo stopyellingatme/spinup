@@ -1,0 +1,67 @@
+<script lang="ts">
+	import '../app.css';
+	import { page } from '$app/state';
+	import AppSidebar from '#lib/components/app/app-sidebar.svelte';
+	import TopBar from '#lib/components/app/top-bar.svelte';
+	import UserMenu from '#lib/components/app/user-menu.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { adminRole } from '#lib/flags.gen.js';
+	import { adminRole as apikeysAdminRole } from '#lib/apikeys.gen.js';
+	import { Toaster } from '#lib/components/ui/sonner/index.js';
+	import { nav } from '#lib/nav.gen.js';
+	import type { LayoutProps } from './$types';
+
+	let { data, children }: LayoutProps = $props();
+
+	// Signed-out visitors get no sidebar. The sign-in pages stay centered.
+	const shell = $derived(data.user !== null);
+
+	// The links under Account in the user menu. Every user gets the keys page. Admins get more.
+	const menuLinks = $derived.by(() => {
+		const links = [{ href: '/settings/api-keys', label: 'API keys' }];
+		if (data.user?.role === adminRole) links.push({ href: '/admin/flags', label: 'Feature flags' });
+		if (data.user?.role === apikeysAdminRole) links.push({ href: '/admin/apikeys', label: 'API plans' });
+		return links;
+	});
+</script>
+
+<svelte:head>
+	<title>todo</title>
+</svelte:head>
+
+<a
+	href="#main"
+	class="bg-background focus-visible:ring-ring sr-only z-50 rounded-md px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus-visible:ring-2"
+>
+	Skip to content
+</a>
+
+<div class="flex min-h-svh flex-col">
+	<TopBar appName="todo" items={nav} pathname={page.url.pathname} menu={shell}>
+		{#snippet actions()}
+			{#if data.user}
+				<UserMenu email={data.user.email} links={menuLinks} />
+			{:else}
+				<Button href="/login" variant="ghost" size="sm">Sign in</Button>
+			{/if}
+		{/snippet}
+	</TopBar>
+	<div class="flex flex-1">
+		{#if shell}
+			<aside class="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 border-r md:block">
+				<AppSidebar items={nav} pathname={page.url.pathname} class="sticky top-14 h-[calc(100svh-3.5rem)]" />
+			</aside>
+		{/if}
+		<main
+			id="main"
+			tabindex="-1"
+			class={['min-w-0 flex-1 outline-none', !shell && 'flex flex-col items-center justify-center']}
+		>
+			<div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+				{@render children()}
+			</div>
+		</main>
+	</div>
+</div>
+
+<Toaster richColors closeButton />
