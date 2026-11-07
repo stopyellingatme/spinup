@@ -45,8 +45,8 @@ func NextMigrationName(dir, name string) (string, error) {
 	}
 	highest := 0
 	for _, source := range []string{dir, filepath.Join(filepath.Dir(filepath.Clean(dir)), "kit")} {
-		entries, err := os.ReadDir(source)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		entries, err := readMigrationDir(source)
+		if err != nil {
 			return "", opError(what, err)
 		}
 		for _, e := range entries {
@@ -70,6 +70,20 @@ func NextMigrationName(dir, name string) (string, error) {
 		return "", &ui.Error{What: what, Why: "the migration numbers reached 99999", Try: "squash old migrations into one file"}
 	}
 	return fmt.Sprintf("%05d_%s.sql", highest+1, name), nil
+}
+
+// readMigrationDir lists dir. A missing dir gives no entries and no error.
+// A file at the path of dir is an error on every OS. Windows reports
+// ReadDir on a file as "path not found", which matches fs.ErrNotExist.
+func readMigrationDir(dir string) ([]os.DirEntry, error) {
+	entries, err := os.ReadDir(dir)
+	if err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return entries, err
+	}
+	if info, serr := os.Stat(dir); serr == nil && !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", dir)
+	}
+	return nil, nil
 }
 
 // migrationSkeleton is the content of a new migration file.
