@@ -33,7 +33,13 @@ const (
 
 func packFile(t *testing.T, pack, name string) *fstest.MapFile {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(packs, pack, "files/api/db/migrations", name))
+	// The api pack keeps 00001_init.sql in the app space. The other packs ship
+	// their migrations in the kit space (ADR 0028).
+	dir := "files/api/db/kit"
+	if pack == "api" {
+		dir = "files/api/db/migrations"
+	}
+	data, err := os.ReadFile(filepath.Join(packs, pack, dir, name))
 	if err != nil {
 		t.Fatalf("read the %s migration %s: %v", pack, name, err)
 	}
