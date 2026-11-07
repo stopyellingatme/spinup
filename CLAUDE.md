@@ -48,6 +48,7 @@ The Rust rewrite stopped after R2 (ADR `docs/adr/0022-go-and-sidecar-services.md
 - JSON v2 and the Go 1.27 minimum (strict request decoding in `httpx.DecodeJSON`, `httpx.CheckJSONBody` and `BodyRules` for generated write routes, v1 kept for responses and persisted JSON) are in `docs/adr/0027-json-v2.md`.
 - The kit migration space (pack migrations in `api/db/kit/` with the table `spinup_kit_version`, `db.WithKitMigrations`, the one-time `adopt` step, codemods `0003_kit_migrations` and `0004_kit_testkit`, kit numbers owned by spinup) is in `docs/adr/0028-kit-migration-space.md`.
 - Feature flags (the `[flags.<key>]` tables of `spinup.toml`, `spinup g flags`, `kit/x/flags` with the precedence and the sticky bucket, the `flags` module, the store and its refresh, `GET /api/flags` and the admin routes, `/admin/flags`, the doctor checks `flags-drift` and `flags-wired`) are in `docs/adr/0029-feature-flags.md`.
+- API keys (the `[apikeys]` table of `spinup.toml` with plans, `spinup g apikeys`, `auth.WithBearer` in the kit, `kit/x/apikeys` with the store, the quotas for each minute and each day, the usage counters, the `/api/me/keys` and admin routes, `/settings/api-keys` and `/admin/apikeys`, the operator `apikeys` command, the doctor checks `apikeys-drift` and `apikeys-wired`) are in `docs/adr/0030-api-keys.md`.
 
 ## Commands
 

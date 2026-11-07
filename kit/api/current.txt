@@ -136,6 +136,7 @@ kit/auth func Required(http.Handler) http.Handler
 kit/auth func UserCommand(*Auth) func(ctx context.Context, args []string) error
 kit/auth func UserFrom(context.Context) (User, bool)
 kit/auth func WithActorContext(func(ctx context.Context, u User) context.Context) Option
+kit/auth func WithBearer(Bearer) Option
 kit/auth func WithEvents(EventSink) Option
 kit/auth func WithHashLimits(int, int, time.Duration) Option
 kit/auth func WithIdleTimeout(time.Duration) Option
@@ -153,6 +154,7 @@ kit/auth func WithSecureCookie(bool) Option
 kit/auth func WithTrustedOrigins(...string) Option
 kit/auth func WithTrustedProxies(...string) Option
 kit/auth func WithUser(context.Context, User) context.Context
+kit/auth imethod Bearer.AuthenticateBearer(context.Context, string) (context.Context, User, error)
 kit/auth imethod Execer.Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 kit/auth method Roles.Valid(string) bool
 kit/auth method Roles.Validate() error
@@ -169,6 +171,7 @@ kit/auth ptrmethod Auth.Roles() Roles
 kit/auth ptrmethod Auth.Routes(*http.ServeMux)
 kit/auth ptrmethod Auth.SetRole(context.Context, string, string) error
 kit/auth type Auth struct
+kit/auth type Bearer interface
 kit/auth type Event struct
 kit/auth type EventSink func(ctx context.Context, q Execer, e Event) error
 kit/auth type Execer interface
@@ -180,6 +183,7 @@ kit/auth type ResetData struct
 kit/auth type ResetOption func(*resetOptions)
 kit/auth type Roles struct
 kit/auth type User struct
+kit/auth var ErrBearerInvalid = errors.New("auth: invalid bearer token")
 kit/auth var ErrLastAdmin error
 kit/auth var ErrUnknownRole error
 kit/auth var ErrUserNotFound error

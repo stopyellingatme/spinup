@@ -332,7 +332,7 @@ func TestEventsOIDCWithAuditTrail(t *testing.T) {
 	t.Parallel()
 	rec := &recorder{}
 	f := oidcDBFixture(t, WithEvents(rec.sink))
-	sql, err := os.ReadFile("../../internal/templates/packs/audit/files/api/db/migrations/00006_audit_events.sql")
+	sql, err := os.ReadFile("../../internal/templates/packs/audit/files/api/db/kit/00006_audit_events.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

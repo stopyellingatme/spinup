@@ -71,7 +71,9 @@ type Config struct {
 		DefaultRole string `toml:"default_role"`
 	} `toml:"auth"`
 	// Flags declares the feature flags of the app (ADR 0029).
-	Flags      map[string]FlagDecl `toml:"flags"`
+	Flags map[string]FlagDecl `toml:"flags"`
+	// APIKeys declares the API key plans of the app (ADR 0030).
+	APIKeys    APIKeysDecl `toml:"apikeys"`
 	Monitoring struct {
 		Profile      string
 		HeartbeatURL string `toml:"heartbeat_url"`
@@ -168,11 +170,14 @@ func Parse(data []byte) (*Config, error) {
 	if err := checkFlagFields(raw["flags"]); err != nil {
 		return nil, err
 	}
+	if err := checkAPIKeysFields(raw["apikeys"]); err != nil {
+		return nil, err
+	}
 	if auth, ok := raw["auth"].(map[string]any); ok {
 		_, config.authAdminSet = auth["admin_role"]
 		_, config.authDefaultSet = auth["default_role"]
 	}
-	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services", "auth", "flags"} {
+	for _, key := range []string{"app", "behavior_version", "modules", "monitoring", "backups", "maintenance", "env", "plugins", "default_env", "services", "auth", "flags", "apikeys"} {
 		delete(raw, key)
 	}
 	config.Extra = raw
@@ -238,6 +243,9 @@ func (c *Config) Validate() error {
 		problems = append(problems, err)
 	}
 	if err := c.FlagDecls().Validate(); err != nil {
+		problems = append(problems, err)
+	}
+	if err := c.APIKeysConfig().Validate(); err != nil {
 		problems = append(problems, err)
 	}
 	return errors.Join(problems...)

@@ -26,7 +26,7 @@ func TestJobAuditActor(t *testing.T) {
 	t.Parallel()
 	pool := migrated(t)
 	ctx := context.Background()
-	sql, err := os.ReadFile("../../internal/templates/packs/audit/files/api/db/migrations/00006_audit_events.sql")
+	sql, err := os.ReadFile("../../internal/templates/packs/audit/files/api/db/kit/00006_audit_events.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -437,7 +437,7 @@ func oidcDBFixture(t *testing.T, opts ...Option) *fixture {
 		t.Skip("OIDC database integration tests require DATABASE_URL")
 	}
 	f := newFixture(t, opts...)
-	sql, err := os.ReadFile("../../internal/templates/packs/auth/files/api/db/migrations/00004_oidc_identities.sql")
+	sql, err := os.ReadFile("../../internal/templates/packs/auth/files/api/db/kit/00004_oidc_identities.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

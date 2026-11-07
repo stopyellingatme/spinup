@@ -9,6 +9,9 @@
 [[- if has "flags" .modules ]]
 	import { adminRole } from '#lib/flags.gen.js';
 [[- end ]]
+[[- if has "apikeys" .modules ]]
+	import { adminRole as apikeysAdminRole } from '#lib/apikeys.gen.js';
+[[- end ]]
 [[- end ]]
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import { nav } from '#lib/nav.gen.js';
@@ -18,6 +21,18 @@
 
 	// Signed-out visitors get no sidebar. The sign-in pages stay centered.
 	const shell = $derived(data.user !== null);
+[[- if has "apikeys" .modules ]]
+
+	// The links under Account in the user menu. Every user gets the keys page. Admins get more.
+	const menuLinks = $derived.by(() => {
+		const links = [{ href: '/settings/api-keys', label: 'API keys' }];
+[[- if has "flags" .modules ]]
+		if (data.user?.role === adminRole) links.push({ href: '/admin/flags', label: 'Feature flags' });
+[[- end ]]
+		if (data.user?.role === apikeysAdminRole) links.push({ href: '/admin/apikeys', label: 'API plans' });
+		return links;
+	});
+[[- end ]]
 [[- else ]]
 	let { children }: LayoutProps = $props();
 
@@ -41,7 +56,9 @@
 	<TopBar appName="[[ .app_name ]]" items={nav} pathname={page.url.pathname} menu={shell}>
 		{#snippet actions()}
 			{#if data.user}
-				[[- if has "flags" .modules ]]
+				[[- if has "apikeys" .modules ]]
+				<UserMenu email={data.user.email} links={menuLinks} />
+[[- else if has "flags" .modules ]]
 				<UserMenu
 					email={data.user.email}
 					links={data.user.role === adminRole ? [{ href: '/admin/flags', label: 'Feature flags' }] : []}

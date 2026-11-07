@@ -69,4 +69,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagsdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagswired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/flags"
+
+	// API keys (ADR 0030)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/apikeysdrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/apikeyswired"
+	_ "github.com/stopyellingatme/spinup/internal/gen/apikeys"
 )

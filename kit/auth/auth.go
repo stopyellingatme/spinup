@@ -83,6 +83,7 @@ type options struct {
 
 	events       EventSink
 	actorContext func(context.Context, User) context.Context
+	bearer       Bearer
 }
 
 // WithSecureCookie sets the Secure attribute of the session cookie. The default is
@@ -149,6 +150,7 @@ type Auth struct {
 	warnedAt     atomic.Int64
 	events       EventSink                                   // nil: no explicit events (ADR 0025)
 	actorContext func(context.Context, User) context.Context // nil: the context does not change
+	bearer       Bearer                                      // nil: only cookie authentication
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -227,6 +229,7 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 		proxies:      proxies,
 		events:       o.events,
 		actorContext: o.actorContext,
+		bearer:       o.bearer,
 		stop:         make(chan struct{}),
 		done:         make(chan struct{}),
 	}
@@ -357,16 +360,18 @@ func UserFrom(ctx context.Context) (User, bool) {
 	return user, ok
 }
 
-// Middleware returns the middleware that Routes and RequireUser need. In order, it:
-//   - sets Content-Security-Policy to [DefaultCSP] when the response has none,
-//   - answers 429 with Retry-After to a client that used up its rate limit for a
-//     login, registration, password reset, or OIDC callback request, before any
-//     session or database work (see [RateLimits]),
-//   - rejects unsafe requests (not GET, HEAD, or OPTIONS) that a browser marks as
-//     cross-site or same-site with Sec-Fetch-Site, or whose Origin differs from the
-//     Host and the trusted origins, with a 403 problem,
+// Middleware returns the middleware that Routes and RequireUser need.
+// It sets Content-Security-Policy to [DefaultCSP] when the response has none.
+// It answers 429 with Retry-After when an authentication request exceeds its rate limit (see [RateLimits]).
+// These checks precede session and database work.
+//
+// With [WithBearer], a Bearer request authenticates without a session or CSRF check.
+// Bearer requests cannot call the sign-in routes.
+//
+// All other requests use cookie authentication. In order, the middleware:
+//   - rejects unsafe requests from an untrusted origin with a 403 problem,
 //   - loads the session from the cookie and saves it before the response,
-//   - loads the signed-in user, so UserFrom returns it.
+//   - loads the signed-in user, so [UserFrom] returns it.
 func (a *Auth) Middleware() httpx.Middleware {
 	return func(next http.Handler) http.Handler {
 		inner := a.csrf.Handler(a.sessions.LoadAndSave(a.loadUser(next)))
@@ -378,6 +383,16 @@ func (a *Auth) Middleware() httpx.Middleware {
 			r, ok := a.allow(w, r)
 			if !ok {
 				return
+			}
+			if a.bearer != nil {
+				// A bare "Bearer" (HTTP parsing trims the trailing space) still takes
+				// the Bearer branch, so an empty token answers 401 and never falls
+				// back to the cookie session (ADR 0030 decision 6.2).
+				scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+				if strings.EqualFold(scheme, "Bearer") {
+					a.serveBearer(w, r, next, token)
+					return
+				}
 			}
 			inner.ServeHTTP(&guardWriter{ResponseWriter: w}, r)
 		})

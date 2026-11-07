@@ -1,0 +1,53 @@
+# Generate the apikeys module and compile its operator command without a database.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys --module example.com/demo --no-git --non-interactive
+cd demo
+exists api/db/kit/00009_api_keys.sql
+exists api/internal/roles/roles.gen.go
+exists api/internal/apikeys/apikeys.gen.go
+exists web/src/lib/apikeys.gen.ts
+exists web/src/lib/server/apikeys.ts
+exists web/src/routes/settings/api-keys/+page.svelte
+exists web/src/routes/admin/apikeys/+page.svelte
+grep 'Prefix: +"key",' api/internal/apikeys/apikeys.gen.go
+
+# A change to [apikeys] changes both generated files.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec spinup g apikeys
+stdout 'Created 0, updated 1 files'
+grep 'Prefix: +"demo",' api/internal/apikeys/apikeys.gen.go
+grep '"pro": +\{PerMinute: 100, PerDay: 1000\},' api/internal/apikeys/apikeys.gen.go
+grep 'DefaultPlan: +"tiny",' api/internal/apikeys/apikeys.gen.go
+grep 'export const adminRole = '  web/src/lib/apikeys.gen.ts
+
+# A second run changes nothing.
+exec spinup g apikeys
+stdout 'Created 0, updated 0 files'
+
+# Other doctor checks can fail when Docker or local ports are unavailable.
+# Assert the apikeys checks independently.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "ok"'
+stdout '(?s)"id": "apikeys-wired",\s+"status": "ok"'
+
+# The API compiles with the store, the Bearer hook, and the command.
+cd api
+exec go build -o $WORK/demo-api ./cmd/api
+[env:DATABASE_URL] exec $WORK/demo-api migrate up
+[env:DATABASE_URL] exec $WORK/demo-api apikeys list
+[env:DATABASE_URL] exec $WORK/demo-api apikeys list --json
+[env:DATABASE_URL] stdout '^\[\]$'
+
+-- declaration.toml --
+
+[apikeys]
+prefix = "demo"
+default_plan = "tiny"
+
+[apikeys.plans.tiny]
+per_minute = 3
+per_day = 5
+
+[apikeys.plans.pro]
+per_minute = 100
+per_day = 1000

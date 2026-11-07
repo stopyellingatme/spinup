@@ -32,6 +32,7 @@ The commands depend on the modules that are on.
 | [`jobs-migrate`](#jobs-migrate) | `jobs` | Runs the migrations of the job queue. |
 | [`user`](#user) | `auth` | Creates accounts and changes roles. |
 | [`audit`](#audit) | `audit` | Reads, exports, and prunes the audit trail. |
+| [`apikeys`](#apikeys) | `apikeys` | Makes, lists, and revokes API keys, and sets plans. |
 | [`flags`](#flags) | `flags` | Lists and changes feature flags. |
 | [`mail-worker`](#mail-worker) | `mail` and `jobs` | Runs a worker that only sends mail. |
 
@@ -115,7 +116,7 @@ applied  kit 00003_password_resets.sql
 ```
 
 The kit lines show the prefix `kit`. A kit migration and an app migration can have the same number.
-The command `migrate kit` is the way to roll back a kit migration. The commands `spinup db migrate` and `spinup db to` work on the app migrations only.
+The command `migrate kit` is the way to roll back a kit migration. From the project, `spinup db migrate kit ...` runs it for you. The commands `spinup db migrate <up|down|status>` and `spinup db to` work on the app migrations only.
 
 A lock in PostgreSQL stops two runners from migrating at the same time.
 With the jobs module, `migrate up` also runs the job queue migrations.
@@ -181,6 +182,35 @@ $ go run ./cmd/api audit list --resource users
 {: .warning }
 `audit prune` deletes events for good. It refuses to run without `--yes`.
 
+## apikeys
+
+Manages the [API keys](../build/api-keys.md) and plans. The command never prompts and needs no web server.
+It writes to the database. A revoke or a plan change acts on the next key request.
+
+| Action | What it does |
+| --- | --- |
+| `apikeys list [--email E] [--json]` | Prints one line for each account: the email, the plan, and today's use. `--json` prints the accounts with their keys. |
+| `apikeys create EMAIL --name N [--scope read\|write] [--expires-days D]` | Makes a key and prints the token one time. The default scope is `read`. `--expires-days` is 0 to 365. |
+| `apikeys revoke ID` | Revokes the key with this ID for any user. |
+| `apikeys plan EMAIL PLAN` | Sets the plan of a user. The plan must be declared in `spinup.toml`. |
+| `apikeys usage EMAIL [--days 30] [--json]` | Prints the stored counts as day, key ID, and count. |
+| `apikeys prune --days N --yes` | Deletes usage rows and revoked keys older than N days. |
+
+<!-- doctest: skip -->
+```console
+$ go run ./cmd/api apikeys create ada@example.com --name reports --scope read
+todo_Q3n8...
+This token cannot be shown again.
+$ go run ./cmd/api apikeys plan ada@example.com pro
+updated ada@example.com	pro
+$ go run ./cmd/api apikeys prune --days 90
+apikeys prune: --yes is required.
+Try: apikeys prune --days <n> --yes
+```
+
+With the [audit trail](../audit.md), each change writes an event. The actor is the operator of the shell.
+`apikeys prune` is the only action that deletes rows for good.
+
 ## flags
 
 Lists and changes the [feature flags](../build/flags.md). The command never prompts and needs no web server.
@@ -242,6 +272,7 @@ The ones you meet most:
 | `PORT` | `8080` | The HTTP port. |
 | `SPINUP_ENV` | `production` | If it is unset or `dev`, the program also reads the `.env` file. `dev` turns on the `/_dev` page. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
+| `APIKEYS_FLUSH` | `5s` | With the `apikeys` module: how often a process writes its day counts to the database. A longer time lets a user go further over the day limit. |
 | `FLAGS_REFRESH` | `10s` | With the `flags` module: how often a process reads the flags from the database. The lowest value is `1s`. |
 
 ## Troubleshooting
