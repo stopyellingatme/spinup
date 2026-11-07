@@ -192,7 +192,7 @@ func Register(mux *http.ServeMux, d Deps) {
 Keep three rules:
 
 - The guard needs the `auth` module. For a public route, pass `mux` as `BaseRouter` and delete `authenticatedMux`.
-- If you later run `spinup g resource`, `registerGenerated` registers every operation too. Delete `registerOwn`, or the app panics on a duplicate route at start.
+- If you later run `spinup g resource`, `routes_gen.go` registers every operation and, with the `auth` module, declares `authenticatedMux`. Delete all of `ping.go` (`registerOwn` and `authenticatedMux`), and remove the `registerOwn(mux)` call. Otherwise the build fails with a redeclared type. Move the methods of `pingServer` to the `Server` type.
 - Add each new operation to `pingServer`, or build the `Server` type of a resource.
 
 ## Rules for fragments
