@@ -70,7 +70,7 @@ func TestRestoreGuardsAndPlan(t *testing.T) {
 func TestRestoreLockContention(t *testing.T) {
 	t.Parallel()
 	vm := &remote.Fake{}
-	vm.Expect("mkdir", "/opt/todo/deploy.lock").Return("", "held", 1)
+	vm.Expect(deploy.LockArgv("todo")...).Return("", "held", 1)
 	info := deploy.LockInfo{Owner: "operator", Acquired: time.Now().UTC(), TTLSeconds: 3600, Release: "busy"}
 	data, err := json.Marshal(info)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestRestoreLockContention(t *testing.T) {
 }
 
 func expectRestoreLock(vm *remote.Fake) {
-	vm.Expect("mkdir", "/opt/todo/deploy.lock").Return("", "", 0)
+	vm.Expect(deploy.LockArgv("todo")...).Return("", "", 0)
 	vm.ExpectUpload("/opt/todo/deploy.lock/owner.json")
 }
 

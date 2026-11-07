@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -18,7 +19,11 @@ import (
 )
 
 // localVM runs the exact remote shell scripts against an isolated local tree.
-type localVM struct{ root string }
+// env adds variables to each command, for example a PATH with a fake mkdir.
+type localVM struct {
+	root string
+	env  []string
+}
 
 func (v localVM) path(s string) string { return strings.ReplaceAll(s, "/opt/app", v.root) }
 func (v localVM) Run(ctx context.Context, c remote.Cmd) (runexec.Result, error) {
@@ -26,7 +31,24 @@ func (v localVM) Run(ctx context.Context, c remote.Cmd) (runexec.Result, error) 
 	for i := range argv {
 		argv[i] = v.path(argv[i])
 	}
-	return (runexec.OSRunner{}).Run(ctx, runexec.Cmd{Name: argv[0], Args: argv[1:], Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Redact: c.Redact, Timeout: c.Timeout})
+	return (runexec.OSRunner{}).Run(ctx, runexec.Cmd{Name: argv[0], Args: argv[1:], Env: v.env, Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Redact: c.Redact, Timeout: c.Timeout})
+}
+
+// lenientMkdirEnv returns a PATH with a mkdir that reports success when the
+// directory already exists. uutils mkdir, the default on Ubuntu 26.04, does
+// this when it loses a race for the same path.
+func lenientMkdirEnv(t *testing.T) []string {
+	t.Helper()
+	bin := t.TempDir()
+	real, err := osexec.LookPath("mkdir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\n" + real + " \"$@\" 2>/dev/null\nexit 0\n"
+	if err := runexec.WriteExecutable(filepath.Join(bin, "mkdir"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH")}
 }
 func (v localVM) Upload(_ context.Context, data []byte, path string, mode fs.FileMode) error {
 	return runexec.WriteExecutable(v.path(path), data, mode)
@@ -98,11 +120,23 @@ func TestLockShellOwnershipAndTTL(t *testing.T) {
 
 func TestLockShellContention(t *testing.T) {
 	t.Parallel()
-	for _, expired := range []bool{false, true} {
-		t.Run(map[bool]string{false: "new", true: "expired"}[expired], func(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		expired, lenient bool
+	}{
+		{name: "new"},
+		{name: "expired", expired: true},
+		{name: "lenient mkdir", lenient: true},
+		{name: "lenient mkdir expired", expired: true, lenient: true},
+	} {
+		expired := tc.expired
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			vm := localVM{root: t.TempDir()}
+			if tc.lenient {
+				vm.env = lenientMkdirEnv(t)
+			}
 			now := fixedTime
 			if expired {
 				if _, err := AcquireLock(ctx, vm, "app", LockOptions{Owner: "old", TTL: time.Second, Now: func() time.Time { return now.Add(-time.Minute) }}); err != nil {

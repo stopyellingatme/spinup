@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stopyellingatme/spinup/internal/deploy"
 	runexec "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/maintain/pg"
 	"github.com/stopyellingatme/spinup/internal/manifest"
@@ -76,7 +77,7 @@ func inspect(f *remote.Fake, major, data string) {
 	f.Expect("docker", "exec", "-i", "old-pg").Return(major+"\n", "", 0)
 }
 func lock(f *remote.Fake) {
-	f.Expect("mkdir", "/opt/demo/deploy.lock")
+	f.Expect(deploy.LockArgv("demo")...)
 	f.ExpectUpload("/opt/demo/deploy.lock/owner.json")
 }
 func backupMetrics(f *remote.Fake) {

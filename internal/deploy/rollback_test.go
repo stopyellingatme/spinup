@@ -82,7 +82,7 @@ func TestRollbackLockContention(t *testing.T) {
 	t.Parallel()
 	x := newFx(t, false, "")
 	held, _ := json.Marshal(LockInfo{Owner: "other", Acquired: testNow, TTLSeconds: 3600})
-	x.vm.Expect("mkdir").Return("", "exists", 1)
+	x.vm.Expect(lockArgv("/opt/todo/deploy.lock")...).Return("", "exists", 1)
 	x.vm.Expect("sh", "-c").Return(string(held), "", 0)
 	x.vm.ExpectClose().Return("", "", 0)
 	err := Rollback(context.Background(), RollbackOptions{Options: x.o}, x.d)

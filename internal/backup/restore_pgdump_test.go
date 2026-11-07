@@ -143,7 +143,7 @@ func TestPgdumpRestoreFailureRecovery(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			t.Parallel()
 			vm := &remote.Fake{}
-			vm.Expect("mkdir", "/opt/todo/deploy.lock").Return("", "", 0)
+			vm.Expect(deploy.LockArgv("todo")...).Return("", "", 0)
 			vm.ExpectUpload("/opt/todo/deploy.lock/owner.json")
 			dumpListing(vm)
 			vm.Expect("cat", "/opt/todo/current/release.json").Return(`{"release":"`+releaseID+`","color":"blue","git_sha":"abcdef1234567890"}`, "", 0)

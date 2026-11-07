@@ -388,7 +388,7 @@ func TestFlowLockHeld(t *testing.T) {
 	held, _ := json.Marshal(LockInfo{Owner: "bob", PID: 7, Host: "ci", Acquired: testNow.Add(-time.Minute), TTLSeconds: 1800, Release: "other"})
 	x.expectLocalGit()
 	x.expectConnect()
-	x.vm.Expect("mkdir", testRoot+"/deploy.lock").Return("", "File exists", 1)
+	x.vm.Expect(lockArgv(testRoot+"/deploy.lock")...).Return("", "File exists", 1)
 	x.vm.Expect("sh", "-c").Return(string(held), "", 0)
 	x.vm.ExpectClose().Return("", "", 0)
 	err := x.run()

@@ -19,13 +19,13 @@ The M5 units run in parallel. These decisions fix the contracts between them. AD
   secrets/<NAME>           one file per secret, mode 0600, owned by the deploy user
   data/                    named volumes live in Docker; this holds bind data (Caddy certs)
   backups/                 pgBackRest spool and local copies
-  deploy.lock/             the deploy lock (a directory, created atomically with mkdir)
+  deploy.lock/             the deploy lock (a directory with an exclusive .claim file)
   deploy.state             the journal of the current deploy (JSON lines)
   releases.json            the release history (newest first, keep 5)
 ```
 
 - A release ID is `<UTC time YYYYMMDDTHHMMSSZ>-<12-char git SHA>`.
-- The lock: `mkdir /opt/<app>/deploy.lock` then write `owner.json` (`{"owner","pid","host","acquired","ttl_seconds","release"}`). A held, unexpired lock makes `deploy` exit 5 (`ui.ExitLocked`) and print the owner. An expired lock may be taken over with a warning. `deploy unlock --force` removes it.
+- The lock: `mkdir /opt/<app>/deploy.lock`, then create `deploy.lock/.claim` with `set -C` (the shell opens it with `O_EXCL`), then write `owner.json` (`{"owner","pid","host","acquired","ttl_seconds","release"}`). A held, unexpired lock makes `deploy` exit 5 (`ui.ExitLocked`) and print the owner. An expired lock may be taken over with a warning. `deploy unlock --force` removes it. `mkdir` alone is not exclusive: uutils `mkdir`, the default on Ubuntu 26.04, can report success when it loses a race for the same path (amended 2026-11-07). The guard directory `deploy.lock.guard` uses the same claim.
 - The journal: one JSON object per line, `{"release","step","status":"started|done|failed","at","detail"}`. `deploy --resume` continues from the first step that is not done. `deploy status` prints the current release, the lock, and the last journal.
 
 ## 3. Hooks (`internal/deploy`, unit M5.2)

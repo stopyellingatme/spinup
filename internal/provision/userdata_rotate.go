@@ -27,13 +27,15 @@ print_key() {
 
 # lock serializes next and activate, so two spinup runs cannot race on the key files.
 # A lock older than two minutes is left by a run that died, so the tool removes it.
+# The .claim file makes the lock exclusive: uutils mkdir (Ubuntu 26.04) can report
+# success when it loses a race, but set -C opens the file with O_EXCL.
 lock() {
   dir="$state/host-key.lock"
   mkdir -p "$state"
   tries=0
-  until mkdir "$dir" 2>/dev/null; do
+  until mkdir "$dir" 2>/dev/null && (set -C; : > "$dir/.claim") 2>/dev/null; do
     if [ -n "$(find "$dir" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
-      rmdir "$dir" 2>/dev/null || true
+      rm -f "$dir/.claim"; rmdir "$dir" 2>/dev/null || true
       continue
     fi
     tries=$((tries + 1))
@@ -43,7 +45,7 @@ lock() {
     fi
     sleep 1
   done
-  trap 'rmdir "$dir" 2>/dev/null || true' EXIT
+  trap 'rm -f "$dir/.claim"; rmdir "$dir" 2>/dev/null || true' EXIT
 }
 
 reload_sshd() {

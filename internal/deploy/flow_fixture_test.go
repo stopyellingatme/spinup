@@ -198,7 +198,7 @@ func (x *fx) expectConnect() {
 }
 
 func (x *fx) expectLock() {
-	x.vm.Expect("mkdir", testRoot+"/deploy.lock").Return("", "", 0)
+	x.vm.Expect(lockArgv(testRoot+"/deploy.lock")...).Return("", "", 0)
 	x.vm.ExpectUpload(testRoot+"/deploy.lock/owner.json").Return("", "", 0)
 }
 

@@ -465,7 +465,7 @@ func TestLockHeld(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	f := &remote.Fake{}
-	f.Expect("mkdir", "/opt/demo/deploy.lock").Return("", "held", 1)
+	f.Expect(deploy.LockArgv("demo")...).Return("", "held", 1)
 	info, _ := json.Marshal(deploy.LockInfo{Owner: "other", Acquired: now, TTLSeconds: 900})
 	f.Expect("sh", "-c").Return(string(info), "", 0)
 	err := Run(context.Background(), Options{Dir: projectDir(t, "", false), Env: "production"}, Deps{Remote: f, Now: func() time.Time { return now }})
@@ -529,7 +529,7 @@ func TestCleanup(t *testing.T) {
 func TestRunFailurePrintsRecovery(t *testing.T) {
 	t.Parallel()
 	u, f, out := fixture(t, false)
-	f.Expect("mkdir", "/opt/demo/deploy.lock")
+	f.Expect(deploy.LockArgv("demo")...)
 	f.ExpectUpload("/opt/demo/deploy.lock/owner.json")
 	expectInspect(u, f, "17.10\n")
 	expectBackup(f)
@@ -586,7 +586,7 @@ func TestNowOverrideAndProtectedCI(t *testing.T) {
 	u.o.Dir = projectDir(t, "Sun 02:00-05:00", true)
 	u.o.Now = true
 	u.o.Confirm = project.Confirm{Yes: true, CI: true}
-	f.Expect("mkdir", "/opt/demo/deploy.lock")
+	f.Expect(deploy.LockArgv("demo")...)
 	f.ExpectUpload("/opt/demo/deploy.lock/owner.json")
 	expectInspect(u, f, "17.11\n")
 	f.Expect("sh", "-c")

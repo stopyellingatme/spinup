@@ -106,7 +106,7 @@ func AcquireLock(ctx context.Context, r remote.Runner, app string, o LockOptions
 		}
 	}
 	l := &Lock{remote: r, path: root + "/deploy.lock", now: o.Now, Info: LockInfo{Owner: o.Owner, PID: os.Getpid(), Host: host, Acquired: utcNow(o.Now), TTLSeconds: seconds, Release: o.Release}}
-	result, err := r.Run(ctx, remote.Cmd{Argv: []string{"mkdir", l.path}})
+	result, err := r.Run(ctx, remote.Cmd{Argv: lockArgv(l.path)})
 	if err != nil {
 		if result.ExitCode != 1 {
 			return nil, err
@@ -122,7 +122,7 @@ func AcquireLock(ctx context.Context, r remote.Runner, app string, o LockOptions
 			return nil, &LockedError{Info: *held}
 		}
 		// The guard serializes takeover, refresh, and release. A new owner must still win mkdir.
-		result, err = r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", guarded(l.path, expected, "rm -rf -- "+remote.Quote(l.path)+" && mkdir "+remote.Quote(l.path))}})
+		result, err = r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", guarded(l.path, expected, "rm -rf -- "+remote.Quote(l.path)+" && "+claimDir(l.path))}})
 		if err != nil {
 			if result.ExitCode == 4 {
 				return nil, &LockedError{Info: *held}
@@ -250,6 +250,21 @@ func ForceUnlock(ctx context.Context, r remote.Runner, app string) error {
 	return err
 }
 
+// LockArgv returns the remote command that AcquireLock runs to create the
+// deploy lock of app. Tests in other packages use it to script a remote.Fake.
+func LockArgv(app string) []string { return lockArgv("/opt/" + app + "/deploy.lock") }
+
+func lockArgv(path string) []string { return []string{"sh", "-c", claimDir(path) + " || exit 1"} }
+
+// claimDir returns shell text that creates dir and claims it for this run.
+// The text fails if another run holds dir.
+// mkdir alone is not an exclusive lock. uutils mkdir, the default on
+// Ubuntu 26.04, reports success when it loses a race for the same path.
+// With noclobber, the shell itself opens .claim with O_EXCL, so one run wins.
+func claimDir(dir string) string {
+	return "{ mkdir -- " + remote.Quote(dir) + " && (set -C; : > " + remote.Quote(dir+"/.claim") + ") 2>/dev/null; }"
+}
+
 func guarded(path string, expected []byte, action string) string {
 	return guardedWithCleanup(path, expected, action, "")
 }
@@ -261,6 +276,6 @@ func guardedWithCleanup(path string, expected []byte, action, cleanup string) st
 		prefix = "trap " + remote.Quote(cleanup) + " 0; "
 		cleanup += "; "
 	}
-	cleanup += "rmdir -- " + remote.Quote(guard)
-	return prefix + "mkdir " + remote.Quote(guard) + " || exit 4; trap " + remote.Quote(cleanup) + " 0; trap 'exit 1' HUP INT TERM; [ \"$(cat " + remote.Quote(path+"/owner.json") + ")\" = " + remote.Quote(string(expected)) + " ] || exit 4; " + action
+	cleanup += "rm -f -- " + remote.Quote(guard+"/.claim") + "; rmdir -- " + remote.Quote(guard)
+	return prefix + claimDir(guard) + " || exit 4; trap " + remote.Quote(cleanup) + " 0; trap 'exit 1' HUP INT TERM; [ \"$(cat " + remote.Quote(path+"/owner.json") + ")\" = " + remote.Quote(string(expected)) + " ] || exit 4; " + action
 }

@@ -19,7 +19,7 @@ func TestLockAcquireRefreshRelease(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := &remote.Fake{}
-	f.Expect("mkdir", "/opt/my-app/deploy.lock").Return("", "", 0)
+	f.Expect(lockArgv("/opt/my-app/deploy.lock")...).Return("", "", 0)
 	f.ExpectUpload("/opt/my-app/deploy.lock/owner.json").Return("", "", 0)
 	now := fixedTime
 	lock, err := AcquireLock(ctx, f, "my-app", LockOptions{Owner: "alice", Release: "r1", TTL: time.Minute, Now: func() time.Time { return now }})
@@ -68,7 +68,7 @@ func TestLockHeldAndExpired(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			f.Expect("mkdir").Return("", "exists", 1)
+			f.Expect(lockArgv("/opt/app/deploy.lock")...).Return("", "exists", 1)
 			f.Expect("sh", "-c").Return(string(data), "", 0)
 			if expired {
 				f.Expect("sh", "-c").Return("", "", 0)
@@ -129,7 +129,7 @@ func TestLockFailures(t *testing.T) {
 	t.Run("SSH failure", func(t *testing.T) {
 		t.Parallel()
 		f := &remote.Fake{}
-		f.Expect("mkdir").Return("", "disconnected", 255)
+		f.Expect(lockArgv("/opt/app/deploy.lock")...).Return("", "disconnected", 255)
 		if _, err := AcquireLock(ctx, f, "app", LockOptions{}); err == nil {
 			t.Fatal("SSH failure ignored")
 		}
@@ -138,7 +138,7 @@ func TestLockFailures(t *testing.T) {
 	t.Run("owner upload failure", func(t *testing.T) {
 		t.Parallel()
 		f := &remote.Fake{}
-		f.Expect("mkdir").Return("", "", 0)
+		f.Expect(lockArgv("/opt/app/deploy.lock")...).Return("", "", 0)
 		f.ExpectUpload("/opt/app/deploy.lock/owner.json").Fail(errors.New("disconnected"))
 		if _, err := AcquireLock(ctx, f, "app", LockOptions{}); err == nil || !strings.Contains(err.Error(), "unlock --force") {
 			t.Fatalf("upload failure = %v", err)
