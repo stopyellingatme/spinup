@@ -350,6 +350,7 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 `api billing check` checks the key (`CheckKey`), each declared lookup key (active and recurring), each declared meter (active), and that a webhook secret is set. It prints one line for each check and exits non-zero on a failure.
 `api billing status <email>` prints the customer, the subscriptions, and the entitlement.
 `api billing sync <email>` runs `Sync` for the user's customer.
+`api billing report-usage` runs one usage pass (`ReportUsage`) now. It prints the number of meter events sent.
 
 ### 15. Secrets, module, and wiring
 
