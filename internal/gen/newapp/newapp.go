@@ -4,7 +4,6 @@ package newapp
 import (
 	"context"
 	"fmt"
-	"github.com/stopyellingatme/spinup/internal/devkit"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/stopyellingatme/spinup/internal/devkit"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/render"
 	"github.com/stopyellingatme/spinup/internal/stackversions"

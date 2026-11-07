@@ -3,6 +3,7 @@ package devkit
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -39,6 +40,9 @@ func TestFind(t *testing.T) {
 
 func TestDirAndHint(t *testing.T) {
 	t.Parallel()
+	if _, file, _, ok := runtime.Caller(0); !ok || !filepath.IsAbs(file) {
+		t.Skip("source path is not available (trimpath build)")
+	}
 	if dir := Dir(); dir == "" || !strings.HasSuffix(dir, "kit") {
 		t.Fatalf("Dir=%q", dir)
 	}

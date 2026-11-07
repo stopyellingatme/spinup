@@ -6,6 +6,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- A development build of the CLI now warns on `spinup new` when no kit replace is set, because the pinned kit can lack packages that the templates import. The warning names `SPINUP_KIT_REPLACE=<checkout>/kit`. The doctor check `kit-version` also warns for a development CLI without a local replace.
+
 ### Added
 
 - API keys and plan quotas (ADR 0030). The opt-in `apikeys` module gives each user Bearer keys with the scope `read` (GET and HEAD) or `write`. Named plans in `[apikeys.plans.<name>]` set `per_minute` and `per_day`, and all keys of a user share the budget of the user plan. `spinup g apikeys` writes `api/internal/apikeys/apikeys.gen.go` and `web/src/lib/apikeys.gen.ts`. The kit adds `auth.WithBearer` and the package `kit/x/apikeys`. The minute limit is in memory in each process. The day limit is shared through PostgreSQL and flushed every `APIKEYS_FLUSH` (default 5s). Answers carry `RateLimit-*` and `Retry-After` headers. Keys show on `/settings/api-keys`. Plans change with the app command `apikeys` or on `/admin/apikeys`. The doctor checks `apikeys-drift` and `apikeys-wired` find stale generated files and missing wiring. Add it with `spinup new --modules auth,apikeys` or `spinup module add apikeys`. See `docs/build/api-keys.md`.

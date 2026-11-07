@@ -61,9 +61,13 @@ func find(start string) string {
 
 // Hint returns the action that fixes a missing kit replace, with the checkout kit when it is known.
 func Hint() string {
-	dir := Dir()
-	if dir == "" {
-		dir = "<spinup checkout>/kit"
+	return EnvReplace + "=" + DirOrPlaceholder()
+}
+
+// DirOrPlaceholder returns the checkout kit directory, or a placeholder when it is not found.
+func DirOrPlaceholder() string {
+	if dir := Dir(); dir != "" {
+		return dir
 	}
-	return EnvReplace + "=" + dir
+	return "<spinup checkout>/kit"
 }

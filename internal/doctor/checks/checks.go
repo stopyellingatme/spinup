@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stopyellingatme/spinup/internal/devkit"
 	"path/filepath"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/compat"
+	"github.com/stopyellingatme/spinup/internal/devkit"
 	"github.com/stopyellingatme/spinup/internal/doctor"
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
@@ -111,7 +111,7 @@ func kitVersion(ctx context.Context, c *doctor.Context) doctor.Result {
 	}
 	if dev {
 		// A development CLI renders the checkout templates, and the released kit can lack their packages.
-		return doctor.Result{Status: doctor.Warn, Message: "development CLI and api/go.mod pins the released kit without a local replace, so go build can fail", Try: "go mod edit -replace=" + kit + "=" + strings.TrimPrefix(devkit.Hint(), devkit.EnvReplace+"=") + " (in api/), then go mod tidy"}
+		return doctor.Result{Status: doctor.Warn, Message: "development CLI and api/go.mod pins the released kit without a local replace, so go build can fail", Try: "go mod edit -replace=" + kit + "=" + devkit.DirOrPlaceholder() + " (in api/), then go mod tidy"}
 	}
 	for _, r := range mod.Require {
 		if r.Path == kit {
