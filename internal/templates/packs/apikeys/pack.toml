@@ -1,0 +1,20 @@
+name = "apikeys"
+description = "API keys: Bearer tokens for each user, with read or write scope and plan quotas for each minute and each day."
+# A key acts as its user (kit/auth), the kit migration needs the users table, and the pages need the web app.
+requires = ["auth"]
+
+# spinup g apikeys rewrites both files from the [apikeys] table of spinup.toml (ADR 0030).
+[[files]]
+path = "api/internal/apikeys/apikeys.gen.go"
+source = "files/api/internal/apikeys/apikeys.gen.go"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/apikeys.gen.ts"
+source = "files/web/src/lib/apikeys.gen.ts"
+class = "managed"
+
+[[files]]
+path = "api/db/kit/00009_api_keys.sql"
+source = "files/api/db/kit/00009_api_keys.sql"
+class = "seed"
