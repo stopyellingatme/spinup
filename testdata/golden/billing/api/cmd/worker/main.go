@@ -1,0 +1,106 @@
+// Command worker runs the background jobs of the app.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	appbilling "example.com/todo/api/internal/billing"
+	jobsapp "example.com/todo/api/internal/jobs"
+	"example.com/todo/api/internal/roles"
+	"github.com/stopyellingatme/spinup/kit/config"
+	"github.com/stopyellingatme/spinup/kit/db"
+	"github.com/stopyellingatme/spinup/kit/jobs"
+	"github.com/stopyellingatme/spinup/kit/logx"
+	kitbilling "github.com/stopyellingatme/spinup/kit/x/billing"
+	"github.com/stopyellingatme/spinup/kit/x/billing/stripe"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	var cfg config.Base
+	if err := config.Load(&cfg); err != nil {
+		return err
+	}
+	level := slog.LevelInfo
+	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
+		level = slog.LevelInfo
+	}
+	logger := logx.New(os.Stderr, logx.Options{Level: level})
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithAppName("todo"+"-worker"), db.WithMaxConns(cfg.DatabaseMaxConns))
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	w, err := newWorker(pool, logger)
+	if err != nil {
+		return err
+	}
+	if err := w.Start(ctx); err != nil {
+		return err
+	}
+
+	<-ctx.Done()
+	logger.Info("worker: stopping", "timeout", cfg.ShutdownTimeout.String())
+	stopCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	return w.Stop(stopCtx)
+}
+
+func newWorker(pool *pgxpool.Pool, logger *slog.Logger) (*jobs.Worker, error) {
+	w, err := jobs.NewWorker(pool, jobs.WithLogger(logger))
+	if err != nil {
+		return nil, err
+	}
+	jobsapp.Register(w, jobsapp.Deps{DB: pool})
+	var billingEnv struct {
+		SecretKey     string `env:"STRIPE_SECRET_KEY" required:"true"`
+		WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
+		APIBase       string `env:"STRIPE_API_BASE"`
+		PublicOrigin  string `env:"PUBLIC_ORIGIN" default:"http://localhost:5173"`
+	}
+	if err := config.Load(&billingEnv); err != nil {
+		return nil, err
+	}
+	var stripeOptions []stripe.Option
+	if billingEnv.APIBase != "" {
+		stripeOptions = append(stripeOptions, stripe.WithBaseURL(billingEnv.APIBase))
+	}
+	stripeClient, err := stripe.New(billingEnv.SecretKey, stripeOptions...)
+	if err != nil {
+		return nil, err
+	}
+	jobsClient, err := jobs.New(pool, jobs.WithLogger(logger))
+	if err != nil {
+		return nil, err
+	}
+	billingSvc, err := kitbilling.New(pool, appbilling.Config, stripeClient,
+		kitbilling.WithJobs(jobsClient),
+		kitbilling.WithRoles(roles.Set),
+		kitbilling.WithPublicOrigin(billingEnv.PublicOrigin),
+		kitbilling.WithWebhookSecrets(billingEnv.WebhookSecret),
+		kitbilling.WithLogger(logger),
+	)
+	if err != nil {
+		return nil, err
+	}
+	billingSvc.Register(w)
+	return w, nil
+}
