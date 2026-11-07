@@ -50,12 +50,25 @@ type config struct {
 	maxAttempts     int
 	pollInterval    time.Duration
 	maxPayloadBytes int
+	jobTimeout      time.Duration
 }
 
 // WithMaxPayloadBytes limits encoded JSON arguments for inserts and worker attempts.
 // Nonpositive values use DefaultMaxPayloadBytes. Configure the client and worker alike.
 func WithMaxPayloadBytes(n int) Option {
 	return func(c *config) { c.maxPayloadBytes = n }
+}
+
+// DefaultJobTimeout is the time limit of a job when no [WithJobTimeout] option
+// and no [Timeouter] apply. It is River's default of one minute.
+const DefaultJobTimeout = river.JobTimeoutDefault
+
+// WithJobTimeout sets the default time limit of every job that a [Worker]
+// runs. When the limit passes, River cancels the context of the job. Zero keeps
+// the default of one minute ([DefaultJobTimeout]). A negative value means no
+// limit. A [Timeouter] on the job arguments overrides this value for that kind.
+func WithJobTimeout(d time.Duration) Option {
+	return func(c *config) { c.jobTimeout = d }
 }
 
 // WithLogger sets the logger for River (default slog.Default()).
@@ -115,6 +128,13 @@ func (c config) river() *river.Config {
 				return checkPayloadSize("work a job", job.EncodedArgs, c.maxPayloadBytes)
 			}),
 		},
+	}
+	// River uses -1 for no limit and 0 for its default.
+	switch {
+	case c.jobTimeout < 0:
+		rc.JobTimeout = -1
+	case c.jobTimeout > 0:
+		rc.JobTimeout = c.jobTimeout
 	}
 	// River refuses a poll interval below its fetch cooldown.
 	if c.pollInterval > 0 && c.pollInterval < river.FetchCooldownDefault {
