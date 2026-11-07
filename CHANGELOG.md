@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Feature flags (ADR 0029). The opt-in `flags` module declares flags in `[flags.<key>]` tables of `spinup.toml`. `spinup g flags` writes typed keys to `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts`. A flag is on for everyone, for a role, for named users, or for a sticky percentage of signed-in users. The kit package `kit/x/flags` evaluates flags from an in-process snapshot that a poll refreshes (`FLAGS_REFRESH`, default 10s). Change flags with the app command `flags` or on the `/admin/flags` page. Pages get the public flags in `data.flags`. The doctor checks `flags-drift` and `flags-wired` find stale generated files, expired flags, and missing wiring. Add it with `spinup new --modules auth,flags` or `spinup module add flags`. See `docs/build/flags.md`.
+- A separate version space for kit migrations (ADR 0028). The migrations of the `auth` and `audit` packs live in `api/db/kit/` and use the table `spinup_kit_version`, so they cannot clash with app migrations. An existing database adopts its applied kit rows once, under the migration lock, after a schema check. `go run ./cmd/api migrate kit up|down|status|to|version` acts on the kit space only.
+- Sidecar services (ADR 0022, ADR 0023). `[[services]]` in `spinup.toml` and `spinup g service <name> --lang rust|python|node` add a component in another language next to the Go API, with a typed Go client, Compose files for dev and deploy, deploy with rollback, public routes through Caddy, OTel tracing, and `spinup ci services`.
+- A PDF report sidecar (ADR 0026): `spinup g service <name> --lang python --kind pdf` (WeasyPrint), `httpx.WriteAttachment`, and `pdf.Serve`.
+- A roles guard (ADR 0024): roles in the `[auth]` table, `spinup g roles`, `auth.RequireRole`, the operator command `user`, `--role` in the generators, and the doctor check `roles-drift`.
+- An audit trail (ADR 0025): the `audit` module with database triggers, `kit/audit`, `spinup g audit`, a History page, the operator command `audit`, and the doctor check `audit-wired`.
+- A performance loop (`make perf`, `make perf-compare`, `docs/contributing/performance.md`) with benchmarks for the kit, the render, and a generated app.
+- A request deadline (`app.WithRequestTimeout`, `REQUEST_TIMEOUT`) and a job payload limit (`jobs.WithMaxPayloadBytes`).
+- A docs site with the just-the-docs theme. Every command has a help example with real flags.
+
 - CI: Add `scripts/ci/install-tools.sh` (pinned and checksum-verified actionlint, shellcheck, and bun), `scripts/ci/warm-cache.sh` (Go modules, pnpm store, and bun cache for the offline tests), and the composite action `.github/actions/prepare-tests`. The `test`, `golden`, and `matrix` jobs use them.
 - CI: Narrow the Windows job. It builds and vets every package for Windows and tests only the packages that `scripts/ci/windows-packages.sh` selects. `scripts/ci/windows-excluded.txt` gives the reason for each excluded package. Skip Unix-only tests on Windows. Fix the local kit replace check for rooted paths and the Git root check of `spinup upgrade` for forward-slash paths on Windows.
 - M14: Add the global flag `--confirm-env <name>`. It answers the typed confirmation of a protected environment without a terminal. The value must equal the environment name. A different value fails and never starts a prompt. `--yes` with `CI=true` still works (ADR 0018).
@@ -26,6 +36,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The web `handleFetch` sends the client address to the API in `X-Forwarded-For`, and the deploy `compose.yml` sets `ADDRESS_HEADER` on the web service. Run `spinup upgrade` so that web form logins count for each client and not for the web server.
 
 ### Changed
+
+- Strict JSON v2 request decoding (ADR 0027). `httpx.DecodeJSON` rejects unknown and duplicate fields. Generated write routes check required and known fields (`httpx.CheckJSONBody`, `BodyRules`) and limit the body to 1 MiB. Responses and persisted JSON keep the v1 format.
+- Owned references use a composite foreign key on `(user_id, id)` (ADR 0015 §7). List endpoints accept an offset up to 10000 and count the total in the same query.
+- The kit stores sessions with one query and no password hash at startup. Auth migration `00007_users_auth_version.sql` adds `users.auth_version` and `sessions.user_id`.
+- `spinup` caches the tool binaries of generators (`SPINUP_NO_TOOL_CACHE=1` turns the cache off) and runs independent post-steps in parallel.
+- `migrate status` prints the kit lines first, as `applied  kit <file>`. App migration numbers continue after the highest number in `api/db/migrations` and `api/db/kit`.
 
 - M14: `spinup deploy digital-ocean status` shows the team as `<name> (<uuid>)` with an environment and without one. The JSON output has `account.team_name` as well as `account.team`.
 - M14: The SSH pin cache keeps one `known_hosts-<hash>` file for each user, host, and port. A change of the pinned keys replaces the file atomically. Old files from earlier versions stay unused in the cache directory.
@@ -51,9 +67,15 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Breaking
 
 - No release is declared by this section.
+- Go 1.27 is the minimum (ADR 0027). Generated apps declare `go 1.27.0`. `GOEXPERIMENT=nojsonv2` is not supported.
+- A generated write route answers 422 for a field that the resource does not declare. Clients that send extra fields must stop.
+- `testkit.DBWithMigrations` takes options (`...testkit.DBOption`). Every call still compiles. Code that uses the function as a value must change.
 - `db.WithMaxConns` takes an `int`, not an `int32`.
 
 ### Upgrade steps
 
+- Upgrade to `0.1.0-alpha.419` or later in one step. Codemods `0002_validation_known_fields`, `0003_kit_migrations`, and `0004_kit_testkit` run during `spinup upgrade`. They add the known-field rules, move the pack migrations to `api/db/kit/`, and add `testkit.WithKitMigrations` to the generated tests.
+- After the upgrade, run `spinup db migrate up` before you start the new binary. The first run prints one `adopted  kit <file>` line for each kit migration that the database already applied. `spinup deploy` runs the migration for you.
+- If the upgrade stops with `is a renamed kit migration`, follow its `Try:` line once for each database.
 - Review `spinup upgrade --plan` before each upgrade.
 - Commit the generated files and the lock file after a successful upgrade.
