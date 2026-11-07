@@ -74,7 +74,7 @@ func nextSteps(result *Result, name string) []string {
 	steps := []string{"cd " + name, "spinup doctor"}
 	if hasWebPack(result) {
 		tool := webtool.FromLock(result.Lock)
-		steps = append(steps, tool.InWeb("", tool.Install(false, false)).String())
+		steps = append(steps, "cd web && "+tool.Install(false, false).String())
 	}
 	return append(steps, "spinup dev")
 }

@@ -30,7 +30,7 @@ func TestCommands(t *testing.T) {
 				if cmd.Name != "bun" || cmd.Dir != filepath.Join("/app", "web") || !reflect.DeepEqual(cmd.Args, []string{"run", "dev"}) {
 					t.Fatalf("bun web command: %+v", cmd)
 				}
-			} else if cmd.Dir != "/app" || !reflect.DeepEqual(cmd.Args, []string{"--dir", "web", "dev"}) {
+			} else if cmd.Dir != filepath.Join("/app", "web") || cmd.Name != "pnpm" || !reflect.DeepEqual(cmd.Args, []string{"dev"}) {
 				t.Fatalf("pnpm web command: %+v", cmd)
 			}
 		})

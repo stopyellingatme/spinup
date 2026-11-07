@@ -22,10 +22,10 @@ type writingRunner struct {
 
 func (r *writingRunner) Run(ctx context.Context, c exec.Cmd) (exec.Result, error) {
 	r.t.Helper()
-	if c.Dir != r.root || c.Name != "pnpm" || len(c.Args) != 7 || !reflect.DeepEqual(c.Args[:6], []string{"--dir", "web", "exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o"}) || !filepath.IsAbs(c.Args[6]) {
+	if c.Dir != filepath.Join(r.root, "web") || c.Name != "pnpm" || len(c.Args) != 5 || !reflect.DeepEqual(c.Args[:4], []string{"exec", "openapi-typescript", "../api/openapi/bundle.gen.yaml", "-o"}) || !filepath.IsAbs(c.Args[4]) {
 		r.t.Fatalf("command = %+v", c)
 	}
-	r.temp = c.Args[6]
+	r.temp = c.Args[4]
 	if err := os.WriteFile(r.temp, []byte(r.output), 0600); err != nil {
 		r.t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestCheck(t *testing.T) {
 			}
 			r := &writingRunner{t: t, root: root, output: tt.fresh}
 			if tt.web && tt.bundle && tt.modules {
-				e := r.fake.Expect("pnpm", "--dir", "web", "exec", "openapi-typescript")
+				e := r.fake.Expect("pnpm", "exec", "openapi-typescript")
 				if tt.toolFail {
 					e.Fail(&exec.NotFoundError{Name: "pnpm"})
 				}
@@ -190,7 +190,7 @@ func TestHeyAPIDrift(t *testing.T) {
 					write(t, root, "web/src/lib/api/client/obsolete.ts", "stale")
 				}
 				runner := &variantRunner{}
-				name, prefix := "pnpm", []string{"--dir", "web", "exec"}
+				name, prefix := "pnpm", []string{"exec"}
 				if pm == "bun" {
 					name = "bunx"
 					prefix = []string{"--no-install"}

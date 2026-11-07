@@ -59,8 +59,8 @@ Run these tests with the web tools instead. [Test your app](../build/testing.md)
 
 <!-- doctest: skip -->
 ```console
-$ pnpm --dir web test
-$ pnpm --dir web test:e2e
+$ cd web && pnpm test
+$ cd web && pnpm test:e2e
 ```
 
 ## Flags
@@ -71,7 +71,7 @@ $ pnpm --dir web test:e2e
 | `--race` | Turn on the race detector. | `spinup test --race` |
 | `--cover` | Report coverage. | `spinup test --cover` |
 | `--api` | Run the API tests. This is the default. | `spinup test --api` |
-| `--web`, `--e2e`, `--contract` | Not available yet. | `pnpm --dir web test` |
+| `--web`, `--e2e`, `--contract` | Not available yet. | `cd web && pnpm test` |
 | `--dir <directory>`, `-C` | Test the app in this folder. | `spinup test -C ~/code/todo` |
 | `--dry-run` | Print the command and do not run it. | `spinup test --dry-run` |
 

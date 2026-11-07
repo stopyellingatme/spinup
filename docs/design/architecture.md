@@ -340,7 +340,7 @@ Field types: string, text, int, bigint, bool, float, decimal, time, date, uuid, 
 2. Run `docker compose -f deploy/compose.dev.yml up -d` for Postgres 18 and Mailpit. With `--lgtm`, add `grafana/otel-lgtm` v0.36.0. Wait for the health checks.
 3. Run migrations through the kit provider, and River migrations if the jobs module is on.
 4. Start `go tool air`. On a change in `queries/*.sql` run `sqlc`. On a change in `openapi.yaml` run `oapi-codegen` and the client generator.
-5. Start `pnpm --dir web dev`. The Vite proxy sends `/api` to `localhost:8080`, so cookies stay on one origin.
+5. Start `pnpm dev` with the working directory `web/`. The Vite proxy sends `/api` to `localhost:8080`, so cookies stay on one origin.
 6. Print a URL table: app, Mailpit, Grafana. Prefix each log line with the process name. On a port conflict, pick a free port and write it to `.spinup/dev.json`.
 7. On exit or crash, stop all children. Leave the infra running unless `--down`.
 

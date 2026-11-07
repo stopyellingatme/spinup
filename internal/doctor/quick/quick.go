@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -68,8 +69,11 @@ func web(c *doctor.Context) bool {
 	return err == nil
 }
 func command(ctx context.Context, c *doctor.Context, name string, args ...string) (string, error) {
+	return commandIn(ctx, c, c.Root, name, args...)
+}
+func commandIn(ctx context.Context, c *doctor.Context, dir, name string, args ...string) (string, error) {
 	r, _ := runner(c)
-	result, err := r.Run(ctx, exec.Cmd{Name: name, Args: args, Dir: c.Root, Timeout: 10 * time.Second})
+	result, err := r.Run(ctx, exec.Cmd{Name: name, Args: args, Dir: dir, Timeout: 10 * time.Second})
 	if err == nil && result.ExitCode != 0 {
 		err = fmt.Errorf("%s exited with code %d", name, result.ExitCode)
 	}
@@ -131,15 +135,51 @@ func pnpm(ctx context.Context, c *doctor.Context) doctor.Result {
 		return fail("cannot read spinup.lock", "repair spinup.lock and repeat spinup doctor")
 	}
 	name := webtool.FromLock(lock).Name()
-	output, err := command(ctx, c, name, "--version")
+	// Corepack picks the version from the package.json of the working directory.
+	// Ask from web/ so the answer is the version that spinup dev uses.
+	output, err := commandIn(ctx, c, filepath.Join(c.Root, "web"), name, "--version")
 	if err != nil {
-		hint := "enable pnpm through corepack and add it to PATH"
+		hint := "run corepack enable pnpm and add the corepack shims to PATH"
 		if name == "bun" {
 			hint = "install bun and add it to PATH"
 		}
 		return fail(name+" is not available on PATH", hint)
 	}
+	if name == "pnpm" {
+		if pin := packageManagerPin(c.Root, "pnpm"); pin != "" && output != pin {
+			where := name
+			if path, lookErr := osexec.LookPath(name); lookErr == nil {
+				where = path
+			}
+			return fail(
+				fmt.Sprintf("pnpm %s answered from %s, but web/package.json pins pnpm@%s", output, where, pin),
+				"run corepack enable pnpm, make sure the corepack shims come first on PATH, and repeat spinup doctor")
+		}
+	}
 	return doctor.Result{Status: doctor.OK, Message: name + " " + output}
+}
+
+// packageManagerPin returns the exact version that web/package.json pins for the
+// named tool, or an empty string when the pin is absent or cannot be read.
+// Corepack installs exactly the pinned version, so any other answer means that
+// corepack is not in effect.
+func packageManagerPin(root, tool string) string {
+	data, err := os.ReadFile(filepath.Join(root, "web", "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pkg struct {
+		PackageManager string `json:"packageManager"`
+	}
+	if json.Unmarshal(data, &pkg) != nil {
+		return ""
+	}
+	name, rest, ok := strings.Cut(pkg.PackageManager, "@")
+	if !ok || name != tool {
+		return ""
+	}
+	pin, _, _ := strings.Cut(rest, "+")
+	return pin
 }
 func docker(ctx context.Context, c *doctor.Context) doctor.Result {
 	if enabled(c, "no-infra") {

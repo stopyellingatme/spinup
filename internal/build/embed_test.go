@@ -108,13 +108,12 @@ func TestEmbedLocal(t *testing.T) {
 			if tc.fail != "copy" {
 				writeBuildFile(t, root, "web/build/_app/immutable/start.js", "new asset")
 			}
-			installArgs := []string{"--dir", "web", "install", "--frozen-lockfile"}
-			webArgs := []string{"--dir", "web", "build"}
-			webDir := root
+			installArgs := []string{"install", "--frozen-lockfile"}
+			webArgs := []string{"build"}
+			webDir := filepath.Join(root, "web")
 			if tc.manager == "bun" {
 				installArgs = []string{"install", "--frozen-lockfile"}
 				webArgs = []string{"run", "build"}
-				webDir = filepath.Join(root, "web")
 			}
 			goArgs := []string{"build", "-tags", "embedweb", "-trimpath", "-ldflags", "-X main.version=v1", "-o", "bin/api", "./cmd/api"}
 			runner := &embedRunner{}
@@ -176,7 +175,7 @@ func TestEmbedLocal(t *testing.T) {
 				if len(runner.fake.Calls()) != 0 {
 					t.Fatal("dry run executed a command")
 				}
-				for _, want := range []string{"pnpm --dir web install --frozen-lockfile", "pnpm --dir web build", "web/build", "api/internal/webdist/dist", "go build -tags embedweb"} {
+				for _, want := range []string{"cd web && pnpm install --frozen-lockfile", "cd web && pnpm build", "web/build", "api/internal/webdist/dist", "go build -tags embedweb"} {
 					if !strings.Contains(out.String(), want) {
 						t.Errorf("output lacks %q: %s", want, &out)
 					}

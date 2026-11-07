@@ -206,3 +206,62 @@ func TestBunPackageManager(t *testing.T) {
 		})
 	}
 }
+
+func TestPnpmPin(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, manifest, answer string
+		want                   doctor.Status
+		hint                   string
+	}{
+		{"match", `{"packageManager":"pnpm@12.11.2"}`, "12.11.2", doctor.OK, ""},
+		{"match with hash", `{"packageManager":"pnpm@12.11.2+sha512.abc"}`, "12.11.2", doctor.OK, ""},
+		{"stale global", `{"packageManager":"pnpm@12.11.2"}`, "7.28.0", doctor.Fail, "corepack enable pnpm"},
+		{"same major, other patch", `{"packageManager":"pnpm@12.11.2"}`, "12.9.0", doctor.Fail, "corepack enable pnpm"},
+		{"no pin", `{"name":"web"}`, "7.28.0", doctor.OK, ""},
+		{"unparseable manifest", `{`, "7.28.0", doctor.OK, ""},
+		{"other tool pinned", `{"packageManager":"yarn@4.0.0"}`, "7.28.0", doctor.OK, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(root, "web"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "web", "package.json"), []byte(tc.manifest), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			fake := &exec.Fake{}
+			fake.Expect("pnpm", "--version").Return(tc.answer, "", 0)
+			result := pnpm(context.Background(), &doctor.Context{Root: root, Deps: map[string]any{"runner": fake, "web": true}})
+			if result.Status != tc.want || !strings.Contains(result.Try, tc.hint) {
+				t.Fatalf("result: %+v", result)
+			}
+			if call := fake.Calls()[0]; call.Dir != filepath.Join(root, "web") {
+				t.Fatalf("pnpm ran in %q, want web/", call.Dir)
+			}
+		})
+	}
+}
+
+func TestBunSkipsPin(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "web", "package.json"), []byte(`{"packageManager":"pnpm@12.11.2"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lock := manifest.New()
+	lock.Answers = map[string]any{"package_manager": "bun"}
+	lock.Packs = []string{"web"}
+	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	fake := &exec.Fake{}
+	fake.Expect("bun", "--version").Return("1.2.0", "", 0)
+	if result := pnpm(context.Background(), &doctor.Context{Root: root, Deps: map[string]any{"runner": fake}}); result.Status != doctor.OK {
+		t.Fatalf("result: %+v", result)
+	}
+}
