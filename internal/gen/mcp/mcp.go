@@ -47,6 +47,12 @@ func toolName(name string) (string, error) {
 	if len(name) > 64 || !snakeName.MatchString(name) {
 		return "", fmt.Errorf("cannot generate MCP tool %q: the name must be snake_case with at most 64 characters\nTry: spinup g mcp tool lookup_order", name)
 	}
+	// The mcp pack owns these files and functions: server.go, whoami.go,
+	// registerGenerated, and registerWhoami(s).
+	switch name {
+	case "generated", "whoami", "server":
+		return "", fmt.Errorf("cannot generate MCP tool %q: the mcp pack already uses this name\nTry: choose another name, such as %s_tool", name, name)
+	}
 	var camel strings.Builder
 	for _, word := range strings.Split(name, "_") {
 		camel.WriteString(strings.ToUpper(word[:1]) + word[1:])

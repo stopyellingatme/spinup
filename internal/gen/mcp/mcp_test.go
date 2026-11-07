@@ -19,7 +19,7 @@ func TestToolNames(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	for _, name := range []string{"", "Lookup", "bad-name", "_a", "a__b", "a_", "2a", strings.Repeat("a", 65)} {
+	for _, name := range []string{"", "Lookup", "bad-name", "_a", "a__b", "a_", "2a", strings.Repeat("a", 65), "generated", "whoami", "server"} {
 		if _, err := toolName(name); err == nil || !strings.Contains(err.Error(), "Try:") {
 			t.Errorf("%q: %v", name, err)
 		}

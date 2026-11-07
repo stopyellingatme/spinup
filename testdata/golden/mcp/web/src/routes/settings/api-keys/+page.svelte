@@ -17,6 +17,14 @@
 
 	let { data, form }: PageProps = $props();
 
+	// Vite replaces the identifier __PUBLIC_ORIGIN__, not text inside a string.
+	const mcpEndpoint = `${__PUBLIC_ORIGIN__}/api/mcp`;
+	const cursorConfig = JSON.stringify(
+		{ mcpServers: { '<app>': { url: mcpEndpoint, headers: { Authorization: 'Bearer <key>' } } } },
+		null,
+		2
+	);
+
 	// Show the toast of a redirect once, then remove its flag from the address bar.
 	afterNavigate(({ to }) => {
 		if (!to?.url.searchParams.has('revoked')) return;
@@ -277,22 +285,15 @@
 		<Card.Content class="grid gap-4">
 			<div class="grid gap-2">
 				<p class="text-sm font-medium">Endpoint</p>
-				<Input readonly value="__PUBLIC_ORIGIN__/api/mcp" aria-label="MCP endpoint" class="font-mono" />
+				<Input readonly value={mcpEndpoint} aria-label="MCP endpoint" class="font-mono" />
 			</div>
 			<div class="grid gap-2">
 				<p class="text-sm font-medium">Claude Code</p>
-				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>claude mcp add --transport http &lt;app&gt; __PUBLIC_ORIGIN__/api/mcp --header "Authorization: Bearer &lt;key&gt;"</code></pre>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>claude mcp add --transport http &lt;app&gt; {mcpEndpoint} --header "Authorization: Bearer &lt;key&gt;"</code></pre>
 			</div>
 			<div class="grid gap-2">
 				<p class="text-sm font-medium">Cursor mcp.json</p>
-				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>{`{
-  "mcpServers": {
-    "<app>": {
-      "url": "__PUBLIC_ORIGIN__/api/mcp",
-      "headers": { "Authorization": "Bearer <key>" }
-    }
-  }
-}`}</code></pre>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>{cursorConfig}</code></pre>
 			</div>
 		</Card.Content>
 	</Card.Root>
