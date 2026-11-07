@@ -19,6 +19,10 @@ import (
  appapikeys "[[ .module ]]/api/internal/apikeys"
  "github.com/stopyellingatme/spinup/kit/x/apikeys"
 [[- end ]]
+[[- if has "mcp" .modules ]]
+ appmcp "[[ .module ]]/api/internal/mcp"
+ kitmcp "github.com/stopyellingatme/spinup/kit/x/mcp"
+[[- end ]]
 
 [[ if has "auth" .modules ]] kitmigrations "[[ .module ]]/api/db/kit"
 [[ end ]] "[[ .module ]]/api/db/migrations"
@@ -94,13 +98,19 @@ func run() (err error) {
  if err := config.Load(&apikeysEnv); err != nil {
   return err
  }
- keyStore, err := apikeys.NewStore(pool, appapikeys.Config)
+ keyStore, err := apikeys.NewStore(pool, appapikeys.Config[[ if has "mcp" .modules ]], apikeys.WithRPCPath(kitmcp.Path)[[ end ]])
  if err != nil {
   return err
  }
  if err := keyStore.Start(ctx, apikeysEnv.Flush); err != nil {
   return err
  }
+[[- if has "mcp" .modules ]]
+ mcpServer, err := appmcp.New(appmcp.Deps{DB: pool, Version: version})
+ if err != nil {
+  return err
+ }
+[[- end ]]
 [[- end ]]
  authn, err := auth.New(pool,
   auth.WithRoles(roles.Set),
@@ -171,6 +181,10 @@ func run() (err error) {
   app.WithRoutes(keyStore.Routes(authn)),
   app.WithCommand("apikeys", keyStore.Command()),
   app.WithReadiness("apikeys", keyStore.Ready),
+[[- end ]]
+[[- if has "mcp" .modules ]]
+  app.WithRoutes(mcpServer.Routes(web.PublicOrigin)),
+  app.WithCommand("mcp", mcpServer.Command()),
 [[- end ]]
 [[- if has "mail" .modules ]]
 [[- if has "jobs" .modules ]]
