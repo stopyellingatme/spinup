@@ -8,7 +8,9 @@ require (
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/otelpgx v0.13.0
 	github.com/felixge/httpsnoop v1.1.0
+	github.com/google/jsonschema-go v0.4.3
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/riverqueue/river v0.49.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.49.0
@@ -78,6 +80,8 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/riverqueue/river/riverdriver v0.49.0 // indirect
 	github.com/riverqueue/river/rivershared v0.49.0 // indirect
+	github.com/segmentio/asm v1.2.1 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sethvargo/go-retry v0.5.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
@@ -88,6 +92,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect
@@ -97,6 +102,7 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261005182115-fad411399dd8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8 // indirect
 	google.golang.org/grpc v1.84.0 // indirect

@@ -1,0 +1,5 @@
+# Managed by spinup. pnpm 12 refuses to install when a dependency's build script is neither
+# allowed nor denied (ADR 0002 rule 9). List each one here.
+allowBuilds:
+  esbuild: true
+  protobufjs: false

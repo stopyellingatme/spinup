@@ -1,0 +1,21 @@
+# The doctor check mcp-wired finds a main.go that lost a line (ADR 0031 §9.6).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys,mcp --module example.com/demo --no-git --non-interactive
+cd demo
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "ok"'
+
+# Delete the WithRPCPath option. The check warns and names the missing line.
+exec sh -c 'sed "s/, apikeys.WithRPCPath(kitmcp.Path)//" api/cmd/api/main.go > main.tmp && mv main.tmp api/cmd/api/main.go'
+! grep 'WithRPCPath' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'warn\tmcp-wired\tapi/cmd/api/main.go lacks apikeys.WithRPCPath inside apikeys.NewStore\.'
+stdout 'Try: add apikeys.WithRPCPath\(kitmcp.Path\) as an option of apikeys.NewStore'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "mcp-wired",\s+"status": "warn"'
+
+# Delete the Routes line. The check names that line.
+exec sh -c 'grep -v "mcpServer.Routes" api/cmd/api/main.go > main.tmp && mv main.tmp api/cmd/api/main.go'
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'warn\tmcp-wired\tapi/cmd/api/main.go lacks mcpServer.Routes inside app.New\.'
+stdout 'Try: add app.WithRoutes\(mcpServer.Routes\(web.PublicOrigin\)\),'

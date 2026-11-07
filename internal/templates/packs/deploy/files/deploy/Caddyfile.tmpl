@@ -58,6 +58,12 @@
 	import Caddyfile.d/*.caddy
 [[- if $web ]]
 
+[[- if has "mcp" .modules ]]
+	handle /api/mcp {
+		import upstream.caddy api 8080 { flush_interval -1 }
+	}
+[[- end ]]
+
 	handle /api/* {
 		import upstream.caddy api 8080
 	}

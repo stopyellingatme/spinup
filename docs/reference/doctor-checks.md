@@ -166,6 +166,14 @@ If the app also has the audit module, it warns when the audit functions did not 
 
 **Fix:** add the line that `Try:` shows. For the audit triggers, see [API keys and plans](../build/api-keys.md#the-audit-trail).
 
+### mcp-wired
+
+The mcp module needs wiring in `api/cmd/api/main.go`: `New` from the app package `api/internal/mcp`, `Routes` of the server inside `app.New`, and `apikeys.WithRPCPath` in the `apikeys.NewStore` call.
+Without `WithRPCPath`, the apikeys middleware refuses every POST of a read key, so a read key cannot call a read-only tool.
+It skips an app without the mcp module. It reports the first missing call.
+
+**Fix:** add the line that `Try:` shows. See [MCP server](../build/mcp.md).
+
 ### flags-drift
 
 The files `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts` come from the `[flags.KEY]` tables in `spinup.toml`.

@@ -31,7 +31,7 @@ class = "scaffold"
 
 [[files]]
 path = "web/src/routes/settings/api-keys/+page.svelte"
-source = "files/web/src/routes/settings/api-keys/+page.svelte"
+source = "files/web/src/routes/settings/api-keys/+page.svelte.tmpl"
 class = "scaffold"
 
 [[files]]

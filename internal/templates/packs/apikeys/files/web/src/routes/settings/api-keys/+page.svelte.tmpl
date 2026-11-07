@@ -16,6 +16,16 @@
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+[[- if has "mcp" .modules ]]
+
+	// Vite replaces the identifier __PUBLIC_ORIGIN__, not text inside a string.
+	const mcpEndpoint = `${__PUBLIC_ORIGIN__}/api/mcp`;
+	const cursorConfig = JSON.stringify(
+		{ mcpServers: { '<app>': { url: mcpEndpoint, headers: { Authorization: 'Bearer <key>' } } } },
+		null,
+		2
+	);
+[[- end ]]
 
 	// Show the toast of a redirect once, then remove its flag from the address bar.
 	afterNavigate(({ to }) => {
@@ -269,7 +279,26 @@
 			</form>
 		</Card.Content>
 	</Card.Root>
-
+[[ if has "mcp" .modules ]]	<Card.Root>
+		<Card.Header>
+			<Card.Title>Connect an AI client</Card.Title>
+			<Card.Description>Use a key with an AI client. Do not share this key.</Card.Description>
+		</Card.Header>
+		<Card.Content class="grid gap-4">
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Endpoint</p>
+				<Input readonly value={mcpEndpoint} aria-label="MCP endpoint" class="font-mono" />
+			</div>
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Claude Code</p>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>claude mcp add --transport http &lt;app&gt; {mcpEndpoint} --header "Authorization: Bearer &lt;key&gt;"</code></pre>
+			</div>
+			<div class="grid gap-2">
+				<p class="text-sm font-medium">Cursor mcp.json</p>
+				<pre class="bg-muted overflow-x-auto rounded-md p-3 text-sm"><code>{cursorConfig}</code></pre>
+			</div>
+		</Card.Content>
+	</Card.Root>[[ end ]]
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Use in the last 30 days</Card.Title>
