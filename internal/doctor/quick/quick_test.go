@@ -184,6 +184,9 @@ func TestBunPackageManager(t *testing.T) {
 		t.Run(fmt.Sprint(absent), func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
+			if err := os.Mkdir(filepath.Join(root, "web"), 0o755); err != nil {
+				t.Fatal(err)
+			}
 			lock := manifest.New()
 			lock.Packs = []string{"web"}
 			lock.Answers["package_manager"] = "bun"
@@ -262,6 +265,16 @@ func TestBunSkipsPin(t *testing.T) {
 	fake := &exec.Fake{}
 	fake.Expect("bun", "--version").Return("1.2.0", "", 0)
 	if result := pnpm(context.Background(), &doctor.Context{Root: root, Deps: map[string]any{"runner": fake}}); result.Status != doctor.OK {
+		t.Fatalf("result: %+v", result)
+	}
+}
+
+func TestPnpmMissingWebDirectory(t *testing.T) {
+	t.Parallel()
+	fake := &exec.Fake{}
+	fake.Expect("pnpm", "--version").Fail(errors.New("chdir: no such file or directory"))
+	result := pnpm(context.Background(), &doctor.Context{Root: t.TempDir(), Deps: map[string]any{"runner": fake, "web": true}})
+	if result.Status != doctor.Fail || !strings.Contains(result.Message, "web/ directory is missing") {
 		t.Fatalf("result: %+v", result)
 	}
 }

@@ -139,6 +139,9 @@ func pnpm(ctx context.Context, c *doctor.Context) doctor.Result {
 	// Ask from web/ so the answer is the version that spinup dev uses.
 	output, err := commandIn(ctx, c, filepath.Join(c.Root, "web"), name, "--version")
 	if err != nil {
+		if info, statErr := os.Stat(filepath.Join(c.Root, "web")); statErr != nil || !info.IsDir() {
+			return fail("web/ directory is missing", "restore web/ or remove the web pack from spinup.lock")
+		}
 		hint := "run corepack enable pnpm and add the corepack shims to PATH"
 		if name == "bun" {
 			hint = "install bun and add it to PATH"
