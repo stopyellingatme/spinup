@@ -37,6 +37,7 @@ The owner decided these points on 2026-11-06. They are binding:
 1.4. A tool call obeys `REQUEST_TIMEOUT` (default 30 s), the same as a REST request. The MCP route is not exempt from the deadline. Long work goes to `kit/jobs`, and the tool returns a handle.
 1.5. One HTTP request is one plan request of the apikeys quota.
 1.6. Out of scope: OAuth, `subscriptions/listen`, prompts and resources helpers (`SDK()` is the escape hatch), and SSE progress.
+1.7. The SDK decodes tool arguments into `map[string]any`, so a JSON number becomes a `float64`. An integer above 2^53 loses precision. A `bigserial` ID never gets there in practice. A tool that needs exact large integers must take them as strings.
 
 ### 2. Dependencies
 
@@ -107,7 +108,10 @@ func ToolError(format string, args ...any) error
 - `tools/list`: remove each tool that the caller cannot call. Set `cacheScope` to `"private"` in the result, because the list depends on the caller.
 - `tools/call`: if the caller cannot call the tool, answer a JSON-RPC error with code `-32602` (invalid params) and the message "The tool <name> is not available for this key. Try: use a key with the write scope." (or "... for your role." for a role refusal).
 - A read key can call a tool only when `ReadOnly` is true. A write key can call every tool. When `Roles` is set, `auth.UserFrom(ctx).HasRole(roles...)` must be true.
-4.4. A plain Go error from the SDK path is code `0`. The kit must not return a plain error from the middleware. It uses `*jsonrpc.Error` from `github.com/modelcontextprotocol/go-sdk/jsonrpc`.
+4.4. Known gap (follow-up): the auth middleware runs before the MCP handler. A request with an invalid Bearer token gets the 401 of `kit/auth` before the Origin check, and that 401 has no `resource_metadata`. The request is still refused. The fix is an MCP middleware that runs before the auth middleware on `Path`.
+4.5. A plain Go error from the SDK path is code `0`. The kit must not return a plain error from the middleware. It uses `*jsonrpc.Error` from `github.com/modelcontextprotocol/go-sdk/jsonrpc`.
+4.6. **Body.** After the credential check and before the SDK, the kit reads the body once, bounded by `MaxBodyBytes`. An over-limit body answers 413. A body that is not valid I-JSON (duplicate names, invalid UTF-8) answers 400, the same strictness as ADR 0027. The kit parses the JSON-RPC IDs once for the span. The SDK then reads the same bytes.
+4.7. **Deadline.** For protocol versions before 2026-07-28, the SDK does not pass the request cancellation to the tool. The kit restores the request deadline and cancellation around each tool call, so `REQUEST_TIMEOUT` applies to every protocol version.
 
 ### 5. The apikeys change: `WithRPCPath`
 
@@ -144,7 +148,7 @@ func WithRPCPath(path string) StoreOption
 
 ### 8. The app command `mcp`
 
-`api mcp tools` prints the tool list as JSON to stdout: name, title, description, the annotations, roles, and the input and output schemas. `api mcp` with no argument or another argument prints usage and exits 2. The command needs no database.
+`api mcp tools` prints the tool list as JSON to stdout: name, title, description, the annotations, roles, and the input and output schemas. `api mcp` with no argument or another argument returns a usage error, and the app exits 1, the same as the other app commands. The command does not query the database, but it runs after the app startup, so it needs `DATABASE_URL` like every app command.
 
 ### 9. Module, wiring, and doctor check
 
