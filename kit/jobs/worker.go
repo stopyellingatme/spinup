@@ -139,19 +139,37 @@ func (w *Worker) Kinds() []string {
 // Only one worker process (the River leader) inserts periodic jobs, so more
 // worker processes do not insert more jobs. Call it before [Worker.Start].
 // It panics when the worker has started or every is not positive.
+//
+// River keeps the schedule in memory. Each worker start begins a new
+// interval, so the first job comes one interval after the start. A worker
+// that restarts more often than every interval never inserts the job. Use
+// [Worker.PeriodicOnStart] for a long interval.
 func (w *Worker) Periodic(every time.Duration, args Args) {
+	w.addPeriodic("Periodic", every, args, false)
+}
+
+// PeriodicOnStart is like [Worker.Periodic], and it also inserts one job
+// when the worker starts. After that, the job comes every interval. The
+// leader inserts the start job, so a worker that joins a running leader does
+// not insert one. Guard the job against a repeat run, because each restart
+// of the leader inserts one more job.
+func (w *Worker) PeriodicOnStart(every time.Duration, args Args) {
+	w.addPeriodic("PeriodicOnStart", every, args, true)
+}
+
+func (w *Worker) addPeriodic(name string, every time.Duration, args Args, onStart bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.started {
-		panic("jobs: Periodic after Start: add every periodic job before Start")
+		panic("jobs: " + name + " after Start: add every periodic job before Start")
 	}
 	if every <= 0 || args == nil {
-		panic(fmt.Sprintf("jobs: Periodic needs a positive interval and args (got %s, %v)", every, args))
+		panic(fmt.Sprintf("jobs: %s needs a positive interval and args (got %s, %v)", name, every, args))
 	}
 	w.periodic = append(w.periodic, river.NewPeriodicJob(
 		river.PeriodicInterval(every),
 		func() (river.JobArgs, *river.InsertOpts) { return args, nil },
-		nil,
+		&river.PeriodicJobOpts{RunOnStart: onStart},
 	))
 }
 

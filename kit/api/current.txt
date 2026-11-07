@@ -332,6 +332,7 @@ kit/jobs ptrmethod Client.Insert(context.Context, Args, ...InsertOption) (int64,
 kit/jobs ptrmethod Client.InsertTx(context.Context, pgx.Tx, Args, ...InsertOption) (int64, error)
 kit/jobs ptrmethod Worker.Kinds() []string
 kit/jobs ptrmethod Worker.Periodic(time.Duration, Args)
+kit/jobs ptrmethod Worker.PeriodicOnStart(time.Duration, Args)
 kit/jobs ptrmethod Worker.Start(context.Context) error
 kit/jobs ptrmethod Worker.Stop(context.Context) error
 kit/jobs type Args interface

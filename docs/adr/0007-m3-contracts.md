@@ -53,3 +53,11 @@ Kit `jobs` never set `river.Config.JobTimeout`, so River cancelled every job aft
 - `jobs.Cancel(err)` wraps `err` with `river.JobCancel`. River cancels the job at once, with no retry. `errors.Is` and `errors.As` still find the cause.
 
 These are additions. Existing apps need no codemod.
+
+## 8. Amendment (2026-11-07): periodic jobs on start
+
+`Worker.Periodic` passed no `PeriodicJobOpts`, so `RunOnStart` was false. In River v0.49.0 the periodic enqueuer keeps the schedule in memory. At start it sets the first run to `ScheduleFunc(now)` (`internal/maintenance/periodic_job_enqueuer.go`, line 413). Only an optional pilot can restore a stored time (lines 409-410), and the kit configures none. A restart therefore waits one full interval again. A `Periodic(24h)` job never runs when the worker restarts each day, and `air` restarts in `spinup dev` starve even an hourly job. The kit adds:
+- `Worker.PeriodicOnStart(every, args)` sets `RunOnStart`. The leader inserts one job at start and then one each interval.
+- `Worker.Periodic` keeps its signature. The API baseline `kit/api/current.txt` lists `Worker.Periodic(time.Duration, Args)`, and `docs/policy/kit-compat.md` fails the guard for a changed line. A variadic option would change that line. A new method is an addition.
+
+The job must guard against a repeat run, because each start of the leader inserts one more job. No codemod is needed.

@@ -388,6 +388,50 @@ func TestPeriodic(t *testing.T) {
 	}
 }
 
+func countTick(t *testing.T, pool *pgxpool.Pool) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM river_job WHERE kind = 'tick'").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestPeriodicOnStart(t *testing.T) {
+	t.Parallel()
+	pool := migrated(t)
+	w, err := jobs.NewWorker(pool, quiet(), jobs.WithPollInterval(50*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs.Register(w, func(context.Context, jobs.Job[tickArgs]) error { return nil })
+	w.PeriodicOnStart(time.Hour, tickArgs{})
+	startWorker(t, w)
+	deadline := time.Now().Add(waitTimeout)
+	for countTick(t, pool) != 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("PeriodicOnStart inserted %d jobs after Start, want 1", countTick(t, pool))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestPeriodicNotOnStart(t *testing.T) {
+	t.Parallel()
+	pool := migrated(t)
+	w, err := jobs.NewWorker(pool, quiet(), jobs.WithPollInterval(50*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs.Register(w, func(context.Context, jobs.Job[tickArgs]) error { return nil })
+	w.Periodic(time.Hour, tickArgs{})
+	startWorker(t, w)
+	time.Sleep(time.Second)
+	if n := countTick(t, pool); n != 0 {
+		t.Fatalf("Periodic inserted %d jobs right after Start, want 0", n)
+	}
+}
+
 func TestGracefulStop(t *testing.T) {
 	t.Parallel()
 	pool := migrated(t)
@@ -521,5 +565,6 @@ func TestWorkerRules(t *testing.T) {
 	jobs.Register(w2, noop)
 	mustPanic("a duplicate kind", func() { jobs.Register(w2, noop) })
 	mustPanic("a zero interval", func() { w2.Periodic(0, greetArgs{}) })
+	mustPanic("a zero start interval", func() { w2.PeriodicOnStart(0, greetArgs{}) })
 	mustPanic("Register after Start", func() { jobs.Register(w, func(context.Context, jobs.Job[tickArgs]) error { return nil }) })
 }

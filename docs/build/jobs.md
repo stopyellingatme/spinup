@@ -138,6 +138,26 @@ Add the call before `w.Start`.
 Only one worker process inserts periodic jobs, so more worker processes do not give more jobs.
 For a fixed time of day, run the job every hour and check the time inside the function.
 
+### Restarts reset the schedule
+
+River keeps the schedule in memory only. When a worker starts, River sets the first run to one interval from that moment.
+The database does not store the time of the last run.
+A restart therefore begins the interval again.
+
+- A `Periodic(24*time.Hour, ...)` job never runs when the worker restarts more often than once a day. Each deploy restarts the worker.
+- In `spinup dev`, `air` restarts the worker on every code change. An hourly job rarely runs.
+
+To insert one job when the worker starts, call `PeriodicOnStart` instead of `Periodic`.
+The job then comes at start and after each interval.
+
+```go
+w.PeriodicOnStart(24*time.Hour, jobsapp.SendDigestArgs{})
+```
+
+Only the leader inserts the start job. Each restart of the leader inserts one more job.
+For a long interval, add a guard in the function so that a repeat run does nothing.
+For example, write a row with the date when the job finishes. At the start of the job, return if the row for today exists.
+
 ## Retries
 
 A job that returns an error is tried again, with a longer wait after each failure.
@@ -275,6 +295,7 @@ It needs `DATABASE_URL`.
 | Jobs stay `available` | No worker runs, or the job is on a queue the worker does not take. | Start the worker. Check the queue names. |
 | The worker logs `no job is registered` | The `jobs` package has no job yet. | Run `spinup g job <name>`. |
 | A job stops after one minute | The default time limit of a job is one minute. | Set `jobs.WithJobTimeout`, or add a `Timeout` method to the job arguments. |
+| A periodic job never runs | The worker restarts before the first interval ends, because River keeps the schedule in memory. | Call `PeriodicOnStart`, and guard the job against a repeat run. |
 | A job is cancelled at shutdown | It ran longer than `SHUTDOWN_TIMEOUT`. | Make it check `ctx.Done()`, or raise the timeout. |
 
 ## See also
