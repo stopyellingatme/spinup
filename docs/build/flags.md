@@ -15,7 +15,7 @@ The `flags` module needs the `auth` module.
 $ spinup new todo --module example.com/todo --modules auth,flags --no-git --non-interactive
 ...
 $ cd todo
-$ spinup doctor --quick | grep flags-drift
+$ spinup doctor --quick 2>/dev/null | grep flags-drift
 ok	flags-drift	generated flags match [flags] in spinup.toml
 ```
 

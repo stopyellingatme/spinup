@@ -14,7 +14,7 @@ A client authenticates with an API key. The module needs the `auth` and `apikeys
 $ spinup new todo --module example.com/todo --modules auth,apikeys,mcp --no-git --non-interactive
 ...
 $ cd todo
-$ spinup doctor --quick | grep mcp-wired
+$ spinup doctor --quick 2>/dev/null | grep mcp-wired
 ok	mcp-wired	mcp wiring is present
 ```
 

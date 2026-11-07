@@ -66,8 +66,10 @@ jobs:
         run: |
           go run ./cmd/spinup tools install
           echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
+      # The testscript package runs near 10 minutes on macOS, so raise the
+      # default timeout of each package to the one that make script uses.
       - name: Test the CLI with the race detector
-        run: go test -race ./...
+        run: go test -race -timeout 30m ./...
       # The kit tests need PostgreSQL. Linux runners start it in Docker (testcontainers).
       # macOS runners have no Docker, so this step starts PostgreSQL 18 from Homebrew.
       - name: Start PostgreSQL on macOS

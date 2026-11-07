@@ -15,7 +15,7 @@ The `apikeys` module needs the `auth` module.
 $ spinup new todo --module example.com/todo --modules auth,apikeys --no-git --non-interactive
 ...
 $ cd todo
-$ spinup doctor --quick | grep apikeys-drift
+$ spinup doctor --quick 2>/dev/null | grep apikeys-drift
 ok	apikeys-drift	generated apikeys match [apikeys] in spinup.toml
 ```
 
