@@ -21,6 +21,8 @@ type commandListKey struct{}
 
 // Routes registers the MCP endpoint and the public metadata endpoint.
 func (s *Server) Routes(publicOrigin string) func(*http.ServeMux) {
+	// PUBLIC_ORIGIN can end in a slash. An origin never does.
+	publicOrigin = strings.TrimRight(publicOrigin, "/")
 	sdkHandler := sdkmcp.NewStreamableHTTPHandler(func(*http.Request) *sdkmcp.Server { return s.sdk }, &sdkmcp.StreamableHTTPOptions{
 		Stateless: true, JSONResponse: true, MaxRequestBodyBytes: s.cfg.MaxBodyBytes, PropagateRequestCancellation: true,
 	})

@@ -150,6 +150,27 @@ func TestMetadata(t *testing.T) {
 		}
 	}
 }
+func TestPublicOriginTrailingSlash(t *testing.T) {
+	installKeyReader(t)
+	mux := http.NewServeMux()
+	newServer(t, Config{}).Routes("https://app.example/")(mux)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, MetadataPath, nil))
+	if !strings.Contains(w.Body.String(), `"resource":"https://app.example/api/mcp"`) {
+		t.Fatalf("metadata: %s", w.Body.String())
+	}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, Path, strings.NewReader("{}"))
+	r.Header.Set("Origin", "https://app.example")
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+	if w.Code == http.StatusForbidden {
+		t.Fatalf("the public origin was refused: %s", w.Body.String())
+	}
+	if got := w.Header().Get("WWW-Authenticate"); got != "" && strings.Contains(got, "example//") {
+		t.Fatalf("WWW-Authenticate: %s", got)
+	}
+}
+
 func registerTestTool(s *Server, def ToolDef) {
 	Tool(s, def, func(context.Context, struct{}) (struct{}, error) { return struct{}{}, nil })
 }
