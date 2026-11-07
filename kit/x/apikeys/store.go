@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,7 @@ type Store struct {
 	logger       *slog.Logger
 	now          func() time.Time
 	rpcPath      string
+	sessionOnly  []string
 	counter      metric.Int64Counter
 	mu           sync.Mutex
 	warned       map[string]bool
@@ -78,6 +80,7 @@ type storeOptions struct {
 	logger *slog.Logger
 	now    func() time.Time
 	rpc    string
+	only   []string
 }
 
 // StoreOption configures NewStore.
@@ -92,6 +95,19 @@ func WithClock(now func() time.Time) StoreOption { return func(o *storeOptions) 
 // WithRPCPath lets a read key send POST to path (an exact match). The handler
 // at path must enforce the read scope itself. The quotas still apply.
 func WithRPCPath(path string) StoreOption { return func(o *storeOptions) { o.rpc = path } }
+
+// WithSessionOnly blocks every request with an API key whose path starts with
+// one of the prefixes. The answer is 403. Several calls add prefixes. An empty
+// prefix is ignored.
+func WithSessionOnly(prefixes ...string) StoreOption {
+	return func(o *storeOptions) {
+		for _, p := range prefixes {
+			if p != "" {
+				o.only = append(o.only, p)
+			}
+		}
+	}
+}
 
 // NewStore validates cfg without accessing the database or starting a loop.
 func NewStore(pool *pgxpool.Pool, cfg Config, opts ...StoreOption) (*Store, error) {
@@ -112,7 +128,7 @@ func NewStore(pool *pgxpool.Pool, cfg Config, opts ...StoreOption) (*Store, erro
 		o.now = time.Now
 	}
 	cfg.Plans = maps.Clone(cfg.Plans)
-	s := &Store{pool: pool, cfg: cfg, logger: o.logger, now: o.now, rpcPath: o.rpc, warned: map[string]bool{}, minute: map[int64]int64{}, days: map[userDay]*dayUsage{}, pending: map[keyDay]int64{}, lastErr: &storeError{message: "apikeys: usage has not been flushed.\nTry: start the store and check the database connection."}}
+	s := &Store{pool: pool, cfg: cfg, logger: o.logger, now: o.now, rpcPath: o.rpc, sessionOnly: slices.Clone(o.only), warned: map[string]bool{}, minute: map[int64]int64{}, days: map[userDay]*dayUsage{}, pending: map[keyDay]int64{}, lastErr: &storeError{message: "apikeys: usage has not been flushed.\nTry: start the store and check the database connection."}}
 	s.initCounter()
 	return s, nil
 }
@@ -271,6 +287,25 @@ func (s *Store) SetPlan(ctx context.Context, email, plan string) error {
 	}
 	return nil
 }
+
+// SetPlanForUser assigns a declared plan to the user with the ID, in the
+// transaction tx. The caller owns the transaction and the audit actor.
+func (s *Store) SetPlanForUser(ctx context.Context, tx pgx.Tx, userID int64, plan string) error {
+	if _, ok := s.cfg.Plans[plan]; !ok {
+		return &storeError{cause: ErrUnknownPlan, message: fmt.Sprintf("apikeys: the plan %q is not declared.\nTry: use one of %s.", plan, strings.Join(s.cfg.PlanNames(), ", "))}
+	}
+	tag, err := tx.Exec(ctx, `INSERT INTO api_key_plans(user_id,plan) SELECT id,$2 FROM users WHERE id=$1 ON CONFLICT(user_id) DO UPDATE SET plan=excluded.plan,updated_at=now()`, userID, plan)
+	if err != nil {
+		return storeFailure("assign the plan", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// DefaultPlan returns the name of the plan of a user with no plan row.
+func (s *Store) DefaultPlan() string { return s.cfg.DefaultPlan }
 
 // Usage returns stored counts for the most recent days, including today, ordered by day and key.
 func (s *Store) Usage(ctx context.Context, userID int64, days int) ([]UsageDay, error) {
