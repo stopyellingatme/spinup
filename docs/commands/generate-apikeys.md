@@ -44,3 +44,5 @@ Created 0, updated 0 files
 ```
 
 The `apikeys-drift` doctor check warns if either generated file differs from the declarations.
+
+See [API keys and plans](../build/api-keys.md) for the full guide.

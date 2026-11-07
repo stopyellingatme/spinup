@@ -1,0 +1,59 @@
+# A bad declaration fails with the rule and a Try line. No file changes.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys --module example.com/demo --no-git --non-interactive
+cd demo
+exec cp spinup.toml $WORK/original.toml
+
+# An unknown key.
+exec sh -c 'cat "$WORK/unknown-key.toml" >> spinup.toml'
+! exec spinup g apikeys
+stderr 'unknown key "color"'
+stderr 'Try: correct \[apikeys\] in spinup.toml and run spinup g apikeys\.'
+grep 'Prefix: +"key",' api/internal/apikeys/apikeys.gen.go
+
+# A default plan that no table declares.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/missing-default.toml" >> spinup.toml'
+! exec spinup g apikeys
+stderr 'default_plan "gold" is not a declared plan'
+stderr 'Try: correct \[apikeys\] in spinup.toml and run spinup g apikeys\.'
+
+# A day limit below the minute limit.
+exec cp $WORK/original.toml spinup.toml
+exec sh -c 'cat "$WORK/small-day.toml" >> spinup.toml'
+! exec spinup g apikeys
+stderr 'plan "free": per_day 5 must be at least per_minute 10'
+stderr 'Try: correct \[apikeys\] in spinup.toml and run spinup g apikeys\.'
+
+# The doctor reports the same fault.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "warn"'
+stdout 'spinup.toml has invalid apikeys\.'
+
+# An app without the module cannot generate apikeys.
+cd $WORK
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g apikeys
+stderr 'the app has no apikeys module'
+stderr 'Try: spinup module add apikeys'
+
+-- unknown-key.toml --
+
+[apikeys]
+color = "blue"
+
+-- missing-default.toml --
+
+[apikeys]
+default_plan = "gold"
+
+[apikeys.plans.free]
+per_minute = 60
+per_day = 1000
+
+-- small-day.toml --
+
+[apikeys.plans.free]
+per_minute = 10
+per_day = 5

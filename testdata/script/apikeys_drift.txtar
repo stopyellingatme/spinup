@@ -1,0 +1,33 @@
+# A hand edit of a generated apikeys file shows as drift in the doctor, and spinup g apikeys fixes it.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,apikeys --module example.com/demo --no-git --non-interactive
+cd demo
+
+# The new app has the default files, so the checks pass.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "ok"'
+
+# A hand edit of the Go file shows as drift.
+exec sh -c 'echo "// edited by hand" >> api/internal/apikeys/apikeys.gen.go'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "warn"'
+stdout 'api/internal/apikeys/apikeys.gen.go does not match \[apikeys\] in spinup.toml\.'
+stdout '"try": "run spinup g apikeys"'
+
+# The generator restores the file, and the doctor passes.
+exec spinup g apikeys
+stdout 'Created 0, updated 1 files'
+! grep 'edited by hand' api/internal/apikeys/apikeys.gen.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "ok"'
+
+# A declaration without a regenerate also shows as drift.
+exec sh -c 'cat "$WORK/declaration.toml" >> spinup.toml'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "apikeys-drift",\s+"status": "warn"'
+stdout '"try": "run spinup g apikeys"'
+
+-- declaration.toml --
+
+[apikeys]
+prefix = "demo"

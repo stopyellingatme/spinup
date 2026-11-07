@@ -148,6 +148,24 @@ The audit trail needs `audit.Command` and `authsink` in `api/cmd/api/main.go`. I
 It skips an app without the audit module.
 **Fix:** add the wiring that [Audit trail](../audit.md) shows. For the trigger, run `spinup g audit user_identities` and then `spinup db migrate up`.
 
+### apikeys-drift
+
+The files `api/internal/apikeys/apikeys.gen.go` and `web/src/lib/apikeys.gen.ts` come from the `[apikeys]` tables in `spinup.toml`.
+It skips an app without the apikeys module. It warns when:
+
+- `spinup.toml` has an invalid `[apikeys]` table.
+- A generated file is missing or differs from `spinup.toml`.
+
+**Fix:** run `spinup g apikeys`. See [API keys and plans](../build/api-keys.md).
+
+### apikeys-wired
+
+The apikeys module needs wiring in `api/cmd/api/main.go`: `apikeys.NewStore`, `auth.WithBearer` with the store, `Start`, the middleware after the auth middleware, `Routes`, the `apikeys` command, and `Close`.
+It skips an app without the apikeys module. It reports the first missing call.
+If the app also has the audit module, it warns when the audit functions did not exist when the apikeys migration ran.
+
+**Fix:** add the line that `Try:` shows. For the audit triggers, see [API keys and plans](../build/api-keys.md#the-audit-trail).
+
 ### flags-drift
 
 The files `api/internal/flags/flags.gen.go` and `web/src/lib/flags.gen.ts` come from the `[flags.KEY]` tables in `spinup.toml`.

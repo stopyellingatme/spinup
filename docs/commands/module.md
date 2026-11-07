@@ -39,6 +39,7 @@ Add `--json` for a structured list.
 | --- | --- | --- |
 | `auth` | Accounts, sessions, and sign-in pages | [Accounts and sign-in](../auth.md) |
 | `audit` | A history of who changed which record | [Audit trail](../audit.md) |
+| `apikeys` | Bearer API keys for each user, with plans and quotas | [API keys and plans](../build/api-keys.md) |
 | `flags` | Feature flags for a feature, a role, a user, or a percentage of users | [Feature flags](../build/flags.md) |
 | `jobs` | Background jobs with a worker process | [Background jobs](../build/jobs.md) |
 | `mail` | Email templates and SMTP delivery | [Mail](../mail.md) |
@@ -175,6 +176,22 @@ The migration goes in `api/db/kit/`, so it does not clash with your own migratio
 The command prints `Next:` lines with the code to paste into `api/cmd/api/main.go` and the web files.
 Then run `spinup db migrate up`, declare a flag in `spinup.toml`, and run `spinup g flags`.
 [Feature flags](../build/flags.md) shows each edit.
+
+## Add the apikeys module to an existing app
+
+`apikeys` needs `auth` and the web app.
+Upgrade the app first, then add the module.
+
+<!-- doctest: skip -->
+```console
+$ spinup upgrade --yes
+$ spinup module add apikeys --yes --non-interactive
+```
+
+The migration goes in `api/db/kit/`, so it does not clash with your own migrations.
+The command prints `Next:` lines with the code to paste into `api/cmd/api/main.go` and the web files.
+Then run `spinup db migrate up`, declare plans in `spinup.toml`, and run `spinup g apikeys`.
+[API keys and plans](../build/api-keys.md) shows each edit.
 
 ## Troubleshooting
 
