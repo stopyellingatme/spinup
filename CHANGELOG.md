@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `docs/commands/generate-openapi.md` gives the handler and the wiring (strict handler, problem error handlers, `auth.Required`) for a hand-written path in an app with no resource, because `spinup g openapi` does not write `routes_gen.go`. The page also names the fix for `missing go.sum entry`. A test compiles the documented code.
 - A development build of the CLI now warns on `spinup new` when no kit replace is set, because the pinned kit can lack packages that the templates import. The warning names `SPINUP_KIT_REPLACE=<checkout>/kit`. The doctor check `kit-version` also warns for a development CLI without a local replace.
 
 ### Added
