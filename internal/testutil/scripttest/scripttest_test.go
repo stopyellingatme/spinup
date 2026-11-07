@@ -98,6 +98,8 @@ func TestScripts(t *testing.T) {
 				ts.Setenv("SPINUP_CREDENTIALS_DIR", ts.MkAbs("creds"))
 				ts.Setenv("SPINUP_BROWSER", "curl -fsSL")
 			},
+			// stripefake runs the in-memory Stripe fake of the kit (ADR 0032 §5). See the package doc.
+			"stripefake": stripeFakeCmd,
 			"mkversion": func(ts *testscript.TestScript, neg bool, args []string) {
 				if neg || len(args) < 1 || len(args) > 2 {
 					ts.Fatalf("usage: mkversion <version> [overlay-dir]")
@@ -108,6 +110,7 @@ func TestScripts(t *testing.T) {
 			},
 		},
 		Setup: func(env *testscript.Env) error {
+			env.Values[stripeKey{}] = &stripeState{}
 			// Scripts have their own HOME, so give git an identity for commits.
 			for key, value := range map[string]string{
 				"GIT_AUTHOR_NAME": "spinup test", "GIT_AUTHOR_EMAIL": "test@example.com",

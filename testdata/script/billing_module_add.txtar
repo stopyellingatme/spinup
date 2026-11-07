@@ -1,0 +1,55 @@
+# spinup module add billing on an app with auth and jobs (ADR 0032 §18).
+# The migration lives in api/db/kit, so it clashes with no app migration (ADR 0028).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+exec spinup new retrofit --modules auth,jobs,deploy --module example.com/retrofit --non-interactive
+cd retrofit
+exec spinup db new add_notes
+exec sh -c 'ls api/db/migrations > $WORK/before.txt'
+! exists api/db/kit/00010_billing.sql
+exec git add -A
+exec git commit -m 'Add a migration'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "billing-wired",\s+"status": "skip"'
+
+# module add writes to a review branch and prints the next steps.
+exec spinup module add billing --yes --non-interactive
+stdout 'git merge spinup/module-billing'
+stdout 'Next: declare plans in spinup.toml'
+stdout 'Next: run spinup g billing\.'
+stdout 'billingSvc, err := kitbilling.New\(pool, appbilling.Config, stripeClient,'
+stdout 'app.WithRoutes\(billingSvc.Routes\(authn\)\),'
+stdout 'app.WithCommand\("billing", billingSvc.Command\(\)\),'
+stdout 'billingSvc.Register\(w\)'
+stdout 'spinup secrets set STRIPE_SECRET_KEY'
+stdout 'stripe listen --forward-to localhost:5173/api/billing/webhook'
+stdout 'billing-drift and billing-wired'
+exists .spinup/upgrade/0.0.0-dev/api/db/kit/00010_billing.sql
+exists .spinup/upgrade/0.0.0-dev/api/internal/billing/billing.gen.go
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/billing.gen.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/pricing/+page.svelte
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/settings/billing/+page.svelte
+! exists .spinup/upgrade/0.0.0-dev/api/db/migrations/00010_billing.sql
+grep '^modules = .*billing' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep 'STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET' .spinup/upgrade/0.0.0-dev/deploy/compose.yml
+
+# The app migrations do not change, and the main checkout stays clean until the merge.
+exec sh -c 'ls api/db/migrations > $WORK/after.txt'
+exec diff $WORK/before.txt $WORK/after.txt
+! exists api/db/kit/00010_billing.sql
+exec git status --porcelain
+! stdout .
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0
