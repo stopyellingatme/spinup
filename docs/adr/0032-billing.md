@@ -357,7 +357,7 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 
 ### 15. Secrets, module, and wiring
 
-15.1. The secrets are `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`, read with `kit/config` (`_FILE` works). The webhook secret can be a comma list for rotation. `STRIPE_API_BASE` overrides the base URL (tests only).
+15.1. The secrets are `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`, read with `kit/config` (`_FILE` works). The webhook secret can be a comma list for rotation. `STRIPE_API_BASE` overrides the base URL (tests only). Both secrets are optional at start, so `migrate`, the other app commands, and `spinup dev` work without Stripe. Without a key, `New` gets a nil client: the API logs a warning, the routes that need Stripe answer 503 with a `Try:` line, `GET /api/me/billing` still answers from the database, and a sync or a usage pass fails with `ErrNotConfigured` (River retries it). Without a webhook secret, the webhook route is not registered, and the API logs an error.
 15.2. `deploy/compose.yml.tmpl` (managed) adds `STRIPE_SECRET_KEY_FILE` and `STRIPE_WEBHOOK_SECRET_FILE` (`/run/secrets/...`) to the api and worker services under `has "billing"`.
 15.3. `main.go.tmpl` (api pack, scaffold), under `has "billing"`: load the env, build the client and the service with `WithJobs`, `WithRoles(roles.Set)`, `WithPublicOrigin`, `WithWebhookSecrets`, and `WithAPIKeys(keyStore)` under `has "apikeys"`. Add `apikeys.WithSessionOnly(billing.SessionPrefix)` to `NewStore`, `app.WithRoutes(billingSvc.Routes(a))`, and `app.WithCommand("billing", billingSvc.Command())`.
 15.4. `cmd/worker/main.go.tmpl` (jobs pack), under `has "billing"`: build the service the same way and call `Register(w)`.
