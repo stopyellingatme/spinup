@@ -47,10 +47,9 @@ Kit `jobs` wraps River (`riverqueue/river` with `riverpgxv5`). The `jobs` pack a
 
 ## 7. Amendment (2026-11-07): job time limit and permanent failure
 
-Kit `jobs` never set `river.Config.JobTimeout`, so River cancelled every job after its default of one minute. Nothing in the docs said so. A job also had no way to fail for good, so a job with input that can never succeed was retried up to `MaxAttempts` times. Dogfooding jostar app found both gaps. The kit adds:
+Kit `jobs` never set `river.Config.JobTimeout`, so River cancelled every job after its default of one minute. Nothing in the docs said so. A job also had no way to fail for good, so a job with input that can never succeed was retried up to `MaxAttempts` times. Dogfooding the jostar app found both gaps. The kit adds:
 - `jobs.WithJobTimeout(d)` sets the default limit of every job a worker runs. Zero keeps River's one minute (`jobs.DefaultJobTimeout`). A negative value means no limit.
 - `jobs.Timeouter` is an optional interface of the job arguments (`Timeout() time.Duration`). It replaces the default for that kind, with the same zero and negative rules. `Register` then uses a River worker with a `Timeout` method instead of `river.WorkFunc`. The audit actor and the `Job[T]` mapping do not change.
 - `jobs.Cancel(err)` wraps `err` with `river.JobCancel`. River cancels the job at once, with no retry. `errors.Is` and `errors.As` still find the cause.
 
 These are additions. Existing apps need no codemod.
-
