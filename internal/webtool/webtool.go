@@ -91,14 +91,11 @@ func (t Tool) Dlx(pkg string, args ...string) exec.Cmd {
 	return exec.Cmd{Name: t.manager, Args: append([]string{"dlx", pkg}, args...)}
 }
 
-// InWeb runs a command in web/. It preserves the original pnpm command spelling.
+// InWeb runs a command with the working directory web/. Corepack picks the
+// package manager version from the package.json of the working directory, so
+// a run from the project root would ignore the packageManager pin of web/.
 func (t Tool) InWeb(root string, c exec.Cmd) exec.Cmd {
-	if t.manager == "pnpm" {
-		c.Dir = root
-		c.Args = append([]string{"--dir", "web"}, c.Args...)
-	} else {
-		c.Dir = filepath.Join(root, "web")
-	}
+	c.Dir = filepath.Join(root, "web")
 	return c
 }
 

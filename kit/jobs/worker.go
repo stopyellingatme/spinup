@@ -74,9 +74,56 @@ func Register[T Args](w *Worker, fn func(ctx context.Context, job Job[T]) error)
 		}
 	}
 	w.kinds = append(w.kinds, kind)
-	river.AddWorker(w.workers, river.WorkFunc(func(ctx context.Context, j *river.Job[T]) error {
+	work := func(ctx context.Context, j *river.Job[T]) error {
 		return fn(jobContext(ctx, kind), Job[T]{ID: j.ID, Args: j.Args, Attempt: j.Attempt})
-	}))
+	}
+	if _, ok := any(zero).(Timeouter); ok {
+		river.AddWorker(w.workers, &timeoutWorker[T]{work: work})
+		return
+	}
+	river.AddWorker(w.workers, river.WorkFunc(work))
+}
+
+// Timeouter is an optional interface of [Args]. Timeout returns the time limit
+// of the jobs of the kind, and it replaces the [WithJobTimeout] default. Zero
+// uses the default. A negative value means no limit.
+type Timeouter interface {
+	Timeout() time.Duration
+}
+
+// timeoutWorker is the River worker of a kind whose Args implement [Timeouter].
+type timeoutWorker[T Args] struct {
+	river.WorkerDefaults[T]
+	work func(context.Context, *river.Job[T]) error
+}
+
+func (w *timeoutWorker[T]) Work(ctx context.Context, j *river.Job[T]) error {
+	return w.work(ctx, j)
+}
+
+// Timeout returns the limit of the job for River: zero is the default, and a
+// negative value is no limit.
+func (w *timeoutWorker[T]) Timeout(j *river.Job[T]) time.Duration {
+	t, ok := any(j.Args).(Timeouter)
+	if !ok {
+		return 0
+	}
+	d := t.Timeout()
+	if d < 0 {
+		return -1
+	}
+	return d
+}
+
+// Cancel wraps err so River cancels the job at once and never retries it, even
+// when attempts remain. Return it from a job function when the input can never
+// succeed. [errors.Is] and [errors.As] still find the cause. A nil err gives a
+// generic message.
+func Cancel(err error) error {
+	if err == nil {
+		err = errors.New("jobs: the job was cancelled and will not be retried")
+	}
+	return river.JobCancel(err)
 }
 
 // Kinds returns the registered job kinds, sorted.
@@ -92,19 +139,37 @@ func (w *Worker) Kinds() []string {
 // Only one worker process (the River leader) inserts periodic jobs, so more
 // worker processes do not insert more jobs. Call it before [Worker.Start].
 // It panics when the worker has started or every is not positive.
+//
+// River keeps the schedule in memory. Each worker start begins a new
+// interval, so the first job comes one interval after the start. A worker
+// that restarts more often than every interval never inserts the job. Use
+// [Worker.PeriodicOnStart] for a long interval.
 func (w *Worker) Periodic(every time.Duration, args Args) {
+	w.addPeriodic("Periodic", every, args, false)
+}
+
+// PeriodicOnStart is like [Worker.Periodic], and it also inserts one job
+// when the worker starts. After that, the job comes every interval. The
+// leader inserts the start job, so a worker that joins a running leader does
+// not insert one. Guard the job against a repeat run, because each restart
+// of the leader inserts one more job.
+func (w *Worker) PeriodicOnStart(every time.Duration, args Args) {
+	w.addPeriodic("PeriodicOnStart", every, args, true)
+}
+
+func (w *Worker) addPeriodic(name string, every time.Duration, args Args, onStart bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.started {
-		panic("jobs: Periodic after Start: add every periodic job before Start")
+		panic("jobs: " + name + " after Start: add every periodic job before Start")
 	}
 	if every <= 0 || args == nil {
-		panic(fmt.Sprintf("jobs: Periodic needs a positive interval and args (got %s, %v)", every, args))
+		panic(fmt.Sprintf("jobs: %s needs a positive interval and args (got %s, %v)", name, every, args))
 	}
 	w.periodic = append(w.periodic, river.NewPeriodicJob(
 		river.PeriodicInterval(every),
 		func() (river.JobArgs, *river.InsertOpts) { return args, nil },
-		nil,
+		&river.PeriodicJobOpts{RunOnStart: onStart},
 	))
 }
 

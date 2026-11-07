@@ -114,6 +114,7 @@ func testPrices() []stripe.Price {
 	return []stripe.Price{
 		{ID: "price_pro_m", LookupKey: "pro_monthly", Currency: "usd", UnitAmount: 1000, Active: true, Recurring: month, Product: stripe.Product{ID: "prod_pro", Name: "Pro"}},
 		{ID: "price_pro_y", LookupKey: "pro_yearly", Currency: "usd", UnitAmount: 10000, Active: true, Recurring: &stripe.Recurring{Interval: "year", IntervalCount: 1, UsageType: "licensed"}, Product: stripe.Product{ID: "prod_pro", Name: "Pro"}},
+		{ID: "price_pro_o", LookupKey: "pro_overage", Currency: "usd", UnitAmount: 1, Active: true, Recurring: &stripe.Recurring{Interval: "month", IntervalCount: 1, UsageType: "metered", Meter: "mtr_1"}, Product: stripe.Product{ID: "prod_pro", Name: "Pro"}},
 		{ID: "price_team_m", LookupKey: "team_monthly", Currency: "usd", UnitAmount: 5000, Active: true, Recurring: &stripe.Recurring{Interval: "month", IntervalCount: 1, UsageType: "metered", Meter: "mtr_1"}, Product: stripe.Product{ID: "prod_team", Name: "Team"}},
 	}
 }

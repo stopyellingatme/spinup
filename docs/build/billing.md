@@ -118,7 +118,7 @@ apikeys_plan = "free"
 
 [[billing.plans]]
 name = "pro"
-prices = ["pro_monthly", "pro_yearly"]
+prices = ["pro_monthly", "pro_yearly", "pro_overage"]
 features = ["basic", "export"]
 apikeys_plan = "pro"
 role = "pro"
@@ -160,25 +160,55 @@ Do these steps in the Stripe Dashboard. Do them first in test mode.
 
 1. Make a product for each paid plan, for example "Pro".
 2. Make a recurring price for each lookup key in `prices`. Set the lookup key of the price to the same value, for example `pro_monthly`.
-3. With a `meter`, make a meter with that event name, for example `api_calls`. Add a metered price on that meter to the plan, and declare its lookup key in `prices`.
+3. With a `meter`, make a meter with that event name, for example `api_calls`. Add a metered price on that meter to the plan, and declare its lookup key in `prices`. Give it the same interval, interval count, and currency as the licensed price. See [Price roles](#price-roles).
 4. Add a webhook endpoint at `https://<your app>/api/billing/webhook` with API version `2026-10-28.endive`. Select these events:
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`,
    `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `invoice.paid`, and `invoice.payment_failed`.
 5. Turn on the Customer Portal. Choose the plans and prices that a user can change to, and allow a cancel.
 
 The API answers 200 to other event types and ignores them.
-Then run the check command from the `api/` folder. It checks the key, each lookup key, each meter, and the webhook secret.
+Then run the check command from the `api/` folder. It checks the key, each lookup key, the price roles of each plan, each meter, and the webhook secret.
 
 <!-- doctest: skip -->
 ```console
 $ go run ./cmd/api billing check
 ok    Stripe key
 ok    price pro_monthly (price_1Q..., every 1 month, licensed)
-ok    price pro_yearly (price_1Q..., every 1 year, licensed)
+ok    price pro_overage (price_1Q..., every 1 month, metered)
+ok    meter api_calls (mtr_test_...)
 ok    webhook secret (1 set)
 ```
 
 A line that starts with `FAIL` names the problem. The command exits with a non-zero status when a check fails.
+A line that starts with `warn` names a problem that does not fail the check, for example `warn  plan team: has a metered price but no meter, so no usage is reported`.
+
+## Price roles
+
+Stripe tells the module if a price is licensed or metered. A plan with a `meter` has both:
+
+```toml
+[[billing.plans]]
+name = "api"
+prices = ["api_monthly", "api_calls_overage"]
+meter = "api_calls"
+```
+
+- The licensed price (`api_monthly`) is the base fee. A user buys the plan through this price.
+- The metered price (`api_calls_overage`) bills the usage that the module reports to the meter. A user does not buy it alone.
+
+When a user buys `api_monthly`, Checkout has two line items: `api_monthly` with quantity 1, and `api_calls_overage` with no quantity. The subscription then has both items, and Stripe bills the usage at the end of each period.
+The sync reads the plan from the licensed item, so the user has one plan.
+
+If the checkout route gets the metered lookup key of a plan that also has a licensed price, it answers 400. Use the licensed lookup key.
+A plan whose declared prices are all metered, and all active in Stripe, is a pure usage plan. A user buys it through its metered price, and there is no base fee.
+If Stripe does not return a declared licensed price, the route does not treat the plan as a pure usage plan. It answers 503 for the metered key.
+
+Stripe needs one interval and one currency for all items of a subscription.
+The route adds only the metered prices that match the licensed price. If a plan has metered prices and none match the licensed price, the route answers 503 with a `Try:` line.
+Add a metered price for each interval you sell, for example a yearly one for `pro_yearly`.
+
+`billing check` fails a plan if no metered price matches any licensed price, and warns about each licensed price without a match.
+`billing check` fails a plan with a `meter` and no metered price. It warns about a plan with a metered price and no `meter`, because the module then reports no usage.
 
 ## Secrets
 
@@ -312,6 +342,7 @@ Stripe marks Billing Meters "Not Recommended" for new integrations, and points t
 | `POST /api/billing/webhook` | Stripe | 200 for a good signature, 400 for a bad one. |
 
 The routes under `/api/me/billing` need a cookie session. An API key gets 403.
+Checkout takes a licensed lookup key, and adds the metered prices of the plan. A metered key of a plan with a licensed price gets 400.
 A user with a live subscription gets 409 from checkout, with the line `Try: open the billing portal to change the plan.`
 The portal answers 409 when the user has no Stripe customer.
 These routes are not in the OpenAPI document of the app. The web pages call them through `web/src/lib/server/billing.ts`.
@@ -322,7 +353,7 @@ Run the command from the `api/` folder.
 
 | Action | What it does |
 | --- | --- |
-| `billing check` | Checks the key, the lookup keys, the meters, and the webhook secret. |
+| `billing check` | Checks the key, the lookup keys, the meters, the metered price of each metered plan, and the webhook secret. |
 | `billing status EMAIL` | Prints the customer, the subscriptions, and the plan of a user. |
 | `billing sync EMAIL` | Reads the subscriptions of the user from Stripe now. |
 | `billing report-usage` | Runs one usage pass now, and prints the number of meter events sent. |

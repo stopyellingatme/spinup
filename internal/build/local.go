@@ -99,7 +99,7 @@ func buildWeb(ctx context.Context, root string, lock *manifest.Lock, o Options, 
 		c = tool.InWeb(root, c)
 		c.Stdout, c.Stderr = o.Out, o.ErrOut
 		if o.DryRun {
-			if _, err := fmt.Fprintln(o.Out, c.String()); err != nil {
+			if _, err := fmt.Fprintln(o.Out, "cd web && "+c.String()); err != nil {
 				return err
 			}
 		} else if _, err := runner.Run(ctx, c); err != nil {

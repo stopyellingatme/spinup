@@ -73,6 +73,22 @@ func TestCheckoutForms(t *testing.T) {
 	}
 }
 
+func TestCheckoutMeteredPrices(t *testing.T) {
+	c := testClient(t, func(r *http.Request) (*http.Response, error) {
+		_ = r.ParseForm()
+		if r.PostForm.Get("line_items[0][price]") != "price_1" || r.PostForm.Get("line_items[0][quantity]") != "1" ||
+			r.PostForm.Get("line_items[1][price]") != "price_m1" || r.PostForm.Get("line_items[2][price]") != "price_m2" ||
+			r.PostForm.Has("line_items[1][quantity]") || r.PostForm.Has("line_items[2][quantity]") {
+			t.Errorf("form = %s", r.PostForm.Encode())
+		}
+		return answer(200, `{"id":"cs_test_1","url":"https://checkout.stripe.fake"}`), nil
+	})
+	_, err := c.CreateCheckoutSession(t.Context(), CheckoutParams{Customer: "cus_1", Price: "price_1", MeteredPrices: []string{"price_m1", "price_m2"}, ClientReferenceID: "7", SuccessURL: "https://app/s", CancelURL: "https://app/c"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRetries(t *testing.T) {
 	cases := []struct {
 		name           string

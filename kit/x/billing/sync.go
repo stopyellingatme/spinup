@@ -59,14 +59,22 @@ func unixTime(seconds int64) *time.Time {
 	return &t
 }
 
-// rowOf maps a Stripe subscription. The plan comes from the first item price
-// whose lookup key a plan declares.
+// rowOf maps a Stripe subscription. The plan comes from the licensed item
+// whose price lookup key a plan declares. A subscription of a plan with a
+// meter also has the metered item of the plan, which maps to the same plan.
+// The first metered item decides only when no licensed item matches (a plan
+// of metered prices only).
 func (s *Service) rowOf(sub stripe.Subscription) subscriptionRow {
 	row := subscriptionRow{id: sub.ID, status: sub.Status, cancelAtPeriodEnd: sub.CancelAtPeriodEnd, trialEnd: unixTime(sub.TrialEnd)}
-	for _, item := range sub.Items {
-		if p, ok := s.cfg.planOfPrice(item.Price.LookupKey); ok {
-			row.plan, row.lookupKey, row.periodEnd = p.Name, item.Price.LookupKey, unixTime(item.CurrentPeriodEnd)
-			return row
+	for _, metered := range []bool{false, true} {
+		for _, item := range sub.Items {
+			if isMetered(item.Price) != metered {
+				continue
+			}
+			if p, ok := s.cfg.planOfPrice(item.Price.LookupKey); ok {
+				row.plan, row.lookupKey, row.periodEnd = p.Name, item.Price.LookupKey, unixTime(item.CurrentPeriodEnd)
+				return row
+			}
 		}
 	}
 	if len(sub.Items) > 0 {

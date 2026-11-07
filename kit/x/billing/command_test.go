@@ -17,7 +17,7 @@ func (f *fixture) command(args ...string) (string, error) {
 
 func TestCommandCheck(t *testing.T) {
 	cfg := testConfig()
-	cfg.Plans[1].Prices = []string{"pro_monthly", "pro_yearly"}
+	cfg.Plans[1].Prices = []string{"pro_monthly", "pro_yearly", "pro_overage"}
 	f := newFixture(t, fixtureOptions{cfg: &cfg})
 	out, err := f.command("check")
 	if err != nil {
@@ -26,7 +26,10 @@ func TestCommandCheck(t *testing.T) {
 	want := "ok    Stripe key\n" +
 		"ok    price pro_monthly (price_pro_m, every 1 month, licensed)\n" +
 		"ok    price pro_yearly (price_pro_y, every 1 year, licensed)\n" +
+		"ok    price pro_overage (price_pro_o, every 1 month, metered)\n" +
 		"ok    price team_monthly (price_team_m, every 1 month, metered)\n" +
+		"warn  plan pro: no metered price has the interval and currency of pro_yearly, so Checkout refuses pro_yearly\n" +
+		"warn  plan team: has a metered price but no meter, so no usage is reported\n" +
 		"ok    meter api_calls (mtr_1)\n" +
 		"ok    webhook secret (1 set)\n"
 	if out != want {
@@ -34,9 +37,23 @@ func TestCommandCheck(t *testing.T) {
 	}
 }
 
+func TestCommandCheckPlanWithMeterNeedsMeteredPrice(t *testing.T) {
+	cfg := testConfig()
+	cfg.Plans[1].Prices = []string{"pro_monthly", "pro_yearly"}
+	f := newFixture(t, fixtureOptions{cfg: &cfg})
+	out, err := f.command("check")
+	if err == nil || !strings.Contains(err.Error(), "1 checks failed") {
+		t.Fatalf("err = %v\n%s", err, out)
+	}
+	if want := "FAIL  plan pro: has the meter api_calls but no metered price. Add a metered price on that meter and declare its lookup key in prices\n"; !strings.Contains(out, want) {
+		t.Fatalf("output has no %q:\n%s", want, out)
+	}
+}
+
 func TestCommandCheckFailures(t *testing.T) {
 	cfg := testConfig()
 	cfg.Plans[2].Meter = "gone_meter"
+	cfg.Plans[1].Prices = append(cfg.Plans[1].Prices, "pro_overage")
 	f := newFixture(t, fixtureOptions{cfg: &cfg, opts: []Option{}})
 	f.svc.secrets = nil
 	f.fake.FailNext("/v1/balance", 401, "false")
@@ -109,5 +126,18 @@ func TestCommandUsage(t *testing.T) {
 	}
 	if f.svc.Command() == nil {
 		t.Fatal("Command returned nil")
+	}
+}
+
+func TestCommandCheckMeteredCycleMustMatchALicensedPrice(t *testing.T) {
+	cfg := testConfig()
+	cfg.Plans[1].Prices = []string{"pro_yearly", "pro_overage"}
+	f := newFixture(t, fixtureOptions{cfg: &cfg})
+	out, err := f.command("check")
+	if err == nil {
+		t.Fatalf("check passed:\n%s", out)
+	}
+	if want := "FAIL  plan pro: no metered price has the interval and currency of a licensed price."; !strings.Contains(out, want) {
+		t.Fatalf("output has no %q:\n%s", want, out)
 	}
 }

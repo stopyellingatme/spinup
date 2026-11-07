@@ -34,7 +34,7 @@ The command takes no arguments.
 
 The bundle is also embedded in the app and shown on the [API reference page](../api-docs.md).
 Both files are build output: the lock does not track them, and the command rebuilds them from their inputs.
-The app needs the `oapi-codegen` runtime package, which the generated `go.mod` already lists.
+The app needs the `oapi-codegen` runtime package, which the generated `go.mod` and `go.sum` already list.
 
 ## How the files fit together
 
@@ -81,7 +81,8 @@ $ grep -c 'Ping(ctx context.Context' api/internal/gen/api.gen.go
 ```
 
 The Go build now fails with `missing method Ping` until you add the handler to the `Server` type.
-Write it in `api/internal/handlers/`:
+If the app has no resource, there is no `Server` type: read [Wire the route](#wire-the-route).
+Write the method in `api/internal/handlers/`:
 
 ```go
 func (s *Server) Ping(ctx context.Context, req gen.PingRequestObject) (gen.PingResponseObject, error) {
@@ -102,6 +103,97 @@ Pong:
 ```
 
 In the path file, set `schema: {$ref: "#/components/schemas/Pong"}` under `content: application/json:`.
+
+## Wire the route
+
+`spinup g resource` writes the wiring in `api/internal/routes/routes_gen.go`.
+That code registers every operation of the generated interface, so it also serves your new operation.
+If the app has a resource, add the `Server` method and stop here.
+
+`spinup g openapi` does not write wiring.
+If the app has no resource, `registerGenerated` stays empty, and `api/internal/handlers/` does not exist.
+In that case, write the handler and the wiring in `api/internal/routes/`.
+Do not edit `routes_gen.go`, because the generators own it.
+
+<!-- wiring-file: api/internal/routes/ping.go -->
+```go
+package routes
+
+import (
+	"context"
+	"net/http"
+
+	"example.com/todo/api/internal/gen"
+	"github.com/stopyellingatme/spinup/kit/auth"
+	"github.com/stopyellingatme/spinup/kit/httpx"
+)
+
+// pingServer implements the operations of gen.StrictServerInterface.
+type pingServer struct{}
+
+var _ gen.StrictServerInterface = pingServer{}
+
+func (pingServer) Ping(ctx context.Context, req gen.PingRequestObject) (gen.PingResponseObject, error) {
+	return gen.Ping200Response{}, nil
+}
+
+// registerOwn adds the operations of pingServer to mux. Errors become problem details.
+func registerOwn(mux *http.ServeMux) {
+	strict := gen.NewStrictHandlerWithOptions(pingServer{}, nil, gen.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusBadRequest, Detail: "The request is not valid."})
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			httpx.WriteProblem(w, r, httpx.ProblemFrom(err))
+		},
+	})
+	gen.HandlerWithOptions(strict, gen.StdHTTPServerOptions{
+		BaseRouter: authenticatedMux{mux},
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			httpx.WriteProblem(w, r, httpx.Problem{Status: http.StatusBadRequest, Detail: "The request is not valid."})
+		},
+	})
+}
+
+// authenticatedMux answers 401 on each route when no user is signed in.
+type authenticatedMux struct{ *http.ServeMux }
+
+func (m authenticatedMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	m.ServeMux.Handle(pattern, auth.Required(http.HandlerFunc(handler)))
+}
+```
+
+Then call `registerOwn(mux)` in `Register`, in `api/internal/routes/routes.go`.
+This file is yours, so no generator edits it.
+
+<!-- wiring-file: api/internal/routes/routes.go -->
+```go
+// Package routes registers the application routes.
+package routes
+
+import (
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Deps contains the dependencies for route handlers.
+type Deps struct {
+	DB *pgxpool.Pool
+}
+
+// Register adds generated routes and application routes to mux.
+func Register(mux *http.ServeMux, d Deps) {
+	registerGenerated(mux, d)
+	registerOwn(mux)
+}
+```
+
+Keep three rules:
+
+- The guard needs the `auth` module. For a public route, pass `mux` as `BaseRouter` and delete `authenticatedMux`.
+- If you later run `spinup g resource`, `routes_gen.go` registers every operation and, with the `auth` module, declares `authenticatedMux`. Delete all of `ping.go` (`registerOwn` and `authenticatedMux`), and remove the `registerOwn(mux)` call. Otherwise the build fails with a redeclared type. Move the methods of `pingServer` to the `Server` type.
+- Add each new operation to `pingServer`, or build the `Server` type of a resource.
 
 ## Rules for fragments
 
@@ -160,6 +252,7 @@ The files that configure the generator (`oapi-codegen.yaml` and `api/internal/ge
 | Symptom | Cause and fix |
 | --- | --- |
 | `duplicate paths key` | Two fragments define the same path. Remove one. |
+| `go build` says `missing go.sum entry` | The `go.sum` file lacks a dependency of the generated code. Run `cd api && go mod tidy`. |
 | `go build` says `missing method` | A new operation needs a handler. Add the method to `Server`. |
 | A `$ref` does not resolve | Use `#/components/schemas/<Name>` and check the spelling. |
 

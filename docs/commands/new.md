@@ -28,7 +28,7 @@ At the end, the command prints the next steps and the local URLs:
 Next:
   cd todo
   spinup doctor
-  pnpm --dir web install
+  cd web && pnpm install
   spinup dev
 
 App      http://localhost:5173

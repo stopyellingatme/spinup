@@ -34,7 +34,7 @@ The owner decided these points on 2026-11-06. They are binding:
 1.1. The endpoint is `POST /api/mcp`. It is under `/api/`, so Caddy sends it to the Go API in every frontend mode.
 1.2. The server is stateless. It sends JSON responses, not SSE streams. Any replica serves any request. Blue/green deploys need no sticky sessions.
 1.3. GET and DELETE on `/api/mcp` answer 405 (the SDK does this in stateless mode).
-1.4. A tool call obeys `REQUEST_TIMEOUT` (default 30 s), the same as a REST request. The MCP route is not exempt from the deadline. Long work goes to `kit/jobs`, and the tool returns a handle.
+1.4. A tool call obeys `REQUEST_TIMEOUT` (default 30 s), the same as a REST request. The MCP route is not exempt from the deadline. Long work goes to `kit/jobs`, and the tool returns a handle. A job has its own limit of one minute by default. Raise it with `jobs.WithJobTimeout` or `jobs.Timeouter` (ADR 0007 §7).
 1.5. One HTTP request is one plan request of the apikeys quota.
 1.6. Out of scope: OAuth, `subscriptions/listen`, prompts and resources helpers (`SDK()` is the escape hatch), and SSE progress.
 1.7. The SDK decodes tool arguments into `map[string]any`, so a JSON number becomes a `float64`. An integer above 2^53 loses precision. A `bigserial` ID never gets there in practice. A tool that needs exact large integers must take them as strings.

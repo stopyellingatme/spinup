@@ -40,6 +40,11 @@ exec spinup new local --api-only --module example.com/local --no-git --non-inter
 exec cat local/api/go.mod
 stdout 'replace github.com/stopyellingatme/spinup/kit => '
 env SPINUP_KIT_REPLACE=
+# A development build without a kit replace warns on stderr and keeps JSON stdout clean.
+exec spinup new warned --api-only --module example.com/warned --no-git --non-interactive --json
+stderr 'SPINUP_KIT_REPLACE='
+! stdout 'development build'
+! stdout 'Try:'
 
 # App operations use the API directory and protect destructive migrations.
 cd todo

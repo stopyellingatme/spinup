@@ -34,8 +34,8 @@ stderr 'Try:'
 cd embedded
 env GOWORK=off
 exec spinup build --dry-run
-stdout 'pnpm --dir web install --frozen-lockfile'
-stdout 'pnpm --dir web build'
+stdout 'cd web && pnpm install --frozen-lockfile'
+stdout 'cd web && pnpm build'
 stdout 'go build -tags embedweb'
 # Image previews need no Docker engine. A local kit replace goes to Docker as the build context kit.
 exec spinup build --image --dry-run

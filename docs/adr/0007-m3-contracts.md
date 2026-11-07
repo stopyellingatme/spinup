@@ -44,3 +44,24 @@ Kit `jobs` wraps River (`riverqueue/river` with `riverpgxv5`). The `jobs` pack a
 ## 6. Lockfiles
 
 `go.mod.tmpl` and `go.sum` cover every module of every pack (a superset): the main loop runs `bump-stack` in app mode with all modules turned on. Unused requirements do not break `go build -mod=readonly`.
+
+## 7. Amendment (2026-11-07): job time limit and permanent failure
+
+Kit `jobs` never set `river.Config.JobTimeout`, so River cancelled every job after its default of one minute. Nothing in the docs said so. A job also had no way to fail for good, so a job with input that can never succeed was retried up to `MaxAttempts` times. Dogfooding the jostar app found both gaps. The kit adds:
+- `jobs.WithJobTimeout(d)` sets the default limit of every job a worker runs. Zero keeps River's one minute (`jobs.DefaultJobTimeout`). A negative value means no limit.
+- `jobs.Timeouter` is an optional interface of the job arguments (`Timeout() time.Duration`). It replaces the default for that kind, with the same zero and negative rules. `Register` then uses a River worker with a `Timeout` method instead of `river.WorkFunc`. The audit actor and the `Job[T]` mapping do not change.
+- `jobs.Cancel(err)` wraps `err` with `river.JobCancel`. River cancels the job at once, with no retry. `errors.Is` and `errors.As` still find the cause.
+
+These are additions. Existing apps need no codemod.
+
+## 8. Amendment (2026-11-07): periodic jobs on start
+
+`Worker.Periodic` passed no `PeriodicJobOpts`, so `RunOnStart` was false. In River v0.49.0 the periodic enqueuer keeps the schedule in memory. At start it sets the first run to `ScheduleFunc(now)` (`internal/maintenance/periodic_job_enqueuer.go`, line 413). Only an optional pilot can restore a stored time (lines 409-410), and the kit configures none. A restart therefore waits one full interval again. A `Periodic(24h)` job never runs when the worker restarts each day, and `air` restarts in `spinup dev` starve even an hourly job. The kit adds:
+- `Worker.PeriodicOnStart(every, args)` sets `RunOnStart`. The leader inserts one job at start and then one each interval.
+- `Worker.Periodic` keeps its signature. The API baseline `kit/api/current.txt` lists `Worker.Periodic(time.Duration, Args)`, and `docs/policy/kit-compat.md` fails the guard for a changed line. A variadic option would change that line. A new method is an addition.
+
+The job must guard against a repeat run, because each start of the leader inserts one more job. No codemod is needed.
+
+## 9. Amendment (2026-11-07): wiring for an app without a resource
+
+`spinup g openapi` does not write `routes_gen.go`. Only `spinup g resource` writes it, because the wiring needs the `Server` type, `RequestError`, and `ResponseError` of `api/internal/handlers/`, and the resource generator owns that package. Once `routes_gen.go` has the wiring, it registers every operation of the generated interface, so a hand-written path needs only a `Server` method. An app with no resource keeps an empty `registerGenerated`. For that app, `docs/commands/generate-openapi.md` gives the handler and the wiring (`gen.NewStrictHandlerWithOptions`, the problem error handlers, and `auth.Required`) for `api/internal/routes/`. The test `TestDocumentedWiringCompiles` compiles the code blocks of that page. The api pack `go.mod.tmpl` and `go.sum` already list `github.com/oapi-codegen/runtime` and `github.com/apapsch/go-jsonmerge/v2`. `TestCompileGeneratedApp` builds a generated app with `-mod=readonly` to keep it so.

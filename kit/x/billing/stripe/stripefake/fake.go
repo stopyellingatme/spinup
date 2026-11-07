@@ -46,7 +46,7 @@ type Request struct {
 
 type checkoutState struct {
 	session   stripe.CheckoutSession
-	price     stripe.Price
+	prices    []stripe.Price
 	trialDays int
 	metadata  map[string]string
 }
@@ -307,7 +307,12 @@ func (f *Fake) CompleteCheckout(sessionID string) (string, error) {
 		return id, nil
 	}
 	now := f.o.Now()
-	sub := stripe.Subscription{ID: f.id("sub_"), Customer: state.session.Customer, Status: "active", Items: []stripe.SubscriptionItem{{ID: f.id("si_"), Price: state.price, CurrentPeriodEnd: now.Add(30 * 24 * time.Hour).Unix()}}}
+	sub := stripe.Subscription{ID: f.id("sub_"), Customer: state.session.Customer, Status: "active", Items: make([]stripe.SubscriptionItem, 0, len(state.prices))}
+	allMetered := true
+	for _, price := range state.prices {
+		sub.Items = append(sub.Items, stripe.SubscriptionItem{ID: f.id("si_"), Price: price, CurrentPeriodEnd: now.Add(30 * 24 * time.Hour).Unix()})
+		allMetered = allMetered && price.Recurring.UsageType == "metered"
+	}
 	if state.trialDays > 0 {
 		sub.Status = "trialing"
 		sub.TrialEnd = now.Add(time.Duration(state.trialDays) * 24 * time.Hour).Unix()
@@ -316,7 +321,7 @@ func (f *Fake) CompleteCheckout(sessionID string) (string, error) {
 	state.session.Status = "complete"
 	state.session.PaymentStatus = "paid"
 	state.session.Subscription = sub.ID
-	if state.trialDays > 0 || state.price.Recurring.UsageType == "metered" {
+	if state.trialDays > 0 || allMetered {
 		state.session.PaymentStatus = "no_payment_required"
 	}
 	events := []stripe.Event{f.event("checkout.session.completed", sessionObject(state)), f.event("customer.subscription.created", subscriptionObject(sub))}

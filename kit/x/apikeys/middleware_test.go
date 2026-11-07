@@ -195,7 +195,7 @@ func TestWrongTokenWithoutDatabase(t *testing.T) {
 	now := time.Now()
 	s := testStore(t, &now)
 	s.pool.Close()
-	for _, token := range []string{"", "wrong_" + strings.Repeat("x", 43), "key_" + strings.Repeat("x", 42), "key_" + strings.Repeat("x", 44)} {
+	for _, token := range []string{"", "Wrong_" + strings.Repeat("x", 43), "key-" + strings.Repeat("x", 43), "key_" + strings.Repeat("x", 42), "key_" + strings.Repeat("x", 44)} {
 		_, _, err := s.AuthenticateBearer(t.Context(), token)
 		if !errors.Is(err, auth.ErrBearerInvalid) {
 			t.Fatalf("wrong token: %v", err)

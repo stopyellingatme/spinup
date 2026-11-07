@@ -39,8 +39,11 @@ type CheckoutParams struct {
 	AutomaticTax, AllowPromotionCodes bool
 	// Metadata contains application fields.
 	Metadata map[string]string
-	// Metered omits the quantity for a metered price.
+	// Metered omits the quantity for the Price line item, because Price is a metered price.
 	Metered bool
+	// MeteredPrices are further metered price IDs. Each is a line item
+	// after Price, with no quantity (Stripe rejects a quantity on a metered price).
+	MeteredPrices []string
 }
 
 // CheckoutSession is a Stripe Checkout session.

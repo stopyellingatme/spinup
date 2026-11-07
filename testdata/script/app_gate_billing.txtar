@@ -63,6 +63,7 @@ cd api
 exec $WORK/gate-api billing check
 stdout '^ok    Stripe key'
 stdout '^ok    price pro_monthly \(price_pro_monthly, every 1 month, licensed\)'
+stdout '^ok    price pro_metered \(price_pro_metered, every 1 month, metered\)'
 stdout '^ok    meter api_calls \(mtr_api_calls\)'
 ! stdout '^FAIL'
 
@@ -218,7 +219,7 @@ apikeys_plan = "free"
 
 [[billing.plans]]
 name = "pro"
-prices = ["pro_monthly"]
+prices = ["pro_monthly", "pro_metered"]
 features = ["basic", "export"]
 apikeys_plan = "pro"
 role = "pro"

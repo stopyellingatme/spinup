@@ -95,7 +95,7 @@ func TestGenerateAndApply(t *testing.T) {
 			t.Fatalf("next steps omit %q:\n%s", want, out.String())
 		}
 	}
-	if strings.Contains(out.String(), "pnpm --dir web install") {
+	if strings.Contains(out.String(), "cd web && pnpm install") {
 		t.Fatalf("API-only next steps install web dependencies:\n%s", out.String())
 	}
 	if _, err := Generate(context.Background(), o, nil); err == nil {
@@ -115,7 +115,7 @@ func TestApplyPrintsWebNextSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"pnpm --dir web install",
+		"cd web && pnpm install",
 		"App      http://localhost:5173",
 		"API      http://localhost:8080",
 		"Mailpit  http://localhost:8025",
@@ -134,7 +134,7 @@ func TestNextStepsIncludeWebInstallForEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps := nextSteps(result, o.Name)
-	if !slices.Contains(steps, "pnpm --dir web install") {
+	if !slices.Contains(steps, "cd web && pnpm install") {
 		t.Fatalf("embed next steps omit web dependencies: %q", steps)
 	}
 }
@@ -506,5 +506,27 @@ func TestCatalogReturnsIndependentPacks(t *testing.T) {
 	first[0].Files[0].Path = "changed"
 	if second[0].Name == "changed" || second[0].Files[0].Path == "changed" {
 		t.Fatal("catalog calls share mutable packs")
+	}
+}
+
+func TestDevBuildWithoutKitReplaceWarns(t *testing.T) {
+	t.Parallel()
+	gen := func(version, kit string) []string {
+		o := Options{Name: "todo", Dir: t.TempDir(), APIOnly: true, Version: version, KitReplace: kit, Answers: map[string]any{"modules": "", "module": "example.com/todo"}}
+		r, err := Generate(context.Background(), o, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Warnings
+	}
+	got := gen("dev", "")
+	if len(got) != 1 || !strings.Contains(got[0], "SPINUP_KIT_REPLACE=") || !strings.Contains(got[0], "Try:") {
+		t.Fatalf("warnings=%q", got)
+	}
+	if w := gen("dev", t.TempDir()); len(w) != 0 {
+		t.Fatalf("replace set: %q", w)
+	}
+	if w := gen("0.1.0-alpha.419", ""); len(w) != 0 {
+		t.Fatalf("release build: %q", w)
 	}
 }
