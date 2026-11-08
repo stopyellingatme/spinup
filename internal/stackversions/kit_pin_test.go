@@ -28,7 +28,7 @@ func TestKitPinHasPackSums(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]bool{
-		kit + " " + version + " ":         false,
+		kit + " " + version + " ":        false,
 		kit + " " + version + "/go.mod ": false,
 	}
 	for _, line := range strings.Split(string(data), "\n") {

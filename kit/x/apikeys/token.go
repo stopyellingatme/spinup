@@ -27,12 +27,16 @@ func wellFormedToken(token string) bool {
 		return false
 	}
 	for i := 0; i < len(secret); i++ {
-		c := secret[i]
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+		if !base64URLChar(secret[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+// base64URLChar reports whether c is in the base64url alphabet (RFC 4648 section 5).
+func base64URLChar(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
 }
 
 func validateCreate(in CreateInput) error {
