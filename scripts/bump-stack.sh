@@ -50,8 +50,18 @@ kit_version="${BUMP_STACK_KIT_VERSION:-$(pin go_modules "$kit_module")}"
 # finish <dir> <go.mod target> <go.sum target> writes the module files as pack sources.
 # The module line becomes a template, and the local kit replace directive is dropped.
 # The kit require line keeps the template expression for the kit pin, not the literal version.
+# The tidy ran against the local kit replace, so go.sum has no hash of the published kit. After the
+# replace goes, go mod download records both hash lines of the pinned kit tag (jostar DOGFOOD.md 26).
 finish() {
   (cd "$1" && go mod edit -dropreplace="$kit_module" 2>/dev/null || true)
+  if grep -q "^[[:space:]]*${kit_module//./\\.} v" "$1/go.mod"; then
+    (cd "$1" && go mod download "$kit_module")
+    if ! grep -q "^${kit_module//./\\.} ${kit_version}/go.mod h1:" "$1/go.sum"; then
+      echo "bump-stack: $1/go.sum has no hash line for $kit_module $kit_version" >&2
+      echo "Try: check that the proxy serves the tag: go list -m $kit_module@$kit_version" >&2
+      exit 1
+    fi
+  fi
   sed -E \
     -e "s#^module .*#module [[ .module ]]/api#" \
     -e "s#^([[:space:]]*${kit_module//./\\.}) v[^[:space:]]+#\\1 [[ gomod \"${kit_module}\" ]]#" \
