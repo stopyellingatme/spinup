@@ -64,10 +64,10 @@ jobs:
       - uses: [[ uses "actions/checkout" ]]
         with:
           persist-credentials: false
+[[- if eq (index . "package_manager") "bun" ]]
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
-[[- if eq (index . "package_manager") "bun" ]]
       - run: |
           set -euo pipefail
           npm install --global bun@[[ npm "bun" ]]
@@ -75,6 +75,11 @@ jobs:
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+      - uses: [[ uses "actions/setup-node" ]]
+        with:
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 [[- end ]]
       - run: |
           set -euo pipefail
@@ -101,6 +106,7 @@ jobs:
       - uses: [[ uses "actions/checkout" ]]
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: [[ uses "actions/setup-go" ]]
         with:
           go-version-file: api/go.mod
@@ -121,9 +127,18 @@ jobs:
 [[- end ]]
       - uses: ./.github/actions/setup-spinup
       - id: services
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          matrix="$(spinup ci services --json)"
+          # A pull request builds only the services that it changed.
+          # A push to main and a manual run build every service.
+          if [ "$EVENT_NAME" = pull_request ]; then
+            matrix="$(spinup ci services --json --changed-since "origin/$BASE_REF")"
+          else
+            matrix="$(spinup ci services --json)"
+          fi
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
           printf 'any=%s\n' "$(jq -r '(.include | length) > 0' <<<"$matrix")" >> "$GITHUB_OUTPUT"
       - run: |

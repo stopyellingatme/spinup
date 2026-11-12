@@ -111,7 +111,7 @@ The script also removes the objects of an earlier run that stopped before its tr
 
 ## CI
 
-The workflow `.github/workflows/monitoring.yml` runs the test every night.
+The workflow `.github/workflows/monitoring.yml` runs the test every Monday.
 It also runs on a pull request or a push to `main` that changes the monitoring pack, the deploy `Caddyfile`, the stack versions, or the test.
 The matrix has the profiles `lite` and `full`.
 When a run fails, the workflow uploads the logs as the artifact `monitoring-boot-<profile>`.

@@ -32,7 +32,7 @@ Run these commands from the repository root:
 go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'
 SPINUP_MATRIX_BUILD=1 go test -race ./internal/upgrade/ -run 'Matrix|LockSchema'
 go test ./internal/templates/ -run PacksDigest
-actionlint .github/workflows/upgrade-matrix.yml
+actionlint .github/workflows/ci.yml
 make build lint
 make doctest
 ```
@@ -42,7 +42,7 @@ It uses the local Go toolchain and disables module downloads.
 Before you run it, populate the module cache through the normal project installation procedure.
 The CI workflow caches the kit dependencies before it starts the offline matrix.
 
-The `coverage` job requires at least 70% statement coverage in each selected package.
+The `upgrade` job of the [CI workflow](ci.md) requires at least 70% statement coverage in each selected package.
 It includes `merge`, `upgrade`, `manifest`, and `migrate`, with their subpackages.
 It prints each package percentage and fails if any package is below the threshold.
 

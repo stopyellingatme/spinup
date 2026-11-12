@@ -26,7 +26,7 @@ Add your own jobs in separate workflow files.
 | File | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | Push to `main`, pull requests | Builds, vets, and tests the API with PostgreSQL. Checks the app with spinup. Builds and tests each sidecar service. |
-| `e2e.yml` | Pull requests, with `web` | Migrates PostgreSQL, starts both apps, and runs Playwright. |
+| `e2e.yml` | Pull requests that are ready for review and change more than docs, with `web` | Migrates PostgreSQL, starts both apps, and runs Playwright. |
 | `deploy.yml` | Manual, with `deploy`. Also on push to `main` with `--ci-deploy-on-push`. | Deploys to the selected GitHub environment. |
 | `backup-verify.yml` | Weekly or manual, with `backups` | Verifies the latest backup of the default environment. |
 | `upgrade-check.yml` | Weekly or manual | Installs the newest release and opens an upgrade PR. |
@@ -116,6 +116,9 @@ $ spinup ci verify
 
 The `spinup` job of `ci.yml` runs `spinup ci services --json` and uses the result as a matrix.
 The `services` job does not run when the app has no [sidecar service](services.md).
+On a pull request, the `spinup` job runs `spinup ci services --json --changed-since origin/<base branch>`.
+The `services` job then builds only the services that the pull request changed.
+A push to `main` and a manual run build every service.
 For each service, it runs:
 
 <!-- doctest: skip -->
@@ -138,6 +141,15 @@ A new service needs no workflow edit.
 An existing app gets the job through the three-way merge of `ci.yml`.
 
 ## Web jobs
+
+The `web` job and the `e2e` job cache the pnpm store when the app uses pnpm.
+The cache key comes from `web/pnpm-lock.yaml`.
+
+`e2e.yml` runs when a pull request is opened, updated, reopened, or marked ready for review.
+A draft pull request skips `e2e`.
+A pull request that changes only `*.md` files or files in `docs/` also skips `e2e`.
+Do not make `e2e` a required check.
+A workflow that a path filter skips leaves a required check pending, and the pull request cannot merge.
 
 The web job runs `pnpm check` and `pnpm test`.
 An app with no unit tests passes.

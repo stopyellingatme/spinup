@@ -187,7 +187,7 @@ The `ci` module writes the workflows. Run `spinup ci generate` if you added it l
 | `ci.yml`, job `web` | `pnpm check` and `pnpm test` (with bun, the `bun` commands) |
 | `ci.yml`, job `spinup` | `spinup check` and `spinup doctor` |
 | `ci.yml`, job `services` | `spinup ci test-service` for each service |
-| `e2e.yml` | On each pull request, builds the stack, then runs the Playwright tests |
+| `e2e.yml` | On each ready pull request, builds the stack, then runs the Playwright tests. A draft or docs-only pull request skips it, so do not make it a required check. |
 
 The `api` job sets `DATABASE_URL` and `CI=true`, so a database test that cannot find a server fails and does not skip.
 See [Generated CI](../ci.md) for the details.

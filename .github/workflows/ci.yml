@@ -1,9 +1,16 @@
 name: CI
 
+# Compute budget (docs/contributing/ci.md):
+# - On a push, the gate job skips the heavy jobs when the same git tree already passed CI.
+#   A manual run (workflow_dispatch) always runs every job.
+# - The macOS job costs about 10 times a Linux minute, so it starts only after the Linux and
+#   Windows jobs pass.
+# - The test jobs run `go test ./...`, which includes the golden trees and the CLI scripts.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,13 +19,43 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
-  lint:
+  gate:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env:
-      GOTOOLCHAIN: local
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci/tree-gate.sh
+          sparse-checkout-cone-mode: false
+      - name: Look for an earlier green run of this tree
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ci.yml
+        run: scripts/ci/tree-gate.sh
+
+  lint:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # A pull request run tests the head commit, not the merge commit, so the gate can
+      # match its tree on the later push.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.2"
@@ -35,19 +72,41 @@ jobs:
           version: v2.14.0
           working-directory: kit
 
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        go: ["1.27.x"]
-    env:
-      GOTOOLCHAIN: local
+  actionlint:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify and run actionlint
+        shell: bash
+        run: |
+          temp_dir=$(mktemp -d)
+          release_url=https://github.com/rhysd/actionlint/releases/download/v1.7.12
+          curl --fail --silent --show-error --location "$release_url/actionlint_1.7.12_linux_amd64.tar.gz" --output "$temp_dir/actionlint_1.7.12_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location "$release_url/actionlint_1.7.12_checksums.txt" --output "$temp_dir/actionlint_1.7.12_checksums.txt"
+          (
+            cd "$temp_dir"
+            sha256sum -c --ignore-missing actionlint_1.7.12_checksums.txt
+            tar -xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
+          )
+          "$temp_dir/actionlint"
+
+  test:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ matrix.go }}
+          go-version: "1.27.2"
           cache-dependency-path: |
             go.sum
             kit/go.sum
@@ -66,36 +125,28 @@ jobs:
         run: |
           go run ./cmd/spinup tools install
           echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
-      # The testscript package runs near 10 minutes on macOS, so raise the
-      # default timeout of each package to the one that make script uses.
+      # This also runs the golden trees (TestGolden*) and the CLI scripts (TestScripts).
       - name: Test the CLI with the race detector
         run: go test -race -timeout 30m ./...
       # The kit tests need PostgreSQL. Linux runners start it in Docker (testcontainers).
-      # macOS runners have no Docker, so this step starts PostgreSQL 18 from Homebrew.
-      - name: Start PostgreSQL on macOS
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          brew install --quiet postgresql@18
-          pg="$(brew --prefix postgresql@18)/bin"
-          "$pg/initdb" --pgdata="$RUNNER_TEMP/pg" --username=postgres --auth=trust >/dev/null
-          "$pg/pg_ctl" --pgdata="$RUNNER_TEMP/pg" --log="$RUNNER_TEMP/pg.log" --options="-p 5432 -k $RUNNER_TEMP" --wait start
-          echo "KIT_DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable" >> "$GITHUB_ENV"
       - name: Test the kit with the race detector
-        run: cd kit && DATABASE_URL="${KIT_DATABASE_URL:-}" go test -race ./...
+        run: cd kit && go test -race ./...
 
   windows:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.skip != 'true' }}
     runs-on: windows-latest
-    env:
-      GOTOOLCHAIN: local
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.27.x"
+          go-version: "1.27.2"
           cache-dependency-path: |
             go.sum
             kit/go.sum
@@ -112,15 +163,20 @@ jobs:
           # shellcheck disable=SC2086
           go test $packages
 
-  golden:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+  # The upgrade matrix (docs/contributing/upgrade-matrix.md): frozen apps upgrade to this
+  # commit and build, every template change has a migration decision, and each upgrade
+  # package keeps 70 percent statement coverage.
+  upgrade:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.2"
@@ -133,27 +189,83 @@ jobs:
             testdata/corpus/**/tools.sum
       - name: Prepare the test machine
         uses: ./.github/actions/prepare-tests
-      - name: Test the golden trees
-        run: make golden
-      - name: Test the CLI scripts
-        run: make script
-
-  actionlint:
-    runs-on: ubuntu-latest
-    env:
-      GOTOOLCHAIN: local
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Verify and run actionlint
+        with:
+          tools: actionlint
+          warm: go
+      - name: Upgrade frozen apps and build the results
+        run: SPINUP_MATRIX_BUILD=1 go test -race -run 'Matrix|LockSchema' ./internal/upgrade/
+      - name: Require template migration decisions
+        if: ${{ !cancelled() }}
+        run: go test -run PacksDigest ./internal/templates/
+      - name: Measure upgrade coverage
+        if: ${{ !cancelled() }}
+        run: go test -coverprofile=cover.out ./internal/merge/... ./internal/upgrade/... ./internal/manifest/... ./internal/migrate/...
+      - name: Require 70 percent in each package
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
-          temp_dir=$(mktemp -d)
-          release_url=https://github.com/rhysd/actionlint/releases/download/v1.7.12
-          curl --fail --silent --show-error --location "$release_url/actionlint_1.7.12_linux_amd64.tar.gz" --output "$temp_dir/actionlint_1.7.12_linux_amd64.tar.gz"
-          curl --fail --silent --show-error --location "$release_url/actionlint_1.7.12_checksums.txt" --output "$temp_dir/actionlint_1.7.12_checksums.txt"
-          (
-            cd "$temp_dir"
-            sha256sum -c --ignore-missing actionlint_1.7.12_checksums.txt
-            tar -xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
-          )
-          "$temp_dir/actionlint"
+          go list ./internal/merge/... ./internal/upgrade/... ./internal/manifest/... ./internal/migrate/... > coverage-packages.txt
+          failed=0
+          while IFS= read -r package; do
+            awk -v package="$package" '
+              NR == 1 { print; next }
+              { file = $1; sub("/[^/]*$", "", file) }
+              file == package { print }
+            ' cover.out > package.cover
+            percentage=$(go tool cover -func=package.cover | awk '/^total:/ { sub(/%$/, "", $3); print $3 }')
+            printf '%s: %s%% statement coverage\n' "$package" "$percentage"
+            if ! awk -v percentage="$percentage" 'BEGIN { exit !(percentage != "" && percentage + 0 >= 70) }'; then
+              failed=1
+            fi
+          done < coverage-packages.txt
+          exit "$failed"
+
+  # The macOS runner costs about 10 times a Linux minute. It starts only after every
+  # other job passes, so a red push does not pay for it.
+  test-macos:
+    needs: [gate, lint, actionlint, test, windows, upgrade]
+    if: >-
+      ${{ !cancelled() && needs.gate.outputs.skip != 'true'
+      && needs.lint.result == 'success' && needs.actionlint.result == 'success'
+      && needs.test.result == 'success' && needs.windows.result == 'success'
+      && needs.upgrade.result == 'success' }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: |
+            go.sum
+            kit/go.sum
+            testdata/golden/**/go.sum
+            testdata/golden/**/tools.sum
+            testdata/corpus/**/go.sum
+            testdata/corpus/**/tools.sum
+      - name: Prepare the test machine
+        uses: ./.github/actions/prepare-tests
+      - name: Install sops and age
+        shell: bash
+        env:
+          SPINUP_TOOLS_DIR: ${{ runner.temp }}/spinup-tools
+          SPINUP_NO_UPDATE_CHECK: "1"
+        run: |
+          go run ./cmd/spinup tools install
+          echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
+      # The testscript package runs near 10 minutes on macOS, so raise the
+      # default timeout of each package to the one that make script uses.
+      - name: Test the CLI with the race detector
+        run: go test -race -timeout 30m ./...
+      # macOS runners have no Docker, so this step starts PostgreSQL 18 from Homebrew.
+      - name: Start PostgreSQL
+        shell: bash
+        run: |
+          brew install --quiet postgresql@18
+          pg="$(brew --prefix postgresql@18)/bin"
+          "$pg/initdb" --pgdata="$RUNNER_TEMP/pg" --username=postgres --auth=trust >/dev/null
+          "$pg/pg_ctl" --pgdata="$RUNNER_TEMP/pg" --log="$RUNNER_TEMP/pg.log" --options="-p 5432 -k $RUNNER_TEMP" --wait start
+      - name: Test the kit with the race detector
+        run: cd kit && DATABASE_URL="postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable" go test -race ./...

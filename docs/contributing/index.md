@@ -74,4 +74,5 @@ If you change a command or a feature, add or update its page under `docs/`, and 
 | Boot the monitoring stack and check its memory | [Monitoring stack boot test](monitoring-boot.md) |
 | Run the live DigitalOcean test | [Run the DigitalOcean live test](do-live-test.md) |
 | Register the DigitalOcean OAuth client or change the fake API | [DigitalOcean OAuth client](digitalocean-client.md) |
+| See which CI jobs run and what they cost | [CI workflows and their cost](ci.md) |
 | Fix a script test that fails under load | [Script test isolation](script-test-isolation.md) |

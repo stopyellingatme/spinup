@@ -129,7 +129,8 @@ If a run fails, read the logs in the work directory that the script prints.
 
 ## CI
 
-`.github/workflows/dind.yml` runs the suite on each push to `main` and each night.
+`.github/workflows/dind.yml` runs the suite on each push to `main` and each Monday.
+A newer push cancels a run that is in progress.
 It runs the API-only app and the full app as two jobs.
 
 ## See also

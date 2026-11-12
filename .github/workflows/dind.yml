@@ -6,7 +6,9 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "41 4 * * *"
+    # Weekly. Each push to main already runs the suite, so the schedule only finds drift
+    # (the apk packages of the VM image and the module proxy).
+    - cron: "41 4 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +16,8 @@ permissions:
 
 concurrency:
   group: dind-${{ github.ref }}
-  cancel-in-progress: false
+  # A newer push contains the older commit, so it cancels the older run.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 env:
   GOTOOLCHAIN: local

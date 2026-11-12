@@ -11,6 +11,11 @@ exec spinup g service py --lang python
 exec spinup ci services --json
 stdout '^\{"include":\[\{"name":"rs","lang":"rust"\},\{"name":"py","lang":"python"\}\]\}$'
 
+# A bad ref fails open: warn on stderr and keep every service.
+exec spinup ci services --json --changed-since no-such-ref
+stdout '^\{"include":\[\{"name":"rs","lang":"rust"\},\{"name":"py","lang":"python"\}\]\}$'
+stderr 'Try: '
+
 exec spinup ci test-service rs --dry-run
 stdout 'RUN cargo test --locked'
 exec spinup ci test-service py --dry-run

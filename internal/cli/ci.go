@@ -54,13 +54,22 @@ func newCI(app *App) *cobra.Command {
 		}
 		return nil
 	}}
+	var changedSince string
 	services := &cobra.Command{Use: "services", Example: `  # Print the services as a GitHub Actions matrix
-  spinup ci services --json`, Short: "List services for a GitHub Actions matrix", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
+  spinup ci services --json
+
+  # Keep only the services that a pull request changed
+  spinup ci services --json --changed-since origin/main`, Short: "List services for a GitHub Actions matrix", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)
 		if err != nil {
 			return err
 		}
-		matrix, err := ci.Matrix(root)
+		var matrix ci.MatrixDoc
+		if changedSince != "" {
+			matrix, err = ci.MatrixChanged(c.Context(), exec.OSRunner{}, root, changedSince, c.ErrOrStderr())
+		} else {
+			matrix, err = ci.Matrix(root)
+		}
 		if err != nil {
 			return err
 		}
@@ -84,6 +93,7 @@ func newCI(app *App) *cobra.Command {
 		}
 		return nil
 	}}
+	services.Flags().StringVar(&changedSince, "changed-since", "", "keep only services changed since this git ref (all services if a shared file changed or git fails)")
 	testService := &cobra.Command{Use: "test-service <name>", Example: `  # Run the tests of the service thumbs
   spinup ci test-service thumbs`, Short: "Run tests for one service", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		root, err := project.FindRoot(app.Flags.Dir)

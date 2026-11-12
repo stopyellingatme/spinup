@@ -91,6 +91,12 @@ A GitHub Actions matrix runs one job for each item.
 `ci services --json` prints your declared sidecar services as one compact JSON line that a matrix can read.
 Without `--json`, it prints a table.
 
+Add `--changed-since <ref>` to keep only the services that changed.
+A service stays when a file in `services/<name>/` changed in `git diff --name-only <ref>...HEAD`.
+All services stay when the diff touches `spinup.toml`, `spinup.lock`, a file under `.github/`, `go.mod`, `go.work`, `api/go.mod`, or a compose file.
+If `git diff` fails, the command writes a warning to stderr and keeps all services.
+The generated `ci.yml` uses this flag on pull requests.
+
 ```console
 $ spinup g service ocr --lang rust
 ...
@@ -124,6 +130,7 @@ Without `--dry-run`, the command builds that file and runs it. If a service has 
 | `--diff` | `generate` | Show unified diffs. Change nothing. | `spinup ci generate --diff` |
 | `--force` | `generate` | Overwrite files with your edits. | `spinup ci generate --force` |
 | `--json` | `generate`, `verify`, `services` | Print JSON. | `spinup ci verify --json` |
+| `--changed-since` | `services` | Keep only the services that changed since a git ref. | `spinup ci services --json --changed-since origin/main` |
 | `--offline` | `generate` | Use local templates only. | `spinup ci generate --offline` |
 
 ## See also

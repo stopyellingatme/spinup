@@ -62,15 +62,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
       - uses: ./.github/actions/setup-spinup
       - id: services
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          matrix="$(spinup ci services --json)"
+          # A pull request builds only the services that it changed.
+          # A push to main and a manual run build every service.
+          if [ "$EVENT_NAME" = pull_request ]; then
+            matrix="$(spinup ci services --json --changed-since "origin/$BASE_REF")"
+          else
+            matrix="$(spinup ci services --json)"
+          fi
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
           printf 'any=%s\n' "$(jq -r '(.include | length) > 0' <<<"$matrix")" >> "$GITHUB_OUTPUT"
       - run: |

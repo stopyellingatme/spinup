@@ -20,7 +20,9 @@ on:
       - "testdata/e2e/monitoring/**"
       - ".github/workflows/monitoring.yml"
   schedule:
-    - cron: "17 3 * * *"
+    # Weekly. The images are pinned by digest, and the path filters run the test on each
+    # change to the pack.
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:

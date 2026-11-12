@@ -3,6 +3,8 @@ name: End-to-end tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['**.md', 'docs/**']
 
 permissions:
   contents: read
@@ -13,6 +15,7 @@ concurrency:
 
 jobs:
   e2e:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -49,10 +52,10 @@ jobs:
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
+[[- if eq (index . "package_manager") "bun" ]]
       - uses: [[ uses "actions/setup-node" ]]
         with:
           node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
-[[- if eq (index . "package_manager") "bun" ]]
       - run: |
           set -euo pipefail
           npm install --global bun@[[ npm "bun" ]]
@@ -60,6 +63,11 @@ jobs:
       - uses: [[ uses "pnpm/action-setup" ]]
         with:
           package_json_file: web/package.json
+      - uses: [[ uses "actions/setup-node" ]]
+        with:
+          node-version: '[[ printf "%.2s" (index .Stack.Images "node").Tag ]]'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 [[- end ]]
       - name: Install the web dependencies and Chromium
         working-directory: web
