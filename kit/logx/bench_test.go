@@ -17,16 +17,21 @@ func BenchmarkAccessLine(b *testing.B) {
 		{"URL", "/proxy/https://user:password@example.com/notes"},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
-			logger := logx.New(io.Discard, logx.Options{})
-			handler := httpx.AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
-			request := (&http.Request{Method: http.MethodGet, URL: &url.URL{Path: tc.path}}).WithContext(context.Background())
-			writer := &benchmarkWriter{header: make(http.Header)}
+			run := newBenchmarkAccessLineBody(tc.path)
 			b.ReportAllocs()
 			for b.Loop() {
-				handler.ServeHTTP(writer, request)
+				run()
 			}
 		})
 	}
+}
+
+func newBenchmarkAccessLineBody(path string) func() {
+	logger := logx.New(io.Discard, logx.Options{})
+	handler := httpx.AccessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	request := (&http.Request{Method: http.MethodGet, URL: &url.URL{Path: path}}).WithContext(context.Background())
+	writer := &benchmarkWriter{header: make(http.Header)}
+	return func() { handler.ServeHTTP(writer, request) }
 }
 
 type benchmarkWriter struct{ header http.Header }
