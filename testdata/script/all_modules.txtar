@@ -1,0 +1,69 @@
+# The all-modules gate exercises a generated app and every module-add path (ADR 0036 §4).
+# macOS CI runners cost much more. Local macOS runs still execute this script.
+[darwin] [env:CI] skip 'macOS CI runner cost is too high'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+
+# Every module accepted by spinup new. Dependencies are present in this list.
+exec spinup new allmodules --modules apikeys,audit,auth,backups,billing,ci,deploy,flags,jobs,mail,mcp,monitoring,secrets,tofu --module example.com/allmodules --no-git --non-interactive
+cd allmodules
+cd api
+exec go build ./...
+exec go vet ./...
+cd ..
+exec spinup check
+
+# Docker needs a running daemon. The app has no web dependencies or web build, so the
+# client-drift and web-bundle checks skip. The app has no SQL queries, so sqlc-drift skips.
+exec sh -c 'spinup doctor --json > doctor.json || test "$?" -eq 1'
+! exec sh -c 'sed -e \'/"id": "docker"/,/^[[:space:]]*}/d\' doctor.json | grep \'"status": "fail"\''
+! exec grep '\[\[ \.' .
+cd $WORK
+
+# Start with only the core packs. Each add leaves a clean merge commit before the next add.
+exec spinup new modulechain --modules '' --module example.com/modulechain --non-interactive
+cd modulechain
+exec spinup module add auth --yes --non-interactive
+exec git merge spinup/module-auth
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add apikeys --yes --non-interactive
+exec git merge spinup/module-apikeys
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add audit --yes --non-interactive
+exec git merge spinup/module-audit
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add jobs --yes --non-interactive
+exec git merge spinup/module-jobs
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add billing --yes --non-interactive
+exec git merge spinup/module-billing
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add mcp --yes --non-interactive
+exec git merge spinup/module-mcp
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add mail --yes --non-interactive
+exec git merge spinup/module-mail
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add secrets --yes --non-interactive
+exec git merge spinup/module-secrets
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add deploy --yes --non-interactive
+exec git merge spinup/module-deploy
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add backups --yes --non-interactive
+exec git merge spinup/module-backups
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add monitoring --yes --non-interactive
+exec git merge spinup/module-monitoring
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add tofu --yes --non-interactive
+exec git merge spinup/module-tofu
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add ci --yes --non-interactive
+exec git merge spinup/module-ci
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+cd api
+exec go build ./...
+cd ..
+exec spinup check
+! exec grep '\[\[ \.' .
