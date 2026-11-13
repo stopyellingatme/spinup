@@ -74,6 +74,17 @@ jobs:
       - run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
+      - name: Check generated API client
+        run: |
+          set -euo pipefail
+          pnpm run gen:client
+          pnpm exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts
+          if [ -n "$(git status --porcelain -- src/lib/api)" ]; then
+            echo "The API client is stale. Run: spinup g client" >&2
+            exit 1
+          fi
+      - run: |
+          set -euo pipefail
           pnpm check
           # A new app has no unit tests. Playwright runs in its own workflow.
           pnpm test --passWithNoTests
@@ -92,7 +103,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: api/go.mod
-          cache-dependency-path: api/go.sum
+          cache-dependency-path: |
+            api/go.sum
+            api/tools.sum
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
