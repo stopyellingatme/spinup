@@ -6,9 +6,9 @@ nav_order: 15
 
 # Web bundle budget
 
-`spinup doctor` measures JavaScript and CSS in a completed web build.
+`spinup doctor` measures all client JavaScript and CSS in a completed web build.
 It measures raw bytes and Brotli bytes.
-The check skips projects with no web app.
+The check skips projects with no web app or when you use `--quick`.
 The check also skips a web app before its first build.
 
 <!-- The command needs a completed web build. -->

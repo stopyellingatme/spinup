@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/stackversions"
@@ -126,18 +127,22 @@ func lintPage(root, page, data string, anchors map[string]map[string]bool) []lin
 	inFence := false
 	var marker byte
 	var width int
+	references := markdownReferences(lines)
 	for index, line := range lines {
 		if !inFence {
-			if nextMarker, nextWidth, ok := fenceStart(line); ok {
+			if nextMarker, nextWidth, ok := lintFenceStart(line); ok {
 				inFence, marker, width = true, nextMarker, nextWidth
 				continue
 			}
-			for _, link := range markdownLinks(line) {
+			if isMarkdownReferenceDefinition(line) {
+				continue
+			}
+			for _, link := range append(markdownLinks(line), markdownReferenceLinks(line, references)...) {
 				problems = append(problems, lintLink(root, page, index+1, link, anchors)...)
 			}
 			continue
 		}
-		if fenceEnd(line, marker, width) {
+		if lintFenceEnd(line, marker, width) {
 			inFence = false
 		}
 	}
@@ -150,7 +155,8 @@ func lintPage(root, page, data string, anchors map[string]map[string]bool) []lin
 
 func pageAnchors(data string) map[string]bool {
 	anchors := make(map[string]bool)
-	for _, line := range markdownLines(data) {
+	used := make(map[string]int)
+	for _, line := range markdownLinesKeepCode(data) {
 		text := strings.TrimLeft(line, " ")
 		level := 0
 		for level < len(text) && text[level] == '#' {
@@ -161,7 +167,13 @@ func pageAnchors(data string) map[string]bool {
 		}
 		heading := strings.TrimSpace(text[level:])
 		heading = strings.TrimSpace(strings.TrimRight(heading, "#"))
-		anchors[headingSlug(heading)] = true
+		base := headingSlug(strings.ReplaceAll(heading, "`", ""))
+		slug := base
+		if count := used[base]; count > 0 {
+			slug += "-" + strconv.Itoa(count)
+		}
+		used[base]++
+		anchors[slug] = true
 	}
 	return anchors
 }
@@ -194,14 +206,15 @@ func markdownLines(data string) []string {
 	var width int
 	for _, line := range lines {
 		if !inFence {
-			if nextMarker, nextWidth, ok := fenceStart(line); ok {
+			if nextMarker, nextWidth, ok := lintFenceStart(line); ok {
 				inFence, marker, width = true, nextMarker, nextWidth
+				result = append(result, "")
 				continue
 			}
 			result = append(result, stripInlineCode(line))
 			continue
 		}
-		if fenceEnd(line, marker, width) {
+		if lintFenceEnd(line, marker, width) {
 			inFence = false
 		}
 		result = append(result, "")
@@ -250,6 +263,95 @@ func markdownLinks(line string) []string {
 	return links
 }
 
+func markdownReferences(lines []string) map[string]string {
+	references := make(map[string]string)
+	for _, line := range lines {
+		match := markdownReferencePattern.FindStringSubmatch(line)
+		if len(match) == 3 {
+			references[strings.ToLower(strings.TrimSpace(match[1]))] = strings.Trim(match[2], "<>")
+		}
+	}
+	return references
+}
+
+var markdownReferencePattern = regexp.MustCompile(`^\s*\[([^]]+)\]:\s*(\S+)`)
+
+func isMarkdownReferenceDefinition(line string) bool {
+	return markdownReferencePattern.MatchString(line)
+}
+
+func markdownReferenceLinks(line string, references map[string]string) []string {
+	pattern := regexp.MustCompile(`\[([^]]+)\]\[([^]]*)\]`)
+	var links []string
+	for _, match := range pattern.FindAllStringSubmatch(stripInlineCode(line), -1) {
+		key := match[2]
+		if key == "" {
+			key = match[1]
+		}
+		if target, ok := references[strings.ToLower(strings.TrimSpace(key))]; ok {
+			links = append(links, target)
+		}
+	}
+	shortcut := regexp.MustCompile(`\[([^]]+)\]`)
+	plain := stripInlineCode(line)
+	for _, match := range shortcut.FindAllStringSubmatchIndex(plain, -1) {
+		start, end := match[0], match[1]
+		if start > 0 && plain[start-1] == ']' || end < len(plain) && (plain[end] == '[' || plain[end] == ':' || plain[end] == '(') {
+			continue
+		}
+		key := plain[match[2]:match[3]]
+		if target, ok := references[strings.ToLower(strings.TrimSpace(key))]; ok {
+			links = append(links, target)
+		}
+	}
+	return links
+}
+
+func markdownLinesKeepCode(data string) []string {
+	lines := strings.Split(strings.ReplaceAll(data, "\r\n", "\n"), "\n")
+	inFence := false
+	var marker byte
+	var width int
+	for index, line := range lines {
+		if !inFence {
+			if nextMarker, nextWidth, ok := lintFenceStart(line); ok {
+				inFence, marker, width, lines[index] = true, nextMarker, nextWidth, ""
+			}
+			continue
+		}
+		lines[index] = ""
+		if lintFenceEnd(line, marker, width) {
+			inFence = false
+		}
+	}
+	return lines
+}
+
+func lintFenceStart(line string) (byte, int, bool) {
+	line = strings.TrimLeft(line, " ")
+	if len(line) < 3 || line[0] != '`' && line[0] != '~' {
+		return 0, 0, false
+	}
+	marker := line[0]
+	width := 0
+	for width < len(line) && line[width] == marker {
+		width++
+	}
+	return marker, width, width >= 3
+}
+
+func lintFenceEnd(line string, marker byte, width int) bool {
+	line = strings.TrimLeft(line, " ")
+	if len(line) < width || line[0] != marker {
+		return false
+	}
+	count := 0
+	for count < len(line) && line[count] == marker {
+		count++
+	}
+	return count >= width && strings.TrimSpace(line[count:]) == ""
+}
+
 func stripInlineCode(line string) string {
 	var result strings.Builder
 	for index := 0; index < len(line); {
@@ -289,7 +391,7 @@ func lintLink(root, page string, line int, target string, anchors map[string]map
 
 func resolvePage(root, target string) (string, bool) {
 	target = filepath.ToSlash(filepath.Clean(target))
-	if !strings.HasPrefix(target, "docs/") {
+	if target == ".." || strings.HasPrefix(target, "../") || filepath.IsAbs(target) {
 		return "", false
 	}
 	candidates := []string{target}

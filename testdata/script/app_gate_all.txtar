@@ -6,6 +6,7 @@
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 exec spinup new allmodules --modules apikeys,audit,auth,backups,billing,ci,deploy,flags,jobs,mail,mcp,monitoring,secrets,tofu --module example.com/allmodules --no-git --non-interactive
 cd allmodules
+exec spinup g resource note body:text
 
 cd web
 exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
@@ -20,6 +21,9 @@ cd ..
 
 # Docker needs a running daemon. All web checks run after the install and build.
 exec sh -c 'spinup doctor --json > doctor.json || test "$?" -eq 1'
+exec cat doctor.json
+stdout '(?s)"id": "openapi-drift",\s+"status": "ok"'
+stdout '(?s)"id": "sqlc-drift",\s+"status": "ok"'
 stdout '(?s)"id": "client-drift",\s+"status": "ok"'
 stdout '(?s)"id": "web-bundle",\s+"status": "ok"'
 ! exec sh -c 'sed -e \'/"id": "docker"/,/^[[:space:]]*}/d\' doctor.json | grep \'"status": "fail"\''

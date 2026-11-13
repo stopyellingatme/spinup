@@ -36,6 +36,9 @@ type asset struct {
 }
 
 func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
+	if c.Root == "" || c.Quick {
+		return skip("web bundle check is local and not quick")
+	}
 	web := filepath.Join(c.Root, "web")
 	info, err := os.Stat(web)
 	if errors.Is(err, os.ErrNotExist) || err == nil && !info.IsDir() {
@@ -54,9 +57,9 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 	if err != nil {
 		return failure("cannot read web/bundle-budget.json: %v", err)
 	}
-	client := filepath.Join(build, "client", "_app", "immutable")
+	client := filepath.Join(build, "client")
 	if _, err := os.Stat(client); errors.Is(err, os.ErrNotExist) {
-		client = filepath.Join(build, "_app", "immutable")
+		client = build
 	} else if err != nil {
 		return failure("cannot inspect client assets: %v", err)
 	}
@@ -132,7 +135,7 @@ func bundle(root string) (int64, int64, []asset, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || !entry.Type().IsRegular() || !isAsset(path) {
+		if entry.IsDir() || !entry.Type().IsRegular() || !isAsset(path) || strings.HasSuffix(path, ".br") || strings.HasSuffix(path, ".gz") {
 			return nil
 		}
 		info, err := entry.Info()

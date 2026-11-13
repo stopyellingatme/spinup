@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 const fuzzBodyLimit = 1024
@@ -52,18 +53,19 @@ func FuzzCheckJSONBody(f *testing.F) {
 
 		restored, checkErr := checkFuzzBody(body)
 		assertFuzzCheckStatus(t, checkErr)
-		if checkErr == nil && !bytes.Equal(restored, body) {
+		if len(body) <= fuzzBodyLimit && !bytes.Equal(restored, body) {
 			t.Fatalf("restored body %q, want %q", restored, body)
 		}
 		if mapErr == nil && problemStatus(checkErr) == http.StatusBadRequest {
 			t.Fatalf("CheckJSONBody returned 400 for DecodeJSON input %q", body)
 		}
-		if bytes.Equal(body, jsonFuzzSeeds[1]) {
-			if problemStatus(mapErr) != http.StatusBadRequest {
-				t.Fatalf("DecodeJSON accepted duplicate key body %q", body)
+		for _, duplicate := range duplicateBodies(body) {
+			if problemStatus(decodeFuzzMap(duplicate)) != http.StatusBadRequest {
+				t.Fatalf("DecodeJSON accepted duplicate key body %q", duplicate)
 			}
-			if problemStatus(checkErr) != http.StatusBadRequest {
-				t.Fatalf("CheckJSONBody accepted duplicate key body %q", body)
+			_, err := checkFuzzBody(duplicate)
+			if problemStatus(err) != http.StatusBadRequest {
+				t.Fatalf("CheckJSONBody accepted duplicate key body %q", duplicate)
 			}
 		}
 	})
@@ -86,14 +88,32 @@ func decodeFuzzMap(body []byte) error {
 func checkFuzzBody(body []byte) ([]byte, error) {
 	r := fuzzRequest(body)
 	err := CheckJSONBody(r, BodyRules{})
-	if err != nil {
-		return nil, err
-	}
 	restored, readErr := io.ReadAll(r.Body)
 	if readErr != nil {
+		if err != nil {
+			return restored, err
+		}
 		return nil, readErr
 	}
-	return restored, nil
+	return restored, err
+}
+
+func duplicateBodies(body []byte) [][]byte {
+	key := string(body)
+	if !utf8.ValidString(key) || key == "" || strings.ContainsAny(key, "\x00\n\r\t\"\\") {
+		return nil
+	}
+	bodies := [][]byte{
+		[]byte(`{"` + key + `":1,"` + key + `":2}`),
+		[]byte(`{"outer":{"` + key + `":1,"` + key + `":2}}`),
+	}
+	var valid [][]byte
+	for _, body := range bodies {
+		if len(body) <= fuzzBodyLimit {
+			valid = append(valid, body)
+		}
+	}
+	return valid
 }
 
 func fuzzRequest(body []byte) *http.Request {
