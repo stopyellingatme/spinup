@@ -219,29 +219,41 @@ def _r(x, digits=3):
     return None if x is None else round(x, digits)
 
 
-def record(suite, metric, unit, samples, better="lower", note="", warmup=0, informational=None):
+def record(suite, metric, unit, samples, better="lower", note="", warmup=0, informational=None,
+           metric_class=None):
     """One metric record (the shape that report.py and compare.py read).
 
-    better is "lower" or "higher". informational is None for a primary metric, or the reason
-    why compare does not fail on the metric (it repeats another measurement, or it is noisy
-    by nature). compare fails only on a primary metric.
+    better is "lower" or "higher". metric_class is primary, informational, or deterministic.
+    informational keeps the old call sites working and selects informational when metric_class
+    is not given. B/op and allocs/op benchmark records are deterministic.
     """
     samples = [_r(s) for s in samples]
     med, p90 = median_p90(samples)
+    if metric_class is None:
+        if informational is not None:
+            metric_class = "informational"
+        elif suite == "micro" and unit in ("B/op", "allocs/op"):
+            metric_class = "deterministic"
+        else:
+            metric_class = "primary"
+    if metric_class not in ("primary", "informational", "deterministic"):
+        raise ValueError(f"unknown metric class {metric_class!r}")
     rec = {
         "suite": suite, "metric": metric, "unit": unit,
         "samples": samples, "n": len(samples), "warmup_discarded": warmup,
         "median": _r(med), "p90": _r(p90), "better": better, "note": note,
-        "informational": informational is not None,
+        "class": metric_class,
+        "informational": metric_class == "informational",
     }
     if informational:
         rec["informational_reason"] = informational
     return rec
 
 
-def skipped(suite, metric, unit, note, better="lower", informational=None):
+def skipped(suite, metric, unit, note, better="lower", informational=None, metric_class=None):
     """A metric that could not be measured: no samples and the reason in the note."""
-    return record(suite, metric, unit, [], better=better, note=note, informational=informational)
+    return record(suite, metric, unit, [], better=better, note=note, informational=informational,
+                  metric_class=metric_class)
 
 
 # ---------------------------------------------------------------------------

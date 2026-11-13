@@ -36,6 +36,7 @@ def build(data):
     m = meta.get("machine", {})
     t = meta.get("toolchain", {})
     r = meta.get("repo", {})
+    p(f"- Commit: {r.get('sha', r.get('short', '?'))}")
     p(f"- Started: {meta.get('started', '?')}; finished: {meta.get('finished', 'not finished')}")
     p(f"- Machine: {m.get('cpu', '?')}, {m.get('cores', '?')} cores, {m.get('ram', '?')}, {m.get('os', '?')}")
     p(f"- Go: {t.get('go', '?')}; GOFLAGS: `{t.get('goflags', '')}`; {t.get('nice', '')}")
@@ -66,7 +67,10 @@ def build(data):
         p("|---|---|---|---|---|---|")
         notes = []
         for rec in (x for x in records if x["suite"] == suite):
-            label = rec["metric"] + (" (info)" if rec.get("informational") else "")
+            metric_class = rec.get("class", "informational" if rec.get("informational") else "primary")
+            label = rec["metric"] + (" (info)" if metric_class == "informational" else "")
+            if metric_class == "deterministic":
+                label += " (deterministic)"
             p(f"| {md_cell(label)} | {rec.get('unit', '')} | {rec.get('better', 'lower')} | {fmt(rec.get('median'))} "
               f"| {fmt(rec.get('p90')) if rec.get('n', 0) > 1 else ''} | {rec.get('n', 0)} |")
             if rec.get("note") and suite != "micro":

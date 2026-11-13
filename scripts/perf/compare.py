@@ -18,11 +18,16 @@ def _key(rec):
     return rec["suite"], rec["metric"]
 
 
+def metric_class(rec):
+    """Return the metric class, including the class of an older result record."""
+    return rec.get("class", "informational" if rec.get("informational") else "primary")
+
+
 def verdict(base, new, threshold):
     """Returns (ratio, verdict, is_regression) for two records (either can be None)."""
     if base is None:
         return None, "new", False
-    info = bool(base.get("informational") or (new or {}).get("informational"))
+    info = metric_class(base) == "informational" or (new is not None and metric_class(new) == "informational")
     b = base.get("median")
     n = new.get("median") if new else None
     if new is None or n is None:
@@ -47,7 +52,7 @@ def verdict(base, new, threshold):
     return ratio, "same", False
 
 
-def compare(base_data, new_data, threshold):
+def compare(base_data, new_data, threshold, only=None):
     """Returns (rows, regressions). A row is (metric, base, new, ratio, verdict)."""
     base_by = {_key(r): r for r in base_data.get("records", [])}
     new_by = {_key(r): r for r in new_data.get("records", [])}
@@ -56,10 +61,15 @@ def compare(base_data, new_data, threshold):
     rows, regressions = [], []
     for k in keys:
         b, n = base_by.get(k), new_by.get(k)
-        ratio, v, bad = verdict(b, n, threshold)
         rec = b or n
+        if only and metric_class(rec) != only:
+            continue
+        ratio, v, bad = verdict(b, n, threshold)
         unit = rec.get("unit", "")
-        label = f"{k[0]}/{k[1]}" + (" (info)" if rec.get("informational") else "")
+        suffix = " (info)" if metric_class(rec) == "informational" else ""
+        if metric_class(rec) == "deterministic":
+            suffix = " (deterministic)"
+        label = f"{k[0]}/{k[1]}" + suffix
         rows.append((label, unit, rec.get("better", "lower"), b.get("median") if b else None,
                      n.get("median") if n else None, ratio, v))
         if bad:
@@ -111,7 +121,7 @@ def markdown(rows, threshold, context):
     return "\n".join(out) + "\n"
 
 
-def main(base_path, new_path, threshold=0.10, md_path=None):
+def main(base_path, new_path, threshold=0.10, md_path=None, only=None):
     if threshold < 0:
         print(f"perf: --threshold is {threshold}, and it cannot be negative\nTry: --threshold 0.10", file=sys.stderr)
         return 2
@@ -121,11 +131,13 @@ def main(base_path, new_path, threshold=0.10, md_path=None):
     except lib.Failure as e:
         print(f"perf: {e}\nTry: {e.hint}", file=sys.stderr)
         return 2
-    rows, regressions = compare(base_data, new_data, threshold)
+    rows, regressions = compare(base_data, new_data, threshold, only=only)
     context = _context_lines(base_data, new_data)
     for line in context:
         print(line)
-    print(f"threshold: {threshold:.0%} (a primary metric that is worse by more than this fails the compare)")
+    description = "a metric that is worse by more than this fails the compare" if only else \
+        "a primary or deterministic metric that is worse by more than this fails the compare"
+    print(f"threshold: {threshold:.0%} ({description})")
     print()
     for line in _table(rows):
         print(line)
@@ -138,7 +150,7 @@ def main(base_path, new_path, threshold=0.10, md_path=None):
         Path(md_path).write_text(markdown(rows, threshold, context))
     sys.stdout.flush()
     if regressions:
-        print(f"perf: {len(regressions)} primary metrics got worse by more than {threshold:.0%}: "
+        print(f"perf: {len(regressions)} metrics got worse by more than {threshold:.0%}: "
               f"{', '.join(regressions)}\nTry: run both results again on an idle machine, or find the change that "
               f"made them slower", file=sys.stderr)
         return 1
