@@ -87,6 +87,98 @@ func TestHeadingSlug(t *testing.T) {
 	}
 }
 
+func TestLintRegressionCases(t *testing.T) {
+	root := t.TempDir()
+	writeLintPage(t, root, "README.md", "# Repository\n")
+	anchors := map[string]map[string]bool{
+		"docs/page.md": {"page": true},
+	}
+	for _, test := range []struct {
+		name string
+		run  func(t *testing.T)
+	}{
+		{
+			name: "inline code heading anchor",
+			run: func(t *testing.T) {
+				if !pageAnchors("## `Hello` world\n")["hello-world"] {
+					t.Fatal("inline code heading did not create hello-world")
+				}
+			},
+		},
+		{
+			name: "repeated heading suffix",
+			run: func(t *testing.T) {
+				if !pageAnchors("## Same\n## Same\n")["same-1"] {
+					t.Fatal("repeated heading did not create same-1")
+				}
+			},
+		},
+		{
+			name: "reference link to missing file",
+			run: func(t *testing.T) {
+				problems := lintPage(root, "docs/page.md", "[text][ref]\n\n[ref]: missing.md\n", anchors)
+				want := []string{"docs/page.md:1: link target \"missing.md\" does not exist"}
+				if got := lintProblemStrings(problems); strings.Join(got, "\n") != strings.Join(want, "\n") {
+					t.Fatalf("lintPage() = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "undefined reference is ignored",
+			run: func(t *testing.T) {
+				if got := lintPage(root, "docs/page.md", "[text][missing]\n[missing]\n", anchors); len(got) != 0 {
+					t.Fatalf("lintPage() = %v, want no problems", got)
+				}
+			},
+		},
+		{
+			name: "three space fence ignores links and tables",
+			run: func(t *testing.T) {
+				data := "   ```text\n[broken](missing.md)\n| One | Two |\n| --- | --- |\n| one |\n   ```\n"
+				if got := lintPage(root, "docs/page.md", data, anchors); len(got) != 0 {
+					t.Fatalf("lintPage() = %v, want no problems", got)
+				}
+			},
+		},
+		{
+			name: "link to repository file",
+			run: func(t *testing.T) {
+				if got := lintPage(root, "docs/page.md", "[readme](../README.md)\n", anchors); len(got) != 0 {
+					t.Fatalf("lintPage() = %v, want no problems", got)
+				}
+			},
+		},
+		{
+			name: "link leaving repository",
+			run: func(t *testing.T) {
+				got := lintProblemStrings(lintPage(root, "docs/page.md", "[outside](../../README.md)\n", anchors))
+				want := []string{"docs/page.md:1: link target \"../../README.md\" does not exist"}
+				if strings.Join(got, "\n") != strings.Join(want, "\n") {
+					t.Fatalf("lintPage() = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "findings after fence use source lines",
+			run: func(t *testing.T) {
+				data := strings.Join([]string{
+					"# Page", "", "```text", "[ignored](missing.md)", "```", "", "[broken](missing.md)", "", "| One | Two |", "| --- | --- |", "| one |",
+				}, "\n")
+				got := lintProblemStrings(lintPage(root, "docs/page.md", data, anchors))
+				want := []string{
+					"docs/page.md:7: link target \"missing.md\" does not exist",
+					"docs/page.md:11: table row has 1 cells, want 2",
+				}
+				if strings.Join(got, "\n") != strings.Join(want, "\n") {
+					t.Fatalf("lintPage() = %q, want %q", got, want)
+				}
+			},
+		},
+	} {
+		t.Run(test.name, test.run)
+	}
+}
+
 func TestLintFacts(t *testing.T) {
 	root := t.TempDir()
 	writeLintPage(t, root, "docs/facts.md", "Go 1.26 or newer.\nGo is version 1.27 or later.\n")

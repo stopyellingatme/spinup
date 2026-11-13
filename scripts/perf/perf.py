@@ -166,12 +166,19 @@ def cpu_slug(cpu):
     return "".join(out) or "unknown-cpu"
 
 
-def _public_result(value):
+def _public_result(value, repo=None, home=None, hostname=None):
     """Copy value without host names or repository paths."""
+    if repo is None:
+        repo, home, hostname = str(lib.REPO), str(Path.home()), lib.machine_info().get("hostname", "")
     if isinstance(value, dict):
-        return {key: _public_result(item) for key, item in value.items() if key not in ("hostname", "path")}
+        return {key: _public_result(item, repo, home, hostname) for key, item in value.items() if key not in ("hostname", "path")}
     if isinstance(value, list):
-        return [_public_result(item) for item in value]
+        return [_public_result(item, repo, home, hostname) for item in value]
+    if isinstance(value, str):
+        for old, new in ((repo, "<repo>"), (home, "~"), (hostname, "<host>")):
+            if old:
+                value = value.replace(old, new)
+        return value
     return copy.deepcopy(value)
 
 
@@ -194,7 +201,7 @@ def write_baseline(result_path, repo=lib.REPO):
     name = cpu_slug(cpu)
     json_path = destination / f"{name}.json"
     markdown_path = destination / f"{name}.md"
-    public = _public_result(data)
+    public = _public_result(data, meta.get("repo", {}).get("path", str(Path(repo).resolve())), str(Path.home()), meta.get("machine", {}).get("hostname", ""))
     json_path.write_text(json.dumps(public, indent=2, sort_keys=True) + "\n")
     import report
     report.main(str(json_path), str(markdown_path), echo=False)

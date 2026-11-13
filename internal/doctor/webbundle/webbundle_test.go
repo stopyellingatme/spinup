@@ -61,6 +61,29 @@ func TestCheckSkipsWithoutWebOrBuild(t *testing.T) {
 	}
 }
 
+func TestCheckSkipsQuickAndEmptyRoot(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	write(t, root, "web/build/client/app.js", "client")
+	for _, checkContext := range []*doctor.Context{{Root: root, Quick: true}, {}} {
+		if got := runCheck(context.Background(), checkContext); got.Status != doctor.Skip {
+			t.Fatalf("context %#v = %+v, want skip", checkContext, got)
+		}
+	}
+}
+
+func TestNodeBuildCountsOnlyClientAssets(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	write(t, root, "web/build/client/vendor.js", "vendor")
+	write(t, root, "web/build/server/index.js", strings.Repeat("s", 100))
+	write(t, root, "web/build/index.js", strings.Repeat("r", 100))
+	got := runCheck(context.Background(), &doctor.Context{Root: root})
+	if got.Status != doctor.OK || !strings.Contains(got.Message, "6 bytes raw") {
+		t.Fatalf("result = %+v, want only client/vendor.js", got)
+	}
+}
+
 func TestRegistration(t *testing.T) {
 	t.Parallel()
 	for _, check := range doctor.Checks(doctor.Local, false) {

@@ -54,7 +54,7 @@ class BaselineTests(unittest.TestCase):
             "meta": {
                 "quick": False,
                 "machine": {"cpu": "A CPU!", "cores": 4, "ram": "8 GiB", "os": "test", "hostname": "host"},
-                "repo": {"sha": "abc", "path": "/secret/repo"},
+                "repo": {"sha": "abc", "path": ""},
             },
             "gate_events": [],
             "nested": {"hostname": "also-host", "path": "/also-secret"},
@@ -65,6 +65,10 @@ class BaselineTests(unittest.TestCase):
             source.write_text(json.dumps(data))
             destination = Path(d) / "repo"
             destination.mkdir()
+            data["meta"]["repo"]["path"] = str(destination)
+            data["note"] = f"{destination}/a host says host"
+            data["meta_args"] = {"out": f"{destination}/output.json"}
+            source.write_text(json.dumps(data))
             json_path, markdown_path = perf.write_baseline(source, destination)
             written = json.loads(json_path.read_text())
             self.assertEqual(json_path.name, "a-cpu-.json")
@@ -73,6 +77,8 @@ class BaselineTests(unittest.TestCase):
             self.assertNotIn("path", written["meta"]["repo"])
             self.assertNotIn("hostname", written["nested"])
             self.assertNotIn("path", written["nested"])
+            self.assertEqual(written["meta_args"]["out"], "<repo>/output.json")
+            self.assertEqual(written["note"], "<repo>/a <host> says <host>")
 
     def test_baseline_rejects_quick_result(self):
         data = {"meta": {"quick": True, "machine": {"cpu": "CPU"}, "repo": {}}, "gate_events": [],

@@ -31,7 +31,8 @@ def verdict(base, new, threshold):
     b = base.get("median")
     n = new.get("median") if new else None
     if new is None or n is None:
-        return None, "missing", False
+        deterministic = metric_class(base) == "deterministic"
+        return None, "MISSING" if deterministic else "missing", deterministic
     if b is None:
         return None, "n/a (no base)", False
     better = base.get("better", "lower")
@@ -62,7 +63,12 @@ def compare(base_data, new_data, threshold, only=None):
     for k in keys:
         b, n = base_by.get(k), new_by.get(k)
         rec = b or n
-        if only and metric_class(rec) != only:
+        if only and metric_class(b or n) != only:
+            continue
+        if only == "deterministic" and b is not None and n is not None and metric_class(n) != "deterministic":
+            label = f"{k[0]}/{k[1]} (deterministic)"
+            rows.append((label, b.get("unit", ""), b.get("better", "lower"), b.get("median"), n.get("median"), None, "CLASS CHANGED"))
+            regressions.append(label)
             continue
         ratio, v, bad = verdict(b, n, threshold)
         unit = rec.get("unit", "")
