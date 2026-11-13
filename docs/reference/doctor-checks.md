@@ -73,7 +73,10 @@ If your app uses an [executable plugin](../plugins-exec.md), the plugin can add 
 | [`lock-valid`](#lock-valid) | no | `spinup.lock` is valid. | The file is damaged. |
 | [`managed-missing`](#managed-missing) | no | Every managed file exists. | You deleted a managed file. |
 | [`kit-version`](#kit-version) | no | The kit version matches the CLI version. | The major or minor versions differ. |
-| [`client-drift`](#client-drift) | no | The TypeScript client matches the API. | The client is stale. |
+| [`openapi-drift`](#openapi-drift) | no | The OpenAPI bundle and Go types match their sources. | A generated file is stale. |
+| [`sqlc-drift`](#sqlc-drift) | no | The generated store matches the SQL sources. | A generated file is stale. |
+| [`client-drift`](#client-drift) | no | The TypeScript client matches the API. | The client is stale or its tool fails. |
+| [`web-bundle`](#web-bundle) | no | The built web app meets its size limits. | The JavaScript and CSS exceed a limit. |
 | [`plaintext-secrets`](#plaintext-secrets) | no | No secret is in Git as plain text. | A key file or a plain secrets file is tracked. |
 | [`services`](#services) | no | The `[[services]]` tables and files are complete. | A service file or secret is missing. |
 
@@ -231,11 +234,34 @@ If a development CLI finds no local kit folder in `api/go.mod`, the check warns.
 **Fix for a release build:** run `spinup upgrade`.
 **Fix for a development build:** set `SPINUP_KIT_REPLACE=<checkout>/kit` when you run `spinup new`. In an existing app, run `go mod edit -replace` in `api/`, as the `Try:` line shows. See [Support policy](../policy/support.md).
 
+### openapi-drift
+
+This local check is not quick. It compares the OpenAPI bundle with the files in `api/openapi/`, byte for byte.
+When the bundle has paths, it generates Go types with the app's `oapi-codegen.yaml` and compares the configured output.
+It writes the temporary config and output outside the app. It fails when a generated file is stale.
+It skips without `api/openapi/`, or when the Go toolchain or cached modules are unavailable.
+**Fix:** run `spinup g openapi`.
+
+### sqlc-drift
+
+This local check is not quick. It runs `sqlc diff` in `api/` and compares the generated store with its SQL sources.
+It fails when the files differ and shows the first 20 lines of the diff. It does not change the app.
+It skips without `api/sqlc.yaml`, without `.sql` files in `api/db/queries`, or when the tool cannot run.
+The generated config needs no database for this check.
+**Fix:** run `spinup db sqlc`.
+
 ### client-drift
 
 The web app calls the API through a generated TypeScript client. The check builds a fresh client from `api/openapi/bundle.gen.yaml` and compares.
+It fails when the client is stale or the tool fails. A tool failure includes the tool message.
 It skips an app without a web app, and an app where `web/node_modules` does not exist.
 **Fix:** run `spinup g client`.
+
+### web-bundle
+
+This local check is not quick. It sums the client JavaScript and CSS in `web/build`, with raw and brotli sizes.
+The default limits are 1,500,000 bytes raw and 400,000 bytes brotli. The file `web/bundle-budget.json` can override these limits.
+It warns above either limit. It skips without a build. See [Web bundle](../web-bundle.md).
 
 ### plaintext-secrets
 
