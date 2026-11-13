@@ -66,7 +66,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: api/go.mod
-          cache-dependency-path: api/go.sum
+          cache-dependency-path: |
+            api/go.sum
+            api/tools.sum
       - uses: ./.github/actions/setup-spinup
       - id: services
         env:
