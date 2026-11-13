@@ -83,4 +83,8 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/billingdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/billingwired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/billing"
+
+	// Web performance and quality gates (ADR 0034, ADR 0036)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/gendrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/webbundle"
 )

@@ -327,6 +327,30 @@ Note: `packs/` means `internal/templates/packs/`.
 
 The Rust rewrite (`docs/design/rust-plan.md`) stopped after R2. Go stays. The run S0 to S13 added sidecar services: `[[services]]` in `spinup.toml`, `services/<name>/` in any language, `spinup g service --lang rust|python|<plugin>/<tpl>`, `spinup g client`, build, deploy, rollback, dev, and the doctor check. The jobs worker now runs in dev and deploy. The status is done. The units and their checks are in the orchestrate run `20261030-130014`.
 
+#### N1 — web performance and quality gates (added 2026-11-13, contracts in ADR 0034 and ADR 0036)
+
+A comparison with corten (a Rust web framework of a co-worker) on 2026-11-13 gave three milestones: N1 (this one), N2 (the `live` data module, ADR 0033), and N3 (agent guidance in generated apps, ADR 0035). No milestone adds a dependency. The main loop owns `packs.digest` in N1: every changed pack gets `none`.
+
+| Unit | Outcome | Check | File set | Deps |
+|---|---|---|---|---|
+| WP1 | `httpx.AcceptsEncoding`, the default `Cache-Control`, `httpx.PublicCache` | `T ./kit/httpx/... ./kit/apidocs/... ./kit/app/...`, `T ./internal/apicompat/...` | `kit/httpx/{encoding,cache}.go`, `kit/apidocs/apidocs.go`, `kit/app/app.go`, `kit/api/current.txt`, `docs/reference/kit.md` | – |
+| WP2 | `WithSPA`: `.br` and `.gz` siblings, `ETag`, `304`, no copy for each request, script hashes in the CSP | `T ./kit/app/...`, `S embed` | `kit/app/spa.go`, `kit/app/spa_index.go`, `docs/embed.md` | WP1 |
+| WP3 | Allocation budgets and `BenchmarkWriteJSON` | `make perf-gate`, `T ./kit/httpx/... ./kit/app/... ./kit/logx/...` | `kit/{httpx,app,logx}/budget_test.go`, `kit/{httpx,app,logx}/race_test.go`, `kit/{httpx,app,logx}/norace_test.go`, `kit/httpx/bench_test.go` | WP2 |
+| WP4 | The embed build writes precompressed files | `G web-embed`, `S embed` | `internal/templates/packs/web/embed/vite.config.js`, `testdata/golden/web-embed/` | – |
+| WP5 | Doctor check `web-bundle` | `T ./internal/doctor/webbundle/...`, `make doctest` | `internal/doctor/webbundle/`, `docs/web-bundle.md` | – |
+| WP6 | Perf core: `baseline`, the deterministic class, loadgen `ttfb_ms`, `-header`, `-expect-body` | `T ./scripts/perf/loadgen/...`, `make perf SUITES=cli QUICK=1` † | `scripts/perf/{perf,lib,compare,report}.py`, `scripts/perf/loadgen/` | – |
+| WP7 | The `web` suite and `bundle.py` | `make perf SUITES=web QUICK=1` † | `scripts/perf/suite_web.py`, `scripts/perf/bundle.py` | WP6, WP2, WP4 |
+| WP8 | The `dev` suite (Go only, from the branch `bench`) | `make perf SUITES=dev QUICK=1` † | `scripts/perf/suite_dev.py` | WP6 |
+| WP9 | `make perf-gate` in CI, the nightly bundle check, `perf/budgets.json`, docs | `actionlint`, `make doctest` | `.github/workflows/ci.yml`, `testdata/e2e/web/run.sh`, `perf/budgets.json`, `docs/contributing/{performance,ci}.md` | WP7, WP3, QG7 |
+| WP10 (main loop) | The committed baseline | `make perf`, `make perf-baseline` | `perf/baseline/` | all |
+| QG1 | `TestDocsLint`, `TestDocsFacts`, and the page fixes | `T ./internal/doctest/...`, `make doctest` | `internal/doctest/lint.go`, the pages that the lint reports, `docs/contributing/writing-docs.md` | – |
+| QG2 | `openapi-drift`, `sqlc-drift`, `client-drift` as a failure | `T ./internal/doctor/gendrift/... ./internal/doctor/clientdrift/...`, `S gen_drift` | `internal/doctor/gendrift/`, `internal/doctor/clientdrift/`, `testdata/script/gen_drift.txtar`, `docs/reference/doctor-checks.md` | QG1 |
+| QG3 | Generated CI: the client diff step and the tools cache path | `G ci`, `actionlint` | `internal/templates/packs/ci/files/.github/workflows/ci.yml.tmpl`, `testdata/golden/ci/`, `docs/ci.md` | QG2 |
+| QG4 | The all-modules gate | `S all_modules`; gate: `make app-gate` † | `testdata/script/{all_modules,app_gate_all}.txtar` | QG2 |
+| QG5 | `kit.csp` in node mode | `G web`, `G web-variants`; gate: `make e2e` † | `internal/templates/packs/web/files/web/vite.config.js`, `testdata/golden/{web,web-variants}/`, `docs/web.md` | WP4 |
+| QG6 | XSS and CSP e2e, `TestNoRawHTML`, the browser switch | `T ./internal/templates/ -run NoRawHTML`, `G web`; gate: `make e2e` † | `testdata/e2e/web/{tests/xss.spec.ts,tests/helpers.ts,playwright.config.ts}`, `internal/templates/packs/web/files/web/e2e/smoke.spec.ts.tmpl`, `internal/templates/raw_html_test.go`, goldens, `docs/contributing/e2e.md` | QG5 |
+| QG7 | Fuzz targets and the nightly fuzz step | `T ./kit/httpx/...` | `kit/httpx/fuzz_test.go`, `kit/httpx/testdata/fuzz/`, `.github/workflows/nightly.yml` | WP3 |
+
 ## Verification
 
 - **Per unit:** the orchestrate Phase 5 runs the unit's Check column, plus `make build lint`. Lanes do not self-certify.
