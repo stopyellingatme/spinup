@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,10 +12,22 @@ import (
 	"time"
 )
 
+func startTestServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("the sandbox cannot listen on loopback: %v", err)
+	}
+	server := httptest.NewUnstartedServer(handler)
+	server.Listener = listener
+	server.Start()
+	return server
+}
+
 func TestRunCountsRequests(t *testing.T) {
 	var hits atomic.Int64
 	var cookies atomic.Int64
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		if r.Header.Get("Cookie") == "session=abc" {
 			cookies.Add(1)
@@ -42,7 +55,7 @@ func TestRunCountsRequests(t *testing.T) {
 
 func TestRunDurationAndWarmup(t *testing.T) {
 	var hits atomic.Int64
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -59,7 +72,7 @@ func TestRunDurationAndWarmup(t *testing.T) {
 }
 
 func TestRunCountsBadStatus(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer srv.Close()
@@ -68,6 +81,31 @@ func TestRunCountsBadStatus(t *testing.T) {
 		Timeout: 5 * time.Second})
 	if res.Errors != 10 || res.Status["429"] != 10 || !strings.Contains(res.FirstError, "429") {
 		t.Fatalf("result = %+v, want 10 errors with status 429", res)
+	}
+}
+
+func TestRunHeadersBodyAndTTFB(t *testing.T) {
+	srv := startTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Perf") != "value" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, _ = io.WriteString(w, "expected response")
+	}))
+	defer srv.Close()
+
+	res := Run(context.Background(), Config{URL: srv.URL, Concurrency: 1, Requests: 3,
+		Expect: http.StatusOK, ExpectBody: "expected", Headers: http.Header{"X-Perf": {"value"}},
+		Timeout: 5 * time.Second})
+	if res.Errors != 0 || res.Bytes != int64(3*len("expected response")) || res.TTFB.P50 <= 0 {
+		t.Fatalf("result = %+v, want headers, body bytes, and TTFB", res)
+	}
+
+	res = Run(context.Background(), Config{URL: srv.URL, Concurrency: 1, Requests: 1,
+		Expect: http.StatusOK, ExpectBody: "missing", Headers: http.Header{"X-Perf": {"value"}},
+		Timeout: 5 * time.Second})
+	if res.Errors != 1 || !strings.Contains(res.FirstError, "does not contain") {
+		t.Fatalf("result = %+v, want body expectation error", res)
 	}
 }
 
@@ -101,8 +139,10 @@ func TestParseFlags(t *testing.T) {
 			t.Errorf("parseFlags(%q) = %v, want an error with %q and a Try: line", tc.args, err, tc.want)
 		}
 	}
-	cfg, err := parseFlags([]string{"-url", "http://127.0.0.1:1/healthz", "-n", "5", "-cookie", "a=b"}, io.Discard)
-	if err != nil || cfg.Requests != 5 || cfg.Concurrency != 32 || cfg.Cookie != "a=b" || cfg.Expect != 200 {
+	cfg, err := parseFlags([]string{"-url", "http://127.0.0.1:1/healthz", "-n", "5", "-cookie", "a=b",
+		"-header", "X-One: one", "-header", "X-One: two", "-expect-body", "ok"}, io.Discard)
+	if err != nil || cfg.Requests != 5 || cfg.Concurrency != 32 || cfg.Cookie != "a=b" || cfg.Expect != 200 ||
+		cfg.ExpectBody != "ok" || len(cfg.Headers.Values("X-One")) != 2 {
 		t.Fatalf("parseFlags = %+v, %v", cfg, err)
 	}
 }
