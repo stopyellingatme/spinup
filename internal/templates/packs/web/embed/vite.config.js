@@ -18,14 +18,17 @@ export default defineConfig(({ mode }) => {
 	// session cookie of the Go API is a first-party cookie.
 	const apiURL = env.API_URL || 'http://localhost:8080';
 
+	const staticAdapter = adapter({ fallback: 'index.html', precompress: true });
+
 	return {
 		plugins: [
 			tailwindcss(),
 			sveltekit({
 				adapter: {
-					...adapter({ fallback: 'index.html' }),
+					...staticAdapter,
 					async adapt(builder) {
-						await adapter({ fallback: 'index.html' }).adapt(builder);
+						// precompress writes a .br and a .gz sibling for each file. The Go binary serves them.
+						await staticAdapter.adapt(builder);
 						// Replace the generated assets so old hashes cannot survive a build.
 						const dist = '../api/internal/webdist/dist';
 						await rm(dist, { recursive: true, force: true });
