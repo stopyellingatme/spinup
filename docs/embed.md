@@ -104,10 +104,45 @@ Deploy settings hold only the replicas and resources of the API.
 
 ## How the binary serves files
 
-- A `GET` or `HEAD` request for a file returns the file. Any other path returns `index.html`, so deep links work.
+- A `GET` or `HEAD` request for a file returns the file. An unknown path returns `index.html`, so deep links work.
+- Other methods return 405 for web paths.
 - The API paths, `/healthz`, metrics, and `/version` never fall back to `index.html`. An unknown path there returns 404 for every method.
 - A missing file under `/_app/` returns 404.
-- Files under `/_app/immutable/` are cached for a year. `index.html` is never cached.
+- Files under `/_app/immutable/` send `Cache-Control: public, max-age=31536000, immutable`. Other files, including `index.html`, send `Cache-Control: no-cache` for revalidation.
+
+`app.WithSPA` builds a file index once, when it registers the route.
+When `Accept-Encoding` permits compression, the handler selects a `.br` sibling first, then a `.gz` sibling, then the plain file.
+A coding with `q=0` is refused.
+An encoded response sends `Content-Encoding: br` or `Content-Encoding: gzip` and the content type of the original file.
+When a file has compressed siblings, every response sends `Vary: Accept-Encoding`, including a plain response.
+
+A compressed sibling has no public URL.
+A request for its name follows the rules for a missing file.
+An orphan `.br` or `.gz` file has its own public URL when no plain file exists.
+The handler opens the selected file for each request and uses `http.ServeContent` with its seekable reader.
+If the file has no seekable reader, the handler reads it once for that request.
+Range requests for plain files remain available.
+
+Files outside `/_app/immutable/` send a strong `ETag` from the SHA-256 hash of the plain content.
+The tag contains the first 32 hexadecimal characters, inside double quotes.
+Compressed variants add `.br` or `.gz` inside those quotes.
+For example, a tag can be `"0123456789abcdef0123456789abcdef.br"`.
+A matching `If-None-Match` returns 304 without a body.
+Files under `/_app/immutable/` send no `ETag`.
+
+At registration, the handler also hashes each inline script body in `index.html`, in document order.
+Each hash covers the exact bytes between the script tags.
+Scripts with a `src` attribute add no hash.
+HTML responses, including the fallback and compressed variants, send this Content Security Policy:
+
+```text
+default-src 'self'; script-src 'self' <hashes>; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+```
+
+Each `<hashes>` entry has the form `'sha256-<base64>'`.
+When `index.html` has no inline scripts, the script directive is `script-src 'self'`.
+The script directive never permits `'unsafe-inline'`.
+The style directive retains `'unsafe-inline'`.
 
 A Go build without the `embedweb` tag contains only a stub.
 Use `spinup build` and not `go build` to get the web files.
