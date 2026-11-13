@@ -169,7 +169,9 @@ func TestSPACSP(t *testing.T) {
 			handler := New(WithLogger(discardLogger()), WithSPA(files)).Handler()
 			script := "script-src 'self'"
 			for _, body := range tc.bodies {
-				sum := sha256.Sum256([]byte(body))
+				// The browser hashes the text after newline normalization.
+				normalized := strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\r", "\n")
+				sum := sha256.Sum256([]byte(normalized))
 				script += " 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
 			}
 			want := "default-src 'self'; " + script + "; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
@@ -306,5 +308,26 @@ func TestSPAReservedPaths(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// A client can send Accept-Encoding in more than one field. A refusal in the
+// second field must count.
+func TestSPASplitAcceptEncoding(t *testing.T) {
+	t.Parallel()
+	files := fstest.MapFS{
+		"index.html":   {Data: []byte("<title>SPA</title>")},
+		"plain.txt":    {Data: []byte("0123456789")},
+		"plain.txt.br": {Data: []byte("brotli plain")},
+		"plain.txt.gz": {Data: []byte("gzip plain")},
+	}
+	handler := New(WithLogger(discardLogger()), WithSPA(files)).Handler()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/plain.txt", nil)
+	req.Header.Add("Accept-Encoding", "*")
+	req.Header.Add("Accept-Encoding", "br;q=0, gzip;q=0")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Encoding") != "" || w.Body.String() != "0123456789" {
+		t.Fatalf("response = %d %v %q, want the plain file", w.Code, w.Header(), w.Body.String())
 	}
 }

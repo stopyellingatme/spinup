@@ -5,13 +5,19 @@ import (
 	"strings"
 )
 
-// AcceptsEncoding reports whether header permits coding.
+// AcceptsEncoding reports whether the Accept-Encoding value header permits coding.
+// A named coding wins over the wildcard. The coding identity is permitted unless
+// the header refuses it by name or refuses the wildcard without naming it (RFC 9110 §12.5.3).
 func AcceptsEncoding(header, coding string) bool {
-	if header == "" || coding == "" {
+	if coding == "" {
 		return false
 	}
+	identity := strings.EqualFold(coding, "identity")
+	if header == "" {
+		return identity
+	}
 
-	wildcard := false
+	wildcard, wildcardSeen := false, false
 	specified := false
 	for value := range strings.SplitSeq(header, ",") {
 		parts := strings.Split(value, ";")
@@ -28,9 +34,15 @@ func AcceptsEncoding(header, coding string) bool {
 			}
 			continue
 		}
-		wildcard = quality > 0
+		wildcard, wildcardSeen = quality > 0, true
 	}
-	return specified || wildcard
+	if specified {
+		return true
+	}
+	if wildcardSeen {
+		return wildcard
+	}
+	return identity
 }
 
 func encodingQuality(parameters []string) float64 {

@@ -240,6 +240,7 @@ This local check is not quick. It compares the OpenAPI bundle with the files in 
 When the bundle has paths, it generates Go types with the app's `oapi-codegen.yaml` and compares the configured output.
 It writes the temporary config and output outside the app. It fails when a generated file is stale.
 It skips without `api/openapi/`, or when the Go toolchain or cached modules are unavailable.
+It also skips for a new app that has no routes and no `bundle.gen.yaml` yet.
 **Fix:** run `spinup g openapi`.
 
 ### sqlc-drift

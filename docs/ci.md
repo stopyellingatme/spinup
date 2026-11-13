@@ -155,6 +155,7 @@ The web job installs the dependencies and runs `gen:client` before it runs `pnpm
 For the heyapi client, it also writes `src/lib/api/schema.d.ts`.
 The job fails when `src/lib/api` changes.
 Run `spinup g client` to update the client.
+The step does nothing for a new app that has no `api/openapi/bundle.gen.yaml` yet.
 An app with no unit tests passes.
 A failed Playwright run uploads `web/playwright-report/` for seven days.
 The workflows take the Go version from `api/go.mod` and the Node major from the spinup stack.

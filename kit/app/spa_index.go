@@ -104,8 +104,9 @@ func spaCSP(index []byte) string {
 			}
 		case html.TextToken:
 			if inline {
-				// Raw preserves the exact script bytes, including line endings.
-				body = append(body, tokens.Raw()...)
+				// A browser hashes the script text after it normalizes CRLF and CR to LF.
+				// Text does the same and does not unescape the raw text of a script.
+				body = append(body, tokens.Text()...)
 			}
 		case html.EndTagToken:
 			if token := tokens.Token(); inline && token.Data == "script" {

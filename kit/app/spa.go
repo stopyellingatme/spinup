@@ -47,9 +47,11 @@ func WithSPA(files fs.FS) Option {
 			}
 			encoding, suffix := "", ""
 			if file.br || file.gzip {
-				if file.br && httpx.AcceptsEncoding(r.Header.Get("Accept-Encoding"), "br") {
+				// A client can send the header in more than one field.
+				accept := strings.Join(r.Header.Values("Accept-Encoding"), ",")
+				if file.br && httpx.AcceptsEncoding(accept, "br") {
 					encoding, suffix = "br", ".br"
-				} else if file.gzip && httpx.AcceptsEncoding(r.Header.Get("Accept-Encoding"), "gzip") {
+				} else if file.gzip && httpx.AcceptsEncoding(accept, "gzip") {
 					encoding, suffix = "gzip", ".gz"
 				}
 			}

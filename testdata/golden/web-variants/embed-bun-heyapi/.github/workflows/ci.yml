@@ -75,6 +75,10 @@ jobs:
       - name: Check generated API client
         run: |
           set -euo pipefail
+          if [ ! -f ../api/openapi/bundle.gen.yaml ]; then
+            echo "The app has no generated OpenAPI bundle yet. The client check does not apply."
+            exit 0
+          fi
           bun run gen:client
           bun x --no-install openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts
           if [ -n "$(git status --porcelain -- src/lib/api)" ]; then

@@ -31,13 +31,16 @@ func TestDefaultCacheControl(t *testing.T) {
 	}{
 		{"default", "private, no-cache"},
 		{"handler value", "public, max-age=60"},
+		{"no write", "private, no-cache"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := DefaultCacheControl(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				if tc.name == "handler value" {
 					w.Header().Set("Cache-Control", tc.cache)
 				}
-				w.WriteHeader(http.StatusNoContent)
+				if tc.name != "no write" {
+					w.WriteHeader(http.StatusNoContent)
+				}
 			}))
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
