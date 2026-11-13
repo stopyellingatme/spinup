@@ -48,6 +48,15 @@ func TestAPIDocsMount(t *testing.T) {
 				if tc.mounted && w.Header().Get("Content-Security-Policy") != csp {
 					t.Fatalf("%s: CSP=%s", path, w.Header().Get("Content-Security-Policy"))
 				}
+				if tc.mounted {
+					cache := "no-cache"
+					if path == "/api/docs/scalar.js" {
+						cache = "public, max-age=86400"
+					}
+					if got := w.Header().Get("Cache-Control"); got != cache {
+						t.Fatalf("%s: Cache-Control=%s, want=%s", path, got, cache)
+					}
+				}
 				if w.Header().Get("X-Content-Type-Options") != "nosniff" {
 					t.Fatal("default security headers missing")
 				}

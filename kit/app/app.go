@@ -98,7 +98,7 @@ func New(opts ...Option) *App {
 		routes(mux)
 	}
 	// Apply deadlines before devtools wraps the writer without deadline control.
-	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders(), a.requestDeadline()}
+	middleware := []httpx.Middleware{httpx.RequestID(), httpx.Recover(a.logger), httpx.AccessLog(a.logger), httpx.SecurityHeaders(), httpx.DefaultCacheControl, a.requestDeadline()}
 	docsMounted := a.apiDocs && (a.config.Env == "dev" || a.config.APIDocs)
 	if docsMounted {
 		opts := apidocs.Options{Spec: a.apiSpec}
