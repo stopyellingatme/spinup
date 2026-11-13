@@ -27,7 +27,7 @@ spinup runs these tools on your machine. `spinup doctor` checks that they are pr
 
 | Tool | Version | Why you need it |
 | --- | --- | --- |
-| Go | 1.26 or later | Builds and runs the API |
+| Go | 1.27 or later | Builds and runs the API |
 | Node | 24 or later | Builds and runs the web app |
 | pnpm | 12, through corepack | Installs the web packages |
 | Docker | 27 or later. `spinup doctor` checks only that the daemon runs. | Runs PostgreSQL and Mailpit in development, and builds images for a deploy |

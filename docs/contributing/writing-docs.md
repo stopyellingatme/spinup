@@ -106,6 +106,14 @@ Write for the user of spinup, not for its maintainers:
 - Use sentence case in headings. Do not end a heading with a period.
 - Link a command to its reference page the first time a page names it.
 
+## Lint
+
+`make doctest` checks links, heading anchors, code fences, and table shapes.
+It also checks each Go minimum statement against the pinned stack version.
+
+Fix each reported `path:line` before you commit a page.
+Do not cite a commit hash. Cite an ADR or a release instead.
+
 ## Navigation
 
 Every published page has front matter with `title`, `parent`, and `nav_order`.

@@ -61,7 +61,7 @@ If your app uses an [executable plugin](../plugins-exec.md), the plugin can add 
 | ID | Quick | What it checks | Fails or warns when |
 | --- | --- | --- | --- |
 | [`git-version`](#git-version) | yes | Your Git is version 2.44 or newer. | Git is missing or too old. |
-| [`go-version`](#go-version) | yes | Go is version 1.26 or newer. | Go is missing or too old. |
+| [`go-version`](#go-version) | yes | Go is version 1.27 or newer. | Go is missing or too old. |
 | [`node-version`](#node-version) | yes | Node is version 24 or newer. | Node is missing or too old. |
 | [`pnpm`](#pnpm) | yes | The web package manager runs. | `pnpm` or `bun` is not on `PATH`. |
 | [`docker`](#docker) | yes | The Docker daemon answers. | Docker is not running. |
