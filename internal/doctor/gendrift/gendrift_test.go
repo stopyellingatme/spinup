@@ -100,10 +100,10 @@ func app(t *testing.T, paths bool) string {
 
 func TestOpenAPI(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"current", "empty", "stale bundle", "missing bundle", "stale types", "missing types", "invalid source", "missing config", "missing tool", "missing cache", "tool error"} {
+	for _, name := range []string{"current", "empty", "new app", "stale bundle", "missing bundle", "stale types", "missing types", "invalid source", "missing config", "missing tool", "missing cache", "tool error"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			root := app(t, name != "empty")
+			root := app(t, name != "empty" && name != "new app")
 			runner := &toolRunner{t: t, root: root, fresh: "package gen\n"}
 			want, calls, message := doctor.Fail, 0, ""
 			switch name {
@@ -111,6 +111,12 @@ func TestOpenAPI(t *testing.T) {
 				want, calls = doctor.OK, 1
 			case "empty":
 				want = doctor.OK
+			case "new app":
+				// A new app has no routes, and no generator has written the bundle yet.
+				want = doctor.Skip
+				if err := os.Remove(filepath.Join(root, "api/openapi/bundle.gen.yaml")); err != nil {
+					t.Fatal(err)
+				}
 			case "stale bundle":
 				write(t, root, "api/openapi/bundle.gen.yaml", "stale\n")
 				message = "bundle.gen.yaml"
