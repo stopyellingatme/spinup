@@ -94,6 +94,7 @@ func newRoot(app *App, in io.Reader, out, errOut io.Writer, entered *bool) *cobr
 			*entered = true
 			*app.UI = *ui.New(in, out, errOut, app.Flags.options())
 			printUpdateNotice(cmd, app, errOut)
+			printPinNotice(cmd, app, errOut)
 			return nil
 		},
 		RunE: func(*cobra.Command, []string) error {
