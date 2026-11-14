@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"io/fs"
+	"maps"
 	"path"
 	"strings"
 	"text/template"
@@ -32,7 +33,9 @@ func Render(in Input) (vfs.Plan, error) {
 		return vfs.Plan{}, err
 	}
 	answers["Stack"], answers["TemplateVersion"] = in.Stack, in.TemplateVersion
-	funcs := functions(in.Stack)
+	base := functions(in.Stack)
+	funcs := maps.Clone(base)
+	funcs["fragments"] = newFragments(in.Packs, answers, base)
 	var plan vfs.Plan
 	origins := map[string]string{}
 	for _, p := range in.Packs {

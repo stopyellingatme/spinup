@@ -27,4 +27,6 @@
 // Function uses takes an owner/repo name and returns owner/repo@sha # tag.
 // Missing stack versions and unknown lookup keys fail the render.
 // These functions use no clock, randomness, subprocess, or external file access.
+// Function fragments joins validated three-cell rows from ordered pack fragments.
+// Function docurl returns the raw Markdown URL of a valid docs-relative path.
 package render
