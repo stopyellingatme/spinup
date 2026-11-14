@@ -41,12 +41,13 @@ type App struct {
 	readiness       map[string]func(context.Context) error
 	commands        map[string]func(context.Context, []string) error
 	shutdown        []func(context.Context) error
+	drain           []func(context.Context) error
 	handler         http.Handler
 	migrationStatus func(context.Context) ([]devtools.Migration, error)
 	routeMu         sync.Mutex
 	routePatterns   map[string]struct{}
 	requestTimeout  time.Duration
-	timeoutExempt   func(*http.Request) bool
+	timeoutExempt   []func(*http.Request) bool
 }
 
 // New constructs an API with the default middleware and built-in routes.
@@ -264,6 +265,7 @@ func (a *App) serveListener(ctx context.Context, listener net.Listener) error {
 			problems = append(problems, fmt.Errorf("HTTP server failed: %w", err))
 		}
 	}
+	problems = append(problems, a.runDrain(ctx)...)
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.config.ShutdownTimeout)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
@@ -288,6 +290,23 @@ func (a *App) serveListener(ctx context.Context, listener net.Listener) error {
 		return fmt.Errorf("%w\nTry: correct the reported server or shutdown failure and restart", errors.Join(problems...))
 	}
 	return nil
+}
+
+// runDrain runs the drain hooks in reverse option order with one shared deadline.
+// A failed hook does not stop the next hook.
+func (a *App) runDrain(ctx context.Context) []error {
+	if len(a.drain) == 0 {
+		return nil
+	}
+	drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), min(DrainTimeout, a.config.ShutdownTimeout))
+	defer cancel()
+	var problems []error
+	for i := len(a.drain) - 1; i >= 0; i-- {
+		if err := a.drain[i](drainCtx); err != nil {
+			problems = append(problems, fmt.Errorf("drain hook failed: %w", err))
+		}
+	}
+	return problems
 }
 
 // Main runs a with process arguments and cancels it on SIGINT or SIGTERM.
