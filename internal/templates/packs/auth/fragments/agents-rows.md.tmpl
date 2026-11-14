@@ -1,0 +1,5 @@
+| Limit a resource to roles | `spinup g resource <name> <field:type>... --role <roles>` | [Roles]([[ docurl "build/roles.md" ]]) |
+| Share the rows of a resource between users | `spinup g resource <name> <field:type>... --shared` | [Roles]([[ docurl "build/roles.md" ]]) |
+| Limit a page to roles | `spinup g page <route> --server --role <roles>` | [generate page]([[ docurl "commands/generate-page.md" ]]) |
+| Change the roles. Edit `[auth]` in `spinup.toml` first. | `spinup g roles` | [Roles]([[ docurl "build/roles.md" ]]) |
+| List the accounts, or change the role of an account | `cd api && go run ./cmd/api user list`, then `cd api && go run ./cmd/api user set-role --email <email> --role <role>` | [App binary commands]([[ docurl "reference/app-commands.md" ]]) |
