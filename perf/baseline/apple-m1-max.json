@@ -1,0 +1,2990 @@
+{
+  "gate_events": [
+    {
+      "budget_exhausted": false,
+      "label": "help_time",
+      "load1": 1.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "version_time",
+      "load1": 1.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "new_time",
+      "load1": 1.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "gen_one_resource_nodb_time",
+      "load1": 1.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "gen_resources_nodb_time",
+      "load1": 1.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "upgrade_noop_time",
+      "load1": 2.82,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "db_migrate_time",
+      "load1": 2.82,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "peak_rss_new",
+      "load1": 3.56,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_cold_build",
+      "load1": 3.91,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_incremental_build",
+      "load1": 4.36,
+      "timed_out": false,
+      "waited_s": 50.1
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_release_build_time",
+      "load1": 4.39,
+      "timed_out": false,
+      "waited_s": 10.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_start_to_healthz",
+      "load1": 4.47,
+      "timed_out": false,
+      "waited_s": 30.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_rps_healthz",
+      "load1": 4.47,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "app_login_latency",
+      "load1": 4.37,
+      "timed_out": false,
+      "waited_s": 95.2
+    },
+    {
+      "budget_exhausted": false,
+      "label": "micro .",
+      "load1": 4.37,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "micro kit",
+      "load1": 3.51,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "web_build_time",
+      "load1": 2.59,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "web_start_to_healthz",
+      "load1": 2.38,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "web_ssr_rps_page",
+      "load1": 2.38,
+      "timed_out": false,
+      "waited_s": 0.0
+    },
+    {
+      "budget_exhausted": false,
+      "label": "embed_index_rps",
+      "load1": 3.62,
+      "timed_out": false,
+      "waited_s": 0.0
+    }
+  ],
+  "meta": {
+    "args": "run",
+    "builds": {
+      "cli": {
+        "build_s": 0.7,
+        "flags": "go build -trimpath -ldflags \"-s -w\"",
+        "note": "warm build cache: this is not a cold-build metric"
+      }
+    },
+    "database_server": "postgres://127.0.0.1:55433/postgres",
+    "finished": "2026-11-13T22:59:32-06:00",
+    "gate_budget_s": 3600,
+    "gate_max_s": 900,
+    "load_limit": 4.5,
+    "machine": {
+      "cores": 10,
+      "cpu": "Apple M1 Max",
+      "kernel": "25.4.0",
+      "os": "macOS 26.4.1 (arm64)",
+      "ram": "64 GiB"
+    },
+    "preflight": {
+      "disk_need_gib": 6
+    },
+    "quick": false,
+    "repo": {
+      "branch": "orch/20261113-130519/integration",
+      "dirty": false,
+      "sha": "3d475d30c8cd7f4c845cc2f1b49a55fe1dd74695",
+      "short": "3d475d30c8cd"
+    },
+    "scenario": {
+      "app_api_only": false,
+      "app_modules": "ci,auth,jobs,mail",
+      "cli_api_only": true,
+      "cli_modules": "ci,jobs,mail",
+      "resources": 20,
+      "resources_file": "scripts/perf/resources.txt"
+    },
+    "schema": 1,
+    "started": "2026-11-13T22:48:47-06:00",
+    "suites": [
+      "cli",
+      "app",
+      "micro",
+      "web"
+    ],
+    "toolchain": {
+      "go": "go version go1.27.3 darwin/arm64",
+      "goflags": "-p=4",
+      "goflags_caller": "-mod=readonly -p=2",
+      "gomaxprocs": "",
+      "nice": "os.nice(10) for the whole perf process",
+      "psql": "psql (PostgreSQL) 14.24 (Homebrew)",
+      "python": "3.12.2"
+    }
+  },
+  "notes": [],
+  "records": [
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 21.096,
+      "metric": "cli_binary_size",
+      "n": 1,
+      "note": "the stripped CLI (go build -trimpath -ldflags '-s -w' ./cmd/spinup)",
+      "p90": 21.096,
+      "samples": [
+        21.096
+      ],
+      "suite": "cli",
+      "unit": "MB",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 11.507,
+      "metric": "help_time",
+      "n": 30,
+      "note": "spinup --help, process wall time; n=30 after 1 warm-up discarded; load 1.91 -> 1.91",
+      "p90": 11.669,
+      "samples": [
+        11.527,
+        11.355,
+        11.504,
+        11.204,
+        11.552,
+        11.614,
+        11.551,
+        11.37,
+        11.644,
+        11.669,
+        11.409,
+        11.394,
+        11.535,
+        11.427,
+        11.114,
+        11.223,
+        11.51,
+        11.497,
+        11.475,
+        11.463,
+        11.435,
+        11.301,
+        11.254,
+        11.659,
+        11.59,
+        12.096,
+        12.519,
+        11.616,
+        11.594,
+        12.115
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 11.53,
+      "metric": "version_time",
+      "n": 30,
+      "note": "spinup version, process wall time; n=30 after 1 warm-up discarded; load 1.91 -> 1.91",
+      "p90": 12.095,
+      "samples": [
+        11.414,
+        11.209,
+        11.123,
+        11.528,
+        11.522,
+        11.663,
+        11.213,
+        11.256,
+        11.331,
+        11.376,
+        11.881,
+        11.714,
+        11.532,
+        11.244,
+        11.733,
+        12.62,
+        13.32,
+        11.957,
+        11.478,
+        11.291,
+        12.985,
+        11.828,
+        11.708,
+        11.934,
+        11.204,
+        11.333,
+        11.567,
+        11.291,
+        12.095,
+        11.894
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 42.63,
+      "metric": "new_time",
+      "n": 10,
+      "note": "spinup new --api-only --modules ci,jobs,mail --no-git in an empty dir; n=10 after 1 warm-up discarded; load 1.91 -> 1.91",
+      "p90": 49.38,
+      "samples": [
+        49.38,
+        42.05,
+        42.602,
+        51.413,
+        43.059,
+        41.847,
+        42.635,
+        44.906,
+        40.829,
+        42.625
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 111.13,
+      "metric": "gen_one_resource_nodb_time",
+      "n": 10,
+      "note": "spinup g resource todo title:string done:bool due:date? priority:enum:low|normal|high --api-only in a new API-only app (the app is created before the timer); generation only: the .env files are hidden and DATABASE_URL is unset, so `g resource` skips its database post-steps; n=10 after 1 warm-up discarded; load 1.91 -> 1.91",
+      "p90": 115.52,
+      "samples": [
+        115.52,
+        114.044,
+        110.765,
+        110.682,
+        109.908,
+        113.313,
+        111.494,
+        116.498,
+        109.198,
+        109.28
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 3.705,
+      "metric": "gen_resources_nodb_time",
+      "n": 3,
+      "note": "spinup g resource --api-only for the 20 resources of scripts/perf/resources.txt, summed process time (the app is created before the timer); generation only: the .env files are hidden and DATABASE_URL is unset, so `g resource` skips its database post-steps; n=3 after 1 warm-up discarded; load 1.91 -> 2.82",
+      "p90": 3.709,
+      "samples": [
+        3.651,
+        3.705,
+        3.709
+      ],
+      "suite": "cli",
+      "unit": "s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 37.898,
+      "metric": "upgrade_noop_time",
+      "n": 10,
+      "note": "spinup upgrade --offline on a new git app with no template change; n=10 after 1 warm-up discarded; load 2.82 -> 2.82",
+      "p90": 40.963,
+      "samples": [
+        40.963,
+        41.174,
+        36.802,
+        39.871,
+        38.319,
+        37.31,
+        37.491,
+        37.48,
+        37.788,
+        38.009
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 325.823,
+      "metric": "db_migrate_time",
+      "n": 5,
+      "note": "spinup db migrate on the 20-resource API-only app, a new database for each sample. It runs `go run ./cmd/api migrate up`, so the link is included (the build cache is warm after the warm-up); n=5 after 1 warm-up discarded; load 2.82 -> 3.56",
+      "p90": 801.74,
+      "samples": [
+        801.74,
+        324.81,
+        325.823,
+        321.118,
+        336.367
+      ],
+      "suite": "cli",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 25.188,
+      "metric": "peak_rss_new",
+      "n": 5,
+      "note": "maximum resident set size of spinup new --api-only, /usr/bin/time (children included); n=5 after 1 warm-up discarded; load 3.56 -> 3.56",
+      "p90": 25.453,
+      "samples": [
+        25.188,
+        24.969,
+        25.453,
+        24.812,
+        25.359
+      ],
+      "suite": "cli",
+      "unit": "MiB",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 11.282,
+      "metric": "app_cold_build",
+      "n": 2,
+      "note": "go build -o <bin> ./cmd/api with a new empty GOCACHE (the standard library compiles too); the modules are already downloaded. No warm-up, because a warm-up is another cold build; n=2 after 0 warm-up discarded; load 3.91 -> 7.67",
+      "p90": 11.486,
+      "samples": [
+        11.078,
+        11.486
+      ],
+      "suite": "app",
+      "unit": "s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 1.227,
+      "metric": "app_incremental_build",
+      "n": 5,
+      "note": "go build after a one-string edit in api/internal/routes/perf_mark.go: the routes package compiles again, and the binary links again; n=5 after 1 warm-up discarded; load 4.36 -> 4.74",
+      "p90": 1.251,
+      "samples": [
+        1.213,
+        1.227,
+        1.251,
+        1.223,
+        1.235
+      ],
+      "suite": "app",
+      "unit": "s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 12.015,
+      "metric": "app_release_build_time",
+      "n": 1,
+      "note": "cold release build as the Dockerfile builds it: CGO_ENABLED=0 go build -trimpath -ldflags \"-s -w\" with a new GOCACHE. One sample: the binary is also the one of the runtime metrics; n=1 after 0 warm-up discarded; load 4.39 -> 5.63",
+      "p90": 12.015,
+      "samples": [
+        12.015
+      ],
+      "suite": "app",
+      "unit": "s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 28.332,
+      "metric": "app_release_binary_size",
+      "n": 1,
+      "note": "the binary of app_release_build_time (stripped, the host target)",
+      "p90": 28.332,
+      "samples": [
+        28.332
+      ],
+      "suite": "app",
+      "unit": "MB",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 11.894,
+      "metric": "app_start_to_healthz",
+      "n": 20,
+      "note": "release binary, SPINUP_ENV=production, a migrated database; spawn to the first 200 from /healthz, polled every 2 ms with a new connection; n=20 after 1 warm-up discarded; load 4.47 -> 4.47",
+      "p90": 14.142,
+      "samples": [
+        14.081,
+        11.627,
+        13.604,
+        11.907,
+        11.874,
+        11.542,
+        11.881,
+        14.186,
+        11.94,
+        13.825,
+        11.294,
+        14.461,
+        11.383,
+        13.209,
+        11.561,
+        11.643,
+        11.455,
+        11.907,
+        14.142,
+        11.154
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 77188.3,
+      "metric": "app_rps_healthz",
+      "n": 3,
+      "note": "GET /healthz. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample; n=3 after 1 warm-up discarded; load 4.47 -> 14.07",
+      "p90": 78092.2,
+      "samples": [
+        77188.3,
+        75718.9,
+        78092.2
+      ],
+      "suite": "app",
+      "unit": "req/s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 0.321,
+      "metric": "app_latency_p50_healthz",
+      "n": 3,
+      "note": "GET /healthz, 32 concurrent. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 0.332,
+      "samples": [
+        0.321,
+        0.332,
+        0.316
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 0.785,
+      "metric": "app_latency_p90_healthz",
+      "n": 3,
+      "note": "GET /healthz, 32 concurrent. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 0.791,
+      "samples": [
+        0.785,
+        0.791,
+        0.773
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 1.729,
+      "metric": "app_latency_p99_healthz",
+      "n": 3,
+      "note": "GET /healthz, 32 concurrent. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 1.735,
+      "samples": [
+        1.727,
+        1.735,
+        1.729
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 2.853,
+      "metric": "app_latency_p999_healthz",
+      "n": 3,
+      "note": "GET /healthz, 32 concurrent. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 2.999,
+      "samples": [
+        2.814,
+        2.999,
+        2.853
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 5395,
+      "metric": "app_rps_list",
+      "n": 3,
+      "note": "GET /api/notes?limit=50 with the session cookie of the perf user: one session lookup and a list of 50 rows as JSON (100 seeded rows of that user). scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 5431.1,
+      "samples": [
+        5431.1,
+        5395,
+        5020.6
+      ],
+      "suite": "app",
+      "unit": "req/s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 5.729,
+      "metric": "app_latency_p50_list",
+      "n": 3,
+      "note": "GET /api/notes?limit=50 with the session cookie of the perf user: one session lookup and a list of 50 rows as JSON (100 seeded rows of that user). scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 6.012,
+      "samples": [
+        5.678,
+        5.729,
+        6.012
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 7.277,
+      "metric": "app_latency_p90_list",
+      "n": 3,
+      "note": "GET /api/notes?limit=50 with the session cookie of the perf user: one session lookup and a list of 50 rows as JSON (100 seeded rows of that user). scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 8.082,
+      "samples": [
+        7.277,
+        7.251,
+        8.082
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 10.317,
+      "metric": "app_latency_p99_list",
+      "n": 3,
+      "note": "GET /api/notes?limit=50 with the session cookie of the perf user: one session lookup and a list of 50 rows as JSON (100 seeded rows of that user). scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 13.068,
+      "samples": [
+        10.159,
+        10.317,
+        13.068
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 24.16,
+      "metric": "app_latency_p999_list",
+      "n": 3,
+      "note": "GET /api/notes?limit=50 with the session cookie of the perf user: one session lookup and a list of 50 rows as JSON (100 seeded rows of that user). scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, the client runs on all cores of the same machine) against the release binary; one new server for each sample",
+      "p90": 24.81,
+      "samples": [
+        24.16,
+        24.81,
+        23.925
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 22.281,
+      "metric": "app_idle_rss",
+      "n": 3,
+      "note": "ps RSS 2 s after the first 200 from /healthz, before any load",
+      "p90": 22.375,
+      "samples": [
+        22.141,
+        22.281,
+        22.375
+      ],
+      "suite": "app",
+      "unit": "MiB",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 45.469,
+      "metric": "app_rss_after_load",
+      "n": 3,
+      "note": "ps RSS right after the two load runs (the Go runtime may keep freed pages). The server never ran a login, so the argon2id buffer is not in this number",
+      "p90": 47.188,
+      "samples": [
+        45.469,
+        45.016,
+        47.188
+      ],
+      "suite": "app",
+      "unit": "MiB",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 43.486,
+      "metric": "app_login_latency",
+      "n": 20,
+      "note": "POST /api/auth/login for the perf user, sequential, one keep-alive connection, the release binary (one argon2id check each; the loopback client is exempt from the rate limit); n=20 after 1 warm-up discarded; load 4.37 -> 4.37",
+      "p90": 45.306,
+      "samples": [
+        43.346,
+        45.025,
+        45.547,
+        44.171,
+        42.807,
+        42.728,
+        42.942,
+        42.358,
+        47.615,
+        44.428,
+        43.626,
+        41.737,
+        45.306,
+        42.303,
+        44.277,
+        43.199,
+        43.974,
+        41.664,
+        44.753,
+        42.251
+      ],
+      "suite": "app",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 5793856.5,
+      "metric": "internal/manifest BenchmarkLockReadValidateWrite ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 5904849.0,
+      "samples": [
+        5844164.0,
+        5791626.0,
+        5696501.0,
+        5796087.0,
+        5762408.0,
+        5904849.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 302443.0,
+      "metric": "internal/manifest BenchmarkLockReadValidateWrite B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 303765.0,
+      "samples": [
+        300837.0,
+        302379.0,
+        303765.0,
+        303241.0,
+        302507.0,
+        301380.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 2447.5,
+      "metric": "internal/manifest BenchmarkLockReadValidateWrite allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 2449.0,
+      "samples": [
+        2447.0,
+        2449.0,
+        2447.0,
+        2448.0,
+        2449.0,
+        2447.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 652916.5,
+      "metric": "internal/render BenchmarkRenderAPI ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 663140.0,
+      "samples": [
+        650978.0,
+        644691.0,
+        647054.0,
+        656807.0,
+        663140.0,
+        654855.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1144085.5,
+      "metric": "internal/render BenchmarkRenderAPI B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 1144504.0,
+      "samples": [
+        1144225.0,
+        1144504.0,
+        1144464.0,
+        1143946.0,
+        1143632.0,
+        1142977.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 5036.0,
+      "metric": "internal/render BenchmarkRenderAPI allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 5036.0,
+      "samples": [
+        5036.0,
+        5036.0,
+        5036.0,
+        5036.0,
+        5036.0,
+        5036.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 1584596.0,
+      "metric": "internal/vfs BenchmarkDiff40 ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 1600384.0,
+      "samples": [
+        1586508.0,
+        1582684.0,
+        1533861.0,
+        1594318.0,
+        1579023.0,
+        1600384.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 146387.0,
+      "metric": "internal/vfs BenchmarkDiff40 B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 146391.0,
+      "samples": [
+        146391.0,
+        144465.0,
+        146384.0,
+        146386.0,
+        146388.0,
+        146389.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1546.0,
+      "metric": "internal/vfs BenchmarkDiff40 allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 1546.0,
+      "samples": [
+        1546.0,
+        1546.0,
+        1546.0,
+        1546.0,
+        1546.0,
+        1546.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 27754980.0,
+      "metric": "internal/vfs BenchmarkApply40 ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 28226803.0,
+      "samples": [
+        27763271.0,
+        27642477.0,
+        27746689.0,
+        27824348.0,
+        28226803.0,
+        26793543.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1571057.5,
+      "metric": "internal/vfs BenchmarkApply40 B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 1571078.0,
+      "samples": [
+        1571043.0,
+        1571078.0,
+        1571072.0,
+        1571077.0,
+        1571016.0,
+        1570943.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 2452.0,
+      "metric": "internal/vfs BenchmarkApply40 allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 4.37 -> 3.51",
+      "p90": 2453.0,
+      "samples": [
+        2453.0,
+        2452.0,
+        2453.0,
+        2452.0,
+        2452.0,
+        2452.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 2844.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/generated ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 3254.0,
+      "samples": [
+        2834.0,
+        3254.0,
+        2854.0,
+        3023.0,
+        2800.0,
+        2831.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 2234.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/generated B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 2234.0,
+      "samples": [
+        2234.0,
+        2234.0,
+        2234.0,
+        2234.0,
+        2234.0,
+        2234.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 29.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/generated allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 29.0,
+      "samples": [
+        29.0,
+        29.0,
+        29.0,
+        29.0,
+        29.0,
+        29.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 2533.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/provided ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 2538.0,
+      "samples": [
+        2523.0,
+        2528.0,
+        2534.0,
+        2532.0,
+        2538.0,
+        2538.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 2202.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/provided B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 2202.0,
+      "samples": [
+        2202.0,
+        2202.0,
+        2202.0,
+        2202.0,
+        2202.0,
+        2202.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 28.0,
+      "metric": "kit/app BenchmarkMiddlewareChain/provided allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 28.0,
+      "samples": [
+        28.0,
+        28.0,
+        28.0,
+        28.0,
+        28.0,
+        28.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 32545.0,
+      "metric": "kit/app BenchmarkSPAAsset ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 32738.0,
+      "samples": [
+        32377.0,
+        32738.0,
+        32713.0,
+        32714.0,
+        31989.0,
+        32041.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 135378.5,
+      "metric": "kit/app BenchmarkSPAAsset B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 135381.0,
+      "samples": [
+        135380.0,
+        135381.0,
+        135378.0,
+        135376.0,
+        135379.0,
+        135376.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 52.0,
+      "metric": "kit/app BenchmarkSPAAsset allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 52.0,
+      "samples": [
+        52.0,
+        52.0,
+        52.0,
+        52.0,
+        52.0,
+        52.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 5269.0,
+      "metric": "kit/app BenchmarkSPAIndex ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 5280.0,
+      "samples": [
+        5277.0,
+        5264.0,
+        5246.0,
+        5274.0,
+        5251.0,
+        5280.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 4358.0,
+      "metric": "kit/app BenchmarkSPAIndex B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 4359.0,
+      "samples": [
+        4358.0,
+        4358.0,
+        4358.0,
+        4359.0,
+        4358.0,
+        4358.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 52.0,
+      "metric": "kit/app BenchmarkSPAIndex allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 52.0,
+      "samples": [
+        52.0,
+        52.0,
+        52.0,
+        52.0,
+        52.0,
+        52.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 22.495,
+      "metric": "kit/auth BenchmarkTake ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 22.7,
+      "samples": [
+        22.16,
+        22.61,
+        22.18,
+        22.4,
+        22.59,
+        22.7
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1.0,
+      "metric": "kit/auth BenchmarkTake B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1.0,
+      "samples": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/auth BenchmarkTake allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 834.1,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/DecodeJSON ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 837.6,
+      "samples": [
+        833.3,
+        830.0,
+        837.6,
+        834.9,
+        835.0,
+        832.8
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 329.695,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/DecodeJSON MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 331.31,
+      "samples": [
+        330.0,
+        331.31,
+        328.33,
+        329.39,
+        329.34,
+        330.2
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 112.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/DecodeJSON B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 112.0,
+      "samples": [
+        112.0,
+        112.0,
+        112.0,
+        112.0,
+        112.0,
+        112.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 3.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/DecodeJSON allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 3.0,
+      "samples": [
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 780.65,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalRead ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 783.4,
+      "samples": [
+        773.8,
+        775.0,
+        779.5,
+        782.8,
+        781.8,
+        783.4
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 352.275,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalRead MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 355.41,
+      "samples": [
+        355.41,
+        354.83,
+        352.78,
+        351.3,
+        351.77,
+        351.05
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 112.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalRead B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 112.0,
+      "samples": [
+        112.0,
+        112.0,
+        112.0,
+        112.0,
+        112.0,
+        112.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 3.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalRead allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 3.0,
+      "samples": [
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 1417.5,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalDecode ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1480.0,
+      "samples": [
+        1480.0,
+        1462.0,
+        1414.0,
+        1413.0,
+        1404.0,
+        1421.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 194.04,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalDecode MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 195.89,
+      "samples": [
+        185.86,
+        188.1,
+        194.52,
+        194.58,
+        195.89,
+        193.56
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 6080.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalDecode B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 6080.0,
+      "samples": [
+        6080.0,
+        6080.0,
+        6080.0,
+        6080.0,
+        6080.0,
+        6080.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 14.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/UnmarshalDecode allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 14.0,
+      "samples": [
+        14.0,
+        14.0,
+        14.0,
+        14.0,
+        14.0,
+        14.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 1510.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/V1 ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1514.0,
+      "samples": [
+        1497.0,
+        1514.0,
+        1513.0,
+        1501.0,
+        1512.0,
+        1508.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 182.085,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/V1 MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 183.65,
+      "samples": [
+        183.65,
+        181.64,
+        181.8,
+        183.22,
+        181.86,
+        182.31
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1578.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/V1 B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1578.0,
+      "samples": [
+        1578.0,
+        1578.0,
+        1578.0,
+        1578.0,
+        1578.0,
+        1578.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 12.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/Resource/V1 allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 12.0,
+      "samples": [
+        12.0,
+        12.0,
+        12.0,
+        12.0,
+        12.0,
+        12.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 49404.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/DecodeJSON ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 49673.0,
+      "samples": [
+        49220.0,
+        49252.0,
+        49349.0,
+        49626.0,
+        49459.0,
+        49673.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 1326.545,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/DecodeJSON MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1331.5,
+      "samples": [
+        1331.5,
+        1330.62,
+        1328.02,
+        1320.58,
+        1325.07,
+        1319.34
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 65736.5,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/DecodeJSON B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 65764.0,
+      "samples": [
+        65764.0,
+        65753.0,
+        65736.0,
+        65736.0,
+        65731.0,
+        65737.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 4.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/DecodeJSON allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 4.0,
+      "samples": [
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 49289.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalRead ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 49951.0,
+      "samples": [
+        49296.0,
+        49215.0,
+        49282.0,
+        49202.0,
+        49353.0,
+        49951.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 1329.63,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalRead MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1331.99,
+      "samples": [
+        1329.43,
+        1331.64,
+        1329.83,
+        1331.99,
+        1327.91,
+        1312.01
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 65747.5,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalRead B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 65764.0,
+      "samples": [
+        65713.0,
+        65748.0,
+        65736.0,
+        65764.0,
+        65747.0,
+        65764.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 4.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalRead allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 4.0,
+      "samples": [
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 62702.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalDecode ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 65743.0,
+      "samples": [
+        65743.0,
+        65109.0,
+        62619.0,
+        62785.0,
+        62244.0,
+        62463.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 1045.2,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalDecode MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1052.89,
+      "samples": [
+        996.85,
+        1006.56,
+        1046.58,
+        1043.82,
+        1052.89,
+        1049.2
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 201952.5,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalDecode B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 201953.0,
+      "samples": [
+        201952.0,
+        201953.0,
+        201953.0,
+        201953.0,
+        201952.0,
+        201952.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 22.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/UnmarshalDecode allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 22.0,
+      "samples": [
+        22.0,
+        22.0,
+        22.0,
+        22.0,
+        22.0,
+        22.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 143253.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/V1 ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 145672.0,
+      "samples": [
+        145672.0,
+        143631.0,
+        141376.0,
+        142875.0,
+        141104.0,
+        143683.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 457.485,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/V1 MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 464.45,
+      "samples": [
+        449.89,
+        456.28,
+        463.56,
+        458.69,
+        464.45,
+        456.11
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 197343.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/V1 B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 197362.0,
+      "samples": [
+        197362.0,
+        197337.0,
+        197343.0,
+        197330.0,
+        197343.0,
+        197356.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 20.0,
+      "metric": "kit/httpx BenchmarkDecodeJSON/64KiB/V1 allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 20.0,
+      "samples": [
+        20.0,
+        20.0,
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 988.85,
+      "metric": "kit/httpx BenchmarkCheckJSONBody ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1007.0,
+      "samples": [
+        994.3,
+        988.8,
+        985.2,
+        986.1,
+        988.9,
+        1007.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 278.11,
+      "metric": "kit/httpx BenchmarkCheckJSONBody MB/s",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 279.13,
+      "samples": [
+        276.58,
+        278.13,
+        279.13,
+        278.87,
+        278.09,
+        273.12
+      ],
+      "suite": "micro",
+      "unit": "MB/s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1000.0,
+      "metric": "kit/httpx BenchmarkCheckJSONBody B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1000.0,
+      "samples": [
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 9.0,
+      "metric": "kit/httpx BenchmarkCheckJSONBody allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 9.0,
+      "samples": [
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+        9.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 691.55,
+      "metric": "kit/httpx BenchmarkWriteJSON ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 696.9,
+      "samples": [
+        696.9,
+        694.5,
+        691.1,
+        688.5,
+        690.2,
+        692.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 1400.0,
+      "metric": "kit/httpx BenchmarkWriteJSON B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1400.0,
+      "samples": [
+        1400.0,
+        1400.0,
+        1400.0,
+        1400.0,
+        1400.0,
+        1400.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 15.0,
+      "metric": "kit/httpx BenchmarkWriteJSON allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 15.0,
+      "samples": [
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 1330.5,
+      "metric": "kit/logx BenchmarkAccessLine/Plain ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 1354.0,
+      "samples": [
+        1330.0,
+        1327.0,
+        1332.0,
+        1326.0,
+        1354.0,
+        1331.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 144.0,
+      "metric": "kit/logx BenchmarkAccessLine/Plain B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 144.0,
+      "samples": [
+        144.0,
+        144.0,
+        144.0,
+        144.0,
+        144.0,
+        144.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 4.0,
+      "metric": "kit/logx BenchmarkAccessLine/Plain allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 4.0,
+      "samples": [
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 3011.0,
+      "metric": "kit/logx BenchmarkAccessLine/URL ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 3039.0,
+      "samples": [
+        3006.0,
+        3015.0,
+        3015.0,
+        3007.0,
+        3039.0,
+        3006.0
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 322.5,
+      "metric": "kit/logx BenchmarkAccessLine/URL B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 323.0,
+      "samples": [
+        322.0,
+        323.0,
+        322.0,
+        322.0,
+        323.0,
+        323.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 10.0,
+      "metric": "kit/logx BenchmarkAccessLine/URL allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 10.0,
+      "samples": [
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 53.375,
+      "metric": "kit/x/flags BenchmarkResolve ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 53.96,
+      "samples": [
+        53.4,
+        53.35,
+        53.28,
+        53.26,
+        53.44,
+        53.96
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkResolve B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkResolve allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 62.615,
+      "metric": "kit/x/flags BenchmarkEnabled/no_override ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 63.36,
+      "samples": [
+        62.69,
+        62.87,
+        63.36,
+        62.41,
+        62.32,
+        62.54
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkEnabled/no_override B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkEnabled/no_override allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 71.77,
+      "metric": "kit/x/flags BenchmarkEnabled/override_table_active ns/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 72.05,
+      "samples": [
+        71.7,
+        72.05,
+        71.82,
+        71.99,
+        71.72,
+        71.52
+      ],
+      "suite": "micro",
+      "unit": "ns/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkEnabled/override_table_active B/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "B/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 0.0,
+      "metric": "kit/x/flags BenchmarkEnabled/override_table_active allocs/op",
+      "n": 6,
+      "note": "go test -bench -benchmem -count 6 -benchtime 1s; one sample per count; load 3.51 -> 2.79",
+      "p90": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "suite": "micro",
+      "unit": "allocs/op",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 578548,
+      "metric": "web_bundle_raw_bytes",
+      "n": 1,
+      "note": "scripts/perf/bundle.py measure: 37 .js and .css files under _app/immutable of the client build; the .br and .gz siblings are summed apart. Largest: _app/immutable/chunks/C8bpp1C7.js 78299, _app/immutable/chunks/JEReDw98.js 70826, _app/immutable/chunks/e3S_5ZKy.js 67927, _app/immutable/assets/0.C2KZFVXq.css 67804, _app/immutable/chunks/Dcw88NNN.js 53718",
+      "p90": 578548,
+      "samples": [
+        578548
+      ],
+      "suite": "web",
+      "unit": "B",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 158359,
+      "metric": "web_bundle_br_bytes",
+      "n": 1,
+      "note": "scripts/perf/bundle.py measure: 37 .js and .css files under _app/immutable of the client build; the .br and .gz siblings are summed apart. Largest: _app/immutable/chunks/C8bpp1C7.js 78299, _app/immutable/chunks/JEReDw98.js 70826, _app/immutable/chunks/e3S_5ZKy.js 67927, _app/immutable/assets/0.C2KZFVXq.css 67804, _app/immutable/chunks/Dcw88NNN.js 53718",
+      "p90": 158359,
+      "samples": [
+        158359
+      ],
+      "suite": "web",
+      "unit": "B",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 183625,
+      "metric": "web_bundle_gz_bytes",
+      "n": 1,
+      "note": "scripts/perf/bundle.py measure: 37 .js and .css files under _app/immutable of the client build; the .br and .gz siblings are summed apart. Largest: _app/immutable/chunks/C8bpp1C7.js 78299, _app/immutable/chunks/JEReDw98.js 70826, _app/immutable/chunks/e3S_5ZKy.js 67927, _app/immutable/assets/0.C2KZFVXq.css 67804, _app/immutable/chunks/Dcw88NNN.js 53718",
+      "p90": 183625,
+      "samples": [
+        183625
+      ],
+      "suite": "web",
+      "unit": "B",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 101034,
+      "metric": "web_first_load_br_bytes_login",
+      "n": 1,
+      "note": "the brotli bytes of the 21 modulepreload and script targets of the anonymous GET /login (the plain size when a file has no .br sibling); CSS not counted",
+      "p90": 101034,
+      "samples": [
+        101034
+      ],
+      "suite": "web",
+      "unit": "B",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 4.515,
+      "metric": "web_build_time",
+      "n": 3,
+      "note": "pnpm build (vite build with adapter-node and precompress) of the generated app after the setup build, with the packages installed; n=3 after 0 warm-up discarded; load 2.59 -> 2.38",
+      "p90": 4.526,
+      "samples": [
+        4.515,
+        4.526,
+        4.395
+      ],
+      "suite": "web",
+      "unit": "s",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 223.383,
+      "metric": "web_start_to_healthz",
+      "n": 10,
+      "note": "node --import <instrumentation> build (the start command of Dockerfile.web), NODE_ENV=production; spawn to the first 200 from /healthz, polled every 5 ms with a new connection; n=10 after 1 warm-up discarded; load 2.38 -> 2.38",
+      "p90": 244.658,
+      "samples": [
+        222.691,
+        222.718,
+        222.382,
+        222.643,
+        228.425,
+        220.399,
+        244.658,
+        228.853,
+        263.73,
+        224.049
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 823.5,
+      "metric": "web_ssr_rps_page",
+      "n": 3,
+      "note": "GET /notes with the session cookie: SSR of the list page (20 of 100 seeded notes), one /api/session and one /api/notes call to the Go API. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine; n=3 after 1 warm-up discarded; load 2.38 -> 4.1",
+      "p90": 838.9,
+      "samples": [
+        750.7,
+        838.9,
+        823.5
+      ],
+      "suite": "web",
+      "unit": "req/s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 4986.9,
+      "metric": "web_ssr_rps_login",
+      "n": 3,
+      "note": "anonymous GET /login: SSR of the sign-in page, no API call. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 5180.3,
+      "samples": [
+        4525.9,
+        4986.9,
+        5180.3
+      ],
+      "suite": "web",
+      "unit": "req/s",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 38.417,
+      "metric": "web_latency_p50_page",
+      "n": 3,
+      "note": "GET /notes with the session cookie: SSR of the list page (20 of 100 seeded notes), one /api/session and one /api/notes call to the Go API. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 42.109,
+      "samples": [
+        42.109,
+        37.567,
+        38.417
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 5.904,
+      "metric": "web_latency_p50_login",
+      "n": 3,
+      "note": "anonymous GET /login: SSR of the sign-in page, no API call. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 6.379,
+      "samples": [
+        6.379,
+        5.904,
+        5.726
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 48.594,
+      "metric": "web_latency_p90_page",
+      "n": 3,
+      "note": "GET /notes with the session cookie: SSR of the list page (20 of 100 seeded notes), one /api/session and one /api/notes call to the Go API. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 53.65,
+      "samples": [
+        53.65,
+        48.04,
+        48.594
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 8.433,
+      "metric": "web_latency_p90_login",
+      "n": 3,
+      "note": "anonymous GET /login: SSR of the sign-in page, no API call. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 10.399,
+      "samples": [
+        10.399,
+        8.433,
+        8.115
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 60.884,
+      "metric": "web_latency_p99_page",
+      "n": 3,
+      "note": "GET /notes with the session cookie: SSR of the list page (20 of 100 seeded notes), one /api/session and one /api/notes call to the Go API. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 67.213,
+      "samples": [
+        67.213,
+        60.404,
+        60.884
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 12.321,
+      "metric": "web_latency_p99_login",
+      "n": 3,
+      "note": "anonymous GET /login: SSR of the sign-in page, no API call. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 12.711,
+      "samples": [
+        12.711,
+        12.321,
+        11.746
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 76.338,
+      "metric": "web_latency_p999_page",
+      "n": 3,
+      "note": "GET /notes with the session cookie: SSR of the list page (20 of 100 seeded notes), one /api/session and one /api/notes call to the Go API. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 83.997,
+      "samples": [
+        76.338,
+        71.389,
+        83.997
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "the same load run as the req/s metric; latency percentiles are noisy on a shared machine",
+      "median": 18.43,
+      "metric": "web_latency_p999_login",
+      "n": 3,
+      "note": "anonymous GET /login: SSR of the sign-in page, no API call. scripts/perf/loadgen -c 32 -d 5s -warmup 1s (keep-alive, no compression, the client runs on the same machine) against one Node process; one new Node server for each sample; the API runs on the same machine",
+      "p90": 20.988,
+      "samples": [
+        20.988,
+        18.43,
+        15.724
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "informational",
+      "informational": true,
+      "informational_reason": "one connection, sequential requests; time to first byte is noisy on a shared machine",
+      "median": 4.066,
+      "metric": "web_ttfb_page",
+      "n": 3,
+      "note": "p50 time to first byte of GET /notes with loadgen -c 1 -d 5s after the RSS reading",
+      "p90": 4.281,
+      "samples": [
+        4.281,
+        3.871,
+        4.066
+      ],
+      "suite": "web",
+      "unit": "ms",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 79.031,
+      "metric": "web_idle_rss",
+      "n": 3,
+      "note": "ps RSS of the Node process 2 s after the first 200 from /healthz, before any load",
+      "p90": 79.234,
+      "samples": [
+        79.031,
+        79.234,
+        79.016
+      ],
+      "suite": "web",
+      "unit": "MiB",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "primary",
+      "informational": false,
+      "median": 516.438,
+      "metric": "web_rss_after_load",
+      "n": 3,
+      "note": "ps RSS of the Node process right after the page and the sign-in load runs",
+      "p90": 519.156,
+      "samples": [
+        516.438,
+        519.156,
+        472.5
+      ],
+      "suite": "web",
+      "unit": "MiB",
+      "warmup_discarded": 1
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 2.0,
+      "metric": "web_api_requests_per_page",
+      "n": 1,
+      "note": "API access-log records (200) for each signed-in GET /notes (100) of a page load run with loadgen -n 100 -c 4 and no warm-up",
+      "p90": 2.0,
+      "samples": [
+        2.0
+      ],
+      "suite": "web",
+      "unit": "req",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "lower",
+      "class": "deterministic",
+      "informational": false,
+      "median": 35110130,
+      "metric": "embed_binary_size",
+      "n": 1,
+      "note": "api/bin/api of spinup build in an embed app (modules ci; go build -tags embedweb -trimpath, not stripped) with the precompressed web files inside",
+      "p90": 35110130,
+      "samples": [
+        35110130
+      ],
+      "suite": "web",
+      "unit": "B",
+      "warmup_discarded": 0
+    },
+    {
+      "better": "higher",
+      "class": "primary",
+      "informational": false,
+      "median": 53618.3,
+      "metric": "embed_index_rps",
+      "n": 3,
+      "note": "GET / with Accept-Encoding: br, gzip against the embed binary (SPINUP_ENV=production, LOG_LEVEL=info): index.html.br from the embedded file index. loadgen -c 32 -d 5s -warmup 1s; one server for all samples; n=3 after 1 warm-up discarded; load 3.62 -> 6.46",
+      "p90": 53908.9,
+      "samples": [
+        53908.9,
+        52586.5,
+        53618.3
+      ],
+      "suite": "web",
+      "unit": "req/s",
+      "warmup_discarded": 1
+    }
+  ],
+  "suites": {
+    "app": {
+      "duration_s": 290.7,
+      "load1_after": 4.37,
+      "load1_before": 3.56,
+      "uptime_after": "22:54  up 5 days,  3:32, 5 users, load averages: 4.37 5.58 5.66",
+      "uptime_before": "22:49  up 5 days,  3:27, 5 users, load averages: 3.56 3.49 5.07"
+    },
+    "cli": {
+      "duration_s": 27.9,
+      "load1_after": 3.56,
+      "load1_before": 1.91,
+      "uptime_after": "22:49  up 5 days,  3:27, 5 users, load averages: 3.56 3.49 5.07",
+      "uptime_before": "22:48  up 5 days,  3:27, 5 users, load averages: 1.91 3.24 5.03"
+    },
+    "micro": {
+      "duration_s": 177.6,
+      "load1_after": 2.79,
+      "load1_before": 4.37,
+      "packages": {
+        ".": [
+          "./internal/manifest",
+          "./internal/render",
+          "./internal/vfs"
+        ],
+        "kit": [
+          "./app",
+          "./auth",
+          "./httpx",
+          "./logx",
+          "./x/flags"
+        ]
+      },
+      "uptime_after": "22:57  up 5 days,  3:35, 5 users, load averages: 2.79 4.60 5.24",
+      "uptime_before": "22:54  up 5 days,  3:32, 5 users, load averages: 4.37 5.58 5.66"
+    },
+    "web": {
+      "bundle": {
+        "br_bytes": 158359,
+        "files": 37,
+        "gz_bytes": 183625,
+        "largest": [
+          {
+            "br_bytes": 19983,
+            "file": "_app/immutable/chunks/C8bpp1C7.js",
+            "gz_bytes": 22320,
+            "raw_bytes": 78299
+          },
+          {
+            "br_bytes": 14048,
+            "file": "_app/immutable/chunks/JEReDw98.js",
+            "gz_bytes": 21785,
+            "raw_bytes": 70826
+          },
+          {
+            "br_bytes": 18193,
+            "file": "_app/immutable/chunks/e3S_5ZKy.js",
+            "gz_bytes": 20526,
+            "raw_bytes": 67927
+          },
+          {
+            "br_bytes": 10719,
+            "file": "_app/immutable/assets/0.C2KZFVXq.css",
+            "gz_bytes": 12251,
+            "raw_bytes": 67804
+          },
+          {
+            "br_bytes": 18365,
+            "file": "_app/immutable/chunks/Dcw88NNN.js",
+            "gz_bytes": 20258,
+            "raw_bytes": 53718
+          }
+        ],
+        "raw_bytes": 578548
+      },
+      "duration_s": 147.8,
+      "load1_after": 6.46,
+      "load1_before": 2.79,
+      "node": "v24.22.2",
+      "uptime_after": "22:59  up 5 days,  3:37, 5 users, load averages: 6.46 4.95 5.25",
+      "uptime_before": "22:57  up 5 days,  3:35, 5 users, load averages: 2.79 4.60 5.24"
+    }
+  }
+}
