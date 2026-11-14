@@ -1,2 +1,2 @@
 | Change the plans or quotas of API keys. Edit `[apikeys]` in `spinup.toml` first. | `spinup g apikeys` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |
-| Create an API key | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |
+| Create an API key. The owner runs this command, because it prints the secret token. Do not run it yourself. | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |

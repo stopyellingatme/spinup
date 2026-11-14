@@ -154,7 +154,7 @@ func llmsFrontMatter(data string) (map[string]string, string) {
 func llmsDescription(body string) string {
 	lines := strings.Split(body, "\n")
 	foundH1 := false
-	inCodeFence := false
+	fence := ""
 	for index := 0; index < len(lines); {
 		line := strings.TrimSpace(lines[index])
 		if !foundH1 {
@@ -164,12 +164,15 @@ func llmsDescription(body string) string {
 			index++
 			continue
 		}
-		if strings.HasPrefix(line, "```") {
-			inCodeFence = !inCodeFence
+		if fence != "" {
+			if llmsClosesFence(line, fence) {
+				fence = ""
+			}
 			index++
 			continue
 		}
-		if inCodeFence {
+		if open := llmsFenceRun(line); open != "" {
+			fence = open
 			index++
 			continue
 		}
@@ -186,8 +189,28 @@ func llmsDescription(body string) string {
 	return ""
 }
 
+// llmsFenceRun returns the run of backticks or tildes that opens a code fence, or "".
+// A fence has at least three of the same character.
+func llmsFenceRun(line string) string {
+	if line == "" || (line[0] != '`' && line[0] != '~') {
+		return ""
+	}
+	run := len(line) - len(strings.TrimLeft(line, line[:1]))
+	if run < 3 {
+		return ""
+	}
+	return line[:run]
+}
+
+// llmsClosesFence reports whether line closes the code fence that open started.
+// The closing run uses the same character, is at least as long, and has no other text.
+func llmsClosesFence(line, open string) bool {
+	run := llmsFenceRun(line)
+	return run != "" && run[0] == open[0] && len(run) >= len(open) && strings.TrimSpace(line[len(run):]) == ""
+}
+
 func llmsProse(line string) bool {
-	if line == "" || strings.HasPrefix(line, "```") || strings.HasPrefix(line, "|") || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "<") || strings.HasPrefix(line, "{:") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, "*") || strings.HasPrefix(line, ">") {
+	if line == "" || llmsFenceRun(line) != "" || strings.HasPrefix(line, "|") || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "<") || strings.HasPrefix(line, "{:") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, "*") || strings.HasPrefix(line, ">") {
 		return false
 	}
 	for index, runeValue := range line {

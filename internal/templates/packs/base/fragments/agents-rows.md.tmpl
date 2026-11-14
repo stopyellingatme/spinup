@@ -2,7 +2,7 @@
 | Run the API tests | `spinup test` | [Test your app]([[ docurl "build/testing.md" ]]) |
 | Find edits of managed files | `spinup check` | [check]([[ docurl "commands/check.md" ]]) |
 | See how a file differs from its template | `spinup diff <path>` | [diff]([[ docurl "commands/diff.md" ]]) |
-| Undo your edit of a managed file | `spinup restore <path>` | [restore]([[ docurl "commands/restore.md" ]]) |
+| Undo your edit of a managed file. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. | `spinup restore <path> --force` | [restore]([[ docurl "commands/restore.md" ]]) |
 | Keep your edit of a managed file | `spinup eject <path>` | [eject]([[ docurl "commands/eject.md" ]]) |
 | List the modules, or add one | `spinup module list`, then `spinup module add <name>` | [module]([[ docurl "commands/module.md" ]]) |
 | Check the health of the app | `spinup doctor --json` | [Doctor checks]([[ docurl "reference/doctor-checks.md" ]]) |

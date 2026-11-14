@@ -114,7 +114,7 @@ docurl(path string) (string, error)
 4.2. `fragments` rules:
 
 - `name` must match `^[a-z][a-z0-9-]*$`. Other names are an error.
-- For each pack of `Input.Packs`, it reads `fragments/<name>.md.tmpl` from `Pack.FS`. A pack without this file adds nothing and causes no error. A name that no pack has returns an empty string.
+- For each built-in pack of `Input.Packs`, it reads `fragments/<name>.md.tmpl` from `Pack.FS`. A built-in pack is a pack of `templates.Embedded()`. A pack without this file adds nothing and causes no error. A name that no pack has returns an empty string.
 - It runs the file as a template with the data and the functions of the render, but without `fragments`. A call of `fragments` inside a fragment is an error ("function not defined").
 - The order of the packs is fixed and does not depend on `Input.Packs`: `base`, `api`, `web`, then the other packs sorted by name. Rows keep the order of their file.
 - It checks each non-blank line of the result. The line must be a Markdown table row with exactly three non-empty cells, written `| a | b | c |`. A cell has no `|`. Other lines are an error. The error says the pack, the line number, and ends with a `Try:` line.
@@ -123,7 +123,7 @@ docurl(path string) (string, error)
 
 4.3. `docurl` rules: `path` matches `^[a-z0-9][a-z0-9/_-]*\.(md|txt)$` and has no `..`. The result is `https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/` plus `path`. The constant is `render.DocsBase`. The raw Markdown is clean text for an agent. A site page is HTML.
 4.4. Both functions are pure. They use no clock, no random value, and no map order. Output is the same for the same packs, answers, and template version.
-4.5. Plugin packs add no rows. A plugin renders in a pass after the main render (`internal/gen/newapp/plugins.go`), so the base pack never sees its fragment.
+4.5. Plugin packs add no rows. `fragments` reads only built-in packs, so it never reads a plugin fragment file, and a bad plugin fragment cannot stop a render. A plugin pack name never equals a built-in name, because the plugin overlay refuses such a name. `TestFragmentsIgnorePluginPacks` proves this.
 
 ### 5. Fragment files
 
@@ -153,15 +153,19 @@ The index of the spinup docs is [[ docurl "llms.txt" ]].
 3. Do not edit tool output. Edit its source, then run the command in the section "Tool output".
 4. Do not edit a migration after the app applied it. Run `spinup g migration <snake_name>` and write a new migration.
 5. Pass `--json --non-interactive` to each `spinup` command that you run. Add `--dry-run` to a generator to see its files first.
-6. Do not read, print, or commit a secret. Do not open `.env`, `.env.*`, `secrets/`, or `*.agekey`.
-7. Do not change a server or a production database unless the owner asks for it in this task. This includes `spinup deploy`, `spinup rollback`, `spinup infra apply`, `spinup backup restore`, `spinup maintenance`, `spinup secrets push`, and `spinup db migrate down`.
+6. Do not read, print, or commit a secret. Do not open `.env`, `.env.*`, `secrets/`, or `*.agekey`. Do not run `spinup secrets get` or `spinup secrets edit`.
+7. Do not change a server, delete data, or replace a key unless the owner asks for it in this task. These commands need the request of the owner:
+   - Servers: `spinup deploy` (except with `--plan` or `status`), `spinup deploy unlock`, `spinup deploy digital-ocean`, `spinup rollback`, `spinup releases prune`, `spinup infra apply`, `spinup infra destroy`, `spinup server bootstrap`, `spinup server ssh`, `spinup maintenance`, `spinup monitor silence`, and `spinup monitor test-alert`.
+   - Backups: `spinup backup now`, `spinup backup prune`, `spinup backup restore`, `spinup backup schedule`, and `spinup backup verify`.
+   - Secrets and keys: `spinup secrets push`, `spinup secrets rotate`, and `spinup secrets rekey`.
+   - Databases: `spinup db migrate down`, `spinup db to`, `spinup db redo`, `spinup db reset`, and `spinup db restore`.
 8. When a command fails, read its `Try:` line. It names the fix. Do not run the same command again without a change.
 
 ## File classes
 
 | Class | Owner | What `spinup upgrade` does |
 | --- | --- | --- |
-| `managed` | spinup | It rewrites the file. `spinup check` fails when you edit it. |
+| `managed` | spinup | It writes the new template. If you edited the file, it merges your edit or reports a conflict. It keeps a file that a generator wrote last. `spinup check` fails when you edit it. |
 | `scaffold` | You | It merges the template changes into your file. |
 | `seed` | You | It never changes the file. |
 
@@ -171,15 +175,18 @@ The index of the spinup docs is [[ docurl "llms.txt" ]].
 
 | Output | Source | Command |
 | --- | --- | --- |
-| `api/openapi/bundle.gen.yaml` and `api/internal/gen/` | The files in `api/openapi/` | `spinup g openapi` |
+| `api/openapi/bundle.gen.yaml` and `api/internal/gen/api.gen.go` | The files in `api/openapi/` | `spinup g openapi` |
 | `api/internal/store/` | `api/db/queries/*.sql` and `api/db/migrations/` | `spinup db sqlc` |
-| `web/src/lib/api/` (web app only) | The files in `api/openapi/` | `spinup g client` |
+| `web/src/lib/api/schema.d.ts` (web app only) | The files in `api/openapi/` | `spinup g openapi`, then `spinup g client` |
+| `web/src/lib/api/client/` (heyapi client only) | The files in `api/openapi/` | `spinup g openapi`, then `spinup g client` |
 
-Each other file with `.gen.` or `_gen.` in its name is a managed file. To undo an edit of it, run `spinup restore <path>`.
+`web/src/lib/api/client.ts` is not tool output. You can edit it.
+
+A generator writes each other file with `.gen.` or `_gen.` in its name, for example `routes_gen.go` and `nav.gen.ts`. Do not run `spinup restore` on such a file. It writes the empty pack version and removes the generated code. To undo your edit of such a file, run `git checkout -- <path>`. If a generator builds the file from `spinup.toml`, you can run that generator again, for example `spinup g roles`.
 
 ## Decision table
 
-Find the row that matches your task. Run its command. Read the page when the command is not enough.
+Find the row that matches your task. Run its command. Read the page when the command is not enough. If the row says that the owner runs the command, or says "Ask the owner first", do not run the command before the owner agrees.
 
 | You need | Run | Read |
 | --- | --- | --- |
@@ -192,7 +199,7 @@ Do each step. Do not report the task as done until each step passes.
 1. Run `spinup test`.
 2. [[ with index . "package_manager" ]]If you changed `web/`, run `cd web && [[ . ]] run check` and `cd web && [[ . ]] run test`.[[ else ]]Skip this step. This app has no web app.[[ end ]]
 3. If you changed a file in `api/db/migrations/`, run `spinup db lint`.
-4. Run `spinup check`. If it reports a managed file, run `spinup restore <path>`, or ask the owner.
+4. Run `spinup check`. If it reports a managed file that you edited, undo your edit. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. For another file, run `spinup restore <path> --force`. If you are not sure, ask the owner.
 5. Run `spinup doctor --json`. Fix each `fail` and each `warn` that names a file of this app. Report each other `fail` to the owner.
 6. Tell the owner each command that you ran and its result.
 ```
@@ -251,7 +258,7 @@ Do not use it for other projects.
 2. Find the row of the decision table in `AGENTS.md` that matches the task. Run its command. For a generator, add `--dry-run` first.
 3. Do not edit managed files, tool output, or applied migrations. `AGENTS.md` says how to change them.
 4. Pass `--json --non-interactive` to each `spinup` command.
-5. Do not run a command that changes a server unless the owner asks for it.
+5. Do not run a command that changes a server, deletes data, or replaces a key unless the owner asks for it. Rule 7 of `AGENTS.md` lists these commands.
 
 ## Finish
 
@@ -269,7 +276,7 @@ Run the finish checklist at the end of `AGENTS.md`. Report each command that you
 | Run the API tests | `spinup test` | [Test your app]([[ docurl "build/testing.md" ]]) |
 | Find edits of managed files | `spinup check` | [check]([[ docurl "commands/check.md" ]]) |
 | See how a file differs from its template | `spinup diff <path>` | [diff]([[ docurl "commands/diff.md" ]]) |
-| Undo your edit of a managed file | `spinup restore <path>` | [restore]([[ docurl "commands/restore.md" ]]) |
+| Undo your edit of a managed file. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. | `spinup restore <path> --force` | [restore]([[ docurl "commands/restore.md" ]]) |
 | Keep your edit of a managed file | `spinup eject <path>` | [eject]([[ docurl "commands/eject.md" ]]) |
 | List the modules, or add one | `spinup module list`, then `spinup module add <name>` | [module]([[ docurl "commands/module.md" ]]) |
 | Check the health of the app | `spinup doctor --json` | [Doctor checks]([[ docurl "reference/doctor-checks.md" ]]) |
@@ -337,14 +344,15 @@ Run the finish checklist at the end of `AGENTS.md`. Report each command that you
 
 ```text
 | Add or change a feature flag. Edit `[flags]` in `spinup.toml` first. | `spinup g flags` | [Feature flags]([[ docurl "build/flags.md" ]]) |
-| Turn a flag on or off while the app runs | `cd api && go run ./cmd/api flags enable <key>` | [Feature flags]([[ docurl "build/flags.md" ]]) |
+| Turn a flag on while the app runs | `cd api && go run ./cmd/api flags enable <key>` | [Feature flags]([[ docurl "build/flags.md" ]]) |
+| Turn a flag off while the app runs | `cd api && go run ./cmd/api flags disable <key>` | [Feature flags]([[ docurl "build/flags.md" ]]) |
 ```
 
 `apikeys`:
 
 ```text
 | Change the plans or quotas of API keys. Edit `[apikeys]` in `spinup.toml` first. | `spinup g apikeys` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |
-| Create an API key | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |
+| Create an API key. The owner runs this command, because it prints the secret token. Do not run it yourself. | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans]([[ docurl "build/api-keys.md" ]]) |
 ```
 
 `mcp`:
@@ -389,7 +397,7 @@ Run the finish checklist at the end of `AGENTS.md`. Report each command that you
 
 ```text
 | List the backups | `spinup backup list --env <env>` | [backup]([[ docurl "commands/backup.md" ]]) |
-| Check that a backup restores | `spinup backup verify --env <env>` | [backup]([[ docurl "commands/backup.md" ]]) |
+| Check that a backup restores. It runs on the server. Ask the owner first. | `spinup backup verify --env <env>` | [backup]([[ docurl "commands/backup.md" ]]) |
 ```
 
 `secrets`:
@@ -414,7 +422,7 @@ Run the finish checklist at the end of `AGENTS.md`. Report each command that you
 ```
 
 8.2. The generator of each of the 20 kinds has a row: `resource`, `model`, `handler`, `migration`, `openapi`, and `service` in `api`. `page`, `component`, and `client` in `web`. `roles` in `auth`. `job` in `jobs`. `mailer` in `mail`. `audit` in `audit`. `flags` in `flags`. `apikeys` in `apikeys`. `mcp` in `mcp`. `billing` in `billing`. `live` in `live`. `dashboard` and `alert` in `monitoring`.
-8.3. A row that tells an agent to change a server says "Ask the owner first". This repeats rule 7.
+8.3. A row that tells an agent to change a server says "Ask the owner first". This repeats rule 7. A row whose command prints a secret says that the owner runs the command. `TestAgentGuidanceOwnerCommands` checks both.
 
 ### 9. Tests
 
@@ -444,7 +452,7 @@ Run the finish checklist at the end of `AGENTS.md`. Report each command that you
 10.2. The generator is `docsite.LLMS(docs fs.FS) ([]byte, error)` in `internal/docsite/llms.go`. `docs` is the `docs/` directory.
 10.3. Pages: each `*.md` file under `docs/`, except the directories `adr`, `design`, and `site`, the file `index.md` of the root, and a page with `nav_exclude: true`. The title is the front matter `title`. A page without a title is an error.
 10.4. Section: the front matter `parent`. A page without `parent` goes to the section "Overview". The section "Contributing" is named "Optional". Order: "Overview", then the parents by the `nav_order` of the page that has this title and no parent, then the other parents by name, then "Optional". In a section, pages follow `nav_order` (a missing one is 1000), then the title.
-10.5. Description: the first sentence of the first prose paragraph after the H1. A line that starts with a code fence, `|`, `#`, `<`, or `{:` is not prose. Link syntax becomes its text. Long text is cut at a word, at 200 characters.
+10.5. Description: the first sentence of the first prose paragraph after the H1. A line that starts with a code fence, `|`, `#`, `<`, or `{:` is not prose. A code fence is three or more backticks or tildes. The block ends at a line with only the same character, at least as many times. Link syntax becomes its text. Long text is cut at a word, at 200 characters.
 10.6. URL: the text `https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/` plus the path of the page. This is the value of `render.DocsBase`. `docsite` imports the constant. The two packages do not import each other in the other direction, so no cycle exists. Unit AG5 starts after AG1, so the constant exists.
 10.7. Fixed text: the title `# spinup`. The summary is `> spinup creates and operates a full-stack app: a Go API, a SvelteKit web app, PostgreSQL, a deploy to a VM, and monitoring. It upgrades the app and keeps your edits.` The note is `Each link points to a Markdown page. Read "Get started" first. The section "Optional" is for people who work on spinup itself.`
 10.8. `TestLLMSIsCurrent` (in `internal/cli`) compares `docs/llms.txt` with `docsite.LLMS`. With `SPINUP_GOLDEN_UPDATE=1` it writes the file. This follows `TestDocsSiteIsCurrent`. No command writes the file.
@@ -476,7 +484,7 @@ type PinAdvice struct {
 
 11.2. The rule, in this order:
 
-1. If one of the two strings does not parse with `ParseVersion`, the state is `PinUnknown`. This covers `dev`, an empty pin, and a pseudo-version of a Go build that has no release.
+1. If one of the two strings does not parse with `ParseVersion`, or is a Go pseudo-version, the state is `PinUnknown`. This covers `dev`, an empty pin, and each pseudo-version form: `vX.0.0-yyyymmddhhmmss-hash`, `vX.Y.Z-pre.0.yyyymmddhhmmss-hash`, and `vX.Y.Z-0.yyyymmddhhmmss-hash`.
 2. If the major or the minor differs, the state is `PinCLIOlder` when the CLI is lower, or `PinCLINewer` when it is higher.
 3. If both versions have a pre-release and the same major, minor, and patch, then:
    - when the pre-release text before the last dot is equal and the last part is a number in both, the CLI is `PinCLIOlder` when its number is lower. It is `PinCLINewer` when its number is at least `PinSlack` higher. Otherwise it is `PinMatch`.
@@ -541,6 +549,21 @@ See `docs/design/plan.md`, section "N3". The graph:
 | AG4 | `TestAgentGuidanceCommandsExist`, the codemod, `upgrade_agents`, the guide, `llms.txt` update | AG3, AG5 |
 | AG5 | `docs/llms.txt` and its tests | AG1 |
 | AG6 | Pin notice and `cli-version` | AG0 |
+
+## Changes from the review (2026-11-14)
+
+Unit F1 made these changes after review R1. The texts in sections 6, 7.3, and 8 are the new texts.
+
+- Finding 2: `spinup restore` writes the pack version of a file. For `routes_gen.go` and other generated files, it removes the generated code. `AGENTS.md` now sends a file with `.gen.` or `_gen.` in its name to `git checkout -- <path>` or to its generator. The restore row and checklist step 4 use `spinup restore <path> --force` only for other managed files.
+- Finding 3: the `apikeys create` row says that the owner runs the command, because it prints the token.
+- Finding 5: the `flags` pack has a row for `flags enable <key>` and a row for `flags disable <key>`.
+- Finding 6: `fragments` reads only built-in packs (4.2, 4.5).
+- Finding 8: rule 7 lists the commands that change a server, delete data, or replace a key, with `spinup secrets rotate` and `spinup secrets rekey`. Rule 6 forbids `spinup secrets get` and `spinup secrets edit`. Rule 5 of `SKILL.md` points to rule 7.
+- Finding 9: the `backup verify` row says that it runs on the server, and "Ask the owner first." The decision table says that the agent waits for the owner on such a row.
+- Finding 10: the table "Tool output" names `api/internal/gen/api.gen.go`, `web/src/lib/api/schema.d.ts`, and `web/src/lib/api/client/` (heyapi only). It says that `web/src/lib/api/client.ts` is not tool output.
+- Finding 11: the row `managed` of the file class table says that an upgrade merges an edited file or reports a conflict, and keeps a file that a generator wrote last.
+- Finding 12: `CheckPin` returns `PinUnknown` for each Go pseudo-version form (11.2).
+- Finding 13: the `llms.txt` description skips tilde fences too (10.5).
 
 ## Deviations from the plan
 

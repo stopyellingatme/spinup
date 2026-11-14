@@ -2,6 +2,7 @@ package compat
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -84,17 +85,12 @@ func prereleaseCounter(pre string) (string, int, bool) {
 	return pre[:index], number, true
 }
 
+// pseudoVersion matches the prerelease of each Go pseudo-version form:
+// vX.0.0-yyyymmddhhmmss-hash, vX.Y.Z-pre.0.yyyymmddhhmmss-hash, and vX.Y.Z-0.yyyymmddhhmmss-hash.
+var pseudoVersion = regexp.MustCompile(`(^|\.)[0-9]{14}-[0-9A-Za-z]+$`)
+
 func isPseudoVersion(v Version) bool {
-	parts := strings.Split(v.Pre, "-")
-	for index := 0; index+1 < len(parts); index++ {
-		if len(parts[index]) != 14 || !isNumeric(parts[index]) {
-			continue
-		}
-		if parts[index+1] != "" {
-			return true
-		}
-	}
-	return false
+	return pseudoVersion.MatchString(v.Pre)
 }
 
 func pinAdvice(state PinState, cli, pin string) PinAdvice {

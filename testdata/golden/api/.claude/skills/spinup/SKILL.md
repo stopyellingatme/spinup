@@ -16,7 +16,7 @@ Do not use it for other projects.
 2. Find the row of the decision table in `AGENTS.md` that matches the task. Run its command. For a generator, add `--dry-run` first.
 3. Do not edit managed files, tool output, or applied migrations. `AGENTS.md` says how to change them.
 4. Pass `--json --non-interactive` to each `spinup` command.
-5. Do not run a command that changes a server unless the owner asks for it.
+5. Do not run a command that changes a server, deletes data, or replaces a key unless the owner asks for it. Rule 7 of `AGENTS.md` lists these commands.
 
 ## Finish
 

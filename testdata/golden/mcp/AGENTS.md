@@ -12,15 +12,19 @@ The index of the spinup docs is https://raw.githubusercontent.com/stopyellingatm
 3. Do not edit tool output. Edit its source, then run the command in the section "Tool output".
 4. Do not edit a migration after the app applied it. Run `spinup g migration <snake_name>` and write a new migration.
 5. Pass `--json --non-interactive` to each `spinup` command that you run. Add `--dry-run` to a generator to see its files first.
-6. Do not read, print, or commit a secret. Do not open `.env`, `.env.*`, `secrets/`, or `*.agekey`.
-7. Do not change a server or a production database unless the owner asks for it in this task. This includes `spinup deploy`, `spinup rollback`, `spinup infra apply`, `spinup backup restore`, `spinup maintenance`, `spinup secrets push`, and `spinup db migrate down`.
+6. Do not read, print, or commit a secret. Do not open `.env`, `.env.*`, `secrets/`, or `*.agekey`. Do not run `spinup secrets get` or `spinup secrets edit`.
+7. Do not change a server, delete data, or replace a key unless the owner asks for it in this task. These commands need the request of the owner:
+   - Servers: `spinup deploy` (except with `--plan` or `status`), `spinup deploy unlock`, `spinup deploy digital-ocean`, `spinup rollback`, `spinup releases prune`, `spinup infra apply`, `spinup infra destroy`, `spinup server bootstrap`, `spinup server ssh`, `spinup maintenance`, `spinup monitor silence`, and `spinup monitor test-alert`.
+   - Backups: `spinup backup now`, `spinup backup prune`, `spinup backup restore`, `spinup backup schedule`, and `spinup backup verify`.
+   - Secrets and keys: `spinup secrets push`, `spinup secrets rotate`, and `spinup secrets rekey`.
+   - Databases: `spinup db migrate down`, `spinup db to`, `spinup db redo`, `spinup db reset`, and `spinup db restore`.
 8. When a command fails, read its `Try:` line. It names the fix. Do not run the same command again without a change.
 
 ## File classes
 
 | Class | Owner | What `spinup upgrade` does |
 | --- | --- | --- |
-| `managed` | spinup | It rewrites the file. `spinup check` fails when you edit it. |
+| `managed` | spinup | It writes the new template. If you edited the file, it merges your edit or reports a conflict. It keeps a file that a generator wrote last. `spinup check` fails when you edit it. |
 | `scaffold` | You | It merges the template changes into your file. |
 | `seed` | You | It never changes the file. |
 
@@ -30,15 +34,18 @@ The index of the spinup docs is https://raw.githubusercontent.com/stopyellingatm
 
 | Output | Source | Command |
 | --- | --- | --- |
-| `api/openapi/bundle.gen.yaml` and `api/internal/gen/` | The files in `api/openapi/` | `spinup g openapi` |
+| `api/openapi/bundle.gen.yaml` and `api/internal/gen/api.gen.go` | The files in `api/openapi/` | `spinup g openapi` |
 | `api/internal/store/` | `api/db/queries/*.sql` and `api/db/migrations/` | `spinup db sqlc` |
-| `web/src/lib/api/` (web app only) | The files in `api/openapi/` | `spinup g client` |
+| `web/src/lib/api/schema.d.ts` (web app only) | The files in `api/openapi/` | `spinup g openapi`, then `spinup g client` |
+| `web/src/lib/api/client/` (heyapi client only) | The files in `api/openapi/` | `spinup g openapi`, then `spinup g client` |
 
-Each other file with `.gen.` or `_gen.` in its name is a managed file. To undo an edit of it, run `spinup restore <path>`.
+`web/src/lib/api/client.ts` is not tool output. You can edit it.
+
+A generator writes each other file with `.gen.` or `_gen.` in its name, for example `routes_gen.go` and `nav.gen.ts`. Do not run `spinup restore` on such a file. It writes the empty pack version and removes the generated code. To undo your edit of such a file, run `git checkout -- <path>`. If a generator builds the file from `spinup.toml`, you can run that generator again, for example `spinup g roles`.
 
 ## Decision table
 
-Find the row that matches your task. Run its command. Read the page when the command is not enough.
+Find the row that matches your task. Run its command. Read the page when the command is not enough. If the row says that the owner runs the command, or says "Ask the owner first", do not run the command before the owner agrees.
 
 | You need | Run | Read |
 | --- | --- | --- |
@@ -46,7 +53,7 @@ Find the row that matches your task. Run its command. Read the page when the com
 | Run the API tests | `spinup test` | [Test your app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/testing.md) |
 | Find edits of managed files | `spinup check` | [check](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/check.md) |
 | See how a file differs from its template | `spinup diff <path>` | [diff](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/diff.md) |
-| Undo your edit of a managed file | `spinup restore <path>` | [restore](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/restore.md) |
+| Undo your edit of a managed file. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. | `spinup restore <path> --force` | [restore](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/restore.md) |
 | Keep your edit of a managed file | `spinup eject <path>` | [eject](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/eject.md) |
 | List the modules, or add one | `spinup module list`, then `spinup module add <name>` | [module](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/module.md) |
 | Check the health of the app | `spinup doctor --json` | [Doctor checks](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/doctor-checks.md) |
@@ -68,7 +75,7 @@ Find the row that matches your task. Run its command. Read the page when the com
 | Check the size of the web bundle | `cd web && pnpm run build`, then `spinup doctor --json` | [Web bundle budget](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/web-bundle.md) |
 | Fix the doctor check `client-drift` | `spinup g client` | [Doctor checks](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/doctor-checks.md) |
 | Change the plans or quotas of API keys. Edit `[apikeys]` in `spinup.toml` first. | `spinup g apikeys` | [API keys and plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/api-keys.md) |
-| Create an API key | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/api-keys.md) |
+| Create an API key. The owner runs this command, because it prints the secret token. Do not run it yourself. | `cd api && go run ./cmd/api apikeys create <email> --name <name>` | [API keys and plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/api-keys.md) |
 | Limit a resource to roles | `spinup g resource <name> <field:type>... --role <roles>` | [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md) |
 | Share the rows of a resource between users | `spinup g resource <name> <field:type>... --shared` | [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md) |
 | Limit a page to roles | `spinup g page <route> --server --role <roles>` | [generate page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-page.md) |
@@ -87,6 +94,6 @@ Do each step. Do not report the task as done until each step passes.
 1. Run `spinup test`.
 2. If you changed `web/`, run `cd web && pnpm run check` and `cd web && pnpm run test`.
 3. If you changed a file in `api/db/migrations/`, run `spinup db lint`.
-4. Run `spinup check`. If it reports a managed file, run `spinup restore <path>`, or ask the owner.
+4. Run `spinup check`. If it reports a managed file that you edited, undo your edit. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. For another file, run `spinup restore <path> --force`. If you are not sure, ask the owner.
 5. Run `spinup doctor --json`. Fix each `fail` and each `warn` that names a file of this app. Report each other `fail` to the owner.
 6. Tell the owner each command that you ran and its result.
