@@ -70,6 +70,7 @@ ci          on     -             Build, test, deploy, verify backups, and propos
 deploy      on     api           Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments.
 flags       off    auth          Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page.
 jobs        off    api           Background jobs on River: a worker process and River migrations in the migrate step.
+live        off    auth          Live data feeds over server-sent events, with a snapshot, numbered patches, and resume.
 mail        off    api           Typed email templates, SMTP delivery, Mailpit, and optional River retries.
 mcp         off    auth,apikeys  A stateless Model Context Protocol server for typed API tools.
 monitoring  off    deploy        Production monitoring next to the app: Alloy, Prometheus, Loki, and Grafana (lite), plus Tempo and exporters (full).

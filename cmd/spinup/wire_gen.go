@@ -84,6 +84,9 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/billingwired"
 	_ "github.com/stopyellingatme/spinup/internal/gen/billing"
 
+	// Live data (ADR 0033)
+	_ "github.com/stopyellingatme/spinup/internal/doctor/livewired"
+
 	// Web performance and quality gates (ADR 0034, ADR 0036)
 	_ "github.com/stopyellingatme/spinup/internal/doctor/gendrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/webbundle"

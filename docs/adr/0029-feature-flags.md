@@ -698,6 +698,7 @@ Facts about the current code that shape the design:
 - Bucketing of signed-out visitors (a cookie or an IP bucket).
 - An OpenFeature adapter module and the `openfeature/go-sdk` dependency. The `Provider` shape makes it possible later.
 - `LISTEN/NOTIFY` or any push refresh. The poll is enough at 10 seconds.
+  > Amended by ADR 0033: the `live` module uses LISTEN and NOTIFY for its own feeds. The flags still poll every 10 s. A flag change does not use the live hub.
 - A `g resource --flag` route gate, and a `spinup flag --env` wrapper command on the CLI.
 - An OpenAPI fragment for the kit routes, and typed client calls through `openapi-fetch` for them.
 - A prune route, a create route, and flag declarations at run time. `spinup.toml` is the source.
