@@ -5,6 +5,7 @@ kit/apidocs field Options.Spec fs.FS
 kit/apidocs field Options.Title string
 kit/apidocs func Mount(*http.ServeMux, Options)
 kit/apidocs type Options struct
+kit/app const DrainTimeout = 5 * time.Second
 kit/app func Main(*App)
 kit/app func New(...Option) *App
 kit/app func WithAPIDocs(fs.FS) Option
@@ -12,6 +13,7 @@ kit/app func WithAddr(string) Option
 kit/app func WithCommand(string, func(ctx context.Context, args []string) error) Option
 kit/app func WithConfig(config.Base) Option
 kit/app func WithDeployInfo(deployx.Options) Option
+kit/app func WithDrain(func(ctx context.Context) error) Option
 kit/app func WithLogger(*slog.Logger) Option
 kit/app func WithMiddleware(...httpx.Middleware) Option
 kit/app func WithMigrationStatus(func(context.Context) ([]devtools.Migration, error)) Option

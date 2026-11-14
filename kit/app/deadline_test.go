@@ -119,3 +119,26 @@ func TestRequestDeadlineAfterResponseStarts(t *testing.T) {
 		t.Fatalf("started response changed: %d %s", w.Code, w.Body)
 	}
 }
+
+func TestExemptPredicatesAdd(t *testing.T) {
+	a := New(WithLogger(discardLogger()), WithRequestTimeout(20*time.Millisecond),
+		WithRequestTimeoutExempt(func(r *http.Request) bool { return r.URL.Path == "/first" }),
+		WithRequestTimeoutExempt(nil),
+		WithRequestTimeoutExempt(func(r *http.Request) bool { return r.URL.Path == "/second" }),
+		WithRoutes(func(mux *http.ServeMux) {
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				if _, ok := r.Context().Deadline(); ok {
+					<-r.Context().Done()
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+			})
+		}))
+	for path, want := range map[string]int{"/first": http.StatusNoContent, "/second": http.StatusNoContent, "/neither": http.StatusServiceUnavailable} {
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), "GET", path, nil))
+		if w.Code != want {
+			t.Errorf("%s: status = %d, want %d", path, w.Code, want)
+		}
+	}
+}

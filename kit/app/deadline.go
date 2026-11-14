@@ -14,7 +14,7 @@ func (a *App) requestDeadline() httpx.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			devtools := a.config.Env == "dev" && (r.URL.Path == "/_dev" || strings.HasPrefix(r.URL.Path, "/_dev/"))
-			if devtools || a.timeoutExempt != nil && a.timeoutExempt(r) {
+			if devtools || a.exempt(r) {
 				// Exempt streams must also outlive the server transport timeout.
 				_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 				next.ServeHTTP(w, r)
@@ -28,6 +28,16 @@ func (a *App) requestDeadline() httpx.Middleware {
 			response.expired()
 		})
 	}
+}
+
+// exempt reports whether any exempt predicate matches r.
+func (a *App) exempt(r *http.Request) bool {
+	for _, match := range a.timeoutExempt {
+		if match(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // Keep writes synchronous so handlers retain normal streaming and panic behavior.
