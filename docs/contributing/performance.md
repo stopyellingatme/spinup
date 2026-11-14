@@ -266,6 +266,39 @@ $ go run ./scripts/perf/loadgen -url http://127.0.0.1:8080/healthz -c 32 -d 5s -
 | `-expect` | 200 | `-expect 204` |
 | `-timeout` | 10s | `-timeout 2s` |
 
+## Live data load
+
+The `app` suite has an opt-in phase for the `live` module (ADR 0033 section 17.6).
+Set `PERF_LIVE=1` to run it. Without the variable, the suite does not change.
+
+```text
+PERF_LIVE=1 make perf SUITES=app QUICK=1
+```
+
+The phase generates a second app with the modules `ci,auth,jobs,mail,live` and the resource `Note body:text --live`.
+It builds the API, migrates a new database, and starts the API on a free port.
+Then it runs `scripts/perf/livegen` with N streams and P patches (N 1000 and P 50, quick mode N 100 and P 10).
+All streams belong to one user, so the phase sets `LIVE_MAX_STREAMS_PER_USER` above N.
+`LIVE_MAX_STREAMS` keeps its default.
+
+`livegen` is a Go program with no dependencies outside the standard library.
+It does a conformance check first: a snapshot, one stream, and one `POST` whose patch must arrive.
+If the check fails, the phase records no number for the live metrics.
+A missed, repeated, or out-of-order patch also fails the phase.
+
+| Metric | Class | What it measures |
+|---|---|---|
+| `live_fanout_p50_ms`, `live_fanout_p99_ms` | informational, primary | the time from the end of a `POST /api/notes` to the arrival of its `patch` frame on each stream |
+| `live_stream_kib` | primary | the server RSS after `ready` on all streams, minus the RSS before the streams, divided by N |
+| `live_resume_ready_s` | informational | all streams close at one time and open again at one time with `since`: the time until all are `ready` |
+| `live_resume_sync_count`, `live_resume_503_count` | informational | the `sync` events and the 503 answers of that resume storm |
+| `live_drain_s` | informational | the time from SIGTERM to the end of the last stream |
+| `live_drain_exit_s` | informational | the time from SIGTERM to the exit of the API process |
+
+A stream that gets 503 or 429 waits for the larger of `Retry-After` and the backoff of the web helper, plus a jitter of 0 to 3 seconds.
+The records have the category `live`, and their notes name N and P.
+The phase stops the API and drops its database at the end, also after a failure.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
