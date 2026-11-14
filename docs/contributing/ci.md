@@ -67,7 +67,7 @@ Fix the Linux or Windows failure first, and the next run shows the macOS result.
 Every job has `timeout-minutes`.
 Without it, GitHub stops a stuck job only after 6 hours.
 
-The `make perf-gate` step runs the deterministic allocation budgets after the race tests.
+The `make perf-gate` step runs the deterministic allocation budgets after the race tests. It also runs the Python unit tests of `scripts/perf`.
 It runs in the existing Linux `test` job, so it creates no new billed job.
 It adds only the budget-test CPU time. It does not time benchmarks or use the network.
 

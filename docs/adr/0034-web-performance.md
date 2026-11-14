@@ -77,7 +77,7 @@ The adapter-node defaults are the contract. spinup sets no option. The `web` per
 ### 8. The gate
 
 1. Timing: `make perf-compare` against the committed baseline of the same machine, before a merge that changes the kit or the web pack. It is a local step. Hosted runners vary by 20 percent or more, so CI does not time anything.
-2. Deterministic, in CI: `make perf-gate` runs the `Test*Budget` tests without the race detector, as one step of the existing `test` job. A budget test uses `testing.AllocsPerRun`, shares the body of its benchmark, and holds the ceiling as a constant. It skips in a race build.
+2. Deterministic, in CI: `make perf-gate` runs the `Test*Budget` tests without the race detector, as one step of the existing `test` job. A budget test uses `testing.AllocsPerRun`, shares the body of its benchmark, and holds the ceiling as a constant. It skips in a race build. The target also runs the Python unit tests of `scripts/perf`.
 3. Deterministic, nightly: the e2e run already builds the web app. `scripts/perf/bundle.py check` compares the bundle bytes with `perf/budgets.json` there.
 
 ## Consequences
