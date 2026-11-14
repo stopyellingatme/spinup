@@ -1,0 +1,5 @@
+# Your extension of compose.yml. spinup creates this file once and never changes it.
+# compose.yml includes it, so the services here run in each color project of a release.
+# Use the same hardening as compose.yml: read_only, cap_drop, no-new-privileges, a non-root
+# user, a health check, and log rotation. `spinup doctor` lints this file.
+services: {}
