@@ -80,6 +80,29 @@ func TestLLMSDescriptions(t *testing.T) {
 	}
 }
 
+func TestLLMSDescriptionsTildeFences(t *testing.T) {
+	t.Parallel()
+	docs := fstest.MapFS{
+		"tilde.md":  {Data: []byte("---\ntitle: Tilde\n---\n\n# Tilde\n\n~~~sh\nspinup new demo\n~~~\n\nText after tilde. More text.\n")},
+		"nested.md": {Data: []byte("---\ntitle: Nested\n---\n\n# Nested\n\n~~~~markdown\n```sh\nNot prose.\n```\n~~~\nStill code.\n~~~~\n\nText after nested. More text.\n")},
+		"mixed.md":  {Data: []byte("---\ntitle: Mixed\n---\n\n# Mixed\n\n```text\n~~~\nInside backticks.\n```\n\nText after mixed. More text.\n")},
+	}
+	got, err := LLMS(docs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(got)
+	for _, want := range []string{
+		"- [Tilde](" + render.DocsBase + "tilde.md): Text after tilde.\n",
+		"- [Nested](" + render.DocsBase + "nested.md): Text after nested.\n",
+		"- [Mixed](" + render.DocsBase + "mixed.md): Text after mixed.\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("LLMS() does not contain %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestLLMSDeterministic(t *testing.T) {
 	t.Parallel()
 	docs := fstest.MapFS{

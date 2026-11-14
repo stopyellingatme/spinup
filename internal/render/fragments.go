@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/stopyellingatme/spinup/internal/templates"
@@ -28,8 +28,35 @@ func docurl(path string) (string, error) {
 	return DocsBase + path, nil
 }
 
+// builtinPacks returns the names of the packs that ship with spinup. A plugin pack name
+// never equals one of them, because the plugin overlay rejects a name that collides.
+var builtinPacks = sync.OnceValue(func() map[string]bool {
+	names, err := templates.List(templates.Embedded())
+	if err != nil {
+		panic(err)
+	}
+	set := make(map[string]bool, len(names))
+	for _, name := range names {
+		set[name] = true
+	}
+	return set
+})
+
+// fragmentProviders returns the built-in packs of a render. Plugin packs add no
+// fragments (ADR 0035 section 4.5), so a plugin fragment file is never read.
+func fragmentProviders(packs []*templates.Pack) []*templates.Pack {
+	builtin := builtinPacks()
+	providers := make([]*templates.Pack, 0, len(packs))
+	for _, pack := range packs {
+		if builtin[pack.Name] {
+			providers = append(providers, pack)
+		}
+	}
+	return providers
+}
+
 func newFragments(packs []*templates.Pack, data map[string]any, base template.FuncMap) func(string) (string, error) {
-	ordered := slices.Clone(packs)
+	ordered := fragmentProviders(packs)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		return fragmentPackOrder(ordered[i].Name) < fragmentPackOrder(ordered[j].Name)
 	})

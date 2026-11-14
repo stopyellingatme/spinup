@@ -70,7 +70,7 @@ func TestGoldenBaseAgentGuidance(t *testing.T) {
 		"| Run the API tests | `spinup test` |",
 		"| Find edits of managed files | `spinup check` |",
 		"| See how a file differs from its template | `spinup diff <path>` |",
-		"| Undo your edit of a managed file | `spinup restore <path>` |",
+		"| Undo your edit of a managed file. For a file with `.gen.` or `_gen.` in its name, run `git checkout -- <path>`. | `spinup restore <path> --force` |",
 		"| Keep your edit of a managed file | `spinup eject <path>` |",
 		"| List the modules, or add one | `spinup module list`, then `spinup module add <name>` |",
 		"| Check the health of the app | `spinup doctor --json` |",

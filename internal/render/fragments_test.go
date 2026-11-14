@@ -20,13 +20,13 @@ func fragmentPack(name, content string) *templates.Pack {
 func TestFragmentsOrder(t *testing.T) {
 	t.Parallel()
 	packs := []*templates.Pack{
-		fragmentPack("zeta", "| zeta | run | read |"),
+		fragmentPack("tofu", "| tofu | run | read |"),
 		fragmentPack("web", "| web | run | read |"),
-		fragmentPack("alpha", "| alpha | run | read |"),
+		fragmentPack("audit", "| audit | run | read |"),
 		fragmentPack("api", "| api | run | read |"),
 		fragmentPack("base", "| base | run | read |"),
 	}
-	want := "| base | run | read |\n| api | run | read |\n| web | run | read |\n| alpha | run | read |\n| zeta | run | read |"
+	want := "| base | run | read |\n| api | run | read |\n| web | run | read |\n| audit | run | read |\n| tofu | run | read |"
 	first, err := newFragments(packs, nil, functions(nil))("agents-rows")
 	if err != nil || first != want {
 		t.Fatalf("first = %q, %v", first, err)
@@ -105,6 +105,52 @@ func TestRenderFragments(t *testing.T) {
 	second, err := Render(Input{Packs: []*templates.Pack{p}})
 	if err != nil || !reflect.DeepEqual(first, second) {
 		t.Fatalf("second = %#v, %v", second, err)
+	}
+}
+
+// TestFragmentsIgnorePluginPacks proves ADR 0035 section 4.5: a plugin pack with a
+// fragment file adds no rows, and a malformed plugin fragment does not stop the render.
+func TestFragmentsIgnorePluginPacks(t *testing.T) {
+	t.Parallel()
+	base := &templates.Pack{
+		Name: "base",
+		FS: fstest.MapFS{
+			"fragments/agents-rows.md.tmpl": {Data: []byte("| base | run | read |")},
+			"agents.md.tmpl":                {Data: []byte("[[ fragments \"agents-rows\" ]]\n")},
+		},
+		Files: []templates.FileSpec{{Path: "AGENTS.md", Source: "agents.md.tmpl", Class: "managed"}},
+	}
+	for _, content := range []string{
+		"| plugin | run | read |",
+		"not a row",
+		"[[ .missing.field ]]",
+		"[[ end ]]",
+	} {
+		plugin := &templates.Pack{
+			Name: "acme-plugin",
+			FS: fstest.MapFS{
+				"fragments/agents-rows.md.tmpl": {Data: []byte(content)},
+				"plugin.txt":                    {Data: []byte("plugin file\n")},
+			},
+			Files: []templates.FileSpec{{Path: "plugin.txt", Source: "plugin.txt", Class: "managed"}},
+		}
+		for _, packs := range [][]*templates.Pack{{base, plugin}, {plugin, base}} {
+			plan, err := Render(Input{Packs: packs})
+			if err != nil {
+				t.Fatalf("content %q: %v", content, err)
+			}
+			agents, ok := plan.Get("AGENTS.md")
+			if !ok || string(agents.Data) != "| base | run | read |\n" {
+				t.Fatalf("content %q: AGENTS.md = %q", content, agents.Data)
+			}
+			if _, ok := plan.Get("plugin.txt"); !ok {
+				t.Fatalf("content %q: the plugin file is missing from the plan", content)
+			}
+		}
+		got, err := newFragments([]*templates.Pack{plugin}, nil, functions(nil))("agents-rows")
+		if err != nil || got != "" {
+			t.Fatalf("content %q: plugin rows = %q, %v", content, got, err)
+		}
 	}
 }
 
