@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { SubmitFunction } from '@sveltejs/kit';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import type { PageProps } from './$types';
+	import type { PageProps, SubmitFunction } from './$types';
 
 	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
