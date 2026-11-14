@@ -29,6 +29,7 @@ spinup generate resource <name> <field:type>... [flags]
 | `--force` | `false` | overwrite files with different content |
 | `--history-role` | `` | comma-separated roles that can read history |
 | `--json` | `false` | write JSON output |
+| `--live` | `false` | publish live changes (requires the live module) |
 | `--mcp` | `false` | generate typed MCP tools (requires the mcp module) |
 | `--no-audit` | `false` | disable audit for this resource |
 | `--no-color` | `false` | turn off color |

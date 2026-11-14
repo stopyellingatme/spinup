@@ -69,6 +69,7 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup generate flags`](generate-flags.md) — Generate the app flag set
 - [`spinup generate handler`](generate-handler.md) — Generate a plain HTTP handler and its test
 - [`spinup generate job`](generate-job.md) — Add a background job (River) to api/internal/jobs
+- [`spinup generate live`](generate-live.md) — Add a live feed to an existing resource
 - [`spinup generate mailer`](generate-mailer.md) — Add a typed mailer and email templates
 - [`spinup generate mcp`](generate-mcp.md) — Generate a typed MCP tool
 - [`spinup generate migration`](generate-migration.md) — Generate an empty SQL migration
