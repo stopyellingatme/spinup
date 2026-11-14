@@ -45,7 +45,7 @@ doctest: ## Run the code blocks in docs/
 	@if [[ -d internal/doctest ]]; then go test ./internal/doctest/... -run 'TestDocs' -count=1; else echo "doctest: not implemented until M1.8"; fi
 
 perf: ## Performance loop: SUITES=cli,app,micro,web QUICK=1 OUT=<file> (docs/contributing/performance.md)
-	@python3 -I scripts/perf/perf.py run --suites $(or $(SUITES),cli,app,micro,web) $(if $(QUICK),--quick) $(if $(OUT),--out $(OUT))
+	@python3 -I scripts/perf/perf.py run $(if $(SUITES),--suites $(SUITES)) $(if $(QUICK),--quick) $(if $(OUT),--out $(OUT))
 
 perf-compare: ## Compare two perf results: BASE=<json> NEW=<json> THRESHOLD=0.10
 	@python3 -I scripts/perf/perf.py compare $(BASE) $(NEW) --threshold $(or $(THRESHOLD),0.10)
