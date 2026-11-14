@@ -140,6 +140,7 @@ The restore builds `<db>_restore` next to the live database and swaps the names.
 After you check the app, drop the old database with the `dropdb` command that spinup prints.
 If a rename fails, read the database names in the error before you restart the app.
 See [backup restore](commands/backup-restore.md) for the safety backup and maintenance window.
+After a restore of an app with the [live module](build/live.md#after-a-database-restore), run `api live reset --all --yes`.
 
 ## Verify a dump
 

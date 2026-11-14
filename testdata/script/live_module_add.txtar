@@ -45,6 +45,10 @@ exists api/db/kit/00011_live.sql
 exists api/internal/live/live.go
 exists api/internal/live/feeds_gen.go
 
+# The merge brings the main.go wiring, so the doctor check passes.
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'ok\tlive-wired\tlive wiring is present'
+
 -- tools/go --
 #!/bin/sh
 case "$*" in

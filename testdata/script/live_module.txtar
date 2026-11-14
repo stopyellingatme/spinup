@@ -30,6 +30,10 @@ grep 'app.WithReadiness\("live", liveHub.Ready\),' api/cmd/api/main.go
 grep 'app.WithDrain\(liveHub.Drain\),' api/cmd/api/main.go
 grep 'app.WithShutdown\(liveHub.Close\),' api/cmd/api/main.go
 
+# The doctor check finds every wiring line. The app has no feed yet.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
+
 cd api
 exec go build ./...
 exec go vet ./...
@@ -45,6 +49,8 @@ cd plain
 ! exists web/src/lib/live.svelte.ts
 ! exists web/src/lib/live.core.test.ts
 ! grep 'applive|kitlive|liveHub|liveEnv|LIVE_MAX_STREAMS' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'skip\tlive-wired\tno live module'
 cd $WORK
 
 # Live requires auth and cannot use embed mode.

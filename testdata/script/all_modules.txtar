@@ -5,7 +5,7 @@
 env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
 
 # Every module accepted by spinup new. Dependencies are present in this list.
-exec spinup new allmodules --modules apikeys,audit,auth,backups,billing,ci,deploy,flags,jobs,mail,mcp,monitoring,secrets,tofu --module example.com/allmodules --no-git --non-interactive
+exec spinup new allmodules --modules apikeys,audit,auth,backups,billing,ci,deploy,flags,jobs,live,mail,mcp,monitoring,secrets,tofu --module example.com/allmodules --no-git --non-interactive
 cd allmodules
 cd api
 exec go build ./...
@@ -17,6 +17,8 @@ exec spinup check
 # client-drift and web-bundle checks skip. The app has no SQL queries, so sqlc-drift skips.
 exec sh -c 'spinup doctor --json > doctor.json || test "$?" -eq 1'
 ! exec sh -c 'sed -e \'/"id": "docker"/,/^[[:space:]]*}/d\' doctor.json | grep \'"status": "fail"\''
+exec cat doctor.json
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
 ! exec grep '\[\[ \.' .
 cd $WORK
 
@@ -40,6 +42,9 @@ exec git merge spinup/module-billing
 exec git worktree remove .spinup/upgrade/0.0.0-dev
 exec spinup module add mcp --yes --non-interactive
 exec git merge spinup/module-mcp
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exec spinup module add live --yes --non-interactive
+exec git merge spinup/module-live
 exec git worktree remove .spinup/upgrade/0.0.0-dev
 exec spinup module add mail --yes --non-interactive
 exec git merge spinup/module-mail
@@ -66,4 +71,6 @@ cd api
 exec go build ./...
 cd ..
 exec spinup check
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'ok\tlive-wired\tlive wiring is present'
 ! exec grep '\[\[ \.' .
