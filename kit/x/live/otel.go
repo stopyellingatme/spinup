@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -29,6 +30,11 @@ type metrics struct {
 	listener  metric.Int64ObservableGauge
 	ring      metric.Int64ObservableGauge
 	meter     metric.Meter
+
+	// regMu guards reg, the registration of the gauge callback. The callback
+	// holds the hub, so unobserve must remove it when the hub closes.
+	regMu sync.Mutex
+	reg   metric.Registration
 }
 
 func newMetrics(mp metric.MeterProvider, tp trace.TracerProvider) (*metrics, error) {
@@ -152,7 +158,7 @@ func (m *metrics) observe(listenerUp func() bool, ringBytes func() int64) {
 	if m == nil {
 		return
 	}
-	_, err := m.meter.RegisterCallback(func(_ context.Context, o metric.Observer) error {
+	reg, err := m.meter.RegisterCallback(func(_ context.Context, o metric.Observer) error {
 		var up int64
 		if listenerUp != nil && listenerUp() {
 			up = 1
@@ -166,6 +172,34 @@ func (m *metrics) observe(listenerUp func() bool, ringBytes func() int64) {
 		return nil
 	}, m.listener, m.ring)
 	if err != nil {
+		otel.Handle(err)
+		return
+	}
+	m.regMu.Lock()
+	old := m.reg
+	m.reg = reg
+	m.regMu.Unlock()
+	if old != nil {
+		if err := old.Unregister(); err != nil {
+			otel.Handle(err)
+		}
+	}
+}
+
+// unobserve removes the gauge callback of observe, so the meter provider no
+// longer holds the hub. It is safe to call twice and without observe.
+func (m *metrics) unobserve() {
+	if m == nil {
+		return
+	}
+	m.regMu.Lock()
+	reg := m.reg
+	m.reg = nil
+	m.regMu.Unlock()
+	if reg == nil {
+		return
+	}
+	if err := reg.Unregister(); err != nil {
 		otel.Handle(err)
 	}
 }

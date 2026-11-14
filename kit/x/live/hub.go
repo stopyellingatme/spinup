@@ -86,7 +86,7 @@ type Hub struct {
 	// drainCh is closed by Drain (unit LV4).
 	drainCh chan struct{}
 	// wg counts the open streams (unit LV4).
-	wg sync.WaitGroup //nolint:unused // unit LV4 (Stream and Drain) uses it
+	wg sync.WaitGroup
 
 	// The dirty set of section 6.6. dmu guards pending, fetchState, and notified.
 	dmu        sync.Mutex
@@ -129,6 +129,7 @@ type options struct {
 	pruneEvery   time.Duration // the time between two Prune calls; default 5 min
 	ringCheck    time.Duration // the time between two ring byte checks; default 15 s
 	beforeDial   func()        // runs before each reconnect attempt
+	duringReset  func(*feed)   // runs in applyReset while it holds the feed lock
 }
 
 // New validates the options and the pool. It does no I/O. A limit of zero or
@@ -274,7 +275,8 @@ func (h *Hub) Ready(_ context.Context) error {
 
 // Close stops the loops, closes the LISTEN connection, and waits for the
 // workers, subject to ctx. Each tracked feed closes, so its streams end. Close
-// is safe without Start and when called twice.
+// also removes the gauge callback from the meter provider, so the provider no
+// longer holds the hub. Close is safe without Start and when called twice.
 func (h *Hub) Close(ctx context.Context) error {
 	h.mu.Lock()
 	if h.state == stateClosed {
@@ -287,6 +289,7 @@ func (h *Hub) Close(ctx context.Context) error {
 		f.close()
 	}
 	h.mu.Unlock()
+	h.m.unobserve()
 	if cancel == nil {
 		return nil
 	}

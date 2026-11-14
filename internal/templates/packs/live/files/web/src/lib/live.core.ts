@@ -276,3 +276,246 @@ export class LiveClient<T> {
 		if (this.current(generation)) this.schedule(backoff(this.attempt++, this.random));
 	}
 }
+
+/** FeedSubscriber receives the events of a shared feed. */
+export interface FeedSubscriber {
+	/** status receives each change of the connection status. */
+	status(status: LiveStatus): void;
+	/** ready receives the ready event of each stream. */
+	ready(cursor: Cursor, resumed: boolean): void;
+	/** patch receives each patch after the cursor of the subscriber, in order. */
+	patch(patch: Patch<unknown>): void;
+	/** sync loads the snapshot again. A subscriber with a cursor then calls snapshot. */
+	sync(): Promise<void>;
+	/** catchUp runs once when a subscriber with no cursor joins a feed that is already open. */
+	catchUp?(): void;
+}
+
+/** FeedMembership is the link of one subscriber to a shared feed. */
+export interface FeedMembership {
+	/** snapshot sets the cursor of a new snapshot of the subscriber. */
+	snapshot(cursor: Cursor): void;
+	/** release removes the subscriber. It returns true when the feed has no subscriber left. */
+	release(): boolean;
+}
+
+/** SharedFeedOptions configures a SharedFeed. */
+export interface SharedFeedOptions {
+	/** feed names the feed. */
+	feed: string;
+	/** fetch goes to the LiveClient. It defaults to globalThis.fetch. */
+	fetch?: typeof fetch;
+	/** random goes to the LiveClient. It defaults to Math.random. */
+	random?: () => number;
+	/** setTimer goes to the LiveClient. It defaults to setTimeout. */
+	setTimer?: typeof setTimeout;
+	/** clearTimer goes to the LiveClient. It defaults to clearTimeout. */
+	clearTimer?: typeof clearTimeout;
+	/** now goes to the LiveClient. It defaults to Date.now. */
+	now?: () => number;
+	/** blocked reports a hidden or offline tab. The feed then does not connect. */
+	blocked?: () => boolean;
+	/** onUnauthorized runs once after the first 401 answer. */
+	onUnauthorized?: () => void;
+}
+
+type Member = { subscriber: FeedSubscriber; position: Cursor | null };
+
+// older reports whether the cursor a is before the cursor b. The cursor 0-0 of
+// an empty snapshot is before every other cursor. Cursors of two other epochs
+// do not compare.
+function older(a: Cursor, b: Cursor): boolean {
+	if (a.epoch === b.epoch) return a.seq < b.seq;
+	return a.epoch === 0;
+}
+
+/**
+ * SharedFeed shares one stream of a feed between the subscribers of a tab.
+ * Each subscriber with a cursor keeps its own position. The stream starts at
+ * the oldest position that a subscriber still needs, and each subscriber gets
+ * only the patches after its own position. A subscriber with a newer snapshot
+ * thus never makes another subscriber skip a patch.
+ */
+export class SharedFeed {
+	/** status is the current connection status. */
+	status: LiveStatus = 'connecting';
+	private readonly client: LiveClient<unknown>;
+	private readonly blocked: () => boolean;
+	private readonly onUnauthorized: () => void;
+	private readonly members = new Set<Member>();
+	// stream is the position of the stream: the start cursor, then the last patch.
+	private stream: Cursor | null = null;
+	private start: Cursor | null = null;
+	private running = false;
+	private readySeen = false;
+	private syncing = false;
+	private disposed = false;
+	private unauthorizedReported = false;
+
+	/** Construct a feed without opening a request. The first join starts it. */
+	constructor(options: SharedFeedOptions) {
+		this.blocked = options.blocked ?? (() => false);
+		this.onUnauthorized = options.onUnauthorized ?? (() => {});
+		this.client = new LiveClient<unknown>({
+			feed: options.feed, fetch: options.fetch, random: options.random,
+			setTimer: options.setTimer, clearTimer: options.clearTimer, now: options.now,
+			getCursor: () => this.start,
+			onStatus: (status) => this.setStatus(status),
+			onReady: (cursor, resumed) => this.ready(cursor, resumed),
+			onPatch: (patch) => this.patch(patch),
+			onSync: (reason) => this.sync(reason)
+		});
+	}
+
+	/** join adds a subscriber. cursor is the cursor of its snapshot, or null. */
+	join(subscriber: FeedSubscriber, cursor: Cursor | null): FeedMembership {
+		const member: Member = { subscriber, position: cursor };
+		const fresh = this.members.size === 0 && !this.running;
+		this.members.add(member);
+		subscriber.status(this.status);
+		if (fresh) this.restart();
+		else if (cursor) this.place(member, cursor);
+		else if (this.readySeen || this.start !== null) {
+			// The stream does not send a ready with resumed false that would refresh it.
+			subscriber.catchUp?.();
+		}
+		return {
+			snapshot: (next) => {
+				if (!this.members.has(member)) return;
+				member.position = next;
+				this.place(member, next);
+			},
+			release: () => {
+				if (!this.members.delete(member)) return this.members.size === 0;
+				if (this.members.size === 0) this.dispose();
+				return this.members.size === 0;
+			}
+		};
+	}
+
+	/** pause aborts the stream and keeps its cursor. */
+	pause(): void {
+		this.client.pause();
+	}
+
+	/** resume connects again after a pause, or starts a stream that a blocked tab deferred. */
+	resume(): void {
+		if (this.blocked() || this.disposed || this.syncing || this.status === 'unauthorized') return;
+		this.client.resume();
+		if (this.status === 'paused') this.restart();
+	}
+
+	/** dispose stops the stream. The feed does nothing after it. */
+	dispose(): void {
+		this.disposed = true;
+		this.running = false;
+		this.client.stop();
+	}
+
+	// place decides whether the stream must start again for a new snapshot cursor.
+	private place(member: Member, cursor: Cursor): void {
+		if (this.syncing) return;
+		const stream = this.stream;
+		if (!this.running || stream === null || older(cursor, stream)) {
+			this.restart();
+			return;
+		}
+		if (cursor.epoch !== stream.epoch && stream.epoch !== 0) {
+			if (cursor.epoch > stream.epoch) this.restart();
+			// A snapshot of an older epoch is stale: load it again.
+			else this.resync(member);
+		}
+		// Otherwise the stream is at or before the cursor. The member skips the patches it has.
+	}
+
+	// required returns the oldest position that a member still needs, or null.
+	private required(): Cursor | null {
+		let newest = 0;
+		for (const member of this.members) {
+			if (member.position) newest = Math.max(newest, member.position.epoch);
+		}
+		let oldest: Cursor | null = null;
+		for (const member of this.members) {
+			const position = member.position;
+			if (!position) continue;
+			if (position.epoch !== 0 && position.epoch < newest) {
+				this.resync(member);
+				continue;
+			}
+			if (!oldest || older(position, oldest)) oldest = position;
+		}
+		return oldest;
+	}
+
+	private restart(): void {
+		if (this.disposed || this.syncing || this.status === 'unauthorized') return;
+		this.client.stop();
+		this.running = false;
+		// A snapshot can complete while the tab is offline or hidden.
+		if (this.blocked()) {
+			this.setStatus('paused');
+			return;
+		}
+		this.start = this.required();
+		this.stream = this.start;
+		this.readySeen = false;
+		this.running = true;
+		this.client.start();
+	}
+
+	private resync(member: Member): void {
+		member.position = null;
+		void member.subscriber.sync().catch(() => {});
+	}
+
+	private setStatus(status: LiveStatus): void {
+		this.status = status;
+		for (const member of [...this.members]) member.subscriber.status(status);
+	}
+
+	private ready(cursor: Cursor, resumed: boolean): void {
+		this.readySeen = true;
+		if (!resumed) {
+			this.stream = cursor;
+			// The stream starts at the head. A member before it missed patches.
+			for (const member of [...this.members]) {
+				if (member.position && older(member.position, cursor)) this.resync(member);
+			}
+		}
+		for (const member of [...this.members]) member.subscriber.ready(cursor, resumed);
+	}
+
+	private patch(patch: Patch<unknown>): void {
+		const at = { epoch: patch.epoch, seq: patch.seq };
+		this.stream = at;
+		for (const member of [...this.members]) {
+			const position = member.position;
+			if (position && position.epoch !== 0 && position.epoch !== at.epoch) {
+				this.resync(member);
+				continue;
+			}
+			if (position && position.epoch === at.epoch && position.seq >= at.seq) continue;
+			if (position) member.position = at;
+			member.subscriber.patch(patch);
+		}
+	}
+
+	private sync(reason: string): void {
+		if (reason === 'unauthorized') {
+			if (!this.unauthorizedReported) {
+				this.unauthorizedReported = true;
+				this.onUnauthorized();
+			}
+			return;
+		}
+		this.running = false;
+		this.stream = null;
+		this.syncing = true;
+		const members = [...this.members];
+		for (const member of members) member.position = null;
+		void Promise.all(members.map((member) => member.subscriber.sync())).then(() => {
+			this.syncing = false;
+			if (!this.disposed) this.restart();
+		}, () => { this.syncing = false; });
+	}
+}

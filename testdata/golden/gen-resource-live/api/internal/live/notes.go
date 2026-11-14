@@ -31,6 +31,10 @@ func registerNotesFeed(mux *http.ServeMux, h *kitlive.Hub, d Deps) {
 		}
 		switch result := response.(type) {
 		case gen.ListNotes200JSONResponse:
+			// The list has more rows than this page: the snapshot answer has more: true.
+			if result.Total > int64(len(result.Items)) {
+				kitlive.MarkMore(ctx)
+			}
 			return result.Items, nil
 		default:
 			return nil, fmt.Errorf("unexpected ListNotes response %T", response)

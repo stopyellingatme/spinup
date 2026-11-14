@@ -197,3 +197,107 @@ func TestHubPrunesTheOutbox(t *testing.T) {
 		t.Fatal("the janitor pruned the new patch")
 	}
 }
+
+// TestResetIsAtomicForAJoiningStream lets a stream try to open while the reset
+// holds the feed. The stream must see the full new feed: the new head, a next
+// of head+1, and no reset mark. A stream that was open before the reset reads
+// readReset, and a stream that resumes from a cursor in the new ring gets the
+// patches after it.
+func TestResetIsAtomicForAJoiningStream(t *testing.T) {
+	t.Parallel()
+	type opened struct {
+		s       *sub
+		head    Cursor
+		resumed bool
+		reason  string
+	}
+	joined := make(chan opened, 1)
+	h := newHub(t, lazyPool(t), func(o *options) {
+		o.duringReset = func(f *feed) {
+			go func() {
+				s, head, resumed, reason := f.open(Cursor{}, false)
+				joined <- opened{s, head, resumed, reason}
+			}()
+			// The stream waits for the feed lock while the reset holds it.
+			time.Sleep(20 * time.Millisecond)
+			select {
+			case got := <-joined:
+				t.Errorf("a stream opened during the reset, with the head %v", got.head)
+				joined <- got
+			default:
+			}
+		}
+	})
+	f := readyFeed("notes", 3, 10)
+	h.feeds[f.key] = f
+	h.ringBytes = f.ring.bytes()
+	before := f.subscribe(4)
+	frames := []pendingFrame{
+		{seq: 10, frame: patchFrame(2, 10, []byte(`[]`))},
+		{seq: 9, frame: patchFrame(2, 9, []byte(`[]`))},
+		{seq: 8, frame: patchFrame(2, 8, []byte(`[]`))},
+	}
+	if !h.applyReset(f, 2, 10, frames) {
+		t.Fatal("applyReset = false for a tracked feed")
+	}
+	var got opened
+	select {
+	case got = <-joined:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the joining stream did not open")
+	}
+	if got.reason != "" || got.head != (Cursor{Epoch: 2, Seq: 10}) || got.s.next != 11 || got.s.reset {
+		t.Fatalf("the joining stream: head %v, next %d, reset %v, reason %q; want 2-10, 11, false, none",
+			got.head, got.s.next, got.s.reset, got.reason)
+	}
+	waitWake(t, got.s, time.Second)
+	if n, state := readAll(f, got.s); state != readOK || len(n) != 0 {
+		t.Fatalf("the first read of the joining stream: %d frames, state %d; want 0 and readOK", len(n), state)
+	}
+	waitWake(t, before, time.Second)
+	if _, state := readAll(f, before); state != readReset {
+		t.Fatalf("the stream from before the reset reads %d, want readReset", state)
+	}
+	resumed, _, ok, reason := f.open(Cursor{Epoch: 2, Seq: 8}, true)
+	if !ok || reason != "" {
+		t.Fatalf("resume from 2-8: resumed %v, reason %q", ok, reason)
+	}
+	if out, state := readAll(f, resumed); state != readOK || len(out) != 2 || string(out[1]) != string(frames[0].frame) {
+		t.Fatalf("resume from 2-8 read %d frames, state %d; want the patches 9 and 10", len(out), state)
+	}
+	if h.ringBytes != f.ring.bytes() {
+		t.Fatalf("hub ring bytes %d, ring %d", h.ringBytes, f.ring.bytes())
+	}
+}
+
+// TestLoadPressureTrimForgetsTheEndedFeeds checks that a trim during the load
+// of a feed removes the notification marks of the idle feeds that it ends.
+func TestLoadPressureTrimForgetsTheEndedFeeds(t *testing.T) {
+	t.Parallel()
+	pool := liveDB(t)
+	exec(t, pool, `INSERT INTO live_feeds (key, seq) VALUES ('fresh', 20)`)
+	exec(t, pool, `INSERT INTO live_outbox (feed, seq, changes) SELECT 'fresh', g, '[{"op":"touch","id":"1"}]' FROM generate_series(1, 20) g`)
+	// The 20 frames have about 2400 bytes. With the idle ring the sum is over 3000.
+	h := newHub(t, pool, WithRing(64, 3000))
+	idle := readyFeed("idle", 10, 150)
+	idle.idleSince = time.Now().Add(-time.Second)
+	h.feeds[idle.key] = idle
+	h.ringBytes = idle.ring.bytes()
+	h.notified["idle"] = 10
+	f := h.acquireFeed(t, "fresh")
+	if f.ring.len() != 20 || f.ring.bytes() > 3000 {
+		t.Fatalf("the loaded ring holds %d patches (%d bytes), want 20 in at most 3000 bytes", f.ring.len(), f.ring.bytes())
+	}
+	h.mu.Lock()
+	_, tracked := h.feeds["idle"]
+	h.mu.Unlock()
+	if tracked {
+		t.Fatal("the idle feed stays after the pressure trim of the load")
+	}
+	h.dmu.Lock()
+	_, mark := h.notified["idle"]
+	h.dmu.Unlock()
+	if mark {
+		t.Fatal("the mark of the feed that the load trim ended stays")
+	}
+}

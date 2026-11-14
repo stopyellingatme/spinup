@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 // lazyPool returns a pool that never connects. New does no I/O, so the tests
@@ -464,5 +465,86 @@ func TestReadCursor(t *testing.T) {
 	var le *Error
 	if _, err := h.readCursor(ctx, "notes:3"); !errors.As(err, &le) || le.Try == "" {
 		t.Fatalf("readCursor with a canceled context = %v, want an *Error", err)
+	}
+}
+
+// gaugePoints returns the number of data points of the two observable gauges.
+func (h *testHub) gaugePoints(t *testing.T) int {
+	t.Helper()
+	var data metricdata.ResourceMetrics
+	if err := h.reader.Collect(context.Background(), &data); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, sm := range data.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if g, ok := m.Data.(metricdata.Gauge[int64]); ok && (m.Name == "live.listener.up" || m.Name == "live.ring.bytes") {
+				n += len(g.DataPoints)
+			}
+		}
+	}
+	return n
+}
+
+// TestCloseUnregistersTheGaugeCallback checks that the meter provider does not
+// keep the callback, and with it the hub, after Close.
+func TestCloseUnregistersTheGaugeCallback(t *testing.T) {
+	t.Parallel()
+	h := newHub(t, lazyPool(t), func(o *options) { o.noListen = true })
+	if err := h.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.gaugePoints(t); n != 2 {
+		t.Fatalf("gauge points before Close = %d, want 2", n)
+	}
+	if err := h.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.gaugePoints(t); n != 0 {
+		t.Fatalf("gauge points after Close = %d, want 0: the callback is still registered", n)
+	}
+	h.m.regMu.Lock()
+	reg := h.m.reg
+	h.m.regMu.Unlock()
+	if reg != nil {
+		t.Fatal("the metrics keep the registration after Close")
+	}
+	if err := h.Close(t.Context()); err != nil {
+		t.Fatalf("second Close = %v", err)
+	}
+}
+
+// TestPressureTrimForgetsTheEndedFeeds checks that a trim from appendFrames or
+// from load removes the notification marks of the feeds that it ends.
+func TestPressureTrimForgetsTheEndedFeeds(t *testing.T) {
+	t.Parallel()
+	h := newHub(t, lazyPool(t), WithRing(64, 1000))
+	idle := readyFeed("idle", 5, 100)
+	idle.idleSince = time.Now().Add(-time.Second)
+	open := readyFeed("open", 1, 100)
+	open.refs = 1
+	for _, f := range []*feed{idle, open} {
+		h.feeds[f.key] = f
+		h.ringBytes += f.ring.bytes()
+	}
+	h.notified["idle"] = 5
+	h.notified["open"] = 1
+	frames := make([]pendingFrame, 0, 5)
+	for seq := int64(2); seq <= 6; seq++ {
+		frames = append(frames, pendingFrame{seq: seq, frame: make([]byte, 100)})
+	}
+	// 600 + 500 bytes is over the limit of 1000: the trim ends the idle feed.
+	if n, result := h.appendFrames(open, 1, frames); n != 5 || result != appendOK {
+		t.Fatalf("appendFrames = %d, %d", n, result)
+	}
+	if _, ok := h.feeds["idle"]; ok {
+		t.Fatal("the idle feed stays after the pressure trim")
+	}
+	h.dmu.Lock()
+	_, idleMark := h.notified["idle"]
+	_, openMark := h.notified["open"]
+	h.dmu.Unlock()
+	if idleMark || !openMark {
+		t.Fatalf("marks after appendFrames: idle %v, open %v; want false and true", idleMark, openMark)
 	}
 }

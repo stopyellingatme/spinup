@@ -100,6 +100,20 @@ func TestSnapshotRowsAndMore(t *testing.T) {
 	if rec := get(exact, "/api/live/notes"); strings.Contains(rec.Body.String(), "more") {
 		t.Fatalf("a snapshot of exactly the limit has more: %s", rec.Body)
 	}
+	// A loader that reads one page of a longer list marks the cut itself.
+	page := live.Snapshot(h, rows, func(ctx context.Context, _ live.Key, _ int) ([]note, error) {
+		live.MarkMore(ctx)
+		return []note{{1, "a"}, {2, "b"}}, nil
+	})
+	if rec := get(page, "/api/live/notes"); !strings.HasSuffix(rec.Body.String(), `"rows":[{"id":1,"body":"a"},{"id":2,"body":"b"}],"more":true}`+"\n") {
+		t.Fatalf("a marked snapshot: %s", rec.Body)
+	}
+	// MarkMore outside a snapshot load does nothing, and the mark does not
+	// stay for the next request.
+	live.MarkMore(t.Context())
+	if rec := get(exact, "/api/live/notes"); strings.Contains(rec.Body.String(), "more") {
+		t.Fatalf("a mark stays after its request: %s", rec.Body)
+	}
 }
 
 func TestSnapshotFailures(t *testing.T) {

@@ -868,3 +868,50 @@ func TestStreamThroughApp(t *testing.T) {
 		t.Fatalf("end of the stream %q", text)
 	}
 }
+
+// TestStreamIdleOutlivesWriteTimeoutHTTP2 keeps an idle stream open over
+// HTTP/2 for several write timeouts. An HTTP/2 server resets a stream when
+// its write deadline passes, even with no pending write. So each write must
+// clear its deadline after the flush, and the idle stream must get the pings.
+func TestStreamIdleOutlivesWriteTimeoutHTTP2(t *testing.T) {
+	t.Parallel()
+	pool := streamDB(t)
+	h := livetest.Hub(t, pool, live.WithWriteTimeout(100*time.Millisecond), live.WithHeartbeat(300*time.Millisecond))
+	server := httptest.NewUnstartedServer(h.Stream(shared("notes")))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/api/live/notes/live", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := server.Client().Do(req) //nolint:bodyclose // readLines closes the body
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ProtoMajor != 2 || resp.StatusCode != http.StatusOK {
+		t.Fatalf("answer %s %d, want HTTP/2 and 200", resp.Proto, resp.StatusCode)
+	}
+	lines := make(chan string, 64)
+	go readLines(ctx, resp, lines)
+	start := time.Now()
+	pings := 0
+	for pings < 3 {
+		select {
+		case line, ok := <-lines:
+			if !ok {
+				t.Fatalf("the stream ended after %s with %d pings: the write deadline stayed armed", time.Since(start), pings)
+			}
+			if line == ": ping" {
+				pings++
+			}
+		case <-time.After(wait):
+			t.Fatalf("no ping in %s", wait)
+		}
+	}
+	if d := time.Since(start); d < 800*time.Millisecond {
+		t.Fatalf("3 pings after %s, want at least 800ms", d)
+	}
+}

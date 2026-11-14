@@ -53,6 +53,38 @@ func ExistingSpec(root, target string) (Spec, error) {
 	return spec, nil
 }
 
+// PlanLiveDestroy adds a rebuilt feeds_gen.go to plan when plan deletes a live
+// feed file, so the registrations no longer call the removed function.
+// spinup destroy resource calls it after it plans the deletions. A plan with
+// no feed deletion, or a project with no feeds_gen.go, comes back unchanged.
+func PlanLiveDestroy(root string, plan vfs.Plan) (vfs.Plan, error) {
+	removes := false
+	for _, file := range plan.Files {
+		if file.Delete && filepath.ToSlash(filepath.Dir(file.Path)) == livegen.Dir && file.Path != livegen.GeneratedPath {
+			removes = true
+		}
+	}
+	if !removes {
+		return plan, nil
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(livegen.GeneratedPath))); errors.Is(err, os.ErrNotExist) {
+		return plan, nil
+	} else if err != nil {
+		return vfs.Plan{}, fmt.Errorf("cannot inspect %s: %w\nTry: check the file permissions", livegen.GeneratedPath, err)
+	}
+	if _, ok := plan.Get(livegen.GeneratedPath); ok {
+		return vfs.Plan{}, fmt.Errorf("rebuild live feeds: %s is already planned\nTry: report this generator bug", livegen.GeneratedPath)
+	}
+	generated, err := livegen.RenderGenerated(root, plan.Files)
+	if err != nil {
+		return vfs.Plan{}, err
+	}
+	if err := plan.Add(generated); err != nil {
+		return vfs.Plan{}, err
+	}
+	return plan.Sorted(), nil
+}
+
 func addLive(spec Spec, in gen.Input, out *gen.Output) (*gen.Output, error) {
 	if err := livegen.RequirePack(in.Lock); err != nil {
 		return nil, err

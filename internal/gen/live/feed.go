@@ -42,7 +42,10 @@ func FeedSource(s FeedSpec) ([]byte, error) {
 	p("mux.Handle(%q, kitlive.Snapshot(h, key, func(ctx context.Context, _ kitlive.Key, limit int) ([]gen.%s, error) {", "GET /api/live/"+name, singular)
 	p("limit32 := int32(min(limit, 200))")
 	p("response, err := server.List%s(ctx, gen.List%sRequestObject{Params: gen.List%sParams{Limit: &limit32}})", plural, plural, plural)
-	p("if err != nil {return nil,err}\nswitch result := response.(type) {\ncase gen.List%s200JSONResponse:\nreturn result.Items,nil\ndefault:\nreturn nil,fmt.Errorf(\"unexpected List%s response %%T\",response)\n}\n}))", plural, plural)
+	p("if err != nil {return nil,err}\nswitch result := response.(type) {\ncase gen.List%s200JSONResponse:", plural)
+	p("// The list has more rows than this page: the snapshot answer has more: true.")
+	p("if result.Total > int64(len(result.Items)) {kitlive.MarkMore(ctx)}")
+	p("return result.Items,nil\ndefault:\nreturn nil,fmt.Errorf(\"unexpected List%s response %%T\",response)\n}\n}))", plural)
 	p("mux.Handle(%q, h.Stream(key))\n}", "GET /api/live/"+name+"/live")
 	data, err := format.Source([]byte(src.String()))
 	if err != nil {

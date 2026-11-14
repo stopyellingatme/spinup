@@ -1,8 +1,8 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 import { invalidate, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
-import { LiveClient, backoff } from './live.core';
-import type { Cursor, LiveStatus, Patch } from './live.core';
+import { SharedFeed, backoff } from './live.core';
+import type { Cursor, FeedSubscriber, LiveStatus, Patch } from './live.core';
 
 // SvelteKit 3 has no $app/environment. The helper does nothing during server rendering.
 const browser = typeof window !== 'undefined';
@@ -42,91 +42,19 @@ export interface LiveList<T> {
 	refresh(): Promise<void>;
 }
 
-type Subscriber = {
-	status: (status: LiveStatus) => void;
-	ready: (cursor: Cursor, resumed: boolean) => void;
-	patch: (patch: Patch<unknown>) => void;
-	sync: () => Promise<void>;
-};
-type Feed = {
-	client: LiveClient<unknown>;
-	cursor: Cursor | null;
-	status: LiveStatus;
-	users: number;
-	subscribers: Set<Subscriber>;
-	syncing: boolean;
-	restart: () => void;
-	dispose: () => void;
-};
+type Feed = { shared: SharedFeed; dispose: () => void };
 const feeds = new Map<string, Feed>();
 
-function createFeed(name: string, cursor: Cursor | null): Feed {
+// createFeed connects a shared feed to the visibility and network events of the tab.
+function createFeed(name: string): Feed {
 	let hiddenTimer: ReturnType<typeof setTimeout> | undefined;
 	let hiddenPaused = false;
 	let offline = !navigator.onLine;
-	let disposed = false;
-	let unauthorizedInvalidated = false;
-	const blocked = () => hiddenPaused || offline;
-	const entry: Feed = {
-		cursor, status: 'connecting', users: 0, subscribers: new Set(), syncing: false,
-		client: new LiveClient<unknown>({
-			feed: name,
-			getCursor: () => entry.cursor,
-			onStatus(status) {
-				entry.status = status;
-				for (const subscriber of entry.subscribers) subscriber.status(status);
-			},
-			onReady(cursor, resumed) {
-				if (!resumed || !entry.cursor) entry.cursor = cursor;
-				for (const subscriber of entry.subscribers) subscriber.ready(cursor, resumed);
-			},
-			onPatch(patch) {
-				entry.cursor = { epoch: patch.epoch, seq: patch.seq };
-				for (const subscriber of entry.subscribers) subscriber.patch(patch);
-			},
-			onSync(reason) {
-				if (reason === 'unauthorized') {
-					if (!unauthorizedInvalidated) {
-						unauthorizedInvalidated = true;
-						void invalidateAll().catch(() => {});
-					}
-					return;
-				}
-				entry.cursor = null;
-				entry.syncing = true;
-				void Promise.all([...entry.subscribers].map((subscriber) => subscriber.sync()))
-					.then(() => {
-						entry.syncing = false;
-						if (!disposed) entry.restart();
-					}, () => { entry.syncing = false; });
-			}
-		}),
-		restart() {
-			if (disposed || entry.syncing || entry.status === 'unauthorized') return;
-			entry.client.stop();
-			// A snapshot can complete while the tab is offline or hidden.
-			if (blocked()) {
-				entry.status = 'paused';
-				for (const subscriber of entry.subscribers) subscriber.status('paused');
-				return;
-			}
-			entry.client.start();
-		},
-		dispose() {
-			disposed = true;
-			entry.client.stop();
-			clearTimeout(hiddenTimer);
-			document.removeEventListener('visibilitychange', visibility);
-			window.removeEventListener('offline', goOffline);
-			window.removeEventListener('online', goOnline);
-		}
-	};
-	function resume() {
-		if (blocked() || disposed || entry.syncing || entry.status === 'unauthorized') return;
-		entry.client.resume();
-		// restart may have deferred the first request while offline.
-		if (entry.status === 'paused') entry.restart();
-	}
+	const shared = new SharedFeed({
+		feed: name,
+		blocked: () => hiddenPaused || offline,
+		onUnauthorized: () => { void invalidateAll().catch(() => {}); }
+	});
 	function visibility() {
 		clearTimeout(hiddenTimer);
 		hiddenTimer = undefined;
@@ -135,51 +63,51 @@ function createFeed(name: string, cursor: Cursor | null): Feed {
 				hiddenTimer = undefined;
 				if (document.visibilityState === 'hidden') {
 					hiddenPaused = true;
-					entry.client.pause();
+					shared.pause();
 				}
 			}, 60000);
 		} else {
 			hiddenPaused = false;
-			resume();
+			shared.resume();
 		}
 	}
 	function goOffline() {
 		offline = true;
-		entry.client.pause();
+		shared.pause();
 	}
 	function goOnline() {
 		offline = false;
-		resume();
+		shared.resume();
 	}
 	document.addEventListener('visibilitychange', visibility);
 	window.addEventListener('offline', goOffline);
 	window.addEventListener('online', goOnline);
 	visibility();
-	return entry;
+	return {
+		shared,
+		dispose() {
+			shared.dispose();
+			clearTimeout(hiddenTimer);
+			document.removeEventListener('visibilitychange', visibility);
+			window.removeEventListener('offline', goOffline);
+			window.removeEventListener('online', goOnline);
+		}
+	};
 }
 
-function join(feed: string, subscriber: Subscriber, cursor: Cursor | null) {
+// join adds a subscriber to the one stream of the feed in this tab.
+function join(feed: string, subscriber: FeedSubscriber, cursor: Cursor | null) {
 	let entry = feeds.get(feed);
-	const fresh = !entry;
 	if (!entry) {
-		entry = createFeed(feed, cursor);
+		entry = createFeed(feed);
 		feeds.set(feed, entry);
 	}
-	entry.users++;
-	entry.subscribers.add(subscriber);
-	subscriber.status(entry.status);
-	if (cursor) entry.cursor = cursor;
-	// A new snapshot can predate an event received by an existing stream. Replay from it.
-	if (fresh || cursor) entry.restart();
 	const joined = entry;
+	const membership = joined.shared.join(subscriber, cursor);
 	return {
-		snapshot(cursor: Cursor) {
-			joined.cursor = cursor;
-			joined.restart();
-		},
+		snapshot: (next: Cursor) => membership.snapshot(next),
 		release() {
-			if (!joined.subscribers.delete(subscriber)) return;
-			if (--joined.users === 0) {
+			if (membership.release() && feeds.get(feed) === joined) {
 				joined.dispose();
 				feeds.delete(feed);
 			}
@@ -221,7 +149,9 @@ export function liveRefresh(feed: string, options: LiveRefreshOptions = {}): Liv
 				},
 				ready: (_cursor, resumed) => { if (!resumed) schedule(); },
 				patch: schedule,
-				sync: refresh
+				sync: refresh,
+				// The page may have loaded before a patch that the open stream already sent.
+				catchUp: schedule
 			}, null);
 			return () => {
 				active = false;

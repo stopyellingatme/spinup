@@ -14,9 +14,11 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stopyellingatme/spinup/internal/gen"
+	"github.com/stopyellingatme/spinup/internal/gen/fields"
 	livegen "github.com/stopyellingatme/spinup/internal/gen/live"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/testutil"
+	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
 func liveFlags(t *testing.T, args ...string) *pflag.FlagSet {
@@ -212,4 +214,57 @@ func TestGoldenGenResourceLive(t *testing.T) {
 	}
 	testutil.Golden(t, "gen-resource-live", got)
 	testutil.Deterministic(t, render)
+}
+
+// TestPlanLiveDestroy checks that the deletion of a live resource rebuilds
+// feeds_gen.go without the removed feed (destroy calls PlanLiveDestroy).
+func TestPlanLiveDestroy(t *testing.T) {
+	t.Parallel()
+	root := authApp(t)
+	packs := []string{"base", "api", "auth", "live"}
+	writeLock(t, root, packs)
+	for _, name := range []string{"note", "memo"} {
+		out, err := run(t.Context(), gen.Input{Root: root, Lock: &manifest.Lock{Packs: packs}, Args: []string{name, "body:text"}, Flags: liveFlags(t, "--live", "--api-only")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, file := range out.Plan.Files {
+			write(t, root, map[string]string{file.Path: string(file.Data)})
+		}
+	}
+	name, err := fields.ParseName("note")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan vfs.Plan
+	for _, path := range Paths(name) {
+		if _, err := os.Stat(filepath.Join(root, path)); err == nil {
+			if err := plan.Add(vfs.File{Path: path, Delete: true}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, ok := plan.Get(livegen.FeedPath(name)); !ok {
+		t.Fatalf("Paths does not delete the feed file: %v", plan.Paths())
+	}
+	got, err := PlanLiveDestroy(root, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated, ok := got.Get(livegen.GeneratedPath)
+	if !ok || generated.Delete || generated.Class != string(manifest.Managed) {
+		t.Fatalf("the plan does not rebuild %s: %v", livegen.GeneratedPath, got.Paths())
+	}
+	if text := string(generated.Data); strings.Contains(text, "registerNotesFeed") || !strings.Contains(text, "registerMemosFeed(mux, h, d)") {
+		t.Fatalf("registrations after the destroy:\n%s", text)
+	}
+	// A plan that deletes no feed file stays the same.
+	other := vfs.Plan{Files: []vfs.File{{Path: QueriesPath(name), Delete: true}}}
+	if same, err := PlanLiveDestroy(root, other); err != nil || !slices.Equal(same.Paths(), other.Paths()) {
+		t.Fatalf("a plan with no feed deletion: %v, %v", same.Paths(), err)
+	}
+	// A project with no live registrations stays the same.
+	if same, err := PlanLiveDestroy(authApp(t), plan); err != nil || !slices.Equal(same.Paths(), plan.Paths()) {
+		t.Fatalf("a project with no feeds_gen.go: %v, %v", same.Paths(), err)
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,11 +20,25 @@ type snapshotBody[T any] struct {
 	More  bool  `json:"more,omitempty"`
 }
 
+// moreKey is the context key of the more mark of a snapshot load.
+type moreKey struct{}
+
+// MarkMore marks the snapshot that ctx loads as cut: the answer has
+// "more":true. A load function calls it when it returns fewer rows than the
+// source holds, such as the first page of a longer list. Outside the load
+// function of Snapshot it does nothing.
+func MarkMore(ctx context.Context) {
+	if more, ok := ctx.Value(moreKey{}).(*atomic.Bool); ok {
+		more.Store(true)
+	}
+}
+
 // Snapshot returns the handler of the snapshot route of a feed (ADR 0033
 // section 7.3). It reads the cursor of the feed first and then calls load, so
 // the rows are at least as new as the cursor. The answer is
 // {"epoch":E,"seq":N,"rows":[...]}, with "more":true when load returned more
-// than WithSnapshotLimit rows. load gets the limit plus one. The stream route
+// than WithSnapshotLimit rows or called MarkMore. load gets the limit plus
+// one. The stream route
 // of the feed must use the same key. A nil hub, key, or load panics.
 func Snapshot[T any](h *Hub, key KeyFunc, load func(ctx context.Context, key Key, limit int) ([]T, error)) http.Handler {
 	if h == nil || key == nil || load == nil {
@@ -82,10 +97,12 @@ func readSnapshot[T any](ctx context.Context, h *Hub, k Key, load func(ctx conte
 		return body, err
 	}
 	limit := h.opts.snapshotLimit
-	rows, err := load(ctx, k, limit+1)
+	var more atomic.Bool
+	rows, err := load(context.WithValue(ctx, moreKey{}, &more), k, limit+1)
 	if err != nil {
 		return body, &Error{Op: "load snapshot rows", Err: err, Try: "check the load function of the snapshot route"}
 	}
+	body.More = more.Load()
 	if len(rows) > limit {
 		rows, body.More = rows[:limit], true
 	}
