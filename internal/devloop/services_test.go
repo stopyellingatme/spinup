@@ -260,7 +260,7 @@ func TestGoWatcher(t *testing.T) {
 	go (goWatcher{Root: root, Reload: reload, Interval: 10 * time.Millisecond, Debounce: 30 * time.Millisecond}).Run(ctx)
 	// Changes in skipped paths never reload. Write them first and wait out the debounce.
 	time.Sleep(50 * time.Millisecond)
-	for _, path := range []string{"api/tmp/api.go", "api/internal/gen/api.gen.go", "api/internal/store/db.go", "api/cmd/api/main_test.go", "api/README.md"} {
+	for _, path := range []string{"api/tmp/api.go", "api/internal/gen/api.gen.go", "api/cmd/api/main_test.go", "api/README.md"} {
 		writeInput(t, root, path, "x")
 	}
 	select {

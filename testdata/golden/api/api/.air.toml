@@ -7,7 +7,9 @@ entrypoint = ["./tmp/api"]
 delay = 300
 include_ext = ["go", "sql"]
 include_dir = []
-exclude_dir = ["tmp", "node_modules", "internal/gen", "internal/store"]
+# internal/store is watched: a query edit rebuilds on the .sql change, and again when sqlc
+# writes the new store code. exclude_unchanged stops a rebuild when sqlc writes the same bytes.
+exclude_dir = ["tmp", "node_modules", "internal/gen"]
 exclude_regex = ["_test.go"]
 exclude_unchanged = true
 stop_on_error = true
