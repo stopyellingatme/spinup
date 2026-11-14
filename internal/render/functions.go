@@ -14,6 +14,7 @@ import (
 
 func functions(stack *stackversions.Stack) template.FuncMap {
 	return template.FuncMap{
+		"docurl":  docurl,
 		"lower":   strings.ToLower,
 		"upper":   strings.ToUpper,
 		"snake":   func(s string) string { return strings.Join(words(s), "_") },
