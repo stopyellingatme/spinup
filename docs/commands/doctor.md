@@ -49,7 +49,7 @@ Error: Doctor checks failed
 
 ## Run only the fast checks
 
-`--quick` runs the checks for your tools and local setup: Git, Go, Node, the package manager, Docker, the ports, and `.env`.
+`--quick` runs the checks for your tools and local setup: Git, Go, Node, the package manager, Docker, the ports, `.env`, and the CLI version.
 `spinup dev` runs the same set before it starts.
 
 <!-- doctest: skip -->

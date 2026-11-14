@@ -124,6 +124,7 @@ These variables change how spinup runs.
 | `NO_COLOR` | not set | Any value turns color off. The same as `--no-color`. |
 | `SPINUP_OFFLINE` | not set | `1` is the same as `--offline`. |
 | `SPINUP_NO_UPDATE_CHECK` | not set | `1` stops the notice about a newer spinup version. |
+| `SPINUP_NO_PIN_NOTICE` | not set | `1` stops the warning about a CLI that differs from `spinup.lock`. |
 | `SPINUP_KEYS_DIR` | `~/.config/spinup/keys` | The folder for the private age keys of your environments. |
 | `SPINUP_CREDENTIALS_DIR` | `~/.config/spinup/credentials` | The folder for the stored cloud sign-in. |
 | `SPINUP_TOOLS_DIR` | `<user config dir>/spinup/bin` | The folder where `spinup tools install` puts `sops`, `age`, and `tofu`. |

@@ -73,6 +73,8 @@ $ spinup self-update --require-signature
 
 If Homebrew installed spinup, run `brew upgrade --cask spinup`. The command prints this hint for you.
 The CLI looks for a new release at most once a day and prints a notice on stderr. Set `SPINUP_NO_UPDATE_CHECK=1` to turn the notice off.
+The CLI warns when its version differs from the version that wrote `spinup.lock`.
+Set `SPINUP_NO_PIN_NOTICE=1` to turn this warning off.
 See [self-update](commands/self-update.md).
 
 ## Upgrade the app
