@@ -23,6 +23,39 @@ export async function register(page: Page, email: string): Promise<void> {
 	await expect(page.getByTestId('user-email')).toHaveText(email);
 }
 
+/** A securitypolicyviolation event that the browser fired, as watchCSP records it. */
+export type CSPViolation = { directive: string; blocked: string; source: string };
+
+/**
+ * watchCSP records each securitypolicyviolation event of the page, also after a navigation.
+ * Call it before the first goto. The returned function reads the events of the current document.
+ */
+export async function watchCSP(page: Page): Promise<() => Promise<CSPViolation[]>> {
+	// Playwright runs init scripts outside the CSP of the page, so the policy does not block this one.
+	await page.addInitScript(() => {
+		const w = window as unknown as { __cspViolations: CSPViolation[] };
+		w.__cspViolations = [];
+		document.addEventListener('securitypolicyviolation', (event) => {
+			w.__cspViolations.push({
+				directive: event.effectiveDirective,
+				blocked: event.blockedURI,
+				source: `${event.sourceFile}:${event.lineNumber}`
+			});
+		});
+	});
+	return () =>
+		page.evaluate(() => (window as unknown as { __cspViolations?: CSPViolation[] }).__cspViolations ?? []);
+}
+
+/** scriptNonce returns the nonce of script-src in a Content-Security-Policy header, or null. */
+export function scriptNonce(header: string | undefined): string | null {
+	const scriptSrc = (header ?? '')
+		.split(';')
+		.map((directive) => directive.trim())
+		.find((directive) => directive.startsWith('script-src '));
+	return scriptSrc?.match(/'nonce-([A-Za-z0-9+/_=-]+)'/)?.[1] ?? null;
+}
+
 /** createTodo fills in the new page and submits it. The browser then shows the read view. */
 export async function createTodo(page: Page, title: string): Promise<void> {
 	await page.goto('/todos/new');

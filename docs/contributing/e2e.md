@@ -8,7 +8,7 @@ nav_order: 8
 
 The suite checks that a user of a generated app can register, log in, keep the session across server-side rendering, use a resource, and log out.
 It runs in a real browser against a generated app.
-It also checks the shell of the web app, the API reference page, and the sign-in rate limit.
+It also checks the shell of the web app, the API reference page, the sign-in rate limit, and the escape of user text under the Content Security Policy.
 
 ```sh
 DATABASE_URL='postgres://postgres:postgres@127.0.0.1:5432/e2e?sslmode=disable' \
@@ -27,10 +27,23 @@ The script `testdata/e2e/web/run.sh` does these steps:
 4. Empty the `public` schema of the database. Generate the resource `todo title:string done:bool due:date?`, and run the migrations.
 5. Build the API binary and the web app.
 6. Start the API and `node build`, and wait for `/healthz` on both.
-7. Run the Playwright tests in Chromium, then run the smoke test that the generated app ships.
+7. Run the Playwright tests in Chromium, then run the smoke test that the generated app ships. The smoke test also checks that the home page sends a `Content-Security-Policy` header with `script-src`.
 8. Stop both servers, also when a step fails.
 
-The tests are in `testdata/e2e/web/tests/` (`auth.spec.ts`, `todos.spec.ts`, `shell.spec.ts`, `apidocs.spec.ts`, and `ratelimit.spec.ts`). They use role and label locators.
+The tests are in `testdata/e2e/web/tests/` (`auth.spec.ts`, `todos.spec.ts`, `shell.spec.ts`, `apidocs.spec.ts`, `ratelimit.spec.ts`, and `xss.spec.ts`). They use role and label locators.
+
+## The XSS test
+
+`xss.spec.ts` creates a todo with the title `<img src=x onerror="window.__xss=1">` (ADR 0036 section 3).
+It checks these conditions on the list view, the read view, and the edit view:
+
+- The page shows the title as literal text, and the page has no `img` element with `src="x"`.
+- `window.__xss` is not set, and no dialog opened.
+- The browser fired no `securitypolicyviolation` event.
+- The `Content-Security-Policy` header of the page has a nonce in `script-src`.
+
+The helper `watchCSP` in `tests/helpers.ts` records the `securitypolicyviolation` events of a page.
+Use it in a new test when the test must prove that the policy blocks nothing.
 
 ## Run the suite
 
@@ -48,6 +61,7 @@ The script also needs Go, Node 24, pnpm, and `python3`.
 | `E2E_ONLINE=1` | Install npm packages from the network. The default is the offline pnpm store. |
 | `E2E_INSTALL_BROWSER=1` | Install the Chromium browser for Playwright. |
 | `E2E_KEEP=1` | Keep the work directory and its logs. |
+| `E2E_BROWSERS=all` | Run the suite in Chromium, Firefox, and WebKit. The default is Chromium only. Install the browsers first with `pnpm exec playwright install firefox webkit`. |
 
 Other arguments go to `playwright test`. For example, list the tests, or keep the work directory of one run:
 

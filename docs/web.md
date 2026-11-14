@@ -221,6 +221,35 @@ So the session cookie is a first-party cookie and the CSRF checks agree.
 It also passes the client address to the API as `X-Forwarded-For`, when `ADDRESS_HEADER` is set.
 The API uses the address for [rate limits](build/auth-security.md).
 
+## Content Security Policy
+
+Each page of the app has a `Content-Security-Policy` header.
+The `csp` option of the SvelteKit plugin in the managed file `web/vite.config.js` sets the policy (ADR 0036).
+
+| Directive | Value |
+| --- | --- |
+| `default-src`, `connect-src`, `base-uri`, `form-action` | `'self'` |
+| `script-src` | `'self'` and a new nonce for each page |
+| `style-src` | `'self' 'unsafe-inline'` |
+| `img-src`, `font-src` | `'self' data:` |
+| `object-src` | `'none'` |
+| `frame-ancestors` | `'none'` |
+
+SvelteKit adds the nonce to its own inline script.
+The mode is `auto`, so a prerendered page gets a hash in place of a nonce.
+`spinup dev` sends the same policy. The WebSocket of Vite HMR uses the same host and port, so `connect-src 'self'` allows it.
+The scaffold `hooks.server.ts` sets `frame-ancestors 'none'` only on a response without a policy, such as an endpoint.
+
+These changes need an edit of the policy, or of the page:
+
+- A page with its own inline `<script>` needs `nonce="%sveltekit.nonce%"`. Alternatively, move the script to a module.
+- An image, a font, or a `fetch` to another origin needs that origin in `img-src`, `font-src`, or `connect-src`.
+- A form that posts to a page that redirects to another origin needs that origin in `form-action`. Chrome applies `form-action` to the redirect too.
+- Code that calls `eval` or `new Function` fails. `web/vite.config.js` sets the `jitless` option of zod in the browser, so zod does not try `new Function`.
+
+Do not use `{@html}` with user text. The test `TestNoRawHTML` refuses `{@html` in the templates of spinup.
+In embed mode, the Go API sends the policy of `index.html`. See [Embed mode](embed.md).
+
 ## Environment variables
 
 | Variable | When | Default | Use |
@@ -265,6 +294,7 @@ Review the changes with `git diff` before you commit them.
 | A form post fails with "Cross-site POST form submissions are forbidden" | `PUBLIC_ORIGIN` does not match the URL in the browser | Build again with the right `PUBLIC_ORIGIN` |
 | The sidebar says to run `spinup g resource` | `nav` is empty | Add a resource, or add a link by hand |
 | `data.user` is `null` after sign-in | The API did not answer `/api/session` | Check that the API runs and `API_URL` is right |
+| The browser console says that a script, an image, or a request "violates the following Content Security Policy directive" | The [policy](#content-security-policy) does not allow that source | Add a nonce to the script, or add the origin to the directive |
 
 ## See also
 
