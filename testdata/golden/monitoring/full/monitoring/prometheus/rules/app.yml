@@ -32,11 +32,12 @@ groups:
           summary: "{{ $labels.job }}: more than 5% of the requests fail"
           description: "{{ $labels.job }} answered {{ $value | humanizePercentage }} of the requests with a 5xx status in the last 5 minutes."
 
+      # Live streams stay open, so their duration does not measure request latency.
       - alert: HighLatencyP95
         expr: |
-          histogram_quantile(0.95, sum by (job, le) (rate(http_server_request_duration_seconds_bucket[5m]))) > 1
+          histogram_quantile(0.95, sum by (job, le) (rate(http_server_request_duration_seconds_bucket{http_route!~".*/api/live/.+/live"}[5m]))) > 1
           and
-          sum by (job) (rate(http_server_request_duration_seconds_count[5m])) > 0.1
+          sum by (job) (rate(http_server_request_duration_seconds_count{http_route!~".*/api/live/.+/live"}[5m])) > 0.1
         for: 10m
         labels:
           severity: warning

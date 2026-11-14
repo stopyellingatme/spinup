@@ -1,0 +1,8 @@
+# Managed by spinup. deploy/Dockerfile.web builds with web/ as the context.
+node_modules
+.svelte-kit
+build
+test-results
+playwright-report
+.env
+.env.*
