@@ -111,5 +111,67 @@ class BaselineTests(unittest.TestCase):
             self.assertIn("quick run", str(raised.exception))
 
 
+suite_app = load("suite_app")
+
+LIVEGEN_OK = {
+    "conformance": {"ok": True},
+    "fanout": {"latency_ms": {"p50": 1.5, "p90": 2.0, "p99": 4.25, "max": 9.0}, "samples": 1000, "early": 3,
+               "missed": 0, "duplicates": 0, "out_of_order": 0, "mismatched": 0, "order_ok": True},
+    "memory": {"before_kib": 20000, "after_kib": 40000, "per_stream_kib": 20.0},
+    "resume": {"ready_s": 0.8, "resumed": 100, "sync": 0, "status_503": 2, "status_429": 0, "retries": 2,
+               "max_attempts": 2},
+    "drain": {"ended_s": 0.05, "exit_s": 0.3, "bye": 100},
+    "failures": [],
+}
+
+
+class LivePhaseTests(unittest.TestCase):
+    def test_live_phase_runs_only_with_perf_live(self):
+        self.assertNotIn(suite_app.live_phase, suite_app.phases({}))
+        self.assertNotIn(suite_app.live_phase, suite_app.phases({"PERF_LIVE": "0"}))
+        self.assertEqual(suite_app.phases({"PERF_LIVE": "1"})[-1], suite_app.live_phase)
+
+    def test_live_records_from_livegen_json(self):
+        recs, failures = suite_app.live_records(LIVEGEN_OK, 100, 10)
+        self.assertEqual(failures, [])
+        by = {r["metric"]: r for r in recs}
+        self.assertEqual(sorted(by), sorted(m for m, *_ in suite_app.LIVE_METRICS))
+        self.assertEqual(by["live_fanout_p50_ms"]["median"], 1.5)
+        self.assertEqual(by["live_fanout_p99_ms"]["median"], 4.25)
+        self.assertEqual(by["live_fanout_p99_ms"]["class"], "primary")
+        self.assertEqual(by["live_stream_kib"]["median"], 20.0)
+        self.assertEqual(by["live_stream_kib"]["class"], "primary")
+        self.assertEqual(by["live_resume_ready_s"]["median"], 0.8)
+        self.assertEqual(by["live_resume_sync_count"]["median"], 0)
+        self.assertEqual(by["live_resume_503_count"]["median"], 2)
+        self.assertEqual(by["live_drain_s"]["median"], 0.05)
+        self.assertEqual(by["live_drain_exit_s"]["median"], 0.3)
+        self.assertTrue(by["live_drain_s"]["informational"])
+        for r in recs:
+            self.assertEqual(r["category"], "live")
+            self.assertEqual(r["suite"], "app")
+            self.assertIn("N=100", r["note"])
+
+    def test_failed_conformance_records_no_zero(self):
+        recs, failures = suite_app.live_records({"conformance": {"ok": False, "error": "no ready"}}, 100, 10)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("no ready", failures[0])
+        for r in recs:
+            self.assertEqual(r["samples"], [])
+            self.assertIsNone(r["median"])
+
+    def test_missed_patch_fails_the_fanout(self):
+        res = json.loads(json.dumps(LIVEGEN_OK))
+        res["fanout"]["missed"] = 2
+        res["fanout"]["order_ok"] = True
+        res["drain"]["error"] = "3 streams ended without a bye event"
+        recs, failures = suite_app.live_records(res, 100, 10)
+        by = {r["metric"]: r for r in recs}
+        self.assertEqual(len(failures), 2)
+        self.assertIsNone(by["live_fanout_p99_ms"]["median"])
+        self.assertIsNone(by["live_drain_s"]["median"])
+        self.assertEqual(by["live_stream_kib"]["median"], 20.0)
+
+
 if __name__ == "__main__":
     unittest.main()

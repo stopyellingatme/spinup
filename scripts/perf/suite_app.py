@@ -9,6 +9,9 @@ Phases:
   2. The release build as the Dockerfile builds it, and the binary size.
   3. Runtime on the release binary: start to /healthz, idle RSS, load on /healthz and on the
      session list endpoint (scripts/perf/loadgen), RSS after the load, and the login latency.
+  4. Live data (only with PERF_LIVE=1, ADR 0033 section 17.6): a second app with the live module
+     and `g resource Note body:text --live`. scripts/perf/livegen opens many SSE streams and
+     measures the fan-out latency, the memory of a stream, the resume storm, and the drain.
 """
 
 import http.client
@@ -100,8 +103,9 @@ def rss_mib(pid):
 class Server:
     """A running release binary. stop() ends it."""
 
-    def __init__(self, ctx, binary, db_url, cwd):
+    def __init__(self, ctx, binary, db_url, cwd, extra_env=None):
         self.ctx, self.binary, self.db_url, self.cwd = ctx, binary, db_url, cwd
+        self.extra_env = dict(extra_env or {})
         self.respawns = 0
         self._fh = None
         self._spawn()
@@ -109,7 +113,8 @@ class Server:
     def _spawn(self):
         self.port = free_port()
         self.log = self.ctx.tmp("srv") / "app.log"
-        env = self.ctx.cmd_env(DATABASE_URL=self.db_url, PORT=self.port, SPINUP_ENV="production", LOG_LEVEL="info")
+        env = self.ctx.cmd_env(DATABASE_URL=self.db_url, PORT=self.port, SPINUP_ENV="production", LOG_LEVEL="info",
+                               **self.extra_env)
         for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "SPINUP_KIT_REPLACE", "DATABASE_URL_FILE", "GOFLAGS"):
             env.pop(k, None)
         if self._fh:
@@ -464,6 +469,181 @@ def login_phase(ctx, st, url, cwd, recs):
 
 
 # ---------------------------------------------------------------------------
+# Phase 4: live data (PERF_LIVE=1)
+# ---------------------------------------------------------------------------
+
+LIVE_RESOURCE = "Note body:text --live"
+LIVE_FEED = "notes"
+LIVE_TIMEOUT = "60s"
+LIVE_INFO = "a single run of scripts/perf/livegen with the client on the same machine; noisy on a shared machine"
+# (metric, unit, better, class, informational reason)
+LIVE_METRICS = [
+    ("live_fanout_p50_ms", "ms", "lower", "informational", LIVE_INFO),
+    ("live_fanout_p99_ms", "ms", "lower", "primary", None),
+    ("live_stream_kib", "KiB", "lower", "primary", None),
+    ("live_resume_ready_s", "s", "lower", "informational", LIVE_INFO),
+    ("live_resume_sync_count", "count", "lower", "informational", LIVE_INFO),
+    ("live_resume_503_count", "count", "lower", "informational", LIVE_INFO),
+    ("live_drain_s", "s", "lower", "informational", LIVE_INFO),
+    ("live_drain_exit_s", "s", "lower", "informational", LIVE_INFO),
+]
+
+
+def phases(environ=None):
+    """The phases of the app suite. The live phase runs only when PERF_LIVE is "1"."""
+    environ = os.environ if environ is None else environ
+    base = (dev_phase, release_phase, runtime_phase)
+    return base + (live_phase,) if environ.get("PERF_LIVE") == "1" else base
+
+
+def _live_record(metric, value, note):
+    unit, better, cls, info = next((u, b, c, i) for m, u, b, c, i in LIVE_METRICS if m == metric)
+    if value is None:
+        rec = lib.skipped(SUITE, metric, unit, note, better=better, informational=info, metric_class=cls)
+    else:
+        rec = lib.record(SUITE, metric, unit, [value], better=better, note=note, informational=info,
+                         metric_class=cls)
+    rec["category"] = "live"
+    return rec
+
+
+def live_records(res, clients, patches):
+    """Turns the livegen JSON into records. Returns (records, failures).
+
+    A scenario that failed gives records with no samples (never a zero), and its failure
+    goes in the failures list. A failed conformance check fails every scenario.
+    """
+    size = f"N={clients} streams of one feed, P={patches} patches"
+    failures = []
+    conf = res.get("conformance") or {}
+    if not conf.get("ok"):
+        why = conf.get("error") or "no conformance result"
+        failures.append(f"conformance: {why}")
+        return [_live_record(m, None, f"the conformance check failed: {why}") for m, *_ in LIVE_METRICS], failures
+
+    def scenario(name, check=None):
+        obj = res.get(name)
+        if obj is None:
+            failures.append(f"{name}: livegen wrote no result")
+            return None, f"livegen wrote no {name} result"
+        why = obj.get("error") or (check(obj) if check else None)
+        if why:
+            failures.append(f"{name}: {why}")
+            return None, f"the {name} scenario failed: {why}"
+        return obj, None
+
+    def fan_check(o):
+        bad = {k: o.get(k, 0) for k in ("missed", "duplicates", "out_of_order", "mismatched")}
+        if any(bad.values()) or not o.get("order_ok"):
+            return ", ".join(f"{v} {k}" for k, v in bad.items()) + " patches"
+        return None
+
+    recs = []
+    fan, why = scenario("fanout", fan_check)
+    lat = (fan or {}).get("latency_ms", {})
+    fan_note = (f"{size}; one POST /api/{LIVE_FEED} for each patch; the time from the end of the POST to the "
+                f"patch frame on each client ({(fan or {}).get('samples', 0)} samples, "
+                f"{(fan or {}).get('early', 0)} frames came before the POST ended and count as 0)")
+    recs.append(_live_record("live_fanout_p50_ms", lat.get("p50") if fan else None, why or fan_note))
+    recs.append(_live_record("live_fanout_p99_ms", lat.get("p99") if fan else None, why or fan_note))
+
+    mem, mwhy = scenario("memory")
+    if mem and mem.get("per_stream_kib") is None:
+        mem, mwhy = None, "no per_stream_kib"
+    mem_note = (f"{size}; (server RSS after ready on all - RSS before the streams) / N, read with ps "
+                f"({(mem or {}).get('before_kib')} KiB -> {(mem or {}).get('after_kib')} KiB)")
+    recs.append(_live_record("live_stream_kib", mem.get("per_stream_kib") if mem else None, mwhy or mem_note))
+
+    rs, rwhy = scenario("resume")
+    rs_note = (f"{size}; all streams closed at one time, then opened again at one time with since; "
+               f"{(rs or {}).get('resumed')} resumed, {(rs or {}).get('status_429')} answers 429, "
+               f"{(rs or {}).get('retries')} retries (jitter 0 to 3 s), most attempts {(rs or {}).get('max_attempts')}")
+    recs.append(_live_record("live_resume_ready_s", rs.get("ready_s") if rs else None, rwhy or rs_note))
+    recs.append(_live_record("live_resume_sync_count", rs.get("sync") if rs else None, rwhy or rs_note))
+    recs.append(_live_record("live_resume_503_count", rs.get("status_503") if rs else None, rwhy or rs_note))
+
+    dr, dwhy = scenario("drain")
+    dr_note = (f"N={clients} open streams; SIGTERM to the API; {(dr or {}).get('bye')} streams got bye "
+               f"(reason drain)")
+    recs.append(_live_record("live_drain_s", dr.get("ended_s") if dr else None,
+                             dwhy or dr_note + "; the time until the last stream ended"))
+    recs.append(_live_record("live_drain_exit_s", dr.get("exit_s") if dr else None,
+                             dwhy or dr_note + "; the time until the process exited (polled with ps)"))
+    return recs, failures
+
+
+def build_livegen(ctx):
+    """Builds scripts/perf/livegen next to the load generator. Returns its path."""
+    out = ctx.scratch / "bin" / "livegen"
+    out.parent.mkdir(exist_ok=True)
+    lib.run(["go", "build", "-o", str(out), "./scripts/perf/livegen"], cwd=ctx.repo, env=ctx.env, timeout=600,
+            capture=True)
+    return out
+
+
+def live_phase(ctx, st, recs):
+    """The live data phase: a live app, its release binary, and one livegen run."""
+    clients, patches = ctx.n(1000, 100), ctx.n(50, 10)
+    parent = ctx.tmp("live")
+    db_name = None
+    srv = None
+    try:
+        tool = build_livegen(ctx)
+        app = lib.new_app(ctx, parent, modules=lib.APP_MODULES + ",live", api_only=False)
+        lib.gen_resources(ctx, app, [LIVE_RESOURCE])
+        binary = ctx.tmp("live-bin") / "api"
+        lib.run(["go", "build", "-trimpath", "-o", str(binary), "./cmd/api"], cwd=Path(app) / "api",
+                env=ctx.cmd_env(CGO_ENABLED="0"), timeout=3600, capture=True)
+        db_name, url = lib.create_db(ctx, "live")
+        env = ctx.cmd_env(DATABASE_URL=url, SPINUP_ENV="production", LOG_LEVEL="warn")
+        env.pop("SPINUP_KIT_REPLACE", None)
+        cwd = ctx.tmp("live-cwd")
+        lib.run([binary, "migrate", "up"], cwd=cwd, env=env, timeout=300, capture=True)
+        # One test user opens every stream, so the limit for each user must allow them all,
+        # also while the resume storm overlaps old and new streams. LIVE_MAX_STREAMS keeps
+        # its default (2000), because the phase checks that default.
+        live_env = {"LIVE_MAX_STREAMS_PER_USER": 2 * clients + 16}
+        # Register on a first server, so the argon2id buffer is not in the measured RSS.
+        srv = Server(ctx, binary, url, cwd, extra_env=live_env)
+        try:
+            srv.wait_ready()
+            _, cookie = sign_in(srv.port, register=True)
+        finally:
+            srv.stop()
+        srv = Server(ctx, binary, url, cwd, extra_env=live_env)
+        srv.wait_ready()
+        pid = srv.proc.pid
+        lib.load_gate(ctx, "live")
+        argv = [tool, "-base", f"http://127.0.0.1:{srv.port}", "-feed", LIVE_FEED, "-cookie", cookie,
+                "-clients", clients, "-patches", patches, "-publish-url", f"http://127.0.0.1:{srv.port}/api/notes",
+                "-publish-body", json.dumps({"body": "live perf"}), "-server-pid", pid, "-resume",
+                "-drain-pid", pid, "-timeout", LIVE_TIMEOUT]
+        rc, so, se = lib.run(argv, timeout=900, capture=True, check=False)
+        try:
+            res = json.loads(so)
+        except ValueError:
+            res = {"conformance": {"ok": False, "error": f"livegen printed no JSON (exit code {rc}): "
+                                   + " ".join((so + se).splitlines()[-3:])[:300]}}
+        new, failures = live_records(res, clients, patches)
+        recs.extend(new)
+        if rc != 0 and not failures:
+            failures.append(f"livegen exited with code {rc}: {se.strip()[:300]}")
+        if failures:
+            raise lib.Failure("live phase: " + "; ".join(failures) + f"\n{srv.tail()}",
+                              "read the app log above and run scripts/perf/livegen by hand against the app")
+    except Exception:
+        if not any(r.get("category") == "live" for r in recs):
+            recs.extend(_live_record(m, None, "the live phase stopped before livegen ran") for m, *_ in LIVE_METRICS)
+        raise
+    finally:
+        if srv:
+            srv.stop()
+        if db_name:
+            lib.drop_db(ctx, db_name)
+        rmtree(parent)
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 
@@ -480,7 +660,7 @@ def run(ctx):
         raise
     failed = []
     try:
-        for phase in (dev_phase, release_phase, runtime_phase):
+        for phase in phases():
             try:
                 phase(ctx, st, recs)
             except Exception as e:  # keep the finished phases, and run the next one
