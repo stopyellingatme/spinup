@@ -133,6 +133,10 @@ func (w *statusWriter) Write(data []byte) (int, error) {
 	}
 	return w.ResponseWriter.Write(data)
 }
+
+// Unwrap lets http.NewResponseController find Flush and SetWriteDeadline below the recorder.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (d *Devtools) record(value request) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

@@ -1,0 +1,62 @@
+# Add live to an app with auth (ADR 0033 section 11.6).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+
+exec spinup new retrofit --modules auth --module example.com/retrofit --non-interactive
+cd retrofit
+! exists api/internal/live/live.go
+
+# The review branch contains the pack and prints the manual wiring steps.
+exec spinup module add live --yes --non-interactive
+stdout 'git merge spinup/module-live'
+stdout 'Next: run spinup db migrate up\. It adds the tables live_feeds and live_outbox\.'
+stdout 'applive "example.com/retrofit/api/internal/live"'
+stdout 'kitlive "github.com/stopyellingatme/spinup/kit/x/live"'
+stdout 'LIVE_MAX_STREAMS'
+stdout 'LIVE_MAX_STREAMS_PER_USER'
+stdout 'kitlive.New\(pool,'
+stdout 'liveHub.Start\(ctx\)'
+stdout 'app.WithRequestTimeoutExempt\(kitlive.IsStream\)'
+stdout 'app.WithRoutes\(applive.Routes\(liveHub, applive.Deps\{DB: pool\}\)\)'
+stdout 'app.WithCommand\("live", liveHub.Command\(\)\)'
+stdout 'app.WithReadiness\("live", liveHub.Ready\)'
+stdout 'app.WithDrain\(liveHub.Drain\)'
+stdout 'app.WithShutdown\(liveHub.Close\)'
+stdout 'spinup g live <resource>'
+stdout 'spinup g resource <Name> --live'
+stdout 'liveRefresh'
+stdout 'Next: run spinup doctor and inspect the live-wired check\.'
+exists .spinup/upgrade/0.0.0-dev/api/db/kit/00011_live.sql
+exists .spinup/upgrade/0.0.0-dev/api/internal/live/live.go
+exists .spinup/upgrade/0.0.0-dev/api/internal/live/feeds_gen.go
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/live.core.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/live.svelte.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/live.core.test.ts
+grep '^modules = .*live' .spinup/upgrade/0.0.0-dev/spinup.toml
+
+# The main checkout stays clean until the merge.
+! exists api/internal/live/live.go
+! exists api/db/kit/00011_live.sql
+exec git status --porcelain
+! stdout .
+exec git merge spinup/module-live
+exists api/db/kit/00011_live.sql
+exists api/internal/live/live.go
+exists api/internal/live/feeds_gen.go
+
+# The merge brings the main.go wiring, so the doctor check passes.
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'ok\tlive-wired\tlive wiring is present'
+
+-- tools/go --
+#!/bin/sh
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+exit 0

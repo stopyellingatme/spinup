@@ -6,6 +6,9 @@ package resource
 // ?created=1. The target page shows a toast once and removes the flag.
 
 const listSvelte = `<script lang="ts">
+[[- if .Live ]]
+	import { liveRefresh } from '#lib/live.svelte.js';
+[[- end ]]
 	import { enhance, type ActionResult, type SubmitFunction } from '$app/forms';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -29,6 +32,9 @@ const listSvelte = `<script lang="ts">
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+[[- if .Live ]]
+	liveRefresh('[[ .Feed ]]');
+[[- end ]]
 
 	// Show the toast of a redirect once, then remove its flag from the address bar.
 	afterNavigate(({ to }) => {

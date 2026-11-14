@@ -19,6 +19,7 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagsdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagswired"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/gendrift"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/livewired"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/mcpwired"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/plainsecrets"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/quick"

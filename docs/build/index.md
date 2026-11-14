@@ -56,6 +56,7 @@ Read these in order: accounts first, then roles, then the audit trail that recor
 | Turn a feature on or off without a deploy | [Feature flags](flags.md) |
 | Let a program call the API with a key and a quota | [API keys and plans](api-keys.md) |
 | Let AI clients call typed tools over MCP | [MCP server](mcp.md) |
+| Show changes on open pages with no reload | [Live data](live.md) |
 | Sell subscriptions and meter API calls with Stripe | [Billing with Stripe](billing.md) |
 | Run work after the response | [Background jobs](jobs.md) |
 | Add a worker in Rust, Python, or Node | [Sidecar services](../services.md) |

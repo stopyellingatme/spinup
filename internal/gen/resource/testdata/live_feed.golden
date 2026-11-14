@@ -1,0 +1,44 @@
+package live
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"example.com/demo/api/internal/gen"
+	"example.com/demo/api/internal/handlers"
+	"github.com/stopyellingatme/spinup/kit/auth"
+	kitlive "github.com/stopyellingatme/spinup/kit/x/live"
+)
+
+const notesFeed = "notes"
+
+// spinup:live-feed notes registerNotesFeed
+func registerNotesFeed(mux *http.ServeMux, h *kitlive.Hub, d Deps) {
+	key := func(r *http.Request) (kitlive.Key, error) {
+		user, ok := auth.UserFrom(r.Context())
+		if !ok {
+			return "", kitlive.ErrUnauthorized
+		}
+		return kitlive.OwnedKey(notesFeed, user.ID), nil
+	}
+	server := handlers.NewServer(d.DB)
+	mux.Handle("GET /api/live/notes", kitlive.Snapshot(h, key, func(ctx context.Context, _ kitlive.Key, limit int) ([]gen.Note, error) {
+		limit32 := int32(min(limit, 200))
+		response, err := server.ListNotes(ctx, gen.ListNotesRequestObject{Params: gen.ListNotesParams{Limit: &limit32}})
+		if err != nil {
+			return nil, err
+		}
+		switch result := response.(type) {
+		case gen.ListNotes200JSONResponse:
+			// The list has more rows than this page: the snapshot answer has more: true.
+			if result.Total > int64(len(result.Items)) {
+				kitlive.MarkMore(ctx)
+			}
+			return result.Items, nil
+		default:
+			return nil, fmt.Errorf("unexpected ListNotes response %T", response)
+		}
+	}))
+	mux.Handle("GET /api/live/notes/live", h.Stream(key))
+}

@@ -214,6 +214,10 @@ func renderPage(name, source string, data pageData) ([]byte, error) {
 
 // pageData is the input of the page templates.
 type pageData struct {
+	// Live enables refresh when a feed changes.
+	Live bool
+	// Feed is the snake case plural name.
+	Feed string
 	// Audit enables the History button.
 	Audit bool
 	// Pascal is the schema name, such as LineItem.
@@ -264,6 +268,8 @@ func capitalize(s string) string {
 func newPageData(spec Spec) pageData {
 	d := pageData{
 		Audit:       spec.Audit.On,
+		Live:        spec.Live,
+		Feed:        spec.Name.PluralSnake(),
 		Pascal:      spec.Name.Pascal(),
 		Words:       words(spec.Name.Snake()),
 		PluralWords: words(spec.Name.PluralSnake()),

@@ -22,9 +22,14 @@ func WithRequestTimeout(timeout time.Duration) Option {
 
 // WithRequestTimeoutExempt exempts matching requests from the application deadline.
 // Use it for streaming, SSE, or websocket routes. Devtools routes are already exempt.
-// The predicate must support concurrent calls. A nil predicate adds no exemptions.
+// Each call adds a predicate. A request is exempt when any predicate returns true.
+// Predicates must support concurrent calls. A nil predicate adds nothing.
 func WithRequestTimeoutExempt(exempt func(*http.Request) bool) Option {
-	return func(a *App) { a.timeoutExempt = exempt }
+	return func(a *App) {
+		if exempt != nil {
+			a.timeoutExempt = append(a.timeoutExempt, exempt)
+		}
+	}
 }
 
 // WithName sets the application name returned by /version.
@@ -65,6 +70,21 @@ func WithCommand(name string, run func(ctx context.Context, args []string) error
 // Hooks share the server shutdown deadline and must honor context cancellation.
 func WithShutdown(hook func(ctx context.Context) error) Option {
 	return func(a *App) { a.shutdown = append(a.shutdown, hook) }
+}
+
+// DrainTimeout is the time that the drain hooks share.
+const DrainTimeout = 5 * time.Second
+
+// WithDrain adds a drain hook. Drain hooks run when shutdown starts, before the
+// HTTP server stops. Use one to end long-lived responses, such as SSE streams.
+// Hooks run in reverse option order and share one deadline of DrainTimeout.
+// A hook must return when its context ends. A nil hook adds nothing.
+func WithDrain(hook func(ctx context.Context) error) Option {
+	return func(a *App) {
+		if hook != nil {
+			a.drain = append(a.drain, hook)
+		}
+	}
 }
 
 // WithAddr overrides the listen address. An empty address uses the configured port.

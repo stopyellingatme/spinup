@@ -351,6 +351,23 @@ A comparison with corten (a Rust web framework of a co-worker) on 2026-11-13 gav
 | QG6 | XSS and CSP e2e, `TestNoRawHTML`, the browser switch | `T ./internal/templates/ -run NoRawHTML`, `G web`; gate: `make e2e` † | `testdata/e2e/web/{tests/xss.spec.ts,tests/helpers.ts,playwright.config.ts}`, `internal/templates/packs/web/files/web/e2e/smoke.spec.ts.tmpl`, `internal/templates/raw_html_test.go`, goldens, `docs/contributing/e2e.md` | QG5 |
 | QG7 | Fuzz targets and the nightly fuzz step | `T ./kit/httpx/...` | `kit/httpx/fuzz_test.go`, `kit/httpx/testdata/fuzz/`, `.github/workflows/nightly.yml` | WP3 |
 
+#### N2 — the live data module (added 2026-11-13, contracts in ADR 0033)
+
+The `live` module adds live data feeds over server-sent events: a snapshot, numbered patches, and resume by cursor. PostgreSQL is the only broker. No unit adds a dependency. The main loop owns `packs.digest` and the kit migration `00011_live.sql`. The packs `live`, `api`, `deploy`, and `monitoring` get `none`. The units and their checks are in the orchestrate run `20261113-230238`.
+
+| Unit | Outcome | Deps |
+|---|---|---|
+| LV0 (main loop) | The pre-seed: the ADR, the amend lines, the pack skeleton, the kit stubs, and the shared files | – |
+| LV1 | `app.WithDrain`, the additive `WithRequestTimeoutExempt`, and the devtools `Unwrap` | LV0 |
+| LV2 | Keys, changes, the cursor, frames, the ring, the feed, and the metrics (no database) | LV0 |
+| LV3 | `Publish`, `Prune`, the hub lifecycle, the listener, the poll, and the feed load and fetch | LV2 |
+| LV4 | `Stream`, `Snapshot`, the limits, `Drain`, `Command`, and `livetest` | LV1, LV3 |
+| LV5 | The pack, the `main.go` wiring, the Caddy block, the alert rule, and the golden trees | LV0 |
+| LV6 | The web helper: `live.core.ts` and `live.svelte.ts` | LV5 |
+| LV7 | `spinup g live` and `spinup g resource --live` | LV5 |
+| LV8 | The doctor check `live-wired`, the guide, and the app gate | LV4, LV6, LV7 |
+| LV9 | The live load check: `livegen` and the perf phase | LV4, LV7 |
+
 ## Verification
 
 - **Per unit:** the orchestrate Phase 5 runs the unit's Check column, plus `make build lint`. Lanes do not self-certify.

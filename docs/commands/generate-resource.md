@@ -364,3 +364,21 @@ $ cd api && go test ./...
 - [generate audit](generate-audit.md) and [generate roles](generate-roles.md)
 - [Accounts and sign-in](../auth.md) and [Audit trail](../audit.md)
 - Flag reference: [`generate resource`](../site/commands/generate-resource.md), [`generate model`](../site/commands/generate-model.md), [`generate handler`](../site/commands/generate-handler.md), [`generate migration`](../site/commands/generate-migration.md)
+
+## Add live data
+
+Add `--live` to generate a feed and publish each write in its transaction.
+The app needs the `auth` and `live` modules.
+The feed uses the owner scope and the roles of the resource.
+With `--shared`, all signed-in users with an allowed role read the same feed.
+
+The generated list page calls `liveRefresh` when the app has the web module.
+With `--api-only`, the generator omits the page.
+An error during publishing rolls the transaction back.
+
+For an existing resource, run [`spinup g live`](generate-live.md).
+Follow its printed instructions to edit the handlers and the list page.
+
+| Flag | What it does |
+| --- | --- |
+| `--live` | Publish live changes. Requires the `auth` and `live` modules. |

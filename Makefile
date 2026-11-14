@@ -51,7 +51,7 @@ perf-compare: ## Compare two perf results: BASE=<json> NEW=<json> THRESHOLD=0.10
 	@python3 -I scripts/perf/perf.py compare $(BASE) $(NEW) --threshold $(or $(THRESHOLD),0.10)
 
 perf-gate: ## Deterministic perf gate: the allocation budgets of the kit, without the race detector, and the unit tests of scripts/perf (ADR 0034 §8)
-	@cd kit && go test -count=1 -run 'Budget$$' ./httpx/... ./app/... ./logx/...
+	@cd kit && go test -count=1 -run 'Budget$$' ./httpx/... ./app/... ./logx/... ./x/live/...
 	@python3 -I -B -m unittest discover -s scripts/perf -p 'test_*.py'
 
 perf-baseline: ## Write perf/baseline/<cpu-slug>.{json,md} from a full result: NEW=<json> (ADR 0034 §7)

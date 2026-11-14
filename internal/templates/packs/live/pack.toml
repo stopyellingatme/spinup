@@ -1,0 +1,33 @@
+name = "live"
+description = "Live data feeds over server-sent events, with a snapshot, numbered patches, and resume."
+requires = ["auth"]
+
+[[files]]
+path = "api/db/kit/00011_live.sql"
+source = "files/api/db/kit/00011_live.sql"
+class = "seed"
+
+[[files]]
+path = "api/internal/live/live.go"
+source = "files/api/internal/live/live.go.tmpl"
+class = "scaffold"
+
+[[files]]
+path = "api/internal/live/feeds_gen.go"
+source = "files/api/internal/live/feeds_gen.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/live.core.ts"
+source = "files/web/src/lib/live.core.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/live.svelte.ts"
+source = "files/web/src/lib/live.svelte.ts"
+class = "managed"
+
+[[files]]
+path = "web/src/lib/live.core.test.ts"
+source = "files/web/src/lib/live.core.test.ts"
+class = "managed"
