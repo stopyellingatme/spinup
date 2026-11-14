@@ -145,6 +145,7 @@ An in-place restore uses the deploy lock, the maintenance window, and a safety b
 It keeps the old data at `$PGDATA.spinup-before-restore`. Check that directory, then remove it by hand.
 A second in-place restore refuses to run while that directory exists. It also refuses symbolic links at either path.
 See [backup restore](commands/backup-restore.md) for the flags and the failure messages.
+After a restore of an app with the [live module](build/live.md#after-a-database-restore), run `api live reset --all --yes`.
 
 ## Verify backups
 

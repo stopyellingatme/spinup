@@ -1,0 +1,37 @@
+# The doctor check live-wired finds a main.go that lost a line and a feed with no Publish call (ADR 0033 section 14).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,live --module example.com/demo --no-git --non-interactive
+cd demo
+exec spinup g resource Note body:text --live
+exists api/internal/live/notes.go
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'ok\tlive-wired\tlive wiring is present'
+
+# Delete the drain line. The check warns and names the missing line.
+cp api/cmd/api/main.go main.orig
+exec sh -c 'grep -v "app.WithDrain(liveHub.Drain)," api/cmd/api/main.go > main.tmp && mv main.tmp api/cmd/api/main.go'
+! grep 'WithDrain' api/cmd/api/main.go
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'warn\tlive-wired\tapi/cmd/api/main.go lacks app.WithDrain\(liveHub.Drain\) inside app.New\.'
+stdout 'Try: add app.WithDrain\(liveHub.Drain\), \(see docs/build/live.md\)'
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "warn"'
+cp main.orig api/cmd/api/main.go
+
+# Replace the Publish calls with a comment. The check warns about the feed.
+exec sh -c 'sed "s#return live.Publish(.*#return nil // no publish#" api/internal/handlers/notes.go > notes.tmp && mv notes.tmp api/internal/handlers/notes.go'
+! grep 'live.Publish' api/internal/handlers/notes.go
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'warn\tlive-wired\tthe feed notes has no Publish call\. A write that does not publish does not reach the clients\.'
+stdout 'Try: add live.Publish to the handlers of the resource \(see docs/build/live.md\), or remove the feed'
+cd $WORK
+
+# An app with no live module skips the check.
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "skip"'
+exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
+stdout 'skip\tlive-wired\tno live module'

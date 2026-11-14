@@ -1,0 +1,319 @@
+# App gate: the live module (ADR 0033 section 17.5). An app with auth and live builds, migrates,
+# and serves. A real server answers the snapshot, the stream, resume, the patches of a POST, a
+# PUT, and a DELETE, the 401, the owner scope, the per-user limit, the reset, the Caddy route,
+# the Vite dev proxy, and the drain on SIGTERM. The gate needs a database, curl, pnpm, and node.
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:curl] skip 'curl is required to call the API'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+[!exec:perl] skip 'perl is required to time the shutdown'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+# The deploy module brings the production Caddyfile.
+exec spinup new gatelive --modules auth,deploy,live --module example.com/gatelive --no-git --non-interactive
+cd gatelive
+exec spinup g resource Note body:text --live
+exists api/internal/live/notes.go
+grep 'registerNotesFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
+grep 'liveRefresh\(.notes.\);' web/src/routes/notes/+page.svelte
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
+
+# Type-check the web app: the generated page and the helper. Then run the vitest tests of the helper.
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+exec sh $WORK/pnpm.sh test
+stdout 'live\.core\.test\.ts'
+cd ..
+
+# Build, vet, and test the API. The handler test counts the outbox rows.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go test ./...
+exec go build -o $WORK/gatelive-api ./cmd/api
+cd ..
+
+# Apply the migrations, including the kit space with live_feeds and live_outbox.
+exec spinup db migrate up
+
+# Make two accounts.
+cd api
+stdin $WORK/password.txt
+exec $WORK/gatelive-api user create --email ada@example.com --role staff --password-stdin
+stdin $WORK/password.txt
+exec $WORK/gatelive-api user create --email bob@example.com --role staff --password-stdin
+
+# Start the server. A user may open at most two streams.
+env PORT=38471
+env PUBLIC_ORIGIN=http://127.0.0.1:38471
+env LIVE_MAX_STREAMS_PER_USER=2
+exec sh $WORK/serve.sh $WORK/gatelive-api &server&
+exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o health.json -w '%{http_code}' http://127.0.0.1:38471/healthz
+stdout '^200$'
+
+# 1. Both users sign in.
+exec curl -sS -c ada.jar -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"ada@example.com","password":"gate password 1"}' http://127.0.0.1:38471/api/auth/login
+stdout '^200$'
+exec curl -sS -c bob.jar -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"bob@example.com","password":"gate password 1"}' http://127.0.0.1:38471/api/auth/login
+stdout '^200$'
+
+# 2. A feed with no patch has the cursor 0-0 and no rows.
+exec sh $WORK/api.sh GET /api/live/notes ada.jar '' snap0.json
+stdout '^200$'
+grep '\A\{"epoch":0,"seq":0,"rows":\[\]\}$' snap0.json
+grep '(?i)^content-type: application/json' snap0.json.headers
+grep '(?i)^cache-control: no-store' snap0.json.headers
+
+# 3. Ada and Bob open a stream with no cursor. The first event is ready.
+exec curl -sS -N --max-time 60 -D s1.headers -o s1.out -b ada.jar http://127.0.0.1:38471/api/live/notes/live &s1&
+exec curl -sS -N --max-time 60 -D s2.headers -o s2.out -b bob.jar http://127.0.0.1:38471/api/live/notes/live &s2&
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":0,"seq":0,"resumed":false\}$'
+exec sh $WORK/waitfor.sh s2.out '^data: \{"epoch":0,"seq":0,"resumed":false\}$'
+grep '\Aevent: ready\nid: 0-0\n' s1.out
+grep '(?i)^content-type: text/event-stream' s1.headers
+grep '(?i)^cache-control: no-cache, no-transform' s1.headers
+grep '(?i)^x-accel-buffering: no' s1.headers
+
+# 4. A POST sends a patch with an upsert and the row. The snapshot then has seq 1 and one row.
+exec sh $WORK/api.sh POST /api/notes ada.jar '{"body":"first"}' created.json
+stdout '^201$'
+exec sh -c 'sed -E "s/.*\"id\":([0-9]+).*/\1/" created.json > id.txt'
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":[0-9]+,"seq":1,"changes":\[.*"op": ?"upsert"' 2
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":[0-9]+,"seq":1,"changes":\[\{"id": ?"@ID@".*"body": ?"first"'
+grep '^event: patch\nid: [0-9]+-1\n' s1.out
+exec sh $WORK/api.sh GET /api/live/notes ada.jar '' snap1.json
+stdout '^200$'
+grep '\A\{"epoch":[1-9][0-9]*,"seq":1,"rows":\[\{.*"body":"first"' snap1.json
+! grep '\},\{' snap1.json
+exec sh -c 'sed -E "s/^\{\"epoch\":([0-9]+).*/\1/" snap1.json > epoch.txt'
+
+# 5. Resume: the cursor of the empty snapshot of the epoch replays the patch. An old epoch gets sync.
+exec sh $WORK/fetch.sh resume.out '/api/live/notes/live?since=@EPOCH@-0' 2 ada.jar
+grep '\Aevent: ready\n' resume.out
+grep '"seq":1,"resumed":true\}' resume.out
+grep '"seq":1,"changes":\[.*"body": ?"first"' resume.out
+exec sh $WORK/fetch.sh old.out '/api/live/notes/live?since=1-0' 5 ada.jar
+grep '\Aevent: sync\ndata: \{"epoch":[0-9]+,"seq":1,"reason":"epoch"\}\n\n\z' old.out
+
+# 6. A PUT sends an upsert. A DELETE sends a delete with the same ID.
+exec sh $WORK/api.sh PUT /api/notes/@ID@ ada.jar '{"body":"second"}' updated.json
+stdout '^200$'
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":[0-9]+,"seq":2,"changes":\[\{"id": ?"@ID@", ?"op": ?"upsert".*"body": ?"second"' 2
+exec sh $WORK/api.sh DELETE /api/notes/@ID@ ada.jar '' deleted.json
+stdout '^204$'
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":[0-9]+,"seq":3,"changes":\[\{"id": ?"@ID@", ?"op": ?"delete"\}\]\}$' 2
+
+# 7. No cookie answers 401 with a problem. Bob never sees the patches of Ada.
+exec sh $WORK/api.sh GET /api/live/notes/live none '' nocookie.json
+stdout '^401$'
+grep '(?i)^content-type: application/problem\+json' nocookie.json.headers
+grep 'A signed-in user is required\. Try: sign in, then connect again\.' nocookie.json
+exec sh $WORK/api.sh GET /api/live/notes none '' nocookie-snap.json
+stdout '^401$'
+grep '(?i)^content-type: application/problem\+json' nocookie-snap.json.headers
+exec sh $WORK/api.sh GET /api/live/notes bob.jar '' bob-snap.json
+stdout '^200$'
+grep '\A\{"epoch":0,"seq":0,"rows":\[\]\}$' bob-snap.json
+grep '^event: ready\n' s2.out
+! grep 'event: patch' s2.out
+
+# 8. Ada has two open streams, so the third answers 429 with Retry-After: 5.
+exec curl -sS -N --max-time 60 -o s3.out -b ada.jar http://127.0.0.1:38471/api/live/notes/live &s3&
+exec sh $WORK/waitfor.sh s3.out '^data: \{"epoch":[0-9]+,"seq":3,"resumed":false\}$'
+exec sh $WORK/api.sh GET /api/live/notes/live ada.jar '' limit.json
+stdout '^429$'
+grep '(?i)^retry-after: 5' limit.json.headers
+grep '(?i)^content-type: application/problem\+json' limit.json.headers
+grep 'This account has 2 open live streams\. Try: close another tab, then connect again\.' limit.json
+
+# 9. The app command lists the feed of Ada with seq 3. A reset sends sync with the reason reset.
+exec $WORK/gatelive-api live feeds --json
+stdout '"key":"notes:[0-9]+","epoch":[0-9]+,"seq":3,"patches":3'
+cp stdout feeds.json
+exec $WORK/gatelive-api live feeds
+stdout '^KEY +EPOCH +SEQ +PATCHES +UPDATED$'
+exec sh -c 'grep -oE "notes:[0-9]+" feeds.json | head -n 1 > key.txt'
+exec sh -c '$WORK/gatelive-api live reset "$(cat key.txt)" --yes'
+stdout '^reset notes:[0-9]+$'
+exec sh $WORK/waitfor.sh s1.out '^data: \{"epoch":[0-9]+,"seq":0,"reason":"reset"\}$' 10
+exec sh $WORK/waitfor.sh s3.out '^data: \{"epoch":[0-9]+,"seq":0,"reason":"reset"\}$' 10
+wait s1
+wait s3
+grep 'event: sync\ndata: \{"epoch":[0-9]+,"seq":0,"reason":"reset"\}\n\n\z' s1.out
+! exec $WORK/gatelive-api live reset notes:999999 --yes
+stderr 'live reset: the feed "notes:999999" has no row\.'
+! exec $WORK/gatelive-api live reset --all
+stderr 'Try: live feeds'
+cd ..
+
+# 10. The Caddyfile: the live route flushes each event at once. A run behind Caddy keeps the stream
+# uncompressed, because the stream sends no-transform.
+[exec:caddy] cp $WORK/upstream.caddy deploy/upstream.caddy
+[exec:caddy] env PUBLIC_HOST=example.com
+[exec:caddy] exec caddy adapt --config deploy/Caddyfile --adapter caddyfile
+[exec:caddy] stdout '"/api/live/\*"'
+[exec:caddy] stdout '"flush_interval":-1'
+[exec:caddy] cp stdout caddy.json
+[exec:caddy] exec sh -c 'grep -o "\"flush_interval\":-1" caddy.json | wc -l | tr -d " "'
+[exec:caddy] stdout '^1$'
+[exec:caddy] exec sh -c 'sed -e "s/^\tadmin localhost:2019$/\tadmin off/" -e "/^:2020 {/,/^}/d" deploy/Caddyfile > deploy/Caddyfile.gate'
+[exec:caddy] cp $WORK/upstream-local.caddy deploy/upstream.caddy
+[exec:caddy] env PUBLIC_HOST=http://127.0.0.1:38473
+[exec:caddy] env XDG_DATA_HOME=$WORK/caddy-data
+[exec:caddy] env XDG_CONFIG_HOME=$WORK/caddy-config
+[exec:caddy] exec caddy run --config deploy/Caddyfile.gate --adapter caddyfile &caddy&
+[exec:caddy] exec curl -sS --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors -o /dev/null -w '%{http_code}' http://127.0.0.1:38473/healthz
+[exec:caddy] stdout '^200$'
+[exec:caddy] exec curl -sS -N --max-time 60 -H 'Accept-Encoding: zstd, gzip' -D api/caddy.headers -o api/caddy.out -b api/ada.jar http://127.0.0.1:38473/api/live/notes/live &cs&
+[exec:caddy] exec sh $WORK/waitfor.sh api/caddy.out '^event: ready$' 10
+[exec:caddy] grep '(?i)^content-type: text/event-stream' api/caddy.headers
+[exec:caddy] grep '(?i)^cache-control: no-cache, no-transform' api/caddy.headers
+[exec:caddy] ! grep '(?i)^content-encoding:' api/caddy.headers
+cd api
+[exec:caddy] exec sh $WORK/api.sh POST /api/notes ada.jar '{"body":"through caddy"}' caddy-note.json
+[exec:caddy] stdout '^201$'
+[exec:caddy] exec sh $WORK/waitfor.sh caddy.out '"op": ?"upsert".*"body": ?"through caddy"' 2
+[exec:caddy] kill cs
+[exec:caddy] kill caddy
+
+# Claim b of ADR 0033: the Vite dev proxy does not buffer the stream. A frame arrives within 2 s.
+cd ../web
+env API_URL=http://127.0.0.1:38471
+exec node node_modules/vite/bin/vite.js dev --host 127.0.0.1 --port 38472 --strictPort &vite&
+exec curl -sS --retry 60 --retry-delay 1 --retry-connrefused --retry-all-errors -o /dev/null -w '%{http_code}' http://127.0.0.1:38472/api/live/notes -b ../api/ada.jar
+stdout '^200$'
+exec curl -sS -N --max-time 60 -o ../api/vite.out -b ../api/ada.jar http://127.0.0.1:38472/api/live/notes/live &vs&
+cd ../api
+exec sh $WORK/waitfor.sh vite.out '^event: ready$' 30
+exec sh $WORK/api.sh POST /api/notes ada.jar '{"body":"through vite"}' vite-note.json
+stdout '^201$'
+exec sh $WORK/waitfor.sh vite.out '"op": ?"upsert".*"body": ?"through vite"' 2
+kill vs
+kill vite
+
+# 11. SIGTERM with one open stream: the server stops in less than 2 s with status 0, and the
+# stream ends with bye (reason drain).
+exec curl -sS -N --max-time 60 -o s4.out -b ada.jar http://127.0.0.1:38471/api/live/notes/live &s4&
+exec sh $WORK/waitfor.sh s4.out '^event: ready$'
+exec sh $WORK/stop.sh
+stdout '^the server stopped in [0-9]+ ms with status 0$'
+wait s4
+grep 'event: bye\ndata: \{"reason":"drain"\}\n\n\z' s4.out
+wait server
+cd ..
+
+# 12. The doctor check is still ok.
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
+
+-- password.txt --
+gate password 1
+-- serve.sh --
+# Run the server in the background of this shell, write its PID to server.pid, and write its
+# exit status to server.status when it ends. An INT or a TERM to this shell stops the server.
+"$@" &
+pid=$!
+echo "$pid" > server.pid
+trap 'kill -TERM "$pid" 2>/dev/null' INT TERM
+while :; do
+  wait "$pid"
+  status=$?
+  kill -0 "$pid" 2>/dev/null || break
+done
+echo "$status" > server.status
+exit "$status"
+-- stop.sh --
+# Send SIGTERM to the server and time its stop. Fail when it takes 2 s or more, or exits
+# with a status other than 0.
+now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time() * 1000'; }
+pid=$(cat server.pid)
+start=$(now_ms)
+kill -TERM "$pid"
+while [ ! -s server.status ]; do
+  if [ $(( $(now_ms) - start )) -ge 5000 ]; then
+    echo "the server did not stop in 5 s" >&2
+    exit 1
+  fi
+  sleep 0.02
+done
+elapsed=$(( $(now_ms) - start ))
+status=$(cat server.status)
+echo "the server stopped in $elapsed ms with status $status"
+[ "$status" -eq 0 ] && [ "$elapsed" -lt 2000 ]
+-- waitfor.sh --
+# Wait until the file $1 matches the extended regular expression $2. $3 is the limit in
+# seconds (default 10). @ID@ and @EPOCH@ in the pattern become the text of id.txt and epoch.txt.
+now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time() * 1000'; }
+file=$1
+limit=${3:-10}
+id=$(cat id.txt 2>/dev/null)
+epoch=$(cat epoch.txt 2>/dev/null)
+pattern=$(printf '%s' "$2" | sed -e "s/@ID@/$id/g" -e "s/@EPOCH@/$epoch/g")
+start=$(now_ms)
+while :; do
+  if [ -f "$file" ] && grep -Eq -- "$pattern" "$file"; then
+    exit 0
+  fi
+  if [ $(( $(now_ms) - start )) -ge $(( limit * 1000 )) ]; then
+    echo "after ${limit} s, $file does not match $pattern" >&2
+    [ -f "$file" ] && cat "$file" >&2
+    exit 1
+  fi
+  sleep 0.05
+done
+-- fetch.sh --
+# Read a stream for at most $3 seconds into the file $1. $2 is the path, with @ID@ and @EPOCH@.
+# $4 is the cookie jar. A stream that is still open at the limit is a success.
+id=$(cat id.txt 2>/dev/null)
+epoch=$(cat epoch.txt 2>/dev/null)
+path=$(printf '%s' "$2" | sed -e "s/@ID@/$id/g" -e "s/@EPOCH@/$epoch/g")
+curl -sS -N --max-time "$3" -D "$1.headers" -o "$1" -b "$4" "http://127.0.0.1:38471$path"
+code=$?
+[ "$code" -eq 0 ] || [ "$code" -eq 28 ] || exit "$code"
+exit 0
+-- api.sh --
+# Send one request to the API and print the status code. $1 is the method, $2 the path with
+# @ID@, $3 the cookie jar or "none", $4 the JSON body or empty, and $5 the output file. The
+# headers go to $5.headers. A write sends the Origin of the app.
+id=$(cat id.txt 2>/dev/null)
+path=$(printf '%s' "$2" | sed -e "s/@ID@/$id/g")
+set -- "$1" "$path" "$3" "$4" "$5"
+jar=
+if [ "$3" != none ]; then
+  jar="-b $3"
+fi
+if [ -n "$4" ]; then
+  exec curl -sS $jar -D "$5.headers" -o "$5" -w '%{http_code}' --max-time 10 -X "$1" \
+    -H 'Origin: http://127.0.0.1:38471' -H 'Content-Type: application/json' -d "$4" \
+    "http://127.0.0.1:38471$2"
+fi
+exec curl -sS $jar -D "$5.headers" -o "$5" -w '%{http_code}' --max-time 10 -X "$1" \
+  -H 'Origin: http://127.0.0.1:38471' "http://127.0.0.1:38471$2"
+-- upstream.caddy --
+reverse_proxy {
+	{block}
+	dynamic a {
+		name {args[0]}-green
+		port {args[1]}
+		refresh 1s
+	}
+	lb_policy round_robin
+	lb_try_duration 5s
+	lb_try_interval 50ms
+	transport http {
+		dial_timeout 250ms
+	}
+}
+-- upstream-local.caddy --
+reverse_proxy 127.0.0.1:38471 {
+	{block}
+}
+-- pnpm.sh --
+# Scripts get their own HOME, but corepack keeps the pinned pnpm, and pnpm keeps the offline
+# store, under the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"
