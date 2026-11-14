@@ -65,5 +65,6 @@ Read these in order: accounts first, then roles, then the audit trail that recor
 | Ship the web app inside the Go binary | [Embed mode](../embed.md) |
 | Use bun or the heyapi client | [Package manager and API client](../web-variants.md) |
 | Add commands or generators from outside | [Plugins](../plugins.md) and [Executable plugins](../plugins-exec.md) |
+| Help AI coding agents work in the app | [Agent guidance](agents.md) |
 
 To deploy the app, read [Deploy](../deploy/index.md). To run it in production, read [Operate](../operate/index.md).

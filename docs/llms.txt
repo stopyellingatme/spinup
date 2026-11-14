@@ -48,6 +48,7 @@ Each link points to a Markdown page. Read "Get started" first. The section "Opti
 - [MCP server](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/mcp.md): The `mcp` module gives your API an endpoint for AI clients that use the Model Context Protocol (MCP).
 - [Billing with Stripe](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/billing.md): The `billing` module sells subscriptions with Stripe.
 - [Live data](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/live.md): The `live` module sends each committed change of a table to the open pages, with no reload.
+- [Agent guidance](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/agents.md): Each new app has files that tell an AI coding agent how to work in it.
 
 ## Deploy
 
