@@ -368,6 +368,20 @@ The `live` module adds live data feeds over server-sent events: a snapshot, numb
 | LV8 | The doctor check `live-wired`, the guide, and the app gate | LV4, LV6, LV7 |
 | LV9 | The live load check: `livegen` and the perf phase | LV4, LV7 |
 
+#### N3 — agent guidance in generated apps (added 2026-11-14, contracts in ADR 0035)
+
+A new app gets `AGENTS.md` (managed), `AGENTS.project.md` (seed), `CLAUDE.md` (seed), and the skill `.claude/skills/spinup/SKILL.md` (managed). Each pack adds rows to the decision table with `fragments "agents-rows"`. The codemod `0005_agent_guidance` keeps the notes of an app that has its own `AGENTS.md`. `docs/llms.txt` is generated. A pin notice and the doctor check `cli-version` report a CLI and lock mismatch. No unit adds a dependency. The main loop owns `packs.digest` (base gets `0005_agent_guidance`, the other packs get `none`) and the `Since` value of the codemod.
+
+| Unit | Outcome | Deps |
+|---|---|---|
+| AG0 (main loop) | The pre-seed: the ADR, the `.gitignore` line, the pointer line, this section | – |
+| AG1 | The template functions `fragments` and `docurl` | AG0 |
+| AG2 | The base pack files, the question `agent_guidance`, the base rows, the golden tree `base`, the docs of the flag | AG1 |
+| AG3 | The rows of 17 packs, `TestAgentRows`, `TestGoldenAgents`, the golden trees `agents`, `api`, `live`, and `mcp` | AG2 |
+| AG4 | `TestAgentGuidanceCommandsExist`, the codemod, `upgrade_agents`, the guide, the `llms.txt` update | AG3, AG5 |
+| AG5 | `docs/llms.txt`, `docsite.LLMS`, and the staleness test | AG1 |
+| AG6 | The pin notice, `compat.CheckPin`, and the doctor check `cli-version` | AG0 |
+
 ## Verification
 
 - **Per unit:** the orchestrate Phase 5 runs the unit's Check column, plus `make build lint`. Lanes do not self-certify.

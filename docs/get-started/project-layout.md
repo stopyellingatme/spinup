@@ -14,11 +14,15 @@ $ spinup new todo --module example.com/todo --no-git --non-interactive
 ...
 $ cd todo
 $ ls -A | LC_ALL=C sort
+.claude
 .env
 .env.example
 .gitattributes
 .github
 .gitignore
+AGENTS.md
+AGENTS.project.md
+CLAUDE.md
 README.md
 api
 deploy
@@ -34,6 +38,10 @@ web
 todo/
 ├── spinup.toml          your app settings (you edit)
 ├── spinup.lock          what spinup made, with hashes (spinup edits)
+├── AGENTS.md            the guide for a coding agent (spinup edits)
+├── AGENTS.project.md    the rules of your app for a coding agent (you edit)
+├── CLAUDE.md            imports both AGENTS files for Claude Code (you edit)
+├── .claude/skills/      the spinup skill for Claude Code (spinup edits)
 ├── .env, .env.example   local settings and secrets for development
 ├── .spinup/             local state of the tools (made by `spinup dev`, not committed)
 ├── .github/workflows/   CI and deploy workflows
@@ -59,6 +67,7 @@ todo/
 Some folders appear only when you need them. `services/` appears with your first `spinup g service`.
 `secrets/` appears with the `secrets` module. A project made with `--api-only` has no `web/`.
 The files `renovate.json` and `.gitattributes` at the root keep dependencies current and line endings the same on every system.
+Write the rules of your app for a coding agent in `AGENTS.project.md`, because spinup never changes that file.
 
 ### Folders that a module adds
 

@@ -71,6 +71,7 @@ If your app uses an [executable plugin](../plugins-exec.md), the plugin can add 
 | [`roles-drift`](#roles-drift) | yes | The roles file matches `[auth]`. | The two differ. |
 | [`audit-wired`](#audit-wired) | yes | The audit module is wired into the API. | `main.go` or a migration lacks the wiring. |
 | [`lock-valid`](#lock-valid) | no | `spinup.lock` is valid. | The file is damaged. |
+| [`cli-version`](#cli-version) | yes | The CLI version fits the version that wrote `spinup.lock`. | The CLI is older, or much newer. |
 | [`managed-missing`](#managed-missing) | no | Every managed file exists. | You deleted a managed file. |
 | [`kit-version`](#kit-version) | no | The kit version matches the CLI version. | The major or minor versions differ. |
 | [`openapi-drift`](#openapi-drift) | no | The OpenAPI bundle and Go types match their sources. | A generated file is stale. |
@@ -218,6 +219,15 @@ If the app also has the audit module, it warns when the audit functions did not 
 
 `spinup.lock` records what spinup rendered. The check parses it.
 **Fix:** restore the file from Git. Do not edit it by hand.
+
+### cli-version
+
+The check compares the CLI version with the version that wrote `spinup.lock`.
+It warns when the CLI is older, or much newer.
+It says `spinup <cli> is older than <pin>, the version that wrote spinup.lock` when the CLI is older.
+It says `spinup <cli> is newer than <pin>, the version that wrote spinup.lock` when the CLI is much newer.
+**Fix:** run `spinup self-update`, or run `spinup upgrade --plan`.
+The notice uses `SPINUP_NO_PIN_NOTICE=1` as its switch.
 
 ### managed-missing
 

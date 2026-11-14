@@ -1,0 +1,10 @@
+| Add a table with a CRUD API | `spinup g resource <name> <field:type>...` | [generate resource]([[ docurl "commands/generate-resource.md" ]]) |
+| Add a table with no API | `spinup g model <name> <field:type>...` | [generate resource]([[ docurl "commands/generate-resource.md" ]]) |
+| Add one plain HTTP handler | `spinup g handler <name>` | [generate resource]([[ docurl "commands/generate-resource.md" ]]) |
+| Change a table with a new migration | `spinup g migration <snake_name>`, then `spinup db migrate up` | [generate resource]([[ docurl "commands/generate-resource.md" ]]) |
+| Rebuild the Go server code after an OpenAPI change | `spinup g openapi` | [generate openapi]([[ docurl "commands/generate-openapi.md" ]]) |
+| Rebuild the Go query code after a SQL change | `spinup db sqlc` | [db]([[ docurl "commands/db.md" ]]) |
+| Add a sidecar service in Rust, Python, or Node | `spinup g service <name> --lang rust` | [generate service]([[ docurl "commands/generate-service.md" ]]) |
+| List the HTTP routes | `spinup routes --json` | [routes]([[ docurl "commands/routes.md" ]]) |
+| Check the migrations for unsafe changes | `spinup db lint` | [db lint]([[ docurl "commands/db-lint.md" ]]) |
+| Fix the doctor checks `openapi-drift` and `sqlc-drift` | `spinup g openapi`, then `spinup db sqlc` | [Doctor checks]([[ docurl "reference/doctor-checks.md" ]]) |

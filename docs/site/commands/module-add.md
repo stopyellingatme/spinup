@@ -19,6 +19,7 @@ spinup module add <name>... [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--abort` | `false` | remove the recorded worktree and branch |
+| `--agent-guidance` | `true` | Write AGENTS.md and an agent skill |
 | `--api-client` | `openapi-fetch` | Generated API client (openapi-fetch or heyapi) |
 | `--auth-oidc` | `false` | Enable OpenID Connect sign-in? |
 | `--ci-deploy-on-push` | `false` | Deploy the default environment on pushes to main |

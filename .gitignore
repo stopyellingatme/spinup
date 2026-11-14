@@ -34,4 +34,4 @@ node_modules/
 credentials/
 
 # local agent state
-.claude/
+/.claude/

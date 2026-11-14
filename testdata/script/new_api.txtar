@@ -11,6 +11,22 @@ exec cat todo/spinup.lock
 stdout '"api/cmd/api/main.go": \{\n[[:space:]]+"class": "scaffold"'
 ! stdout '"\.env":'
 
+# The base pack writes the agent guidance files (ADR 0035).
+exists todo/AGENTS.md todo/AGENTS.project.md todo/CLAUDE.md todo/.claude/skills/spinup/SKILL.md
+grep '^@AGENTS.md$' todo/CLAUDE.md
+grep 'spinup test' todo/AGENTS.md
+stdout '"AGENTS\.md": \{\n[[:space:]]+"class": "managed"'
+stdout '"AGENTS\.project\.md": \{\n[[:space:]]+"class": "seed"'
+stdout '"agent_guidance": true'
+# With --agent-guidance=false the app has none of the four files.
+exec spinup new bare --api-only --module example.com/bare --no-git --non-interactive --agent-guidance=false
+! exists bare/AGENTS.md
+! exists bare/AGENTS.project.md
+! exists bare/CLAUDE.md
+! exists bare/.claude/skills/spinup/SKILL.md
+exec cat bare/spinup.lock
+stdout '"agent_guidance": false'
+
 # Occupied targets and unavailable packs give actionable errors.
 ! exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
 stderr 'Try:'

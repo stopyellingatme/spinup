@@ -1,0 +1,29 @@
+[[questions]]
+key = "agent_guidance"
+prompt = "Write AGENTS.md and an agent skill"
+type = "bool"
+default = true
+
+[[files]]
+path = "AGENTS.md"
+source = "files/AGENTS.md.tmpl"
+class = "managed"
+when = "agent_guidance"
+
+[[files]]
+path = "AGENTS.project.md"
+source = "files/AGENTS.project.md.tmpl"
+class = "seed"
+when = "agent_guidance"
+
+[[files]]
+path = "CLAUDE.md"
+source = "files/CLAUDE.md"
+class = "seed"
+when = "agent_guidance"
+
+[[files]]
+path = ".claude/skills/spinup/SKILL.md"
+source = "files/.claude/skills/spinup/SKILL.md"
+class = "managed"
+when = "agent_guidance"

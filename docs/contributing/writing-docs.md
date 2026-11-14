@@ -135,6 +135,13 @@ The `parent` is the `title` of a section page:
 Do not edit `docs/site/`. Run `spinup docs reference --out docs/site` after you change a command.
 A command's examples come from the `Example` field of its cobra command.
 
+## The llms.txt index
+
+The generated `docs/llms.txt` file indexes the Markdown pages for agents.
+A new page or a changed first sentence makes this file stale.
+Run `SPINUP_GOLDEN_UPDATE=1 go test ./internal/cli -run LLMS` to update the file.
+`make test` finds a stale file.
+
 ## Check your page
 
 Run these from the repository root before you commit:
