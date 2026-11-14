@@ -204,11 +204,13 @@ type pendingFrame struct {
 
 // appendFrames appends the frames to f under the hub lock, so the ring byte
 // sum stays exact. It stops at the first result that is not appendOK.
+// A pressure trim can end idle feeds: their notification marks go after the
+// hub lock is released.
 func (h *Hub) appendFrames(f *feed, epoch int64, frames []pendingFrame) (int, appendResult) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if h.feeds[f.key] != f {
 		// The janitor ended the feed during the fetch.
+		h.mu.Unlock()
 		return 0, appendStale
 	}
 	before := f.ring.bytes()
@@ -222,9 +224,12 @@ func (h *Hub) appendFrames(f *feed, epoch int64, frames []pendingFrame) (int, ap
 		appended++
 	}
 	h.ringBytes += f.ring.bytes() - before
+	var ended []Key
 	if h.ringBytes > h.opts.ringBytes {
-		h.trimRingsLocked()
+		ended = h.trimRingsLocked()
 	}
+	h.mu.Unlock()
+	h.forget(ended)
 	return appended, result
 }
 
@@ -236,19 +241,37 @@ func (h *Hub) resetFeed(ctx context.Context, tx pgx.Tx, f *feed, epoch, seq int6
 	if err != nil {
 		return err
 	}
+	if h.applyReset(f, epoch, seq, frames) {
+		h.log.InfoContext(ctx, "live: a feed was reset", "feed", f.key.Feed(), "epoch", epoch, "seq", seq)
+	}
+	return nil
+}
+
+// applyReset resets f to the epoch and fills its ring with the frames (in
+// descending order). The clear, the fill, the reset mark of each sub, and the
+// wake happen under one hold of f.mu. A stream that opens during the reset
+// thus sees the old feed (and reads readReset) or the full new feed, never an
+// empty ring with the head 0. It returns false when the hub no longer tracks f.
+func (h *Hub) applyReset(f *feed, epoch, seq int64, frames []pendingFrame) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.feeds[f.key] != f {
-		return nil
+		return false
 	}
 	before := f.ring.bytes()
-	f.reset(epoch)
 	f.mu.Lock()
+	f.ring.clear()
+	if h.opts.duringReset != nil {
+		h.opts.duringReset(f)
+	}
 	fill(f, epoch, seq, frames)
+	for s := range f.subs {
+		s.reset = true
+	}
+	f.wakeAll()
 	f.mu.Unlock()
 	h.ringBytes += f.ring.bytes() - before
-	h.log.InfoContext(ctx, "live: a feed was reset", "feed", f.key.Feed(), "epoch", epoch, "seq", seq)
-	return nil
+	return true
 }
 
 // readRing reads the newest patches of the feed, up to the ring size, in
@@ -311,14 +334,16 @@ func (h *Hub) load(ctx context.Context, f *feed) error {
 		return err
 	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	f.mu.Lock()
 	fill(f, epoch, seq, frames)
 	f.mu.Unlock()
 	h.ringBytes += f.ring.bytes()
+	var ended []Key
 	if h.ringBytes > h.opts.ringBytes {
-		h.trimRingsLocked()
+		ended = h.trimRingsLocked()
 	}
+	h.mu.Unlock()
+	h.forget(ended)
 	return nil
 }
 

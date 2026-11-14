@@ -348,6 +348,9 @@ func streamAge(d time.Duration) time.Duration {
 }
 
 // streamWriter writes frames with a write deadline for each batch (section 7.8).
+// The deadline covers one write and its flush. After a successful flush the
+// writer clears it: with HTTP/2 an armed deadline resets an idle stream even
+// when no write waits, so a deadline must not stay armed between writes.
 type streamWriter struct {
 	w          http.ResponseWriter
 	rc         *http.ResponseController
@@ -369,11 +372,22 @@ func (o *streamWriter) deadline() error {
 	return err
 }
 
+// flushed flushes the written bytes, then clears the write deadline.
+func (o *streamWriter) flushed() error {
+	if err := o.rc.Flush(); err != nil {
+		return err
+	}
+	if o.noDeadline {
+		return nil
+	}
+	return o.rc.SetWriteDeadline(time.Time{})
+}
+
 func (o *streamWriter) flush() error {
 	if err := o.deadline(); err != nil {
 		return err
 	}
-	return o.rc.Flush()
+	return o.flushed()
 }
 
 // send writes one frame and flushes it.
@@ -384,7 +398,7 @@ func (o *streamWriter) send(frame []byte) error {
 	if _, err := o.w.Write(frame); err != nil {
 		return err
 	}
-	return o.rc.Flush()
+	return o.flushed()
 }
 
 // batch writes the frames and flushes them once.
@@ -397,7 +411,7 @@ func (o *streamWriter) batch(frames [][]byte) error {
 			return err
 		}
 	}
-	return o.rc.Flush()
+	return o.flushed()
 }
 
 // final writes the last frame of a stream. The stream ends after it, so an

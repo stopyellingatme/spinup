@@ -29,6 +29,16 @@ grep 'registerNotesFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
 ! exec spinup g live note
 stderr 'Try: pass --force to replace the file'
 exec spinup g live note --force
+# Destroying a live resource rebuilds feeds_gen.go without its feed.
+exec spinup destroy resource note
+stdout 'remove api/internal/live/notes.go'
+stdout 'update api/internal/live/feeds_gen.go'
+! exists api/internal/live/notes.go
+! grep 'registerNotesFeed' api/internal/live/feeds_gen.go
+grep 'registerMemosFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
+cd api
+exec go build ./...
+cd ..
 ! exec spinup g live nothing
 stderr 'Try: spinup g resource nothing <field:type>...'
 cd $WORK

@@ -1,14 +1,16 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveClient, backoff, parseCursor, parseSSE } from './live.core';
-import type { Cursor, LiveClientOptions, LiveStatus } from './live.core';
+import { LiveClient, SharedFeed, backoff, parseCursor, parseSSE } from './live.core';
+import type { Cursor, FeedMembership, LiveClientOptions, LiveStatus, Patch } from './live.core';
 
 const clients: LiveClient<unknown>[] = [];
+const shared: SharedFeed[] = [];
 const encoder = new TextEncoder();
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => {
 	for (const client of clients.splice(0)) client.stop();
+	for (const feed of shared.splice(0)) feed.dispose();
 	expect(vi.getTimerCount()).toBe(0);
 	vi.useRealTimers();
 });
@@ -340,5 +342,179 @@ describe('LiveClient', () => {
 		source.send(frame('patch', { epoch: 1, seq: 3, changes: [] }) + frame('patch', { epoch: 1, seq: 4, changes: [] }));
 		await settle();
 		expect(onPatch).toHaveBeenCalledOnce();
+	});
+});
+
+// sharedSetup returns a shared feed whose requests each get a new stream.
+function sharedSetup() {
+	const sources: ReturnType<typeof stream>[] = [];
+	const request = vi.fn<typeof fetch>().mockImplementation(async () => {
+		const source = stream();
+		sources.push(source);
+		return source.response;
+	});
+	const feed = new SharedFeed({ feed: 'notes', fetch: request, random: () => 0 });
+	shared.push(feed);
+	return { feed, request, sources };
+}
+
+// member returns a subscriber that records the sequence of each patch.
+function member(sync: () => Promise<void> = async () => {}) {
+	const seqs: number[] = [];
+	const subscriber = {
+		status: vi.fn<(status: LiveStatus) => void>(),
+		ready: vi.fn<(cursor: Cursor, resumed: boolean) => void>(),
+		patch: vi.fn((patch: Patch<unknown>) => { seqs.push(patch.seq); }),
+		sync: vi.fn(sync),
+		catchUp: vi.fn()
+	};
+	return { subscriber, seqs };
+}
+
+function patches(...seqs: number[]) {
+	return seqs.map((seq) => frame('patch', { epoch: 1, seq, changes: [] }, `1-${seq}`)).join('');
+}
+
+describe('SharedFeed', () => {
+	it('keeps the older cursor when a subscriber with a newer snapshot joins', async () => {
+		// A has the snapshot 1-0. Patch 1 commits before the stream sends it to A.
+		// B loads the snapshot 1-1 and joins. A must still get patch 1.
+		const { feed, request, sources } = sharedSetup();
+		const a = member();
+		const b = member();
+		feed.join(a.subscriber, { epoch: 1, seq: 0 });
+		await settle();
+		sources[0].send(frame('ready', { epoch: 1, seq: 0, resumed: true }, '1-0'));
+		await settle();
+		feed.join(b.subscriber, { epoch: 1, seq: 1 });
+		await settle();
+		sources[0].send(patches(1, 2));
+		await settle();
+		expect(request).toHaveBeenCalledOnce();
+		expect(request.mock.calls[0][0]).toBe('/api/live/notes/live?since=1-0');
+		expect(a.seqs).toEqual([1, 2]);
+		expect(b.seqs).toEqual([2]);
+	});
+
+	it('does not restart at a newer snapshot of one subscriber while another needs older patches', async () => {
+		const { feed, request, sources } = sharedSetup();
+		const a = member();
+		const b = member();
+		feed.join(a.subscriber, { epoch: 1, seq: 0 });
+		const second: FeedMembership = feed.join(b.subscriber, { epoch: 1, seq: 0 });
+		await settle();
+		sources[0].send(frame('ready', { epoch: 1, seq: 0, resumed: true }, '1-0'));
+		await settle();
+		// B refreshes its list (a touch) and gets the snapshot 1-3.
+		second.snapshot({ epoch: 1, seq: 3 });
+		await settle();
+		sources[0].send(patches(1, 2, 3, 4));
+		await settle();
+		expect(request).toHaveBeenCalledOnce();
+		expect(a.seqs).toEqual([1, 2, 3, 4]);
+		expect(b.seqs).toEqual([4]);
+	});
+
+	it('replays from an older snapshot and skips the patches that a subscriber has', async () => {
+		const { feed, request, sources } = sharedSetup();
+		const a = member();
+		const b = member();
+		feed.join(a.subscriber, { epoch: 1, seq: 0 });
+		await settle();
+		sources[0].send(frame('ready', { epoch: 1, seq: 0, resumed: true }, '1-0') + patches(1, 2));
+		await settle();
+		// B loaded the snapshot 1-1 before the stream sent patch 2.
+		feed.join(b.subscriber, { epoch: 1, seq: 1 });
+		await settle();
+		expect(request).toHaveBeenCalledTimes(2);
+		expect(request.mock.calls[1][0]).toBe('/api/live/notes/live?since=1-1');
+		sources[1].send(frame('ready', { epoch: 1, seq: 2, resumed: true }, '1-2') + patches(2, 3));
+		await settle();
+		expect(a.seqs).toEqual([1, 2, 3]);
+		expect(b.seqs).toEqual([2, 3]);
+	});
+
+	it('restarts at the oldest new snapshot after a sync', async () => {
+		const { feed, request, sources } = sharedSetup();
+		let first!: FeedMembership;
+		let second!: FeedMembership;
+		const a = member(async () => { first.snapshot({ epoch: 1, seq: 9 }); });
+		const b = member(async () => { second.snapshot({ epoch: 1, seq: 7 }); });
+		first = feed.join(a.subscriber, { epoch: 1, seq: 0 });
+		second = feed.join(b.subscriber, { epoch: 1, seq: 0 });
+		await settle();
+		sources[0].send(frame('sync', { epoch: 1, seq: 9, reason: 'gap' }));
+		await settle();
+		expect(a.subscriber.sync).toHaveBeenCalledOnce();
+		expect(b.subscriber.sync).toHaveBeenCalledOnce();
+		expect(request).toHaveBeenCalledTimes(2);
+		expect(request.mock.calls[1][0]).toBe('/api/live/notes/live?since=1-7');
+		sources[1].send(frame('ready', { epoch: 1, seq: 9, resumed: true }, '1-9') + patches(8, 9, 10));
+		await settle();
+		expect(a.seqs).toEqual([10]);
+		expect(b.seqs).toEqual([8, 9, 10]);
+	});
+
+	it('refreshes a liveRefresh subscriber that joins a feed that is already live', async () => {
+		const { feed, request, sources } = sharedSetup();
+		const first = member();
+		const second = member();
+		feed.join(first.subscriber, null);
+		await settle();
+		expect(request.mock.calls[0][0]).toBe('/api/live/notes/live');
+		sources[0].send(frame('ready', { epoch: 1, seq: 5, resumed: false }, '1-5'));
+		await settle();
+		expect(first.subscriber.ready).toHaveBeenCalledExactlyOnceWith({ epoch: 1, seq: 5 }, false);
+		// The page of the second subscriber loaded before a patch that the stream already sent.
+		feed.join(second.subscriber, null);
+		expect(second.subscriber.catchUp).toHaveBeenCalledOnce();
+		expect(first.subscriber.catchUp).not.toHaveBeenCalled();
+		await settle();
+		expect(request).toHaveBeenCalledOnce();
+		expect(second.subscriber.status).toHaveBeenCalledWith('live');
+	});
+
+	it('refreshes a liveRefresh subscriber that joins a stream that resumes from a cursor', async () => {
+		const { feed, request, sources } = sharedSetup();
+		const list = member();
+		const page = member();
+		feed.join(list.subscriber, { epoch: 1, seq: 3 });
+		await settle();
+		sources[0].send(frame('ready', { epoch: 1, seq: 3, resumed: true }, '1-3'));
+		await settle();
+		feed.join(page.subscriber, null);
+		expect(page.subscriber.catchUp).toHaveBeenCalledOnce();
+		sources[0].send(patches(4));
+		await settle();
+		expect(request).toHaveBeenCalledOnce();
+		expect(page.seqs).toEqual([4]);
+		expect(list.seqs).toEqual([4]);
+	});
+
+	it('does not refresh twice when a subscriber joins before a ready at the head', async () => {
+		const { feed, sources } = sharedSetup();
+		const first = member();
+		const second = member();
+		feed.join(first.subscriber, null);
+		feed.join(second.subscriber, null);
+		await settle();
+		expect(second.subscriber.catchUp).not.toHaveBeenCalled();
+		sources[0].send(frame('ready', { epoch: 1, seq: 5, resumed: false }, '1-5'));
+		await settle();
+		expect(second.subscriber.ready).toHaveBeenCalledExactlyOnceWith({ epoch: 1, seq: 5 }, false);
+	});
+
+	it('stops the stream when the last subscriber leaves', async () => {
+		const { feed, request } = sharedSetup();
+		const a = member();
+		const b = member();
+		const first = feed.join(a.subscriber, null);
+		const second = feed.join(b.subscriber, null);
+		await settle();
+		const signal = request.mock.calls[0][1]?.signal;
+		expect(first.release()).toBe(false);
+		expect(signal?.aborted).toBe(false);
+		expect(second.release()).toBe(true);
+		expect(signal?.aborted).toBe(true);
 	});
 });

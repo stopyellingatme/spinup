@@ -28,6 +28,8 @@ type Feed struct {
 }
 
 // ScanFeeds reads feed markers, applies pending files, and sorts by feed name.
+// A pending file with Delete set removes the file from the scan, so a planned
+// deletion drops its feed.
 func ScanFeeds(root string, pending []vfs.File) ([]Feed, error) {
 	paths, err := filepath.Glob(filepath.Join(root, Dir, "*.go"))
 	if err != nil {
@@ -47,7 +49,12 @@ func ScanFeeds(root string, pending []vfs.File) ([]Feed, error) {
 	}
 	for _, file := range pending {
 		path := filepath.ToSlash(file.Path)
-		if filepath.ToSlash(filepath.Dir(path)) == Dir && strings.HasSuffix(path, ".go") && path != GeneratedPath {
+		if filepath.ToSlash(filepath.Dir(path)) != Dir || !strings.HasSuffix(path, ".go") || path == GeneratedPath {
+			continue
+		}
+		if file.Delete {
+			delete(sources, path)
+		} else {
 			sources[path] = file.Data
 		}
 	}
