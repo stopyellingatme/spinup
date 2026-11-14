@@ -72,10 +72,10 @@ def measure(build_dir):
     files = []
     for p in sorted(immutable.rglob("*")):
         if p.is_file() and not p.is_symlink() and p.suffix in ASSET_SUFFIXES:
-            files.append({"path": p.relative_to(root).as_posix(), **file_sizes(p)})
+            files.append({"file": p.relative_to(root).as_posix(), **file_sizes(p)})
     total = {k: sum(f[k] for f in files) for k in ("raw_bytes", "br_bytes", "gz_bytes")}
-    largest = sorted(files, key=lambda f: (-f["raw_bytes"], f["path"]))[:LARGEST]
-    return {"dir": str(root), "files": len(files), **total, "largest": largest}
+    largest = sorted(files, key=lambda f: (-f["raw_bytes"], f["file"]))[:LARGEST]
+    return {"files": len(files), **total, "largest": largest}
 
 
 def read_budgets(path):
@@ -109,7 +109,7 @@ def check(result, limits):
         if key in limits and result[field] > limits[key]:
             over.append(f"{field} {result[field]:,} is above {key} {limits[key]:,}")
     if over:
-        big = ", ".join(f"{f['path']} ({f['raw_bytes']:,} raw, {f['br_bytes']:,} br)" for f in result["largest"])
+        big = ", ".join(f"{f['file']} ({f['raw_bytes']:,} raw, {f['br_bytes']:,} br)" for f in result["largest"])
         return False, ("bundle.py: the client bundle is above the budget: " + "; ".join(over)
                        + f"\nLargest files: {big}"
                        + "\nTry: make the client code smaller, or raise the budget in the budgets file "

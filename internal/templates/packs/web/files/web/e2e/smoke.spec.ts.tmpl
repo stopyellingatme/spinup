@@ -8,7 +8,11 @@ test('the home page loads', async ({ page }) => {
 test('the home page sends a Content-Security-Policy with script-src', async ({ page }) => {
 	const response = await page.goto('/');
 	expect(response).not.toBeNull();
+	[[- if eq (index . "frontend_mode") "embed" ]]
+	// The embed Go binary sets the policy and script hashes.
+	[[- else ]]
 	// vite.config.js sets the policy. SvelteKit adds a nonce to script-src for each page.
+	[[- end ]]
 	expect(response?.headers()['content-security-policy']).toMatch(/(^|;\s*)script-src\s/);
 });
 [[- if has "auth" .modules ]]

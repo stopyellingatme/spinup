@@ -31,6 +31,7 @@
 </script>
 
 <svelte:head><title>Pricing</title></svelte:head>
+<svelte:window onpageshow={(event) => { if (event.persisted) submitting = false; }} />
 
 <div class="mx-auto grid w-full max-w-5xl gap-6">
 	<PageHeader title="Pricing" description="Select a plan. Stripe handles your payment details." />
