@@ -1,0 +1,163 @@
+# An upgrade adds the agent guidance files and keeps the own notes of the app (ADR 0035 3.10).
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.1.0-alpha.782 old
+mkversion 0.1.0-alpha.783
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+! exists templates/0.1.0-alpha.782/packs/base/files/AGENTS.md.tmpl
+exists templates/0.1.0-alpha.783/packs/base/files/AGENTS.md.tmpl
+
+# Case 1: an old app with its own AGENTS.md and CLAUDE.md.
+exec spinup new demo --api-only --module example.com/demo --non-interactive
+cd demo
+exists AGENTS.md AGENTS.project.md CLAUDE.md .claude/skills/spinup/SKILL.md
+exec go run ../legacy.go
+! exists AGENTS.md
+! exists AGENTS.project.md
+! exists CLAUDE.md
+! exists .claude/skills/spinup/SKILL.md
+! grep 'AGENTS|CLAUDE|SKILL|agent_guidance' spinup.lock
+grep '"template_version": "0.1.0-alpha.782"' spinup.lock
+cp ../own/AGENTS.md AGENTS.md
+cp ../own/CLAUDE.md CLAUDE.md
+exec git add -A
+exec git commit -q -m 'old app with its own agent notes'
+
+exec spinup upgrade --plan --offline --to 0.1.0-alpha.783
+stdout '0005_agent_guidance'
+stdout 'Move AGENTS.md to AGENTS.project.md'
+grep '"path": "AGENTS.md",' .spinup/plan.json
+grep '"action": "create"' .spinup/plan.json
+! grep '"action": "conflict"' .spinup/plan.json
+exists AGENTS.md
+! exists AGENTS.project.md
+
+exec spinup upgrade --yes --no-verify --offline --to 0.1.0-alpha.783
+cd .spinup/upgrade/0.1.0-alpha.783
+grep 'Use tabs\.' AGENTS.project.md
+grep '^# Notes$' AGENTS.project.md
+! grep 'Use tabs\.' AGENTS.md
+grep 'spinup g --help' AGENTS.md
+grep -count=1 'Be brief\.' CLAUDE.md
+grep -count=1 '^# Mine$' CLAUDE.md
+grep -count=1 '^@AGENTS\.md$' CLAUDE.md
+grep -count=1 '^@AGENTS\.project\.md$' CLAUDE.md
+cmp CLAUDE.md ../../../../want/CLAUDE.md
+exists .claude/skills/spinup/SKILL.md
+grep '0005_agent_guidance' spinup.lock
+exec go run ../../../../classes.go AGENTS.md managed .claude/skills/spinup/SKILL.md managed AGENTS.project.md seed CLAUDE.md seed
+exec spinup check
+cd $WORK
+
+# Case 2: an old app with no own files gets the four files from the templates.
+exec spinup new plain --api-only --module example.com/plain --non-interactive
+cd plain
+exec go run ../legacy.go
+exec git add -A
+exec git commit -q -m 'old app with no agent files'
+exec spinup upgrade --plan --offline --to 0.1.0-alpha.783
+! grep '"action": "conflict"' .spinup/plan.json
+exec spinup upgrade --yes --no-verify --offline --to 0.1.0-alpha.783
+cd .spinup/upgrade/0.1.0-alpha.783
+exists AGENTS.md CLAUDE.md .claude/skills/spinup/SKILL.md
+grep '^# Rules of plain$' AGENTS.project.md
+grep 'Write the rules of this app here\.' AGENTS.project.md
+cmp CLAUDE.md ../../../../want/imports.md
+exec go run ../../../../classes.go AGENTS.md managed .claude/skills/spinup/SKILL.md managed AGENTS.project.md seed CLAUDE.md seed
+exec spinup check
+cd $WORK
+
+# Case 3: an old app whose lock answer agent_guidance is false gets none of the files.
+exec spinup new off --api-only --module example.com/off --non-interactive
+cd off
+exec go run ../legacy.go off
+grep '"agent_guidance": false' spinup.lock
+exec git add -A
+exec git commit -q -m 'old app with agent guidance off'
+exec spinup upgrade --yes --no-verify --offline --to 0.1.0-alpha.783
+cd .spinup/upgrade/0.1.0-alpha.783
+! exists AGENTS.md
+! exists AGENTS.project.md
+! exists CLAUDE.md
+! exists .claude/skills/spinup/SKILL.md
+grep '"agent_guidance": false' spinup.lock
+grep '"template_version": "0.1.0-alpha.783"' spinup.lock
+exec spinup check
+
+-- old/DELETE --
+packs/base/pack.d/agents.toml
+packs/base/files/AGENTS.md.tmpl
+packs/base/files/AGENTS.project.md.tmpl
+packs/base/files/CLAUDE.md
+packs/base/files/.claude
+-- own/AGENTS.md --
+# Notes
+Use tabs.
+-- own/CLAUDE.md --
+# Mine
+Be brief.
+-- want/CLAUDE.md --
+# Mine
+Be brief.
+
+@AGENTS.md
+@AGENTS.project.md
+-- want/imports.md --
+@AGENTS.md
+@AGENTS.project.md
+-- legacy.go --
+// Command legacy turns a new app into an app of 0.1.0-alpha.782, which had no agent files.
+// With the argument "off", the lock answer agent_guidance is false.
+package main
+
+import (
+ "encoding/json"
+ "os"
+)
+
+func main() {
+ data, err := os.ReadFile("spinup.lock")
+ if err != nil { panic(err) }
+ var lock map[string]any
+ if err := json.Unmarshal(data, &lock); err != nil { panic(err) }
+ lock["template_version"] = "0.1.0-alpha.782"
+ files := lock["files"].(map[string]any)
+ for _, name := range []string{"AGENTS.md", "AGENTS.project.md", "CLAUDE.md", ".claude/skills/spinup/SKILL.md"} {
+  if err := os.Remove(name); err != nil { panic(err) }
+  delete(files, name)
+ }
+ if err := os.RemoveAll(".claude"); err != nil { panic(err) }
+ answers := lock["answers"].(map[string]any)
+ delete(answers, "agent_guidance")
+ if len(os.Args) > 1 && os.Args[1] == "off" {
+  answers["agent_guidance"] = false
+ }
+ data, err = json.MarshalIndent(lock, "", "  ")
+ if err != nil { panic(err) }
+ if err := os.WriteFile("spinup.lock", append(data, '\n'), 0o644); err != nil { panic(err) }
+}
+-- classes.go --
+// Command classes checks the class of files in spinup.lock. The arguments are pairs of a
+// path and a class.
+package main
+
+import (
+ "encoding/json"
+ "fmt"
+ "os"
+)
+
+func main() {
+ data, err := os.ReadFile("spinup.lock")
+ if err != nil { panic(err) }
+ var lock struct {
+  Files map[string]struct{ Class string `json:"class"` } `json:"files"`
+ }
+ if err := json.Unmarshal(data, &lock); err != nil { panic(err) }
+ for i := 1; i+1 < len(os.Args); i += 2 {
+  entry, ok := lock.Files[os.Args[i]]
+  if !ok || entry.Class != os.Args[i+1] {
+   fmt.Fprintf(os.Stderr, "%s: class %q, in lock %v; want %q\n", os.Args[i], entry.Class, ok, os.Args[i+1])
+   os.Exit(1)
+  }
+ }
+}
