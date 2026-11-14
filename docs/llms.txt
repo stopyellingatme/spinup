@@ -1,0 +1,154 @@
+# spinup
+
+> spinup creates and operates a full-stack app: a Go API, a SvelteKit web app, PostgreSQL, a deploy to a VM, and monitoring. It upgrades the app and keeps your edits.
+
+Each link points to a Markdown page. Read "Get started" first. The section "Optional" is for people who work on spinup itself.
+
+## Overview
+
+- [Get started](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/get-started/index.md): Read these pages in order if spinup is new to you.
+- [Build your app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/index.md): These guides show how to add features to the app that `spinup new` made.
+- [Deploy](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/deploy/index.md): spinup puts your app on one VM that runs Docker Compose and Caddy.
+- [Operate](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/operate/index.md): Day-2 work starts after the first deploy.
+- [Upgrade](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/upgrading.md): Three things have versions: the spinup CLI, the templates your app was generated from, and the kit library your API imports.
+- [Command guides](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/index.md): Each guide shows one command, or one group of commands, with examples you can copy.
+- [Reference](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/index.md): Use these pages to look up a key, a flag, a check, or a policy.
+- [Contributing](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/index.md): These pages are for people who work on spinup itself.
+
+## Get started
+
+- [Install spinup](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/get-started/install.md): Install the `spinup` binary with one command.
+- [Your first app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/get-started/first-app.md): In this tutorial you build a small to-do app.
+- [Project layout](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/get-started/project-layout.md): This page tells you what each folder of a generated app holds, and who edits it: you, or spinup.
+- [Concepts](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/concepts.md): This page explains the ideas behind spinup, one at a time, with a short example for each.
+- [Recipes](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/recipes.md): Short answers for the tasks you do most.
+- [Troubleshooting](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/troubleshooting.md): Every spinup error has the same shape: what failed, why, and a `Try:` line with the fix.
+
+## Build your app
+
+- [The web app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/web.md): `spinup new` creates a SvelteKit 3 app in `web/`, unless you pass `--api-only`.
+- [Package manager and API client](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/web-variants.md): You choose two tools for the web app when you create it.
+- [Accounts and sign-in](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/auth.md): The `auth` module adds user accounts to your app.
+- [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md): Each user has one role, such as `manager` or `staff`.
+- [Sign-in security](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/auth-security.md): The `auth` module is safe by default.
+- [Sign in with an identity provider](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/oidc.md): OpenID Connect (OIDC) lets users sign in with Google, Keycloak, or another provider.
+- [Mail](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/mail.md): The `mail` module sends email from your app.
+- [Background jobs](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/jobs.md): A background job is work that your API starts but does not wait for.
+- [Sidecar services](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/services.md): A sidecar service is a small program in its own container, next to your Go API.
+- [PDF reports](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/pdf-reports.md): You write a report as an HTML page with print CSS.
+- [Audit trail](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/audit.md): The audit trail answers "who changed this, and when?".
+- [API reference page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/api-docs.md): Your API serves an interactive reference of its own routes at `/api/docs`.
+- [Test your app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/testing.md): A generated app comes with tests for the API, the web app, and each sidecar service.
+- [Embed mode](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/embed.md): In embed mode, the Go binary serves the API and the web app together.
+- [Plugins](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/plugins.md): A plugin adds your own files and generators to a spinup app.
+- [Web bundle budget](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/web-bundle.md): `spinup doctor` measures all client JavaScript and CSS in a completed web build.
+- [Executable plugins](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/plugins-exec.md): An executable plugin is a program that adds generators and `spinup doctor` checks to your app.
+- [Feature flags](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/flags.md): A feature flag turns a feature on or off without a deploy.
+- [API keys and plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/api-keys.md): An API key lets a program call your API without a browser sign-in.
+- [MCP server](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/mcp.md): The `mcp` module gives your API an endpoint for AI clients that use the Model Context Protocol (MCP).
+- [Billing with Stripe](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/billing.md): The `billing` module sells subscriptions with Stripe.
+- [Live data](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/live.md): The `live` module sends each committed change of a table to the open pages, with no reload.
+
+## Deploy
+
+- [Deploy to DigitalOcean](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/deploy-digitalocean.md): One command creates a droplet, a firewall, and a DNS record, makes the secrets, and deploys your app.
+- [Deploy to your own server](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/deploy.md): This page takes you from a bare Debian or Ubuntu VM to a running app, and then explains the files that the deploy uses.
+- [Environments](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/deploy/environments.md): An environment is one place you deploy to, such as `staging` or `production`.
+- [Secrets](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/deploy/secrets.md): Secrets are the passwords and keys of your app, such as `DATABASE_URL`.
+- [Hetzner Cloud with OpenTofu](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/infra.md): The optional `tofu` module creates a Hetzner Cloud server, a firewall, an SSH key, and an attached volume.
+- [Generated CI](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/ci.md): The `ci` module writes GitHub Actions workflows that build and test your app, deploy it, and propose spinup upgrades.
+
+## Operate
+
+- [Monitoring](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/monitoring.md): The `monitoring` module runs Grafana, Prometheus, Loki, and an OpenTelemetry collector (Alloy) next to your app.
+- [Backups with pg_dump](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/backups-pgdump.md): The `pgdump` backend is the simplest backup.
+- [Backups with WAL-G](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/backups-walg.md): WAL-G is a backup backend that archives PostgreSQL continuously to S3-compatible storage.
+- [Telemetry and data handling](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/data-handling.md): Your generated API sends traces, metrics, and logs to your own collector, and only when you set an endpoint.
+
+## Command guides
+
+- [backup restore — recover data](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/backup-restore.md): Three commands protect you after a backup exists.
+- [backup schedule — back up on a timer](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/backup-schedule.md): `spinup backup schedule` installs three systemd timers on the VM: a full backup, a differential backup, and a verification.
+- [backup — back up the database](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/backup.md): `spinup backup` takes, lists, checks, and removes backups of the production database.
+- [build — build the API and images](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/build.md): `spinup build` compiles the Go API into one binary.
+- [cache — manage template versions](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/cache.md): `spinup cache` manages the template versions that `upgrade`, `diff`, and `module add` need.
+- [check — find drift for CI](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/check.md): `spinup check` tells you whether your app still matches what spinup made.
+- [ci — generate and check CI files](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/ci.md): `spinup ci` writes the GitHub Actions files of your app, checks them for unsafe settings, and lists your sidecar services for a test matrix.
+- [db lint — check migrations](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/db-lint.md): `spinup db lint` reads the `Up` section of each migration in `api/db/kit` and `api/db/migrations`.
+- [db — operate the database](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/db.md): `spinup db` runs the migrations of your app and manages the development database.
+- [deploy digital-ocean — create a server and deploy](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/deploy-digital-ocean.md): `spinup deploy digital-ocean` takes an app from no server to a live deploy on DigitalOcean in one command.
+- [deploy — ship a release](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/deploy.md): `spinup deploy` builds your app, sends it to the VM of one environment, and switches traffic to the new release with no downtime.
+- [destroy — undo a generator](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/destroy.md): `spinup destroy <kind> <name>` removes the files that a generator made, and keeps every file you changed.
+- [dev — run the local stack](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/dev.md): `spinup dev` starts everything your app needs on your machine: PostgreSQL, Mailpit, the API, the jobs worker, and the web server.
+- [diff — compare files with the template](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/diff.md): `spinup diff` shows how your files differ from the template that made them.
+- [docs — compatibility and CLI reference](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/docs.md): `spinup docs` prints which versions work together, and it writes the CLI reference pages.
+- [doctor — check your setup](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/doctor.md): `spinup doctor` checks your tools, your app files, and (with `--remote`) your server.
+- [eject — take ownership of a file](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/eject.md): `spinup eject <path>` stops spinup from managing one file.
+- [generate alert — add a Prometheus alert](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-alert.md): `spinup g alert <name> --expr <PromQL>` adds an alert rule to your app.
+- [generate apikeys — declare API key plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-apikeys.md): Declare plans in `spinup.toml`.
+- [generate audit — track changes to a table](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-audit.md): An audit trail records who changed which row, and when.
+- [generate billing — declare billing plans](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-billing.md): Declare plans in `spinup.toml`.
+- [generate client — rebuild the API clients](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-client.md): `spinup g client` rebuilds the typed clients that call your Go API and your sidecar services.
+- [generate component — add UI components](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-component.md): `spinup g component` adds shadcn-svelte components, such as a dialog or a dropdown menu, to the web app.
+- [generate dashboard — add a Grafana dashboard](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-dashboard.md): `spinup g dashboard <name>` adds a Grafana dashboard with time-series panels to your app.
+- [generate flags — declare feature flags](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-flags.md): Declare each flag in `spinup.toml`.
+- [generate job — add a background job](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-job.md): A background job is work that runs outside a web request, such as sending a digest email.
+- [generate live — add a live feed](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-live.md): `spinup g live <resource>` adds a live feed to an existing resource.
+- [generate mailer — add an email template](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-mailer.md): `spinup g mailer <name> [field:type...]` adds one email to your app.
+- [generate mcp — add a typed MCP tool](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-mcp.md): `spinup g mcp tool <name>` adds one typed tool to the MCP server of your app.
+- [generate openapi — rebuild the Go server code](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-openapi.md): The OpenAPI files in `api/openapi/` describe your API.
+- [generate page — add a web page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-page.md): `spinup g page` adds a SvelteKit page to the web app in `web/src/routes/`.
+- [generate resource — add a CRUD API](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-resource.md): `spinup g resource` turns one line into a working REST API for a database table.
+- [generate roles — define who can do what](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-roles.md): Roles tell your app which signed-in users may use which parts of it.
+- [generate service — add a sidecar service](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-service.md): A sidecar service is a small program in its own container, next to your Go API.
+- [generate — add code to your app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate.md): `spinup generate` (alias `spinup g`) writes new code into your app: a CRUD API, a page, a background job, a mailer, and more.
+- [infra — create the server with OpenTofu](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/infra.md): `spinup infra` runs OpenTofu for the `tofu` module.
+- [maintenance pg-upgrade — minor and major](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/maintenance-pg.md): These two commands upgrade the production database through SSH.
+- [maintenance pg-upgrade-in-place — upgrade PostgreSQL fast](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/maintenance-pgupgrade.md): `pg-upgrade-in-place` upgrades the PostgreSQL major version with `pg_upgrade --link`.
+- [maintenance — patch and clean the VM](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/maintenance.md): The `maintenance` commands keep a deployed VM healthy.
+- [module — add optional features](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/module.md): A module is an optional feature of your app, such as `auth`, `jobs`, `mail`, or `monitoring`.
+- [monitor — open Grafana, read logs, manage alerts](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/monitor.md): The `monitor` commands let you look at a deployed app from your terminal.
+- [new — create an app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/new.md): `spinup new <name>` makes a new directory with a Go API, a SvelteKit web app, PostgreSQL, deploy files, and CI.
+- [plugin new — scaffold a plugin](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/plugin-new.md): `spinup plugin new <name>` creates a ready-to-edit plugin directory.
+- [plugin — add and manage plugins](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/plugin.md): A plugin adds generators and template files to your app.
+- [releases — list and prune releases](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/releases.md): Each deploy puts a release on the VM of an environment.
+- [restore — bring back a template file](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/restore.md): `spinup restore <path>` writes a file again, as the template made it.
+- [rollback — return to an earlier release](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/rollback.md): `spinup rollback` switches a deployed environment back to a release that is still on the VM.
+- [routes — list the HTTP routes](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/routes.md): `spinup routes` prints every HTTP route that your API serves: the method, the path, and where the route comes from.
+- [secrets — keep secrets encrypted](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/secrets.md): `spinup secrets` stores the secrets of each environment in your repository as an encrypted file.
+- [self-update — update spinup](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/self-update.md): `spinup self-update` downloads the newest stable release of spinup, checks it, and replaces the binary you run.
+- [server — prepare and inspect a VM](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/server.md): `spinup server` prepares a fresh Debian or Ubuntu VM for your app, checks that it stays safe, and lets you read its logs or open a shell.
+- [test — run the app tests](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/test.md): `spinup test` runs the Go tests of your API.
+- [tools — install sops, age, and tofu](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/tools.md): `spinup tools` installs the helper programs that some spinup commands need: `sops` and `age` for secrets, and `tofu` (OpenTofu) for infrastructure.
+- [upgrade — move an app to a new version](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/upgrade.md): `spinup upgrade` brings the template files of your app up to a newer template version.
+- [version — print the versions](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/version.md): `spinup version` prints the version of the spinup you run.
+
+## Reference
+
+- [spinup.toml](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/configuration.md): `spinup.toml` is the settings file of your app.
+- [Global flags](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/global-flags.md): Every spinup command accepts the same ten flags.
+- [Doctor checks](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/doctor-checks.md): `spinup doctor` runs a list of checks on your machine and your app.
+- [App binary commands](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/app-commands.md): The API of your app is one program, `api/cmd/api`.
+- [The kit library](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/kit.md): The kit is the Go library that every generated API imports.
+- [Support policy](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/policy/support.md): This page says which versions of spinup get fixes, which tools and platforms work with it, and how far back you can upgrade.
+- [Kit compatibility](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/policy/kit-compat.md): The kit is the Go library that your app imports from `api/cmd/api/main.go` and your handlers.
+- [Behavior versions](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/policy/behavior-version.md): The behavior version lets the kit change a default without a surprise.
+- [Plugin trust](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/policy/plugins.md): A plugin adds files and generators to your app.
+- [Windows](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/policy/windows.md): spinup ships a Windows program (`spinup.exe`) for amd64 and arm64.
+
+## Optional
+
+- [Writing the docs](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/writing-docs.md): These rules keep the spinup docs easy to read.
+- [Release spinup](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/release.md): A CLI release and its kit tag identify the same commit.
+- [v1.0 checklist](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/v1-checklist.md): This page lists what must be true before spinup v1.0, and how to check each item.
+- [Upgrade matrix](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/upgrade-matrix.md): This page has two jobs.
+- [Bump the sidecar pins](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/stack-bumps.md): The sidecar service templates pin their images, crates, Python packages, and Node packages.
+- [Docker-in-Docker deploy suite](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/dind.md): The suite checks `spinup deploy` and `spinup rollback` against a generated app on a containerized VM.
+- [Disaster-recovery drill](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/dr-drill.md): The drill proves that a backup can replace a lost server.
+- [Browser end-to-end suite](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/e2e.md): The suite checks that a user of a generated app can register, log in, keep the session across server-side rendering, use a resource, and log out.
+- [Monitoring stack boot test](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/monitoring-boot.md): The boot test keeps the promise of the monitoring pack: the `lite` profile runs on a VM with 2 GiB of RAM.
+- [Run the DigitalOcean live test](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/do-live-test.md): The script `scripts/do-live-test.sh` repeats the live test of `spinup deploy digital-ocean` on a real account.
+- [DigitalOcean OAuth client](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/digitalocean-client.md): `spinup deploy digital-ocean login` signs in with an OAuth public client that the maintainers registered once.
+- [Script test isolation](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/script-test-isolation.md): Each testscript gets its own `HOME`, so scripts cannot change each other's files or caches.
+- [Performance loop](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/performance.md): The performance loop measures spinup and a generated app, and it finds regressions.
+- [CI workflows and their cost](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/ci.md): This page tells you which GitHub Actions workflows run, when they run, and how they keep runner minutes low.
