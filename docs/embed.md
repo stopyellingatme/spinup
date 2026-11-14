@@ -144,6 +144,8 @@ When `index.html` has no inline scripts, the script directive is `script-src 'se
 The script directive never permits `'unsafe-inline'`.
 The style directive retains `'unsafe-inline'`.
 
+The smoke spec CSP test needs the embed binary. The embed Vite dev server sends no CSP.
+
 A Go build without the `embedweb` tag contains only a stub.
 Use `spinup build` and not `go build` to get the web files.
 

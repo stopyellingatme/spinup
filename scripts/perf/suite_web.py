@@ -388,7 +388,7 @@ def setup_node(ctx, parent, node, servers):
 
 def bundle_records(sc, recs, login_html):
     b = bundle.measure(sc.build)
-    largest = ", ".join(f"{f['path']} {f['raw_bytes']}" for f in b["largest"])
+    largest = ", ".join(f"{f['file']} {f['raw_bytes']}" for f in b["largest"])
     note = (f"scripts/perf/bundle.py measure: {b['files']} .js and .css files under _app/immutable of the client "
             f"build; the .br and .gz siblings are summed apart. Largest: {largest}")
     recs.append(lib.record(SUITE, "web_bundle_raw_bytes", "B", [b["raw_bytes"]], note=note,
@@ -511,6 +511,8 @@ def node_phase(ctx, sc, recs):
         lines = access_lines(sc.api.log) - before
     finally:
         s.stop()
+    if lines == 0:
+        fail("the API access log has no records after the signed-in page load")
     recs.append(lib.record(
         SUITE, "web_api_requests_per_page", "req", [lines / res["requests"]], metric_class="deterministic",
         note=f"API access-log records ({lines}) for each signed-in GET {PAGE_PATH} ({res['requests']}) of a page "

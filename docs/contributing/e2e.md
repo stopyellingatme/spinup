@@ -59,9 +59,9 @@ The script also needs Go, Node 24, pnpm, and `python3`.
 | --- | --- |
 | `--list` | List the tests. Do not start the servers. |
 | `E2E_ONLINE=1` | Install npm packages from the network. The default is the offline pnpm store. |
-| `E2E_INSTALL_BROWSER=1` | Install the Chromium browser for Playwright. |
+| `E2E_INSTALL_BROWSER=1` | Install Chromium. With `E2E_BROWSERS=all`, install Chromium, Firefox, and WebKit. |
 | `E2E_KEEP=1` | Keep the work directory and its logs. |
-| `E2E_BROWSERS=all` | Run the suite in Chromium, Firefox, and WebKit. The default is Chromium only. Install the browsers first with `pnpm exec playwright install firefox webkit`. |
+| `E2E_BROWSERS=all` | Run the suite in Chromium, Firefox, and WebKit. The default is Chromium only. Set `E2E_INSTALL_BROWSER=1` to install all three. |
 
 Other arguments go to `playwright test`. For example, list the tests, or keep the work directory of one run:
 

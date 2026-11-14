@@ -27,6 +27,7 @@
 </script>
 
 <svelte:head><title>Billing</title></svelte:head>
+<svelte:window onpageshow={(event) => { if (event.persisted) submitting = false; }} />
 
 <div class="mx-auto grid w-full max-w-3xl gap-6">
 	<PageHeader title="Billing" description="View your plan and manage your subscription with Stripe." />

@@ -48,6 +48,8 @@ jobs:
         with:
           version: 12.11.2
       - name: Run the browser end-to-end suite
+        env:
+          E2E_BROWSERS: all
         run: make e2e
       - name: Fuzz the strict JSON paths
         working-directory: kit

@@ -59,7 +59,7 @@ class MeasureTests(unittest.TestCase):
             self.assertEqual(r["raw_bytes"], 1520)
             self.assertEqual(r["br_bytes"], 420)
             self.assertEqual(r["gz_bytes"], 570)
-            self.assertEqual([f["path"] for f in r["largest"]],
+            self.assertEqual([f["file"] for f in r["largest"]],
                              ["_app/immutable/entry/start.js", "_app/immutable/assets/0.css",
                               "_app/immutable/chunks/tiny.js"])
 

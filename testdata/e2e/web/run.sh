@@ -3,7 +3,7 @@
 # It builds the CLI, generates an app, starts the API and the web app, and runs Playwright.
 # Usage: run.sh [--list] [extra playwright arguments]
 # Set E2E_ONLINE=1 to install packages from the network (CI). The default is the offline store.
-# Set E2E_INSTALL_BROWSER=1 to install the Chromium browser for Playwright (needs the network).
+# Set E2E_INSTALL_BROWSER=1 to install the requested Playwright browsers (needs the network).
 # Set E2E_KEEP=1 to keep the work directory.
 # Needs: DATABASE_URL (a disposable database; run.sh empties its public schema when psql exists), Go, Node 24, pnpm, and python3.
 set -euo pipefail
@@ -97,11 +97,14 @@ if [[ -n "${E2E_ONLINE:-}" ]]; then offline=(); fi
 pnpm install --frozen-lockfile ${offline[@]+"${offline[@]}"} >"$work/logs/pnpm-install.log" 2>&1
 # adapter-node bakes PUBLIC_ORIGIN into the build (ADR 0002 rule 2).
 PUBLIC_ORIGIN="$origin" API_URL="$api_url" pnpm build >"$work/logs/pnpm-build.log" 2>&1
-python3 -I "$repo/scripts/perf/bundle.py" check build "$repo/perf/budgets.json"
 
 if [[ -n "${E2E_INSTALL_BROWSER:-}" ]]; then
-  echo "==> install Chromium"
-  pnpm exec playwright install --with-deps chromium
+  browsers=(chromium)
+  if [[ "${E2E_BROWSERS:-}" == "all" ]]; then
+    browsers=(chromium firefox webkit)
+  fi
+  echo "==> install ${browsers[*]}"
+  pnpm exec playwright install --with-deps "${browsers[@]}"
 fi
 
 echo "==> copy the tests"
@@ -114,6 +117,8 @@ if [[ "${1:-}" == "--list" ]]; then
   pnpm exec playwright test --config e2e/playwright.config.ts --list "$@"
   exit 0
 fi
+
+python3 -I "$repo/scripts/perf/bundle.py" check build "$repo/perf/budgets.json"
 
 echo "==> start the API on $api_url"
 # exec, so the recorded PID is the API itself and cleanup stops it (a subshell PID would leave

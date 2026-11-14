@@ -412,9 +412,8 @@ class DevApp:
         src = MARK.sub(mark, self.query.read_text())
         t0 = time.monotonic()
         self.query.write_text(src)
-        # air builds on the .sql change itself. When that build starts before the dev watcher has
-        # run sqlc, the new api/internal/store code never reaches a build, because .air.toml
-        # excludes internal/store. The sample then times out, and the message names the race.
+        # Air can build on the .sql edit before sqlc finishes. The generated store then misses
+        # that build. The sample times out, and the message names the timing race.
         try:
             return self.wait_body(QUERY, mark, t0, "query edit")
         except lib.Failure as e:
@@ -425,9 +424,8 @@ class DevApp:
                 generated = False
             if not generated:
                 raise
-            raise lib.Failure(f"{e}\nsqlc wrote {mark} into {store.name}, but no air build picked it up: air "
-                              "built on the .sql change before sqlc finished, and api/.air.toml excludes "
-                              "internal/store", "remove internal/store from exclude_dir in api/.air.toml") from e
+            raise lib.Failure(f"{e}\nsqlc wrote {mark} into {store.name}, but the air build started before sqlc "
+                              "finished", "read the dev log and check the air and sqlc timing") from e
 
     def openapi_edit(self):
         mark = self.next_mark()
@@ -613,6 +611,12 @@ def run(ctx):
             for metric, info in METRICS:
                 recs.append(lib.skipped(SUITE, metric, "ms", msg, informational=info))
             raise
+        try:
+            dev.start()
+            dev.ready()
+            dev.conform()
+        finally:
+            dev.stop()
         failed = []
         for part in (_cold_start, _edits):
             try:

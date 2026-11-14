@@ -80,6 +80,26 @@ class BaselineTests(unittest.TestCase):
             self.assertEqual(written["meta_args"]["out"], "<repo>/output.json")
             self.assertEqual(written["note"], "<repo>/a <host> says <host>")
 
+    def test_baseline_keeps_bundle_file_without_a_build_directory(self):
+        with tempfile.TemporaryDirectory() as d:
+            source = Path(d) / "result.json"
+            destination = Path(d) / "repo"
+            destination.mkdir()
+            data = {
+                "meta": {"quick": False, "machine": {"cpu": "CPU"}, "repo": {"path": str(destination)}},
+                "gate_events": [],
+                "suite_meta": {"web": {"bundle": {"largest": [
+                    {"file": "_app/immutable/entry/start.js", "raw_bytes": 42},
+                ]}}},
+                "records": [],
+            }
+            source.write_text(json.dumps(data))
+            json_path, _ = perf.write_baseline(source, destination)
+            written = json.loads(json_path.read_text())
+            bundle = written["suite_meta"]["web"]["bundle"]
+            self.assertNotIn("dir", bundle)
+            self.assertEqual(bundle["largest"][0]["file"], "_app/immutable/entry/start.js")
+
     def test_baseline_rejects_quick_result(self):
         data = {"meta": {"quick": True, "machine": {"cpu": "CPU"}, "repo": {}}, "gate_events": [],
                 "records": []}
