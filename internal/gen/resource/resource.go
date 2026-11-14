@@ -17,6 +17,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/db/ops"
 	"github.com/stopyellingatme/spinup/internal/gen"
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
+	livegen "github.com/stopyellingatme/spinup/internal/gen/live"
 	"github.com/stopyellingatme/spinup/internal/gen/registry"
 	"github.com/stopyellingatme/spinup/internal/gen/resource/validation"
 	"github.com/stopyellingatme/spinup/internal/manifest"
@@ -39,6 +40,7 @@ func init() {
   spinup g resource invoice total:decimal due:date --api-only`,
 		Usage: "<name> <field:type>...",
 		Flags: func(fs *pflag.FlagSet) {
+			fs.Bool("live", false, "publish live changes (requires the live module)")
 			fs.Bool("mcp", false, "generate typed MCP tools (requires the mcp module)")
 			fs.Bool("api-only", false, "skip the parts that other packs register, such as web pages")
 			fs.Bool("no-tests", false, "skip the handler test file")
@@ -67,6 +69,8 @@ type Spec struct {
 	Shared bool
 	// Audit describes the trail and its history guard.
 	Audit AuditSpec
+	// Live publishes changes in the transaction of each write.
+	Live bool
 	// Roles are the declared roles that can use the resource.
 	Roles []string
 	// ownerRefs are the ref fields that must refer to rows of the same user.
@@ -143,8 +147,9 @@ func handlersTestPath(name fields.Name) string {
 // Paths returns the files that a resource owns, without its migration and
 // without the files that all resources share (server.go and routes_gen.go).
 // The list includes the files of registered parts. It is sorted.
+// Destroy ignores absent paths and preserves the shared feed registrations.
 func Paths(name fields.Name) []string {
-	paths := []string{QueriesPath(name), openapiPathsPath(name), SchemasPath(name), handlersPath(name), handlersTestPath(name), historyHandlerPath(Spec{Name: name}), historyPathsPath(Spec{Name: name})}
+	paths := []string{livegen.FeedPath(name), QueriesPath(name), openapiPathsPath(name), SchemasPath(name), handlersPath(name), handlersTestPath(name), historyHandlerPath(Spec{Name: name}), historyPathsPath(Spec{Name: name})}
 	for _, p := range registeredParts() {
 		if p.Paths != nil {
 			paths = append(paths, p.Paths(name)...)
@@ -282,6 +287,15 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 	if err != nil {
 		return nil, err
 	}
+	spec.Live = Bool(in.Flags, "live")
+	if spec.Live {
+		if err := livegen.RequirePack(in.Lock); err != nil {
+			return nil, err
+		}
+		if !authenticated {
+			return nil, fmt.Errorf("cannot publish live changes because the auth module is missing\nTry: spinup module add auth")
+		}
+	}
 	spec.Roles = roles
 	if len(spec.Roles) > 0 {
 		if !authenticated {
@@ -359,6 +373,12 @@ func build(ctx context.Context, in gen.Input, parts []Part) (*gen.Output, error)
 		PostSteps: steps,
 		Next:      next,
 		Edits:     validationEdits(apiPlan),
+	}
+	if spec.Live {
+		out, err = addLive(spec, in, out)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if Bool(in.Flags, "mcp") {
 		return addMCP(spec, in, out)

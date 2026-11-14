@@ -165,28 +165,14 @@ func columnsOf(body string) []string {
 // ExistingAuditSpec reads a table and the access guard of its generated resource.
 // A table without a generated handler has no history operation.
 func ExistingAuditSpec(root, target string, flags *pflag.FlagSet) (Spec, bool, error) {
-	name, err := fields.ParseName(target)
+	name, def, ok, err := existingTable(root, target)
 	if err != nil {
 		return Spec{}, false, err
-	}
-	table := name.Table()
-	def, ok, err := findTable(root, table)
-	if err != nil {
-		return Spec{}, false, err
-	}
-	if !ok { // Auth tables can have names that the inflector does not preserve.
-		def, ok, err = findTable(root, target)
-		if err != nil {
-			return Spec{}, false, err
-		}
-		if ok {
-			table = target
-			name.Plural = target
-		}
 	}
 	if !ok {
 		return Spec{}, false, fmt.Errorf("cannot audit %q because no migration creates the table\nTry: name an existing resource or table", target)
 	}
+	table := name.Table()
 	spec := Spec{Root: root, Name: name}
 	switch table {
 	case "sessions", "login_attempts", "password_resets", "audit_events":
@@ -208,19 +194,9 @@ func ExistingAuditSpec(root, target string, flags *pflag.FlagSet) (Spec, bool, e
 		}
 	}
 
-	spec.Owned = slices.Contains(columns, "user_id")
-	if spec.Owned {
-		valid := false
-		for _, def := range splitTopLevel(def.Body) {
-			words := strings.Fields(def)
-			if len(words) < 2 || strings.Trim(words[0], `"`) != "user_id" {
-				continue
-			}
-			valid = slices.Contains([]string{"bigint", "int8", "integer", "int", "int4", "smallint", "int2"}, strings.ToLower(words[1]))
-		}
-		if !valid {
-			return Spec{}, false, fmt.Errorf("cannot audit %s because user_id is not an integer owner column\nTry: attach its triggers in a handwritten migration", table)
-		}
+	spec.Owned, ok = tableOwner(def)
+	if !ok {
+		return Spec{}, false, fmt.Errorf("cannot audit %s because user_id is not an integer owner column\nTry: attach its triggers in a handwritten migration", table)
 	}
 
 	spec.Shared = !spec.Owned
@@ -246,4 +222,38 @@ func ExistingAuditSpec(root, target string, flags *pflag.FlagSet) (Spec, bool, e
 		return Spec{}, false, fmt.Errorf("cannot audit the table because the audit module is missing\nTry: spinup module add audit")
 	}
 	return spec, isResource, nil
+}
+
+// existingTable shares the resource lookup, including names of auth tables.
+func existingTable(root, target string) (fields.Name, tableDef, bool, error) {
+	name, err := fields.ParseName(target)
+	if err != nil {
+		return fields.Name{}, tableDef{}, false, err
+	}
+	def, ok, err := findTable(root, name.Table())
+	if err != nil {
+		return name, def, false, err
+	}
+	if !ok {
+		def, ok, err = findTable(root, target)
+		if ok {
+			name.Plural = target
+		}
+	}
+	return name, def, ok, err
+}
+
+// tableOwner detects and validates the integer owner column.
+func tableOwner(def tableDef) (owned, valid bool) {
+	owned = slices.Contains(columnsOf(def.Body), "user_id")
+	if !owned {
+		return false, true
+	}
+	for _, column := range splitTopLevel(def.Body) {
+		words := strings.Fields(column)
+		if len(words) >= 2 && strings.Trim(words[0], `"`) == "user_id" {
+			return true, slices.Contains([]string{"bigint", "int8", "integer", "int", "int4", "smallint", "int2"}, strings.ToLower(words[1]))
+		}
+	}
+	return true, false
 }

@@ -1,0 +1,39 @@
+# Live resource generation builds without network access.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new demo --modules auth,live --module example.com/demo --no-git --non-interactive
+cd demo
+exec spinup g resource Note body:text --live
+exists api/internal/handlers/notes.go
+exists api/internal/handlers/notes_test.go
+exists api/internal/live/notes.go
+exists web/src/routes/notes/+page.svelte
+grep '// spinup:live-feed notes registerNotesFeed' api/internal/live/notes.go
+grep 'registerNotesFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
+grep 'live.Publish\(ctx, tx,' api/internal/handlers/notes.go
+grep 'liveRefresh\(.notes.\)' web/src/routes/notes/+page.svelte
+cd api
+exec go build ./...
+exec go vet ./...
+cd ..
+exec spinup g resource Memo body:text
+exec spinup g live memo
+stdout 'if the live module is new: spinup db migrate up'
+stdout 'live.Upsert\(strconv.FormatInt\(row.ID, 10\), item\)'
+stdout 'live.Delete\(strconv.FormatInt\(req.Id, 10\)\)'
+stdout 'liveRefresh\(.memos.\)'
+exists api/internal/live/memos.go
+grep 'registerMemosFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
+grep 'registerNotesFeed\(mux, h, d\)' api/internal/live/feeds_gen.go
+! grep 'live.Publish' api/internal/handlers/memos.go
+! grep 'liveRefresh' web/src/routes/memos/+page.svelte
+! exec spinup g live note
+stderr 'Try: pass --force to replace the file'
+exec spinup g live note --force
+! exec spinup g live nothing
+stderr 'Try: spinup g resource nothing <field:type>...'
+cd $WORK
+exec spinup new plain --modules auth --module example.com/plain --no-git --non-interactive
+cd plain
+! exec spinup g resource Thing body:text --live
+stderr 'Try: spinup module add live'
+! exists api/db/queries/things.sql
