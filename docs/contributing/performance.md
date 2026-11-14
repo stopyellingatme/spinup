@@ -7,13 +7,14 @@ nav_order: 13
 # Performance loop
 
 The performance loop measures spinup and a generated app, and it finds regressions.
-One command measures the CLI, the build of a generated app, and the generated API under load.
-A second command compares two results, and it fails when a metric got worse.
-Run the loop before and after a change that can make spinup or the kit slower.
+The default suites measure the CLI, a generated API, micro benchmarks, and the web app.
+The opt-in dev suite measures edit-to-response times for `spinup dev`.
+A compare command fails when a primary metric gets worse.
+Run the loop before and after a change that can slow spinup, the kit, or the web pack.
 
 <!-- doctest: skip -->
 ```console
-$ python3 -I scripts/perf/perf.py run --suites cli,app,micro
+$ python3 -I scripts/perf/perf.py run --suites cli,app,micro,web
 ...
 perf: results in perf/results/20261105-220330.json and perf/results/20261105-220330.md
 $ python3 -I scripts/perf/perf.py compare perf/results/base.json perf/results/20261105-220330.json
@@ -26,7 +27,12 @@ The Makefile has the same two commands as `make perf` and `make perf-compare`.
 ## How it works
 
 The loop is `scripts/perf/perf.py`. It uses only the Python 3 standard library.
-It builds the CLI and the load generator once. Then it runs the suites in the order `cli`, `app`, `micro`.
+It builds the CLI and the load generator once.
+Then it runs the default suites in this order: `cli`, `app`, `micro`, `web`.
+
+Each suite runs its conformance checks before it records a metric.
+If a conformance check fails, the suite stops.
+The suite does not record zero for a failed check.
 
 - Each series of samples starts with a load gate. The gate waits while the 1-minute load average is at or above 45 percent of the cores.
 - Each series discards its first sample (the warm-up). The record keeps the median and the p90 of the other samples.
@@ -45,6 +51,15 @@ On a busy machine, the load gates can add up to one hour of waits.
 <!-- doctest: skip -->
 ```console
 $ python3 -I scripts/perf/perf.py run
+```
+
+Run the dev suite when a change affects the watcher or `spinup dev`.
+The dev suite runs `spinup dev --no-web --no-infra --no-worker`.
+It needs no Docker.
+
+<!-- doctest: skip -->
+```console
+$ make perf SUITES=dev
 ```
 
 Run some suites in quick mode while you work. Quick mode takes fewer samples and shorter load runs.
@@ -70,7 +85,9 @@ Open the Markdown file. It has one table for each suite:
 
 - `median` and `p90` come from the samples after the warm-up. `n` is the number of these samples.
 - `better` tells if a lower or a higher value is better.
-- A metric with `(info)` is informational. It comes from the same measurement as another metric, or it is noisy by nature. The compare shows it, but it does not fail on it.
+- A `primary` metric is compared by `make perf-compare`. It fails above the configured regression threshold.
+- An `informational` metric includes latency percentiles and time to first byte. The compare reports it but does not fail.
+- A `deterministic` metric includes bytes, allocations, and request counts. It compares on any machine.
 - The notes under each table tell how the loop measured each metric, and the load average before and after the series.
 - The "Run notes" section tells how many load gates timed out. If many gates timed out, the machine was busy, and the numbers are less exact.
 
@@ -109,12 +126,49 @@ Change the threshold with `--threshold`. The value is a fraction:
 $ python3 -I scripts/perf/perf.py compare base.json new.json --threshold 0.25
 ```
 
-Compare only results from the same machine. The compare prints a warning when the CPUs are different, or when only one result is a quick run.
+Compare only timing results from the same machine. The compare prints a warning when the CPUs are different, or when only one result is a quick run.
 If a timing metric is `WORSE`, run both sides again on an idle machine before you look for a cause.
 Sizes and `allocs/op` do not change with the load, so trust a change in them at once.
 
+Before a merge that changes the kit or the web pack, run `make perf-compare`.
+Compare with the committed baseline from the same machine.
+This is a local step.
+CI does not time the suites because hosted runners vary too much.
+
 `--md <file>` also writes the compare table as Markdown.
 `perf.py report <result.json>` writes the Markdown table of one result again.
+
+## Baselines and cited numbers
+
+Create a baseline from a full result:
+
+<!-- doctest: skip -->
+```console
+$ make perf-baseline NEW=perf/results/full.json
+```
+
+The command writes `perf/baseline/<cpu-slug>.json` and `perf/baseline/<cpu-slug>.md`.
+It refuses a dirty tree, a quick run, or a run with a timed-out load gate.
+The baseline records the commit SHA, CPU, cores, RAM, OS, and Go version.
+It does not record the hostname or the repository path.
+Name the commit for every number cited in documentation.
+
+## Deterministic gate
+
+Run the deterministic gate locally before you change an allocation ceiling:
+
+<!-- doctest: skip -->
+```console
+$ make perf-gate
+```
+
+CI runs this command in the Linux `test` job.
+The command runs the kit `Test*Budget` tests without the race detector.
+Each test uses `testing.AllocsPerRun` and the matching benchmark body.
+
+Increase an allocation ceiling only when a required change increases allocations.
+Change the named budget constant in the same commit.
+State the reason in the commit message.
 
 ## Add a Go benchmark
 
@@ -131,7 +185,7 @@ Use `b.Loop()` in a new benchmark. Keep the setup out of the loop, so the benchm
 
 | Flag | Default | Example |
 |---|---|---|
-| `--suites` | `cli,app,micro` | `--suites app` |
+| `--suites` | `cli,app,micro,web` | `--suites app` |
 | `--quick` | off | `--quick` |
 | `--out` | `perf/results/<timestamp>.json` | `--out /tmp/a.json` |
 | `--database-url` | `DATABASE_URL`, or the test server on port 55433 | `--database-url postgres://u:p@127.0.0.1:5432/postgres` |
@@ -164,8 +218,26 @@ The scenario app has the 20 resources of `scripts/perf/resources.txt`.
 | `app` | `app_latency_<p>_healthz`, `app_latency_<p>_list` | the p50, p90, p99, and p99.9 latency of the same load runs (informational) |
 | `app` | `app_login_latency` | one `POST /api/auth/login` (one argon2id check) |
 | `micro` | `<package> <benchmark> <unit>` | the Go benchmarks of the repository |
+| `web` | `web_ssr_rps_page`, `web_ssr_rps_login` | the Node SSR rate for a signed-in list page and an anonymous login page |
+| `web` | `web_build_time`, `web_start_to_healthz` | the web build and server start time |
+| `web` | `web_idle_rss`, `web_rss_after_load` | the Node server memory before and after load |
+| `web` | `web_bundle_raw_bytes`, `web_bundle_br_bytes`, `web_bundle_gz_bytes` | the client JavaScript and CSS bundle bytes |
+| `web` | `web_first_load_br_bytes_login`, `web_api_requests_per_page` | the login first-load bytes and API requests for one page |
+| `web` | `web_ttfb_page` | the page time to first byte (informational) |
+| `web` | `embed_binary_size`, `embed_index_rps` | the embed binary size and index rate (not in quick mode) |
+| `dev` | `dev_cold_start`, `dev_handler_edit`, `dev_query_edit`, `dev_openapi_edit` | the `spinup dev` start and edit-to-response times |
+| `dev` | `dev_compile_error_feedback`, `dev_compile_error_recovery` | compiler error feedback and recovery times |
+| `dev` | `dev_breakdown_edit_to_ready`, `dev_breakdown_ready_to_response` | edit timing details (informational) |
 
 The `app` suite generates the app with the modules `ci,auth,jobs,mail`, because the login and the session need the `auth` module.
+
+The `web` suite checks the signed-in page, brotli assets, and ETag revalidation first.
+It then records the Node mode metrics.
+A non-quick run also checks and measures the embed mode.
+
+The `dev` suite verifies its probe app first.
+It then records handler, query, OpenAPI, and compile-error changes.
+It stops all processes when it ends.
 
 ### The load generator
 

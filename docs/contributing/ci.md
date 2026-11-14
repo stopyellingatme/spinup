@@ -26,7 +26,7 @@ Before you add a job, a matrix entry, or a schedule, count its minutes.
 | `gate` | Linux | On a push, it looks for an earlier green run of the same git tree. |
 | `lint` | Linux | Runs `golangci-lint` on the CLI and the kit. |
 | `actionlint` | Linux | Checks the workflow files. |
-| `test` | Linux | Runs `go test -race ./...` and the kit tests. This includes the golden trees and the CLI scripts. |
+| `test` | Linux | Runs `go test -race ./...`, the kit tests, and `make perf-gate`. This includes the golden trees and the CLI scripts. |
 | `windows` | Windows | Vets every package, builds the CLI, and tests the portable packages. |
 | `upgrade` | Linux | Runs the [upgrade matrix](upgrade-matrix.md), the pack digest check, and the coverage floor. |
 | `test-macos` | macOS | Runs the `test` job on macOS. It starts only after every other job passes. |
@@ -58,7 +58,7 @@ Fix the Linux or Windows failure first, and the next run shows the macOS result.
 | --- | --- |
 | `dind.yml` | Each push to `main`, and each Monday. A newer push cancels a run that is in progress. See [Docker-in-Docker deploy suite](dind.md). |
 | `monitoring.yml` | A pull request or push that changes the monitoring paths, and each Monday. See [Monitoring stack boot test](monitoring-boot.md). |
-| `nightly.yml` | Each night. It downloads from the network, so it finds drift in npm, crates.io, PyPI, and the browsers. See [Browser end-to-end suite](e2e.md). |
+| `nightly.yml` | Each night. It downloads from the network, finds package drift, and checks bundle bytes. See [Browser end-to-end suite](e2e.md). |
 | `kit-compat.yml` | A pull request that changes `kit/`. |
 | `docs.yml` | A push to `main` that changes `docs/`. |
 | `canary-*.yml`, `bump.yml`, `shas.yml`, `dr.yml` | Once a week. |
@@ -66,6 +66,10 @@ Fix the Linux or Windows failure first, and the next run shows the macOS result.
 
 Every job has `timeout-minutes`.
 Without it, GitHub stops a stuck job only after 6 hours.
+
+The `make perf-gate` step runs the deterministic allocation budgets after the race tests.
+It runs in the existing Linux `test` job, so it creates no new billed job.
+It adds only the budget-test CPU time. It does not time benchmarks or use the network.
 
 ## Measure the minutes
 
