@@ -258,6 +258,9 @@ func registerOrdersFeed(mux *http.ServeMux, h *kitlive.Hub, d Deps) {
 }
 ```
 
+The kit asks the loader for one row more than the limit, and it sets `"more":true` when the loader returns that row.
+A loader that has its own smaller limit calls `kitlive.MarkMore(ctx)` when it leaves rows out. The generated feeds do this.
+
 Keep the marker `// spinup:live-feed <feed> register<Name>Feed` on the line before the function.
 The generators read it to write `feeds_gen.go`. After you add a feed file, run `spinup g live <resource> --force` for any resource, or add the call to `feeds_gen.go`.
 

@@ -109,7 +109,12 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 		}
 	}
 	if o.Kind == "resource" {
-		navPlan, err := resource.PlanNav(o.Root, result.Files, result.Files.Paths())
+		removed := result.Files.Paths()
+		livePlan, err := resource.PlanLiveDestroy(o.Root, result.Files)
+		if err != nil {
+			return nil, err
+		}
+		navPlan, err := resource.PlanNav(o.Root, livePlan, removed)
 		if err != nil {
 			return nil, err
 		}

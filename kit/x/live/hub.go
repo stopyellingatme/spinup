@@ -208,7 +208,7 @@ func (o *options) resolve() error {
 		o.ringBytes = defaultRingBytes
 	}
 	if o.logger == nil {
-		o.logger = slog.Default()
+		o.logger = slog.New(lateDefault{})
 	}
 	return nil
 }
@@ -475,7 +475,8 @@ func (h *Hub) totalRingBytes() int64 {
 	return h.ringBytes
 }
 
-// WithLogger sets the logger. The default is slog.Default().
+// WithLogger sets the logger. The default is slog.Default(), read at each log call. An app builds
+// the hub before app.New installs its logger, and the hub must use that logger.
 func WithLogger(l *slog.Logger) Option { return func(o *options) { o.logger = l } }
 
 // WithMeterProvider sets the meter provider. The default is otel.GetMeterProvider().
