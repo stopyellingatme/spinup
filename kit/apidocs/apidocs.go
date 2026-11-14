@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/kit/httpx"
@@ -62,7 +61,7 @@ func Mount(mux *http.ServeMux, opts Options) {
 	mux.HandleFunc("GET /api/docs/scalar.js", func(w http.ResponseWriter, r *http.Request) {
 		headers(w, "text/javascript; charset=utf-8", "public, max-age=86400")
 		w.Header().Add("Vary", "Accept-Encoding")
-		if acceptsGzip(strings.Join(r.Header.Values("Accept-Encoding"), ",")) {
+		if httpx.AcceptsEncoding(strings.Join(r.Header.Values("Accept-Encoding"), ","), "gzip") {
 			w.Header().Set("Content-Encoding", "gzip")
 			_, _ = w.Write(scalarGzip)
 			return
@@ -94,31 +93,4 @@ func readSpec(opts Options) ([]byte, error) {
 		return fs.ReadFile(opts.Spec, "bundle.gen.yaml")
 	}
 	return nil, fs.ErrNotExist
-}
-
-func acceptsGzip(value string) bool {
-	wildcard := false
-	for token := range strings.SplitSeq(value, ",") {
-		parts := strings.Split(token, ";")
-		name := strings.TrimSpace(parts[0])
-		if !strings.EqualFold(name, "gzip") && name != "*" {
-			continue
-		}
-		quality := 1.0
-		for _, parameter := range parts[1:] {
-			key, raw, ok := strings.Cut(strings.TrimSpace(parameter), "=")
-			if ok && strings.EqualFold(key, "q") {
-				parsed, err := strconv.ParseFloat(raw, 64)
-				quality = 0
-				if err == nil && parsed > 0 && parsed <= 1 {
-					quality = parsed
-				}
-			}
-		}
-		if strings.EqualFold(name, "gzip") {
-			return quality > 0
-		}
-		wildcard = quality > 0
-	}
-	return wildcard
 }

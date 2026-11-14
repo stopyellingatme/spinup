@@ -1,0 +1,34 @@
+# Doctor verifies generated OpenAPI and sqlc files without a database.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new todo --api-only --module example.com/todo --no-git --non-interactive
+cd todo
+exec spinup g resource todo title:string done:bool
+exists api/openapi/bundle.gen.yaml api/internal/gen/api.gen.go api/internal/store/todos.sql.go
+
+# Other local checks can fail because the machine lacks Docker or an env file.
+exec sh -c 'spinup doctor --json || test "$?" -eq 1'
+stdout '(?s)"id": "openapi-drift",\s+"status": "ok"'
+stdout '(?s)"id": "sqlc-drift",\s+"status": "ok"'
+
+# Hand edits must fail the checks and make doctor return a nonzero exit code.
+cp $WORK/stale-bundle.yaml api/openapi/bundle.gen.yaml
+cp $WORK/stale-store.go api/internal/store/todos.sql.go
+! exec spinup doctor --json
+stdout '(?s)"id": "openapi-drift",\s+"status": "fail",.*?"try": "spinup g openapi"'
+stdout '(?s)"id": "sqlc-drift",\s+"status": "fail",.*?"try": "spinup db sqlc"'
+! exec spinup doctor
+stdout 'fail\topenapi-drift\t'
+stdout 'Try: spinup g openapi'
+stdout 'fail\tsqlc-drift\t'
+stdout 'Try: spinup db sqlc'
+
+# Doctor must leave the hand edits intact.
+cmp api/openapi/bundle.gen.yaml $WORK/stale-bundle.yaml
+cmp api/internal/store/todos.sql.go $WORK/stale-store.go
+
+-- stale-bundle.yaml --
+# A hand edit makes the bundle stale.
+paths: {}
+-- stale-store.go --
+// A hand edit makes the generated store stale.
+package store

@@ -151,10 +151,19 @@ A pull request that changes only `*.md` files or files in `docs/` also skips `e2
 Do not make `e2e` a required check.
 A workflow that a path filter skips leaves a required check pending, and the pull request cannot merge.
 
-The web job runs `pnpm check` and `pnpm test`.
+The web job installs the dependencies and runs `gen:client` before it runs `pnpm check` and `pnpm test`.
+For the heyapi client, it also writes `src/lib/api/schema.d.ts`.
+The job fails when `src/lib/api` changes.
+Run `spinup g client` to update the client.
+The step does nothing for a new app that has no `api/openapi/bundle.gen.yaml` yet.
 An app with no unit tests passes.
 A failed Playwright run uploads `web/playwright-report/` for seven days.
 The workflows take the Go version from `api/go.mod` and the Node major from the spinup stack.
+
+The `spinup doctor` step checks three generated outputs.
+`openapi-drift` checks the OpenAPI bundle and Go API code.
+`sqlc-drift` checks the SQL query output.
+`client-drift` checks the TypeScript client.
 
 ## The upgrade workflow
 

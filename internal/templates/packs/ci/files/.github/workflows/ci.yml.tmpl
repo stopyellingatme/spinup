@@ -85,11 +85,38 @@ jobs:
           set -euo pipefail
 [[- if eq (index . "package_manager") "bun" ]]
           bun install --frozen-lockfile
+[[- else ]]
+          pnpm install --frozen-lockfile
+[[- end ]]
+      - name: Check generated API client
+        run: |
+          set -euo pipefail
+          if [ ! -f ../api/openapi/bundle.gen.yaml ]; then
+            echo "The app has no generated OpenAPI bundle yet. The client check does not apply."
+            exit 0
+          fi
+[[- if eq (index . "package_manager") "bun" ]]
+          bun run gen:client
+[[- if eq .api_client "heyapi" ]]
+          bun x --no-install openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts
+[[- end ]]
+[[- else ]]
+          pnpm run gen:client
+[[- if eq .api_client "heyapi" ]]
+          pnpm exec openapi-typescript ../api/openapi/bundle.gen.yaml -o src/lib/api/schema.d.ts
+[[- end ]]
+[[- end ]]
+          if [ -n "$(git status --porcelain -- src/lib/api)" ]; then
+            echo "The API client is stale. Run: spinup g client" >&2
+            exit 1
+          fi
+      - run: |
+          set -euo pipefail
+[[- if eq (index . "package_manager") "bun" ]]
           bun run check
           # A new app has no unit tests. Playwright runs in its own workflow.
           bun run test --passWithNoTests
 [[- else ]]
-          pnpm install --frozen-lockfile
           pnpm check
           # A new app has no unit tests. Playwright runs in its own workflow.
           pnpm test --passWithNoTests
@@ -110,7 +137,9 @@ jobs:
       - uses: [[ uses "actions/setup-go" ]]
         with:
           go-version-file: api/go.mod
-          cache-dependency-path: api/go.sum
+          cache-dependency-path: |
+            api/go.sum
+            api/tools.sum
 [[- if index . "shadcn_registry" ]]
       - uses: [[ uses "actions/setup-node" ]]
         with:

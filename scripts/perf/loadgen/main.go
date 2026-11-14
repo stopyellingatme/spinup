@@ -20,6 +20,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,11 +30,13 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"runtime"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,6 +52,8 @@ type Config struct {
 	Cookie      string
 	Expect      int
 	Timeout     time.Duration
+	Headers     http.Header
+	ExpectBody  string
 }
 
 // Latency holds the latency percentiles of a run in milliseconds (nearest rank).
@@ -70,6 +75,8 @@ type Result struct {
 	DurationS   float64        `json:"duration_s"`
 	RPS         float64        `json:"rps"`
 	Latency     Latency        `json:"latency_ms"`
+	TTFB        Latency        `json:"ttfb_ms"`
+	Bytes       int64          `json:"bytes_received"`
 	Status      map[string]int `json:"status"`
 	FirstError  string         `json:"first_error"`
 	WarmupS     float64        `json:"warmup_s"`
@@ -113,6 +120,8 @@ func parseFlags(args []string, out io.Writer) (Config, error) {
 	fs.StringVar(&cfg.Cookie, "cookie", "", "the value of a Cookie header for every request")
 	fs.IntVar(&cfg.Expect, "expect", http.StatusOK, "the expected status code (another status is an error)")
 	fs.DurationVar(&cfg.Timeout, "timeout", 10*time.Second, "the timeout of one request")
+	fs.Var(headerValue{headers: &cfg.Headers}, "header", "an HTTP header for every request, in 'Name: value' form")
+	fs.StringVar(&cfg.ExpectBody, "expect-body", "", "a body substring required in every response")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
@@ -133,6 +142,25 @@ func parseFlags(args []string, out io.Writer) (Config, error) {
 	return cfg, nil
 }
 
+// headerValue parses one repeatable -header flag.
+type headerValue struct{ headers *http.Header }
+
+func (v headerValue) String() string { return "" }
+
+func (v headerValue) Set(value string) error {
+	name, content, ok := strings.Cut(value, ":")
+	name = strings.TrimSpace(name)
+	content = strings.TrimSpace(content)
+	if !ok || name == "" || content == "" {
+		return fmt.Errorf("loadgen: -header %q is not 'Name: value'\nTry: -header 'Authorization: Bearer token'", value)
+	}
+	if *v.headers == nil {
+		*v.headers = make(http.Header)
+	}
+	v.headers.Add(name, content)
+	return nil
+}
+
 // newTransport returns a keep-alive transport with one idle connection for each worker.
 func newTransport(cfg Config) *http.Transport {
 	return &http.Transport{
@@ -148,7 +176,9 @@ func newTransport(cfg Config) *http.Transport {
 // worker is the state of one worker goroutine.
 type worker struct {
 	lat    []time.Duration
+	ttfb   []time.Duration
 	status map[int]int
+	bytes  int64
 	errs   int64
 	first  string
 }
@@ -210,12 +240,17 @@ func (w *worker) loop(ctx context.Context, client *http.Client, cfg Config, budg
 	if cfg.Cookie != "" {
 		req.Header.Set("Cookie", cfg.Cookie)
 	}
+	for name, values := range cfg.Headers {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
 	for ctx.Err() == nil {
 		if budget != nil && budget.Add(-1) < 0 {
 			return
 		}
 		t := time.Now()
-		code, err := do(client, req)
+		code, received, firstByte, responseBody, err := do(client, req)
 		d := time.Since(t)
 		if err != nil && ctx.Err() != nil {
 			return // the duration ended during the request: the request does not count
@@ -224,6 +259,10 @@ func (w *worker) loop(ctx context.Context, client *http.Client, cfg Config, budg
 			continue
 		}
 		w.lat = append(w.lat, d)
+		if firstByte > 0 {
+			w.ttfb = append(w.ttfb, firstByte)
+		}
+		w.bytes += received
 		switch {
 		case err != nil:
 			w.errs++
@@ -236,6 +275,12 @@ func (w *worker) loop(ctx context.Context, client *http.Client, cfg Config, budg
 			if w.first == "" {
 				w.first = fmt.Sprintf("status %d, expected %d", code, cfg.Expect)
 			}
+		case cfg.ExpectBody != "" && !bytes.Contains(responseBody, []byte(cfg.ExpectBody)):
+			w.status[code]++
+			w.errs++
+			if w.first == "" {
+				w.first = fmt.Sprintf("response body does not contain %q", cfg.ExpectBody)
+			}
 		default:
 			w.status[code]++
 		}
@@ -243,17 +288,24 @@ func (w *worker) loop(ctx context.Context, client *http.Client, cfg Config, budg
 }
 
 // do sends one request and reads the whole body, so the connection goes back to the pool.
-func do(client *http.Client, req *http.Request) (int, error) {
-	resp, err := client.Do(req)
+func do(client *http.Client, req *http.Request) (int, int64, time.Duration, []byte, error) {
+	start := time.Now()
+	var firstByte time.Time
+	trace := &httptrace.ClientTrace{GotFirstResponseByte: func() { firstByte = time.Now() }}
+	resp, err := client.Do(req.WithContext(httptrace.WithClientTrace(req.Context(), trace)))
 	if err != nil {
-		return 0, err
+		return 0, 0, 0, nil, err
 	}
-	_, err = io.Copy(io.Discard, resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	cerr := resp.Body.Close()
 	if err == nil {
 		err = cerr
 	}
-	return resp.StatusCode, err
+	ttfb := time.Duration(0)
+	if !firstByte.IsZero() {
+		ttfb = firstByte.Sub(start)
+	}
+	return resp.StatusCode, int64(len(body)), ttfb, body, err
 }
 
 // summarize merges the worker states into one Result.
@@ -261,8 +313,11 @@ func summarize(cfg Config, ws []*worker, elapsed time.Duration) Result {
 	res := Result{URL: cfg.URL, Concurrency: cfg.Concurrency, Status: map[string]int{},
 		DurationS: round(elapsed.Seconds(), 3), WarmupS: cfg.Warmup.Seconds(), GOMAXPROCS: runtime.GOMAXPROCS(0)}
 	var all []time.Duration
+	var allTTFB []time.Duration
 	for _, w := range ws {
 		all = append(all, w.lat...)
+		allTTFB = append(allTTFB, w.ttfb...)
+		res.Bytes += w.bytes
 		res.Errors += w.errs
 		if res.FirstError == "" {
 			res.FirstError = w.first
@@ -279,6 +334,7 @@ func summarize(cfg Config, ws []*worker, elapsed time.Duration) Result {
 		res.RPS = round(float64(len(all))/elapsed.Seconds(), 1)
 	}
 	res.Latency = percentiles(all)
+	res.TTFB = percentiles(allTTFB)
 	return res
 }
 

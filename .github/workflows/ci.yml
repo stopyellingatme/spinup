@@ -131,6 +131,8 @@ jobs:
       # The kit tests need PostgreSQL. Linux runners start it in Docker (testcontainers).
       - name: Test the kit with the race detector
         run: cd kit && go test -race ./...
+      - name: Run the deterministic performance gate
+        run: make perf-gate
 
   windows:
     needs: gate

@@ -1,0 +1,36 @@
+# App gate: every module builds with the web app and the script database (ADR 0036 §4).
+[!env:DATABASE_URL] skip 'DATABASE_URL is empty: export it to run this gate'
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new allmodules --modules apikeys,audit,auth,backups,billing,ci,deploy,flags,jobs,mail,mcp,monitoring,secrets,tofu --module example.com/allmodules --no-git --non-interactive
+cd allmodules
+exec spinup g resource note body:text
+
+cd web
+exec sh $WORK/pnpm.sh install --frozen-lockfile --offline
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+exec sh $WORK/pnpm.sh build
+cd ..
+
+cd api
+exec go test ./...
+cd ..
+
+# Docker needs a running daemon. All web checks run after the install and build.
+exec sh -c 'spinup doctor --json > doctor.json || test "$?" -eq 1'
+exec cat doctor.json
+stdout '(?s)"id": "openapi-drift",\s+"status": "ok"'
+stdout '(?s)"id": "sqlc-drift",\s+"status": "ok"'
+stdout '(?s)"id": "client-drift",\s+"status": "ok"'
+stdout '(?s)"id": "web-bundle",\s+"status": "ok"'
+! exec sh -c 'sed -e \'/"id": "docker"/,/^[[:space:]]*}/d\' doctor.json | grep \'"status": "fail"\''
+! exec grep '\[\[ \.' .
+
+-- pnpm.sh --
+# Scripts get their own HOME. Use the real home for the pinned pnpm and its offline store.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"

@@ -13,7 +13,7 @@ export PATH := $(CURDIR)/scripts/bin:/opt/homebrew/opt/node@24/bin:$(PATH)
 MODULES := . ./kit ./plugin-sdk
 PKGS ?= ./...
 
-.PHONY: help build test lint vuln golden script app-gate doctest e2e dind tools-check bump-stack install perf perf-compare
+.PHONY: help build test lint vuln golden script app-gate doctest e2e dind tools-check bump-stack install perf perf-compare perf-gate perf-baseline
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -44,11 +44,18 @@ app-gate: ## Generate apps and build/test them (Docker + network; gate check)
 doctest: ## Run the code blocks in docs/
 	@if [[ -d internal/doctest ]]; then go test ./internal/doctest/... -run 'TestDocs' -count=1; else echo "doctest: not implemented until M1.8"; fi
 
-perf: ## Performance loop: SUITES=cli,app,micro QUICK=1 OUT=<file> (docs/contributing/performance.md)
-	@python3 -I scripts/perf/perf.py run --suites $(or $(SUITES),cli,app,micro) $(if $(QUICK),--quick) $(if $(OUT),--out $(OUT))
+perf: ## Performance loop: SUITES=cli,app,micro,web QUICK=1 OUT=<file> (docs/contributing/performance.md)
+	@python3 -I scripts/perf/perf.py run $(if $(SUITES),--suites $(SUITES)) $(if $(QUICK),--quick) $(if $(OUT),--out $(OUT))
 
 perf-compare: ## Compare two perf results: BASE=<json> NEW=<json> THRESHOLD=0.10
 	@python3 -I scripts/perf/perf.py compare $(BASE) $(NEW) --threshold $(or $(THRESHOLD),0.10)
+
+perf-gate: ## Deterministic perf gate: the allocation budgets of the kit, without the race detector, and the unit tests of scripts/perf (ADR 0034 §8)
+	@cd kit && go test -count=1 -run 'Budget$$' ./httpx/... ./app/... ./logx/...
+	@python3 -I -B -m unittest discover -s scripts/perf -p 'test_*.py'
+
+perf-baseline: ## Write perf/baseline/<cpu-slug>.{json,md} from a full result: NEW=<json> (ADR 0034 §7)
+	@python3 -I scripts/perf/perf.py baseline $(NEW)
 
 e2e: ## Playwright smoke on a generated app with auth (needs DATABASE_URL and the Chromium browser)
 	@if [[ -z "$${DATABASE_URL:-}" ]]; then echo "e2e: DATABASE_URL is empty"; echo "Try: export DATABASE_URL=postgres://... (an empty database server you own)"; exit 1; fi

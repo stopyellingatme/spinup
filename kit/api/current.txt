@@ -280,12 +280,15 @@ kit/httpx field Problem.Instance string
 kit/httpx field Problem.Status int
 kit/httpx field Problem.Title string
 kit/httpx field Problem.Type string
+kit/httpx func AcceptsEncoding(string, string) bool
 kit/httpx func AccessLog(*slog.Logger) Middleware
 kit/httpx func Chain(http.Handler, ...Middleware) http.Handler
 kit/httpx func CheckJSONBody(*http.Request, BodyRules) error
 kit/httpx func DecodeJSON(*http.Request, any) error
+kit/httpx func DefaultCacheControl(http.Handler) http.Handler
 kit/httpx func MaxBody(int64) Middleware
 kit/httpx func ProblemFrom(error) Problem
+kit/httpx func PublicCache(http.ResponseWriter, time.Duration)
 kit/httpx func Recover(*slog.Logger) Middleware
 kit/httpx func RequestID() Middleware
 kit/httpx func RequestIDFrom(context.Context) string

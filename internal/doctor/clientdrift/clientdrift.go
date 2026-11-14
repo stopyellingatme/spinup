@@ -34,7 +34,7 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 		return skip("outside a spinup project: spinup.lock is missing")
 	}
 	if err != nil {
-		return warning("cannot read spinup.lock: %v", err)
+		return failure("cannot read spinup.lock: %v", err)
 	}
 	if !slices.Contains(lock.Packs, "web") {
 		return skip("no web pack")
@@ -45,10 +45,10 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 			return skip(path + " is missing")
 		}
 		if err != nil {
-			return warning("cannot inspect %s: %v", path, err)
+			return failure("cannot inspect %s: %v", path, err)
 		}
 		if path == "web/node_modules" && !info.IsDir() {
-			return warning("web/node_modules is not a directory")
+			return failure("web/node_modules is not a directory")
 		}
 	}
 	runner, ok := c.Deps["runner"].(exec.Runner)
@@ -58,21 +58,21 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 	// Keep the temporary output outside the project and always remove it.
 	dir, err := os.MkdirTemp("", "spinup-client-drift-*")
 	if err != nil {
-		return warning("cannot create temporary client directory: %v", err)
+		return failure("cannot create temporary client directory: %v", err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	tool := webtool.FromLock(lock)
 	output := filepath.Join(dir, filepath.Base(tool.ClientOutput()))
 	if err := client.GenerateTypes(ctx, c.Root, output, runner); err != nil {
-		return warning("cannot generate TypeScript client: %v", err)
+		return failure("cannot generate TypeScript client: %v", err)
 	}
 	fresh, err := outputs(output, tool.HeyAPI())
 	if err != nil {
-		return warning("cannot read generated TypeScript client: %v", err)
+		return failure("cannot read generated TypeScript client: %v", err)
 	}
 	disk, err := outputs(filepath.Join(c.Root, "web", tool.ClientOutput()), tool.HeyAPI())
 	if err != nil {
-		return warning("cannot read web/%s: %v", tool.ClientOutput(), err)
+		return failure("cannot read web/%s: %v", tool.ClientOutput(), err)
 	}
 	names := make([]string, 0, len(fresh)+len(disk))
 	for name := range fresh {
@@ -86,7 +86,7 @@ func runCheck(ctx context.Context, c *doctor.Context) doctor.Result {
 		a, aok := fresh[name]
 		b, bok := disk[name]
 		if !aok || !bok || !bytes.Equal(normalize(a), normalize(b)) {
-			return warning("web/src/lib/api/%s is stale", name)
+			return failure("web/src/lib/api/%s is stale", name)
 		}
 	}
 	return doctor.Result{Status: doctor.OK, Message: "TypeScript client matches the OpenAPI bundle"}
@@ -144,8 +144,9 @@ func skip(reason string) doctor.Result {
 	return doctor.Result{Status: doctor.Skip, Message: reason}
 }
 
-func warning(format string, args ...any) doctor.Result {
-	message := fmt.Sprintf(format, args...)
-	message, _, _ = strings.Cut(message, "\nTry:")
-	return doctor.Result{Status: doctor.Warn, Message: strings.Join(strings.Fields(message), " "), Try: "spinup g client"}
+func failure(format string, args ...any) doctor.Result {
+	lines := strings.Split(fmt.Sprintf(format, args...), "\n")
+	lines = slices.DeleteFunc(lines, func(line string) bool { return strings.HasPrefix(line, "Try:") })
+	message := strings.Join(strings.Fields(strings.Join(lines, " ")), " ")
+	return doctor.Result{Status: doctor.Fail, Message: message, Try: "spinup g client"}
 }

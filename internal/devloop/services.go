@@ -65,7 +65,7 @@ type goWatcher struct {
 }
 
 // skippedGoDirs mirrors exclude_dir of the managed api/.air.toml.
-var skippedGoDirs = []string{"tmp", "node_modules", "internal/gen", "internal/store"}
+var skippedGoDirs = []string{"tmp", "node_modules", "internal/gen"}
 
 func (w goWatcher) Run(ctx context.Context) {
 	interval, debounce := w.Interval, w.Debounce

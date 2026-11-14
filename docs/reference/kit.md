@@ -193,7 +193,12 @@ The body remains readable and retains its original `Close` method.
 
 `RequireJSONFields(r, required)` calls `CheckJSONBody` without a list of known fields.
 It validates JSON syntax even when no field is required. An empty body with empty rules is allowed.
-`WriteAttachment` sends a file download. The middleware are `RequestID`, `Recover`, `AccessLog`, `SecurityHeaders`, and `MaxBody`.
+`WriteAttachment` sends a file download. The middleware are `RequestID`, `Recover`, `AccessLog`, `SecurityHeaders`, `DefaultCacheControl`, and `MaxBody`.
+
+`AcceptsEncoding(header, coding)` reports whether an `Accept-Encoding` header accepts a coding.
+It supports quality values and the wildcard coding.
+`PublicCache(w, maxAge)` sets a public cache header with whole seconds.
+`DefaultCacheControl` adds `private, no-cache` when a handler did not set `Cache-Control`.
 
 `AccessLog` records the method, path, status, bytes, duration, and request ID.
 Successful responses (2xx) from `/healthz` and `/readyz` use the debug level.

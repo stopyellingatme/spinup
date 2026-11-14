@@ -17,7 +17,9 @@ threshold (a fraction: 0.10 is 10 percent).
 """
 
 import argparse
+import copy
 import importlib
+import json
 import os
 import sys
 import time
@@ -29,14 +31,14 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import lib  # noqa: E402
 
-SUITE_ORDER = ["cli", "app", "micro"]
+SUITE_ORDER = ["cli", "app", "micro", "web", "dev"]
 
 
 def parse_args(argv):
     ap = argparse.ArgumentParser(prog="perf.py", description="Measure spinup, and compare two measurements.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="build the CLI and run the suites")
-    r.add_argument("--suites", default=",".join(SUITE_ORDER), help="comma list of cli,app,micro (default all)")
+    r.add_argument("--suites", default="cli,app,micro,web", help="comma list of cli,app,micro,web,dev (default cli,app,micro,web)")
     r.add_argument("--quick", action="store_true", help="fewest samples and short load runs")
     r.add_argument("--out", default=None,
                    help="the JSON result file (default perf/results/<timestamp>.json in the repository)")
@@ -53,10 +55,14 @@ def parse_args(argv):
                         f"{lib.GATE_BUDGET_S_QUICK}); after it the gates pass at once")
     r.add_argument("--min-free-gb", type=float, default=None, help="free disk needed to start (0 skips the check)")
     c = sub.add_parser("compare", help="compare two results")
-    c.add_argument("base")
-    c.add_argument("new")
+    c.add_argument("base", nargs="?")
+    c.add_argument("new", nargs="?")
     c.add_argument("--threshold", type=float, default=0.10, help="the allowed regression, a fraction (default 0.10)")
     c.add_argument("--md", default=None, help="also write the table as Markdown to this file")
+    c.add_argument("--only", choices=("primary", "informational", "deterministic"),
+                   help="compare only one metric class")
+    b = sub.add_parser("baseline", help="write the baseline for the CPU of this machine")
+    b.add_argument("json", help="a full, clean performance result")
     p = sub.add_parser("report", help="turn a result JSON into Markdown")
     p.add_argument("json")
     p.add_argument("--md", default=None, help="write the Markdown to this file (it is also printed)")
@@ -146,11 +152,91 @@ def cmd_run(a):
     return rc
 
 
+def cpu_slug(cpu):
+    """Return the file-safe slug for a CPU name."""
+    out = []
+    separator = False
+    for char in cpu.lower():
+        if "a" <= char <= "z" or "0" <= char <= "9":
+            out.append(char)
+            separator = False
+        elif not separator:
+            out.append("-")
+            separator = True
+    return "".join(out) or "unknown-cpu"
+
+
+def _public_result(value, repo=None, home=None, hostname=None):
+    """Copy value without host names or repository paths."""
+    if repo is None:
+        repo, home, hostname = str(lib.REPO), str(Path.home()), lib.machine_info().get("hostname", "")
+    if isinstance(value, dict):
+        return {key: _public_result(item, repo, home, hostname) for key, item in value.items() if key not in ("hostname", "path")}
+    if isinstance(value, list):
+        return [_public_result(item, repo, home, hostname) for item in value]
+    if isinstance(value, str):
+        for old, new in ((repo, "<repo>"), (home, "~"), (hostname, "<host>")):
+            if old:
+                value = value.replace(old, new)
+        return value
+    return copy.deepcopy(value)
+
+
+def write_baseline(result_path, repo=lib.REPO):
+    """Validate result_path and write its public JSON and Markdown baseline under repo."""
+    data = lib.read_results(result_path)
+    meta = data.get("meta", {})
+    if meta.get("repo", {}).get("dirty"):
+        raise lib.Failure("cannot write a baseline from a dirty tree", "run the performance loop from a clean tree")
+    if meta.get("quick"):
+        raise lib.Failure("cannot write a baseline from a quick run", "run perf.py without --quick")
+    if any(event.get("timed_out") for event in data.get("gate_events", [])):
+        raise lib.Failure("cannot write a baseline after a load gate timed out",
+                          "run the performance loop again when the machine is idle")
+    cpu = meta.get("machine", {}).get("cpu", "")
+    if not cpu:
+        raise lib.Failure("cannot write a baseline without a CPU name", "run perf.py again on this machine")
+    destination = Path(repo) / "perf" / "baseline"
+    destination.mkdir(parents=True, exist_ok=True)
+    name = cpu_slug(cpu)
+    json_path = destination / f"{name}.json"
+    markdown_path = destination / f"{name}.md"
+    public = _public_result(data, meta.get("repo", {}).get("path", str(Path(repo).resolve())), str(Path.home()), meta.get("machine", {}).get("hostname", ""))
+    json_path.write_text(json.dumps(public, indent=2, sort_keys=True) + "\n")
+    import report
+    report.main(str(json_path), str(markdown_path), echo=False)
+    return json_path, markdown_path
+
+
+def cmd_baseline(a):
+    try:
+        json_path, markdown_path = write_baseline(a.json)
+    except lib.Failure as e:
+        print(f"perf: {e}\nTry: {e.hint}", file=sys.stderr)
+        return 1
+    print(f"perf: baseline in {json_path} and {markdown_path}", file=sys.stderr)
+    return 0
+
+
 def main(argv):
     a = parse_args(argv)
     if a.cmd == "compare":
         import compare
-        return compare.main(a.base, a.new, a.threshold, a.md)
+        if a.new is None:
+            a.base, a.new = "", a.base
+        if not a.new:
+            print("perf: compare needs a new result\nTry: perf.py compare '' perf/results/new.json", file=sys.stderr)
+            return 2
+        base = a.base
+        if base == "":
+            base = lib.REPO / "perf" / "baseline" / f"{cpu_slug(lib.machine_info().get('cpu', ''))}.json"
+            if not Path(base).is_file():
+                print(f"perf: no baseline exists for this CPU at {base}\n"
+                      "Try: run make perf-baseline NEW=<full-result.json> on this machine", file=sys.stderr)
+                return 1
+        return compare.main(base, a.new, a.threshold, a.md, a.only)
+    if a.cmd == "baseline":
+        return cmd_baseline(a)
     if a.cmd == "report":
         import report
         return report.main(a.json, a.md)

@@ -43,12 +43,12 @@ func TestCheck(t *testing.T) {
 	}{
 		{name: "current", web: true, bundle: true, modules: true, disk: "types\n", fresh: "types\n", status: doctor.OK},
 		{name: "line endings", web: true, bundle: true, modules: true, disk: "types\r\nnext\r\n", fresh: "types\nnext\n", status: doctor.OK},
-		{name: "stale", web: true, bundle: true, modules: true, disk: "old\n", fresh: "new\n", status: doctor.Warn, message: "stale"},
-		{name: "missing schema", web: true, bundle: true, modules: true, missing: true, status: doctor.Warn, message: "schema.d.ts"},
+		{name: "stale", web: true, bundle: true, modules: true, disk: "old\n", fresh: "new\n", status: doctor.Fail, message: "stale"},
+		{name: "missing schema", web: true, bundle: true, modules: true, missing: true, status: doctor.Fail, message: "schema.d.ts"},
 		{name: "no web", status: doctor.Skip, message: "no web pack"},
 		{name: "no bundle", web: true, modules: true, status: doctor.Skip, message: "bundle.gen.yaml"},
 		{name: "no modules", web: true, bundle: true, status: doctor.Skip, message: "web/node_modules"},
-		{name: "tool fails", web: true, bundle: true, modules: true, toolFail: true, status: doctor.Warn, message: "pnpm"},
+		{name: "tool fails", web: true, bundle: true, modules: true, toolFail: true, status: doctor.Fail, message: "pnpm"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -82,7 +82,7 @@ func TestCheck(t *testing.T) {
 			if got.Status != tt.status || !strings.Contains(got.Message, tt.message) {
 				t.Fatalf("result = %+v", got)
 			}
-			if got.Status == doctor.Warn && got.Try != "spinup g client" {
+			if got.Status == doctor.Fail && got.Try != "spinup g client" {
 				t.Fatalf("Try = %q", got.Try)
 			}
 			r.fake.AssertDone(t)
@@ -198,7 +198,7 @@ func TestHeyAPIDrift(t *testing.T) {
 				runner.fake.Expect(name, append(append([]string{}, prefix...), "openapi-ts")...)
 				runner.fake.Expect(name, append(append([]string{}, prefix...), "openapi-typescript")...)
 				got := runCheck(t.Context(), &doctor.Context{Root: root, Deps: map[string]any{"runner": runner}})
-				want := doctor.Warn
+				want := doctor.Fail
 				if difference == "none" {
 					want = doctor.OK
 				}
@@ -218,4 +218,25 @@ func TestHeyAPIDrift(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestToolFailureMessage(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	lock := manifest.New()
+	lock.Packs = []string{"web"}
+	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, "api/openapi/bundle.gen.yaml", "bundle")
+	if err := os.MkdirAll(filepath.Join(root, "web/node_modules"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &writingRunner{t: t, root: root}
+	runner.fake.Expect("pnpm", "exec", "openapi-typescript").Return("", "schema generation failed: invalid reference", 1).Fail(&exec.ExitError{Code: 1})
+	got := runCheck(t.Context(), &doctor.Context{Root: root, Deps: map[string]any{"runner": runner}})
+	if got.Status != doctor.Fail || !strings.Contains(got.Message, "schema generation failed: invalid reference") || got.Try != "spinup g client" {
+		t.Fatalf("result = %+v", got)
+	}
+	runner.fake.AssertDone(t)
 }

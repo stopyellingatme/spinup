@@ -48,7 +48,14 @@ jobs:
         with:
           version: 12.11.2
       - name: Run the browser end-to-end suite
+        env:
+          E2E_BROWSERS: all
         run: make e2e
+      - name: Fuzz the strict JSON paths
+        working-directory: kit
+        run: |
+          go test -run '^$' -fuzz '^FuzzDecodeJSON$' -fuzztime 60s ./httpx/
+          go test -run '^$' -fuzz '^FuzzCheckJSONBody$' -fuzztime 60s ./httpx/
 
   # The Rust and Python service templates (ADR 0022). The script generates an app with the jobs
   # module and one service in each language, then builds, runs, and probes both service images.

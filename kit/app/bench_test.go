@@ -17,14 +17,21 @@ func BenchmarkMiddlewareChain(b *testing.B) {
 			if tc.requestID != "" {
 				req.Header.Set("X-Request-ID", tc.requestID)
 			}
+			run := benchmarkMiddlewareChainBody(handler, req)
 			b.ReportAllocs()
 			for b.Loop() {
-				recorder := httptest.NewRecorder()
-				handler.ServeHTTP(recorder, req)
-				if recorder.Code != http.StatusOK {
-					b.Fatal(recorder.Code)
-				}
+				run()
 			}
 		})
+	}
+}
+
+func benchmarkMiddlewareChainBody(handler http.Handler, req *http.Request) func() {
+	return func() {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		if recorder.Code != http.StatusOK {
+			panic(recorder.Code)
+		}
 	}
 }
