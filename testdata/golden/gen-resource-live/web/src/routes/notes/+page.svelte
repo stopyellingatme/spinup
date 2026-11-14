@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { liveRefresh } from '#lib/live.svelte';
+	import { liveRefresh } from '#lib/live.svelte.js';
 	import { enhance, type ActionResult, type SubmitFunction } from '$app/forms';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';

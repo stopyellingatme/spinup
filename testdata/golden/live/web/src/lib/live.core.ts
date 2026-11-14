@@ -86,7 +86,7 @@ export function parseSSE(): TransformStream<Uint8Array, SSEEvent> {
 		}
 	});
 	const decoder = new TextDecoderStream();
-	return { writable: decoder.writable, readable: decoder.readable.pipeThrough(lines) };
+	return { writable: decoder.writable as WritableStream<Uint8Array>, readable: decoder.readable.pipeThrough(lines) };
 }
 
 /** LiveClient reads a feed with cursor resume and bounded reconnect delays. */

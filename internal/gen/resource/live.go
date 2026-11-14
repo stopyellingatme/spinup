@@ -120,7 +120,7 @@ func runLive(_ context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	page := filepath.Join(spec.Root, pagesDir(spec.Name), "+page.svelte")
 	if _, err := os.Stat(page); err == nil {
-		next = append(next, "import { liveRefresh } from '#lib/live.svelte';\nliveRefresh('"+spec.Name.PluralSnake()+"');")
+		next = append(next, "import { liveRefresh } from '#lib/live.svelte.js';\nliveRefresh('"+spec.Name.PluralSnake()+"');")
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("cannot inspect list page: %w\nTry: check the file permissions", err)
 	}

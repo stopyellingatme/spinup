@@ -7,7 +7,7 @@ package resource
 
 const listSvelte = `<script lang="ts">
 [[- if .Live ]]
-	import { liveRefresh } from '#lib/live.svelte';
+	import { liveRefresh } from '#lib/live.svelte.js';
 [[- end ]]
 	import { enhance, type ActionResult, type SubmitFunction } from '$app/forms';
 	import { afterNavigate, goto } from '$app/navigation';

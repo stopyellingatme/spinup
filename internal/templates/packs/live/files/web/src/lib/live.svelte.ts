@@ -1,9 +1,11 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
-import { browser } from '$app/environment';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { untrack } from 'svelte';
 import { LiveClient, backoff } from './live.core';
 import type { Cursor, LiveStatus, Patch } from './live.core';
+
+// SvelteKit 3 has no $app/environment. The helper does nothing during server rendering.
+const browser = typeof window !== 'undefined';
 
 /** LiveRefreshOptions controls the delay and target of page refreshes. */
 export interface LiveRefreshOptions {

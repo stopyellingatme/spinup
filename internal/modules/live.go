@@ -33,7 +33,7 @@ Next: add these options to app.New(...), after the apikeys options:
  app.WithDrain(liveHub.Drain),
 Next: add app.WithShutdown(liveHub.Close), after the hook that closes the pool.
 Next: add a feed with spinup g live <resource>, or spinup g resource <Name> --live.
-Next: in a page, call liveRefresh('<feed>') from '#lib/live.svelte'. See docs/build/live.md.
+Next: in a page, call liveRefresh('<feed>') from '#lib/live.svelte.js'. See docs/build/live.md.
 Next: run spinup doctor and inspect the live-wired check.
 `
 }
