@@ -97,6 +97,7 @@ if [[ -n "${E2E_ONLINE:-}" ]]; then offline=(); fi
 pnpm install --frozen-lockfile ${offline[@]+"${offline[@]}"} >"$work/logs/pnpm-install.log" 2>&1
 # adapter-node bakes PUBLIC_ORIGIN into the build (ADR 0002 rule 2).
 PUBLIC_ORIGIN="$origin" API_URL="$api_url" pnpm build >"$work/logs/pnpm-build.log" 2>&1
+python3 -I "$repo/scripts/perf/bundle.py" check build "$repo/perf/budgets.json"
 
 if [[ -n "${E2E_INSTALL_BROWSER:-}" ]]; then
   echo "==> install Chromium"
