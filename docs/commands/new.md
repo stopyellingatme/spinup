@@ -13,6 +13,9 @@ $ spinup new todo --api-only --module example.com/todo --no-git --non-interactiv
 ...
 $ cd todo
 $ ls
+AGENTS.md
+AGENTS.project.md
+CLAUDE.md
 README.md
 api
 deploy
@@ -42,7 +45,7 @@ The ports are the defaults. `spinup dev` picks other ports when these are busy.
 
 ## What you get
 
-The command writes 43 files for an API-only app and about 160 with the web app. The most important are:
+The command writes 47 files for an API-only app and about 164 with the web app. The most important are:
 
 | Path | What it holds |
 | --- | --- |
@@ -53,6 +56,8 @@ The command writes 43 files for an API-only app and about 160 with the web app. 
 | `deploy/` | Docker Compose, Caddy, and the Dockerfiles. |
 | `.env` | Your local settings. The command makes it from `.env.example`, and Git ignores it. |
 | `renovate.json` | Settings for Renovate, which proposes dependency updates. It leaves `.github/workflows/` to `spinup upgrade`. |
+| `AGENTS.md` | The guide for a coding agent: the rules, the file classes, and a table of tasks and commands. spinup edits this file. |
+| `AGENTS.project.md` | The rules of your app for a coding agent. You edit this file. `CLAUDE.md` imports both files. |
 
 [Project layout](../get-started/project-layout.md) shows the whole tree and says who edits which file.
 
@@ -148,7 +153,7 @@ The output looks like this:
 {
   "dir": "/home/you/scripted",
   "packs": ["base", "api", "ci", "deploy"],
-  "files": 43
+  "files": 47
 }
 ```
 
@@ -166,6 +171,7 @@ The output looks like this:
 | `--db-version <major>` | Choose PostgreSQL `18`, `17`, or `16`. Default: `18`. | `--db-version 17` |
 | `--monitoring-profile <name>` | Choose `lite`, `full`, or `none` for the monitoring module. Default: `lite`. | `--monitoring-profile full` |
 | `--ci-deploy-on-push` | Make the CI deploy the default environment on each push to `main`. | `--ci-deploy-on-push` |
+| `--agent-guidance` | Write `AGENTS.md`, `AGENTS.project.md`, `CLAUDE.md`, and an agent skill. Default: `true`. | `--agent-guidance=false` |
 | `--shadcn-registry <version>` | Record the version of the shadcn-svelte components. Default: `1.7.0`. | `--shadcn-registry 1.7.0` |
 | `--plugin <source>` | Add a pack plugin source. Repeat the flag for more. | `--plugin path:./plugins/example` |
 | `--trust` | Trust the plugin sources and their hashes. | `--trust` |

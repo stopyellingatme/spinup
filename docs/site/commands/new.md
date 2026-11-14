@@ -17,6 +17,7 @@ spinup new <name> [flags]
 
 | Flag | Default | Description |
 | --- | --- | --- |
+| `--agent-guidance` | `true` | Write AGENTS.md and an agent skill |
 | `--api-client` | `openapi-fetch` | Generated API client (openapi-fetch or heyapi) |
 | `--api-only` | `false` | create only the Go API |
 | `--auth-oidc` | `false` | Enable OpenID Connect sign-in? |

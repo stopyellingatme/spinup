@@ -72,6 +72,7 @@ $ spinup module add mail --dry-run --yes --non-interactive
 | `--ci-deploy-on-push` | Deploy the default environment on each push to `main`, when you add `ci` | `spinup module add ci --ci-deploy-on-push` |
 | `--auth-oidc` | Sign-in with an identity provider, when you add `auth` | `spinup module add auth --auth-oidc` |
 | `--db-version <major>` | The PostgreSQL major version, when you add `ci` or `deploy` (default `18`) | `spinup module add deploy --db-version 17` |
+| `--agent-guidance` | Only for `spinup new`, which writes the agent files. Every app has the base pack, so `module add` refuses this flag. | `spinup new todo --agent-guidance=false` |
 
 An explicit flag wins over the lock answers and the defaults.
 A flag works only for a module that you are adding now.

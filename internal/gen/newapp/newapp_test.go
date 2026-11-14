@@ -170,7 +170,7 @@ func TestQuestionsAndPrompt(t *testing.T) {
 	if _, err := Generate(context.Background(), o, p); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version", "ci_deploy_on_push"}) {
+	if !reflect.DeepEqual(p.keys, []string{"modules", "db_version", "agent_guidance", "ci_deploy_on_push"}) {
 		t.Fatalf("prompt keys=%q", p.keys)
 	}
 }
