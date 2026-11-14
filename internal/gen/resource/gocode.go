@@ -24,6 +24,8 @@ func (g *goFile) p(format string, args ...any) {
 
 // knownImports maps a package name to its import path and an optional name.
 var knownImports = []struct{ name, path, alias string }{
+	{"live", "github.com/stopyellingatme/spinup/kit/x/live", ""},
+	{"db", "github.com/stopyellingatme/spinup/kit/db", ""},
 	{"context", "context", ""},
 	{"audit", "github.com/stopyellingatme/spinup/kit/audit", ""},
 	{"authsink", "github.com/stopyellingatme/spinup/kit/audit/authsink", ""},

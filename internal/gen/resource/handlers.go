@@ -426,18 +426,29 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	if rc.spec.Owned {
 		g.p("params.UserID = user.ID")
 	}
-	if rc.spec.Audit.On {
+	if rc.spec.Audit.On || rc.spec.Live {
+		if rc.spec.Live {
+			g.p("var item gen.%s", rc.item)
+		}
 		g.p("var row store.%s", rc.row)
-		g.p("err = audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("err = %s(ctx, s.DB, func(tx pgx.Tx) error {", liveTx(rc.spec))
 		g.p("var err error")
 		g.p("row, err = s.Queries.WithTx(tx).Create%s(ctx, params)", singular)
-		g.p("return err")
+		if rc.spec.Live {
+			rc.liveUpsert(g, withErr)
+		} else {
+			g.p("return err")
+		}
 		g.p("})")
 	} else {
 		g.p("row, err := s.Queries.Create%s(ctx, params)", singular)
 	}
 	rc.writeError(g)
-	convert("gen.Create" + singular + "201JSONResponse")
+	if rc.spec.Live {
+		g.p("return gen.Create%s201JSONResponse(item), nil", singular)
+	} else {
+		convert("gen.Create" + singular + "201JSONResponse")
+	}
 	g.p("}")
 	g.p("")
 
@@ -463,9 +474,12 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	g.p("if err != nil {")
 	g.p("return nil, err")
 	g.p("}")
-	if rc.spec.Audit.On {
+	if rc.spec.Audit.On || rc.spec.Live {
+		if rc.spec.Live {
+			g.p("var item gen.%s", rc.item)
+		}
 		g.p("var row store.%s", rc.row)
-		g.p("err = audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("err = %s(ctx, s.DB, func(tx pgx.Tx) error {", liveTx(rc.spec))
 		g.p("var err error")
 		g.p("row, err = s.Queries.WithTx(tx).Update%s(ctx, store.Update%sParams{", singular, singular)
 	} else {
@@ -483,12 +497,20 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 		}
 	}
 	g.p("})")
-	if rc.spec.Audit.On {
-		g.p("return err")
+	if rc.spec.Audit.On || rc.spec.Live {
+		if rc.spec.Live {
+			rc.liveUpsert(g, withErr)
+		} else {
+			g.p("return err")
+		}
 		g.p("})")
 	}
 	rc.writeError(g)
-	convert("gen.Update" + singular + "200JSONResponse")
+	if rc.spec.Live {
+		g.p("return gen.Update%s200JSONResponse(item), nil", singular)
+	} else {
+		convert("gen.Update" + singular + "200JSONResponse")
+	}
 	g.p("}")
 	g.p("")
 
@@ -497,9 +519,9 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	guard("Delete" + singular)
 	query := "s.Queries"
 	assign := ":="
-	if rc.spec.Audit.On {
+	if rc.spec.Audit.On || rc.spec.Live {
 		g.p("var deleted int64")
-		g.p("err := audit.InTx(ctx, s.DB, func(tx pgx.Tx) error {")
+		g.p("err := %s(ctx, s.DB, func(tx pgx.Tx) error {", liveTx(rc.spec))
 		g.p("var err error")
 		query = "s.Queries.WithTx(tx)"
 		assign = "="
@@ -509,8 +531,14 @@ func (rc resourceCode) handlersGo() ([]byte, error) {
 	} else {
 		g.p("deleted, err %s %s.Delete%s(ctx, req.Id)", assign, query, singular)
 	}
-	if rc.spec.Audit.On {
-		g.p("return err")
+	if rc.spec.Audit.On || rc.spec.Live {
+		if rc.spec.Live {
+			g.p("if err != nil {return err}")
+			g.p("if deleted > 0 {return live.Publish(ctx, tx, %s, live.Delete(strconv.FormatInt(req.Id, 10)))}", liveKey(rc.spec))
+			g.p("return nil")
+		} else {
+			g.p("return err")
+		}
 		g.p("})")
 	}
 	g.p("if err != nil {")
@@ -690,7 +718,9 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 
 	g.p("func Test%sCRUD(t *testing.T) {", plural)
 	g.p("t.Parallel()")
-	if rc.spec.Audit.On {
+	if rc.spec.Live {
+		g.p("if os.Getenv(\"DATABASE_URL\")==\"\" {t.Skip(\"DATABASE_URL is required for live events\")}")
+	} else if rc.spec.Audit.On {
 		g.p("if os.Getenv(\"DATABASE_URL\")==\"\" {t.Skip(\"DATABASE_URL is required for audit events\")}")
 	}
 	if rc.spec.Owned || rc.spec.Shared {
@@ -758,6 +788,10 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 			g.p("t.Fatalf(\"insert a row into %s: %%v\", err)", p.Table)
 			g.p("}")
 		}
+	}
+	if rc.spec.Live && rc.spec.Shared {
+		g.p("var userB int64")
+		g.p("if err := pool.QueryRow(t.Context(), `INSERT INTO users (email, password_hash) VALUES ('live-b@example.com', 'test-hash-b') RETURNING id`).Scan(&userB); err != nil {t.Fatal(err)}")
 	}
 	insertParents("userA", parentVars, false)
 	if ownerChecks && ownedParent {
@@ -840,6 +874,21 @@ func (rc resourceCode) handlersTestGo(parents []parentInsert) ([]byte, error) {
 	g.p("if rec.Code != http.StatusNoContent {")
 	g.p("t.Fatalf(\"delete: status %%d, want %%d\\n%%s\", rec.Code, http.StatusNoContent, rec.Body)")
 	g.p("}")
+	if rc.spec.Live {
+		key := fmt.Sprintf("live.SharedKey(%q)", rc.spec.Name.PluralSnake())
+		if rc.spec.Owned {
+			key = fmt.Sprintf("live.OwnedKey(%q, userA)", rc.spec.Name.PluralSnake())
+		}
+		g.p("var published int64")
+		g.p("if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM live_outbox WHERE feed = $1`, string(%s)).Scan(&published); err != nil {t.Fatal(err)}", key)
+		g.p("if published != 3 {t.Fatalf(\"live patches = %%d, want 3\",published)}")
+		g.p("if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM live_outbox WHERE feed = $1`, string(live.OwnedKey(%q, userB))).Scan(&published); err != nil {t.Fatal(err)}", rc.spec.Name.PluralSnake())
+		wantOther := 0
+		if ownerChecks { // The owner-reference checks deliberately create one row for user B.
+			wantOther = 1
+		}
+		g.p("if published != %d {t.Fatalf(\"other user live patches = %%d, want %d\",published)}", wantOther, wantOther)
+	}
 	g.p("rec = testkit.Do(t, handler, http.MethodGet, path, nil)")
 	g.p("if rec.Code != http.StatusNotFound {")
 	g.p("t.Fatalf(\"get after delete: status %%d, want %%d\\n%%s\", rec.Code, http.StatusNotFound, rec.Body)")
