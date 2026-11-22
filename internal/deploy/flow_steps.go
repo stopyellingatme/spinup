@@ -617,7 +617,7 @@ func (f *flow) upload(ctx context.Context) (string, error) {
 		}
 	}
 	fmt.Fprintf(f.out, "Pushing %d secrets\n", len(f.l.secrets))
-	if err := secrets.Push(ctx, uploader{vm: f.vm, redact: f.redact}, f.l.app, f.l.secrets); err != nil {
+	if err := secrets.Push(ctx, uploader{vm: f.vm}, f.l.app, f.l.secrets); err != nil {
 		return "", err
 	}
 	data, err := json.MarshalIndent(f.releaseSnapshot(), "", "  ")
@@ -633,8 +633,7 @@ func (f *flow) upload(ctx context.Context) (string, error) {
 
 // uploader adapts remote.Runner to secrets.Uploader.
 type uploader struct {
-	vm     remote.Runner
-	redact []string
+	vm remote.Runner
 }
 
 func (u uploader) Upload(ctx context.Context, data []byte, path string, mode fs.FileMode) error {
@@ -642,7 +641,10 @@ func (u uploader) Upload(ctx context.Context, data []byte, path string, mode fs.
 }
 
 func (u uploader) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
-	return u.vm.Run(ctx, remote.Cmd{Argv: append([]string{c.Name}, c.Args...), Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Timeout: c.Timeout, Redact: append(slices.Clone(u.redact), c.Redact...)})
+	// Do not redact the secret values here. secrets.Push runs only commands that name files
+	// (sh, find, rm), and it parses the find output. A value that is also part of a path, such
+	// as a bucket with the name of the app, would change "/opt/<app>/secrets" and stop the push.
+	return u.vm.Run(ctx, remote.Cmd{Argv: append([]string{c.Name}, c.Args...), Stdin: c.Stdin, Stdout: c.Stdout, Stderr: c.Stderr, Timeout: c.Timeout, Redact: c.Redact})
 }
 
 // edgeSyncScript stages a complete Caddy tree and Postgres configuration.

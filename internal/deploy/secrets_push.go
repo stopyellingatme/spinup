@@ -46,14 +46,12 @@ func PushSecrets(ctx context.Context, o Options, d Deps) error {
 		return err
 	}
 	defer func() { _ = lock.Release(context.WithoutCancel(ctx)) }()
-	redact := make([]string, 0, len(values))
 	names := make([]string, 0, len(values))
-	for name, value := range values {
-		redact = append(redact, value)
+	for name := range values {
 		names = append(names, name)
 	}
 	slices.Sort(names)
-	if err := secrets.Push(ctx, uploader{vm: vm, redact: redact}, app, values); err != nil {
+	if err := secrets.Push(ctx, uploader{vm: vm}, app, values); err != nil {
 		return &ui.Error{What: "Cannot push secrets", Why: stripTry(err.Error()), Try: "check the SSH connection and /opt/" + app + "/secrets on the host", Err: err}
 	}
 	fmt.Fprintf(o.Out, "Pushed %d secrets to %s: %s\n", len(names), env.Name, strings.Join(names, ", "))
