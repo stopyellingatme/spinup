@@ -105,8 +105,8 @@ func ensureMetricsDir(ctx context.Context, r remote.Runner, app string) error {
 	chmod := remote.Cmd{Argv: []string{"chmod", "0755", dir}}
 	if _, err := r.Run(ctx, chmod); err != nil {
 		// Docker can create a missing bind source as root before the first backup.
-		// Match the parent owner so subsequent uploads work as the deploy user.
-		if _, err = r.Run(ctx, remote.Cmd{Argv: []string{"sudo", "-n", "chown", "--reference=" + path.Dir(dir), dir}}); err != nil {
+		// The deploy user has Docker access, but no sudo permission for chown.
+		if _, err = r.Run(ctx, remote.Cmd{Argv: []string{"sh", "-ec", metricsOwnerScript, "spinup-metrics-owner", app, dir}}); err != nil {
 			return fmt.Errorf("set metrics directory owner: %w\nTry: give the deploy user ownership of %s", err, dir)
 		}
 		if _, err = r.Run(ctx, chmod); err != nil {
@@ -115,3 +115,13 @@ func ensureMetricsDir(ctx context.Context, r remote.Runner, app string) error {
 	}
 	return nil
 }
+
+// Use the installed Postgres image without starting its entrypoint or mounting data.
+// Mount only the metrics directory from the VM. Match its parent owner.
+const metricsOwnerScript = `app=$1
+dir=$2
+container=$(docker ps -aq --filter "label=com.docker.compose.project=$app" --filter label=com.docker.compose.service=postgres)
+[ -n "$container" ]
+image=$(docker inspect --format '{{.Image}}' -- "$container")
+owner=$(stat -c '%u:%g' "$dir/..")
+docker run --rm --pull=never --network none --read-only --user 0:0 --cap-drop ALL --cap-add CHOWN --security-opt no-new-privileges --mount "type=bind,src=$dir,dst=/metrics" --entrypoint chown "$image" -- "$owner" /metrics`
