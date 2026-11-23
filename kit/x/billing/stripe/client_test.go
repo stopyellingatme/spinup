@@ -57,7 +57,7 @@ func TestCheckoutForms(t *testing.T) {
 			if err := r.ParseForm(); err != nil {
 				t.Fatal(err)
 			}
-			want := url.Values{"mode": {"subscription"}, "ui_mode": {"hosted_page"}, "customer": {"cus_1"}, "line_items[0][price]": {"price_1"}, "client_reference_id": {"7"}, "success_url": {"https://app/success"}, "cancel_url": {"https://app/cancel"}, "subscription_data[trial_period_days]": {"5"}, "automatic_tax[enabled]": {"true"}, "allow_promotion_codes": {"true"}, "metadata[user_id]": {"7"}}
+			want := url.Values{"mode": {"subscription"}, "ui_mode": {"hosted_page"}, "customer": {"cus_1"}, "line_items[0][price]": {"price_1"}, "client_reference_id": {"7"}, "success_url": {"https://app/success"}, "cancel_url": {"https://app/cancel"}, "subscription_data[trial_period_days]": {"5"}, "automatic_tax[enabled]": {"true"}, "managed_payments[enabled]": {"false"}, "allow_promotion_codes": {"true"}, "metadata[user_id]": {"7"}}
 			if !metered {
 				want.Set("line_items[0][quantity]", "1")
 			}
@@ -345,5 +345,20 @@ func TestCancellationDuringHTTPRequest(t *testing.T) {
 	c.o.retries = 0
 	if err := c.CheckKey(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("lost cancellation: %v", err)
+	}
+}
+
+func TestCheckoutManagedPaymentsAccountDefault(t *testing.T) {
+	c := testClient(t, func(r *http.Request) (*http.Response, error) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		if r.PostForm.Has("managed_payments[enabled]") {
+			t.Errorf("unexpected setting: %v", r.PostForm)
+		}
+		return answer(200, `{}`), nil
+	})
+	if _, err := c.CreateCheckoutSession(t.Context(), CheckoutParams{ManagedPayments: true}, ""); err != nil {
+		t.Fatal(err)
 	}
 }
