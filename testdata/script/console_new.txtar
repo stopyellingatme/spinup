@@ -1,0 +1,44 @@
+# Defaults select console. An explicit module list controls omission.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new defaults --api-only --module example.com/defaults --non-interactive
+cd defaults
+exists api/cmd/console/main.go console/compose.console.yml console/compose.query.yml
+grep '^modules = .*console' spinup.toml
+grep 'COPY --from=build /out/console /console' deploy/Dockerfile.api
+grep 'console/files/api/cmd/console/main.go.tmpl' spinup.lock
+grep 'console/files/console/compose.console.yml.tmpl' spinup.lock
+grep 'console/files/console/compose.query.yml.tmpl' spinup.lock
+exec spinup module list
+stdout 'console +on +deploy +Operator overview of one deployed app\.'
+exec spinup console --help
+stdout 'open'
+exec spinup console open --help
+stdout '--no-browser'
+stdout '--accept-new-host-key'
+exec spinup status --help
+stdout '--json'
+stdout '--accept-new-host-key'
+
+# An explicit selection must include the deploy dependency.
+cd $WORK
+! exec spinup new missing --api-only --module example.com/missing --modules console --non-interactive
+stderr 'pack "console" requires missing pack "deploy"'
+stderr 'Try: select the required module with --modules'
+exec spinup new dependency --api-only --module example.com/dependency --modules deploy,console --non-interactive
+cd dependency
+grep '^modules = .*deploy.*console' spinup.toml
+exists deploy/compose.yml console/compose.console.yml
+! exists web monitoring
+grep '^services: \{\}$' console/compose.query.yml
+
+cd $WORK
+exec spinup new omitted --api-only --module example.com/omitted --modules ci,deploy --non-interactive
+cd omitted
+! exists api/cmd/console console
+! grep '/out/console' deploy/Dockerfile.api
+! grep 'console/files/' spinup.lock
+! exec spinup status --env production
+stderr 'Cannot open console: module console is disabled\.'
+stderr 'Try: spinup module add console'
+! exec spinup console open --env production --no-browser
+stderr 'Cannot open console: module console is disabled\.'

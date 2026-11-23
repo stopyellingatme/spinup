@@ -26,6 +26,7 @@ AGENTS.project.md
 CLAUDE.md
 README.md
 api
+console
 deploy
 renovate.json
 spinup.lock
@@ -63,6 +64,7 @@ $ spinup new plain --api-only --module example.com/plain --agent-guidance=false 
 $ ls plain
 README.md
 api
+console
 deploy
 renovate.json
 spinup.lock

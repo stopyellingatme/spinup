@@ -197,6 +197,17 @@ It restarts after database failures and has no health check, because it has no H
 Set `worker` under `[replicas]` in the environment file to change how many run.
 See [Background jobs](build/jobs.md).
 
+## Console on deploy
+
+New apps select the `console` module by default. An explicit `--modules ci,deploy` list omits it.
+Existing apps keep their locked selection during upgrades. Read [Operator console](console.md) to adopt it and deploy once.
+If you ejected `deploy/Dockerfile.api`, review its console build and copy instructions before deployment.
+An ejected `deploy/compose.yml` does not prevent adoption.
+
+The deploy installs the console before monitoring and reconciles its relay after monitoring starts.
+The console remains available when monitoring fails. Resume the deploy after you repair the failure.
+After post completes, deploy forces a console sample after it releases the deploy lock.
+
 ## Monitoring on deploy
 
 If the app has the `monitoring` module, `spinup deploy` starts the monitoring stack after the release is recorded.
@@ -268,7 +279,8 @@ Every service has these settings:
 - a health check (not `migrate`, which exits when the migrations finish)
 - log rotation: `json-file`, 10 MB, 3 files
 
-Only Caddy publishes ports (80, 443, and 443/udp). Postgres publishes none.
+Caddy publishes public ports (80, 443, and 443/udp). Postgres publishes none.
+The selected console publishes port 7410 only on VM loopback. Grafana also uses a loopback publication.
 `spinup doctor` runs a Compose security lint on every `deploy/compose*.yml` file.
 To check the rendered files by hand:
 

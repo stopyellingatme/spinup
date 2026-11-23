@@ -9,6 +9,9 @@ nav_order: 1
 The `monitoring` module runs Grafana, Prometheus, Loki, and an OpenTelemetry collector (Alloy) next to your app.
 You see logs, traces, metrics, and alerts in one place. Nothing in the stack is open to the internet.
 
+The [operator console](console.md) gives you a smaller overview through SSH. New apps select it by default.
+It works without monitoring. Monitoring adds alerts, log search, and Grafana links.
+
 ## See your logs and traces in Grafana
 
 On your laptop, one command starts your app with a local Grafana. It needs Docker.

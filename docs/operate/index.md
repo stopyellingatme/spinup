@@ -11,6 +11,8 @@ Day-2 work starts after the first deploy. You read logs, get alerts, take backup
 Every task here is one `spinup` command. Add `--env production` to run it against your VM.
 
 ```sh
+spinup status --env production
+spinup console open --env production
 spinup monitor logs --env production --service todo-api --since 1h
 spinup backup now --env production
 spinup maintenance vuln-scan --env production
@@ -22,6 +24,8 @@ Backups need the `backups` module and monitoring needs the `monitoring` module. 
 
 | I want to ... | Read | Command |
 | --- | --- | --- |
+| See the deployed overview | [Operator console](../console.md) | `spinup status --env production` |
+| Open the console | [console](../commands/console.md) | `spinup console open --env production` |
 | See my logs | [Monitoring](../monitoring.md#see-logs-and-traces) | `spinup monitor logs --env production` |
 | See a trace | [Monitoring](../monitoring.md#see-logs-and-traces) | `spinup monitor trace --env production <trace-id>` |
 | Open Grafana | [Monitoring](../monitoring.md#open-grafana) | `spinup monitor open --env production` |

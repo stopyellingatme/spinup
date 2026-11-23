@@ -1,0 +1,64 @@
+# Adoption uses the locked pack version, then leaves a branch for review.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go
+env PATH=$WORK/tools:$PATH
+mkversion 0.0.1 newer
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --api-only --modules ci --module example.com/demo --non-interactive
+cd demo
+! exists console api/cmd/console
+exec spinup module add console --yes --non-interactive
+stdout 'Adding required modules: deploy'
+stdout 'git merge spinup/module-console'
+! exists console deploy/compose.yml
+! exists .spinup/upgrade.json
+exec git status --porcelain
+! stdout .
+exists .spinup/upgrade/0.0.0-dev/console/compose.console.yml
+grep '127.0.0.1:7410:7410/tcp' .spinup/upgrade/0.0.0-dev/console/compose.console.yml
+! grep 'NEWER_VERSION' .spinup/upgrade/0.0.0-dev/console/compose.console.yml
+grep '"template_version": "0.0.0-dev"' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep '^modules = .*console' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep '^modules = .*deploy' .spinup/upgrade/0.0.0-dev/spinup.toml
+exec git merge spinup/module-console
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exists api/cmd/console/main.go console/compose.console.yml console/compose.query.yml deploy/compose.yml
+grep 'console/files/api/cmd/console/main.go.tmpl' spinup.lock
+grep 'console/files/console/compose.console.yml.tmpl' spinup.lock
+grep 'console/files/console/compose.query.yml.tmpl' spinup.lock
+env SPINUP_TEMPLATES_DIR=
+exec spinup check --json
+stdout '"problems": \[\]'
+exec spinup module add console --yes --non-interactive
+stdout 'Modules are already enabled\.'
+exec git status --porcelain
+! stdout .
+
+# Every added file is managed, so an edit must produce managed drift.
+exec sh ../edit.sh
+! exec spinup check
+stdout 'console/compose.console.yml: managed file differs'
+stdout 'console/compose.query.yml: managed file differs'
+stdout 'api/cmd/console/main.go: managed file differs'
+
+-- tools/go --
+#!/bin/sh
+# Adoption verification stays offline. Package tests verify real Go behavior.
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 linux/amd64' ;;
+esac
+exit 0
+
+-- newer/packs/console/files/console/compose.console.yml.tmpl --
+# NEWER_VERSION must not replace the locked pack during adoption.
+services: {}
+
+-- edit.sh --
+#!/bin/sh
+for file in api/cmd/console/main.go console/compose.console.yml console/compose.query.yml; do
+  case "$file" in
+    *.go) printf '\n// local edit\n' >> "$file" ;;
+    *) printf '\n# local edit\n' >> "$file" ;;
+  esac
+done
