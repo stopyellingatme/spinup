@@ -22,6 +22,8 @@ type Options struct {
 	Secret string
 	// WebhookURL receives events. An empty URL records events without delivery.
 	WebhookURL string
+	// ManagedPaymentsDefault enables Managed Payments when the form omits the setting.
+	ManagedPaymentsDefault bool
 	// Prices is the price catalog.
 	Prices []stripe.Price
 	// Meters is the billing meter catalog.

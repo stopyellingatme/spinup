@@ -90,6 +90,11 @@ func (s *Service) internal(w http.ResponseWriter, r *http.Request, action string
 
 func (s *Service) stripeFailed(w http.ResponseWriter, r *http.Request, action string, err error) {
 	s.logger.ErrorContext(r.Context(), "billing: Stripe failed to "+action, "error", err, "request_id", httpx.RequestIDFrom(r.Context()))
+	var se *stripe.Error
+	if errors.As(err, &se) && se.Status == http.StatusBadRequest && strings.Contains(se.Message, "Managed Payments") {
+		problem(w, r, http.StatusBadGateway, "Stripe Managed Payments requires a tax code on each product. Try: turn off the Managed Payments default in the Stripe Dashboard, or set a tax code on each product.")
+		return
+	}
 	problem(w, r, http.StatusBadGateway, "Stripe did not answer the request. Try: retry later.")
 }
 
@@ -287,6 +292,7 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 		CancelURL:           s.origin + "/pricing",
 		TrialDays:           s.cfg.TrialDays,
 		AutomaticTax:        s.cfg.AutomaticTax,
+		ManagedPayments:     s.managedPayments,
 		AllowPromotionCodes: s.cfg.AllowPromotionCodes,
 		Metadata:            map[string]string{"user_id": user},
 		Metered:             chosenMetered,

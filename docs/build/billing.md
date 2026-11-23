@@ -166,6 +166,10 @@ Do these steps in the Stripe Dashboard. Do them first in test mode.
    `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `invoice.paid`, and `invoice.payment_failed`.
 5. Turn on the Customer Portal. Choose the plans and prices that a user can change to, and allow a cancel.
 
+Checkout disables Managed Payments by default, even when the Stripe account enables it.
+To use the account default, pass `billing.WithManagedPayments()` to `billing.New`.
+If the account enables Managed Payments, set an eligible tax code on each product in the Stripe Dashboard.
+
 The API answers 200 to other event types and ignores them.
 Then run the check command from the `api/` folder. It checks the key, each lookup key, the price roles of each plan, each meter, and the webhook secret.
 
@@ -410,3 +414,9 @@ Then run `spinup db migrate up`.
 - [Roles](roles.md): the role that a billing plan can give
 - [Background jobs](jobs.md): the worker that runs the sync
 - [ADR 0032](https://github.com/stopyellingatme/spinup/blob/main/docs/adr/0032-billing.md): the decisions
+
+## Troubleshooting
+
+| Problem | Action |
+|---|---|
+| Checkout reports a Managed Payments tax code error. | Turn off the Managed Payments default in the Stripe Dashboard, or set an eligible tax code on each product. |

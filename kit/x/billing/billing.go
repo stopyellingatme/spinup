@@ -192,18 +192,22 @@ func (c Config) clone() Config {
 }
 
 type options struct {
-	logger   *slog.Logger
-	now      func() time.Time
-	jobs     *jobs.Client
-	keys     *apikeys.Store
-	roles    *auth.Roles
-	origin   string
-	secrets  []string
-	reporter Reporter
+	managedPayments bool
+	logger          *slog.Logger
+	now             func() time.Time
+	jobs            *jobs.Client
+	keys            *apikeys.Store
+	roles           *auth.Roles
+	origin          string
+	secrets         []string
+	reporter        Reporter
 }
 
 // Option configures New.
 type Option func(*options)
+
+// WithManagedPayments lets the Stripe account default apply to Checkout.
+func WithManagedPayments() Option { return func(o *options) { o.managedPayments = true } }
 
 // WithLogger selects the logger. The default is slog.Default().
 func WithLogger(l *slog.Logger) Option { return func(o *options) { o.logger = l } }
@@ -251,17 +255,18 @@ func WithReporter(r Reporter) Option { return func(o *options) { o.reporter = r 
 // Service runs the billing routes, the sync, the gates, and usage metering.
 // It is safe for concurrent use.
 type Service struct {
-	pool     *pgxpool.Pool
-	cfg      Config
-	client   *stripe.Client
-	logger   *slog.Logger
-	now      func() time.Time
-	jobs     *jobs.Client
-	keys     *apikeys.Store
-	roles    *auth.Roles
-	origin   string
-	secrets  []string
-	reporter Reporter
+	managedPayments bool
+	pool            *pgxpool.Pool
+	cfg             Config
+	client          *stripe.Client
+	logger          *slog.Logger
+	now             func() time.Time
+	jobs            *jobs.Client
+	keys            *apikeys.Store
+	roles           *auth.Roles
+	origin          string
+	secrets         []string
+	reporter        Reporter
 
 	webhookOnce sync.Once
 
@@ -332,7 +337,7 @@ func New(pool *pgxpool.Pool, cfg Config, client *stripe.Client, opts ...Option) 
 	if o.reporter == nil {
 		o.reporter = notConfigured{}
 	}
-	return &Service{pool: pool, cfg: cfg, client: client, logger: o.logger, now: o.now, jobs: o.jobs, keys: o.keys, roles: o.roles,
+	return &Service{managedPayments: o.managedPayments, pool: pool, cfg: cfg, client: client, logger: o.logger, now: o.now, jobs: o.jobs, keys: o.keys, roles: o.roles,
 		origin: origin, secrets: o.secrets, reporter: o.reporter, warned: map[string]bool{}}, nil
 }
 

@@ -43,7 +43,7 @@ func allowed(endpoint, key string) bool {
 	case "customer":
 		return key == "email" || key == "name" || metadataKey(key)
 	case "checkout":
-		return lineItemKey.MatchString(key) || slices.Contains([]string{"mode", "ui_mode", "customer", "client_reference_id", "success_url", "cancel_url", "subscription_data[trial_period_days]", "automatic_tax[enabled]", "allow_promotion_codes"}, key) || metadataKey(key)
+		return lineItemKey.MatchString(key) || slices.Contains([]string{"mode", "ui_mode", "customer", "client_reference_id", "success_url", "cancel_url", "subscription_data[trial_period_days]", "automatic_tax[enabled]", "managed_payments[enabled]", "allow_promotion_codes"}, key) || metadataKey(key)
 	case "portal":
 		return key == "customer" || key == "return_url"
 	case "subscriptions":
@@ -154,6 +154,9 @@ func (f *Fake) checkout(form url.Values) (any, *apiError) {
 		if !found {
 			return nil, missing("price")
 		}
+		if f.o.ManagedPaymentsDefault && form.Get("managed_payments[enabled]") != "false" && price.Product.TaxCode == "" {
+			return nil, invalid("parameter_invalid", field, "Product tax code is required for Managed Payments")
+		}
 		if !price.Active || price.Recurring == nil {
 			return nil, invalid("parameter_invalid", field, "An active recurring price is required")
 		}
@@ -193,7 +196,7 @@ func (f *Fake) checkout(form url.Values) (any, *apiError) {
 		}
 		trial = days
 	}
-	for _, key := range []string{"automatic_tax[enabled]", "allow_promotion_codes"} {
+	for _, key := range []string{"automatic_tax[enabled]", "managed_payments[enabled]", "allow_promotion_codes"} {
 		if value := form.Get(key); value != "" && value != "true" && value != "false" {
 			return nil, invalid("parameter_invalid_boolean", key, "A boolean value is required")
 		}
