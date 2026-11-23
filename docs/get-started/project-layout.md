@@ -25,6 +25,7 @@ AGENTS.project.md
 CLAUDE.md
 README.md
 api
+console
 deploy
 renovate.json
 spinup.lock
@@ -55,6 +56,7 @@ todo/
 │   ├── db/queries/          SQL queries, one file for each resource
 │   ├── db/seeds/            SQL files for `spinup db seed`
 │   └── openapi/             the OpenAPI contract: paths/ and schemas/
+├── console/             the Compose files for the operator console
 ├── web/                 the SvelteKit app
 │   ├── src/routes/          pages: one folder for each URL
 │   ├── src/lib/             shared code, the API client, the UI components
@@ -73,6 +75,7 @@ Write the rules of your app for a coding agent in `AGENTS.project.md`, because s
 
 | Module | What it adds | Example |
 | --- | --- | --- |
+| `console` | `api/cmd/console/` and `console/` with the isolated Compose files | `spinup module add console` |
 | `auth` | `api/internal/roles/`, the pages `login`, `register`, and `account` in `web/src/routes/`, and `web/src/lib/server/auth.ts` | `spinup module add auth` |
 | `jobs` | `api/cmd/worker/` and `api/internal/jobs/` | `spinup module add jobs` |
 | `mail` | `api/internal/mail/` | `spinup module add mail` |

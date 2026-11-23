@@ -33,7 +33,7 @@ $ cat spinup.toml
 # Select the kit behavior defaults.
 behavior_version = 1
 # Enable these optional modules.
-modules = [ "ci", "deploy" ]
+modules = [ "ci", "deploy", "console" ]
 
 [app]
 # Name the application.
@@ -67,6 +67,7 @@ auth        off    web           Accounts with kit auth: register, log in, log o
 backups     off    deploy        Continuous PostgreSQL backups with pgBackRest: full, differential, and WAL to encrypted S3-compatible storage.
 billing     off    auth,jobs     Subscriptions, feature gates, and API key usage with Stripe Checkout and the Customer Portal.
 ci          on     -             Build, test, deploy, verify backups, and propose upgrades with GitHub Actions.
+console     on     deploy        Operator overview of one deployed app.
 deploy      on     api           Production Compose for blue/green deploys, Caddy, a Postgres image with pgBackRest, cloud-init, and environments.
 flags       off    auth          Feature flags: declared in spinup.toml, targeted by role, user, or percentage, and changed at runtime with an app command or an admin page.
 jobs        off    api           Background jobs on River: a worker process and River migrations in the migrate step.
@@ -88,6 +89,7 @@ tofu        off    deploy        OpenTofu infrastructure for a Hetzner Cloud VM.
 | `billing` | Stripe subscriptions, feature gates, and metered API calls | [Billing with Stripe](build/billing.md) |
 | `mail` | Typed emails and a development inbox | [Mail](mail.md) |
 | `ci` | GitHub Actions workflows | [Generated CI](ci.md) |
+| `console` | An operator overview through SSH | [Operator console](console.md) |
 | `deploy` | Production Compose files and environments | [Deploy to your own server](deploy.md) |
 | `secrets` | Encrypted secrets for each environment | [Secrets](deploy/secrets.md) |
 | `backups` | Database backups. The default backend is pgBackRest. See [Which backup backend?](operate/index.md#which-backup-backend) | [Backups with pg_dump](backups-pgdump.md) or [Backups with WAL-G](backups-walg.md) |
@@ -95,7 +97,7 @@ tofu        off    deploy        OpenTofu infrastructure for a Hetzner Cloud VM.
 | `tofu` | OpenTofu files for a Hetzner Cloud VM | [Hetzner Cloud with OpenTofu](infra.md) |
 
 A module can need another one. The `REQUIRES` column shows it, and spinup turns on the required modules for you.
-A new app has `ci` and `deploy`. Choose others at creation with `--modules`, or add one later:
+A new app has `ci`, `deploy`, and `console`. Choose others at creation with `--modules`, or add one later:
 
 ```console
 $ spinup module add jobs --dry-run

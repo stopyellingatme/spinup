@@ -63,6 +63,7 @@ Each link points to a Markdown page. Read "Get started" first. The section "Opti
 
 - [Monitoring](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/monitoring.md): The `monitoring` module runs Grafana, Prometheus, Loki, and an OpenTelemetry collector (Alloy) next to your app.
 - [Backups with pg_dump](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/backups-pgdump.md): The `pgdump` backend is the simplest backup.
+- [Operator console](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/console.md): The `console` module gives you an overview of one deployed app on one VM.
 - [Backups with WAL-G](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/backups-walg.md): WAL-G is a backup backend that archives PostgreSQL continuously to S3-compatible storage.
 - [Telemetry and data handling](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/data-handling.md): Your generated API sends traces, metrics, and logs to your own collector, and only when you set an endpoint.
 
@@ -75,6 +76,7 @@ Each link points to a Markdown page. Read "Get started" first. The section "Opti
 - [cache — manage template versions](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/cache.md): `spinup cache` manages the template versions that `upgrade`, `diff`, and `module add` need.
 - [check — find drift for CI](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/check.md): `spinup check` tells you whether your app still matches what spinup made.
 - [ci — generate and check CI files](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/ci.md): `spinup ci` writes the GitHub Actions files of your app, checks them for unsafe settings, and lists your sidecar services for a test matrix.
+- [console — open the operator overview](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/console.md): `spinup console` groups the console commands.
 - [db lint — check migrations](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/db-lint.md): `spinup db lint` reads the `Up` section of each migration in `api/db/kit` and `api/db/migrations`.
 - [db — operate the database](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/db.md): `spinup db` runs the migrations of your app and manages the development database.
 - [deploy digital-ocean — create a server and deploy](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/deploy-digital-ocean.md): `spinup deploy digital-ocean` takes an app from no server to a live deploy on DigitalOcean in one command.
@@ -119,6 +121,7 @@ Each link points to a Markdown page. Read "Get started" first. The section "Opti
 - [secrets — keep secrets encrypted](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/secrets.md): `spinup secrets` stores the secrets of each environment in your repository as an encrypted file.
 - [self-update — update spinup](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/self-update.md): `spinup self-update` downloads the newest stable release of spinup, checks it, and replaces the binary you run.
 - [server — prepare and inspect a VM](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/server.md): `spinup server` prepares a fresh Debian or Ubuntu VM for your app, checks that it stays safe, and lets you read its logs or open a shell.
+- [status — read the operator overview](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/status.md): `spinup status` reads the deployed console overview through authenticated SSH.
 - [test — run the app tests](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/test.md): `spinup test` runs the Go tests of your API.
 - [tools — install sops, age, and tofu](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/tools.md): `spinup tools` installs the helper programs that some spinup commands need: `sops` and `age` for secrets, and `tofu` (OpenTofu) for infrastructure.
 - [upgrade — move an app to a new version](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/upgrade.md): `spinup upgrade` brings the template files of your app up to a newer template version.

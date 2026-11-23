@@ -10,7 +10,7 @@ In this tutorial you build a small to-do app. You create it, run it, add a CRUD 
 It takes about fifteen minutes. You need the tools from [Install spinup](install.md).
 
 ```sh
-spinup new todo --module example.com/todo --modules ci,deploy,auth
+spinup new todo --module example.com/todo --modules ci,deploy,auth,console
 cd todo
 spinup g resource task title:string done:bool
 spinup dev
@@ -26,11 +26,11 @@ The steps below show each part in turn.
 | Flag | What it does |
 | --- | --- |
 | `--module example.com/todo` | Sets the Go module path of the API |
-| `--modules ci,deploy,auth` | Turns on these modules. The default is `ci,deploy`. `auth` adds sign-in. This flag is not the same as `--module`, which sets the Go path. |
+| `--modules ci,deploy,auth,console` | Turns on these modules. The default is `ci,deploy,console`. `auth` adds sign-in. This flag is not the same as `--module`, which sets the Go path. |
 | `--non-interactive` | Does not ask questions |
 
 ```console
-$ spinup new todo --module example.com/todo --modules ci,deploy,auth --non-interactive
+$ spinup new todo --module example.com/todo --modules ci,deploy,auth,console --non-interactive
 ...
 App      http://localhost:5173
 API      http://localhost:8080

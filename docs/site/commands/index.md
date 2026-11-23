@@ -28,6 +28,8 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup ci services`](ci-services.md) — List services for a GitHub Actions matrix
 - [`spinup ci test-service`](ci-test-service.md) — Run tests for one service
 - [`spinup ci verify`](ci-verify.md) — Check workflow safety and run optional actionlint
+- [`spinup console`](console.md) — Open the operator console through SSH
+- [`spinup console open`](console-open.md) — Open the console through local SSH tunnels
 - [`spinup db`](db.md) — Operate the application database
 - [`spinup db doctor`](db-doctor.md) — Check the PostgreSQL version and pending migrations
 - [`spinup db dump`](db-dump.md) — Dump the development database (default .spinup/dumps/app.dump)
@@ -138,6 +140,7 @@ Each page lists the flags of one command. For examples and how-to guides, see th
 - [`spinup server bootstrap`](server-bootstrap.md) — Prepare a Debian or Ubuntu host
 - [`spinup server logs`](server-logs.md) — Read service logs from the host
 - [`spinup server ssh`](server-ssh.md) — Open an interactive shell on the host
+- [`spinup status`](status.md) — Show the console overview of a deployed app
 - [`spinup test`](test.md) — Run application tests
 - [`spinup tools`](tools.md) — Install and inspect checksum-verified host tools
 - [`spinup tools install`](tools-install.md) — Download and verify pinned tool releases
