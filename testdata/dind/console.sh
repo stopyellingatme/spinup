@@ -619,7 +619,7 @@ code="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' -H "Origin: http://evil.ex
 [[ "$code" == 403 ]] || fail "a foreign Origin answered $code through the forward, want 403"
 code="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' -H 'Host: console.example.com' "http://127.0.0.1:$c_port/")"
 [[ "$code" == 403 ]] || fail "a foreign Host answered $code through the forward, want 403"
-# Interrupt the first command. It closes only its own forwards. The second keeps working.
+# Interrupt the first command. It closes only its own forwards. The second remains active.
 close_console "$a_pid"
 if curl -fsS -m 3 "http://127.0.0.1:$a_port/healthz" >/dev/null 2>&1; then fail "the interrupted command left its console forward open"; fi
 if curl -fsS -m 3 "http://127.0.0.1:$a_gport/api/health" >/dev/null 2>&1; then fail "the interrupted command left its Grafana forward open"; fi
@@ -738,7 +738,7 @@ read -r id _ <<<"$(cj release "$work/c-failed-page.json")"
 cj history "$work/c-failed-page.json" >"$work/c-failed.history"
 grep -q "^$broken failed " "$work/c-failed.history" || { cat "$work/c-failed.history" >&2; fail "the history has no failed attempt $broken"; }
 # deploy.state holds only the latest attempt. A retained release without its events is "recorded".
-grep -q "^$rel1 recorded king ${rel1##*-}" "$work/c-failed.history" || { cat "$work/c-failed.history" >&2; fail "the history lost the retained release $rel1"; }
+grep -q "^$rel1 recorded ${USER:-unknown} ${rel1##*-}" "$work/c-failed.history" || { cat "$work/c-failed.history" >&2; fail "the history lost the retained release $rel1"; }
 [[ "$(console_started)" == "$started_before" ]] || fail "the failed deploy restarted the console"
 echo "    the failed attempt $broken is in the history, $rel1 stays live, and the console did not restart"
 
