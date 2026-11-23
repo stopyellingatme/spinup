@@ -16,11 +16,17 @@ func TestMonitoringTraceReceiver(t *testing.T) {
 	const path = "monitoring/alloy/config.alloy"
 	lite := readDeployFile(t, renderMonitoring(t, "lite"), path)
 	// A receiver with no trace consumer does not register the OTLP trace endpoint.
+	// A filter with an empty trace output is also not enough: Alloy v1.20.1 then answers a
+	// real span with 503 "telemetry type is not supported" (an empty batch still gets 200,
+	// so test with a real span). To check the rendered file by hand, run it in the pinned
+	// image and POST one span as JSON to /v1/traces: the answer must be 200.
 	for _, want := range []string{
 		"traces  = [otelcol.processor.filter.discard_traces.input]",
 		`otelcol.processor.filter "discard_traces" {`,
 		`span = ["true"]`,
-		"traces = []",
+		"traces = [otelcol.connector.spanmetrics.discard_traces.input]",
+		`otelcol.connector.spanmetrics "discard_traces" {`,
+		"metrics = [otelcol.processor.batch.default.input]",
 	} {
 		if !strings.Contains(lite, want) {
 			t.Errorf("lite trace receiver is missing %q", want)

@@ -52,7 +52,19 @@ otelcol.processor.filter "discard_traces" {
 		span = ["true"]
 	}
 	output {
-		traces = []
+		traces = [otelcol.connector.spanmetrics.discard_traces.input]
+	}
+}
+
+// The filter needs one trace consumer. With an empty output, Alloy does not build the
+// trace pipeline and answers each real span with "telemetry type is not supported".
+// No span reaches this connector, because the filter drops each one, so it makes no metrics.
+otelcol.connector.spanmetrics "discard_traces" {
+	histogram {
+		explicit { }
+	}
+	output {
+		metrics = [otelcol.processor.batch.default.input]
 	}
 }[[ end ]]
 
