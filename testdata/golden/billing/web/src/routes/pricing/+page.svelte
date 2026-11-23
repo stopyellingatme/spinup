@@ -55,7 +55,9 @@
 							<p class="font-medium">{price.product_name}</p>
 							<p class="text-sm">{amount(price.unit_amount, price.currency)} / {price.interval_count} {price.interval}</p>
 							{#if price.usage_type === 'metered'}<p class="text-muted-foreground text-sm">The charge depends on your API key usage.</p>{/if}
-							{#if data.user}
+							{#if price.usage_type === 'metered' && plan.prices.some((other) => other.usage_type !== 'metered')}
+								<p class="text-muted-foreground text-sm">This charge is included when you subscribe to the plan.</p>
+							{:else if data.user}
 								<form method="POST" action="?/checkout" use:enhance={toStripe}>
 									<input type="hidden" name="price" value={price.lookup_key} />
 									<Button type="submit" disabled={submitting}>Subscribe to {plan.name}</Button>
