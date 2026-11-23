@@ -1121,7 +1121,12 @@ func (r *runner) resume(ctx context.Context, streams []*stream, rs *Resume) erro
 // drain sends SIGTERM to the server and measures the end of the streams and of the process.
 func (r *runner) drain(streams []*stream, d *Drain) error {
 	start := time.Now()
-	if err := syscall.Kill(r.cfg.DrainPID, syscall.SIGTERM); err != nil {
+	// os.Process.Signal compiles on every platform. syscall.Kill does not exist on Windows.
+	proc, err := os.FindProcess(r.cfg.DrainPID)
+	if err != nil {
+		return fmt.Errorf("cannot find process %d: %w", r.cfg.DrainPID, err)
+	}
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("cannot send SIGTERM to process %d: %w", r.cfg.DrainPID, err)
 	}
 	deadline := start.Add(r.cfg.Timeout)
