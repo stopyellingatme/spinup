@@ -5,7 +5,8 @@ import "context"
 // HookOptions are the deploy flags and facts that a hook can read from its context.
 // HookContext (ADR 0009 §3) has no field for them, so the deployer passes them in the context.
 type HookOptions struct {
-	// SkipBackup is true for spinup deploy --skip-backup.
+	// SkipBackup is true for --skip-backup or an automatic skip on an existing deployment.
+	// The backup hook still checks the safety of pending migrations.
 	SkipBackup bool
 	// Root is the local project root.
 	Root string

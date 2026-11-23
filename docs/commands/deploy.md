@@ -254,6 +254,9 @@ See the [required storage secrets](backup.md#set-up-pgbackrest-backups).
 
 With no recorded release, the backup is skipped even when PostgreSQL already runs after a failed first deploy.
 Changed `PGBACKREST_*` hashes also skip the backup, so the deploy can upload new storage secrets.
+On an existing deployment, this automatic skip applies the same migration check as `--skip-backup`.
+If a pending migration lacks the safe marker, deploy the storage change first without that migration.
+Then deploy the migration separately, with a fresh backup.
 The deploy prints the reason, uploads the secrets, then restarts PostgreSQL and waits until it is healthy.
 This deploy has no automatic backup before migrations.
 Take a backup with `spinup backup now` after the deploy.
@@ -317,7 +320,11 @@ It removes files for names that no longer exist.
 Secret values never enter an image, a Compose file, `.env`, the journal, or the output.
 The file `release.json` keeps only the SHA-256 of each value.
 For pgBackRest, a changed, added, or removed `PGBACKREST_*` secret causes a PostgreSQL restart after `upload`.
-The deploy compares hashes against the current `release.json`, including when it resumes at `edge`.
+The deploy compares hashes against `postgres/backup-secrets.json`, which records the secrets applied to PostgreSQL.
+It writes this file with mode `0600` after PostgreSQL restarts and passes its health check.
+The file contains only hashes and remains accurate if a later step fails before the release becomes current.
+When a resumed deploy skips upload, it uses the hashes from the uploaded release.
+If the file is absent and storage secrets exist, the deploy restarts PostgreSQL once and writes the file.
 Unchanged storage hashes cause no restart.
 To change a secret without a deploy, read [`spinup secrets push`](secrets.md#push-secrets-to-the-vm).
 
@@ -327,6 +334,7 @@ To change a secret without a deploy, read [`spinup secrets push`](secrets.md#pus
   current -> releases/<release-id>
   caddy/                   Caddyfile, Caddyfile.d/, upstream.caddy (the live color)
   postgres/                postgresql.conf and conf.d/
+  postgres/backup-secrets.json  hashes applied to PostgreSQL
   secrets/<NAME>           one file for each secret
   deploy.lock/             the lock
   deploy.state             the journal of the last deploy

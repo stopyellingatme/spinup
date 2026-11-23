@@ -110,8 +110,13 @@ For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests fo
 Last, deploy. The files above reach the VM only through `spinup deploy`.
 With the pgBackRest backend, preflight refuses a deploy when a required storage secret is absent or empty.
 The error names each missing secret and gives a `Try:` line before the deploy changes the VM.
-The required secrets are `PGBACKREST_REPO1_CIPHER_PASS` and all five S3 secrets in the table above.
-For a repository type other than S3, only the passphrase is required.
+S3 repositories require the endpoint, bucket, and region secrets.
+They require static keys only when `repo1-s3-key-type` is absent or `shared`.
+Other authentication types, including `auto` and `web-id`, need neither static key.
+The passphrase is required only when `repo1-cipher-type` is not `none`.
+The default cipher type is `none`. The generated configuration selects `aes-256-cbc`.
+These options come from `pgbackrest.conf`, with values in the application stanza taking precedence over global values.
+The secrets `PGBACKREST_REPO1_S3_KEY_TYPE` and `PGBACKREST_REPO1_CIPHER_TYPE` override the configuration.
 The repository type comes from `repo1-type` in `pgbackrest.conf`, with `PGBACKREST_REPO1_TYPE` taking precedence.
 
 `--skip-backup` does not bypass this check, because PostgreSQL starts with WAL archiving enabled.

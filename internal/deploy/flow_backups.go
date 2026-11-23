@@ -1,12 +1,17 @@
 package deploy
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/project"
+	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
 func usesPGBackRest(config *project.Config) bool {
@@ -24,7 +29,8 @@ func backupSecrets(root string, config *project.Config, values map[string]string
 	if err != nil {
 		return nil, preflightError("cannot read "+name+": "+err.Error(), "restore "+name+" with spinup restore")
 	}
-	repoType, stanzaType, section := "posix", "", ""
+	global := map[string]string{"repo1-type": "posix", "repo1-s3-key-type": "shared", "repo1-cipher-type": "none"}
+	stanza, section := map[string]string{}, ""
 	for line := range strings.SplitSeq(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
@@ -32,53 +38,85 @@ func backupSecrets(root string, config *project.Config, values map[string]string
 			continue
 		}
 		key, value, ok := strings.Cut(line, "=")
-		if !ok || strings.TrimSpace(key) != "repo1-type" {
+		if !ok {
 			continue
 		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 		switch section {
 		case "global":
-			repoType = strings.TrimSpace(value)
+			global[key] = value
 		case config.App.Name:
-			stanzaType = strings.TrimSpace(value)
+			stanza[key] = value
 		}
 	}
-	if stanzaType != "" {
-		repoType = stanzaType
+	maps.Copy(global, stanza)
+	option := func(name string) string {
+		if value := values["PGBACKREST_"+strings.ToUpper(strings.ReplaceAll(name, "-", "_"))]; value != "" {
+			return value
+		}
+		return global[name]
 	}
-	if value := values["PGBACKREST_REPO1_TYPE"]; value != "" {
-		repoType = value
+	var need []string
+	if option("repo1-cipher-type") != "none" {
+		need = append(need, "PGBACKREST_REPO1_CIPHER_PASS")
 	}
-	need := []string{"PGBACKREST_REPO1_CIPHER_PASS"}
-	if repoType == "s3" {
+	if option("repo1-type") == "s3" {
 		need = append(need,
 			"PGBACKREST_REPO1_S3_ENDPOINT",
 			"PGBACKREST_REPO1_S3_BUCKET",
 			"PGBACKREST_REPO1_S3_REGION",
-			"PGBACKREST_REPO1_S3_KEY",
-			"PGBACKREST_REPO1_S3_KEY_SECRET",
 		)
+		if option("repo1-s3-key-type") == "shared" {
+			need = append(need, "PGBACKREST_REPO1_S3_KEY", "PGBACKREST_REPO1_S3_KEY_SECRET")
+		}
 	}
 	return need, nil
 }
 
 // backupSecretsChanged includes additions and removals as well as changed values.
-func backupSecretsChanged(cur *Release, values map[string]string) bool {
-	var before map[string]string
-	if cur != nil {
-		before = cur.Secrets
-	}
-	after := SecretHashes(values)
-	for name, hash := range after {
-		if strings.HasPrefix(name, "PGBACKREST_") && before[name] != hash {
-			return true
+func backupSecretsChanged(before map[string]string, values map[string]string) bool {
+	return !maps.Equal(before, backupSecretHashes(values))
+}
+
+func backupSecretHashes(values map[string]string) map[string]string {
+	hashes := SecretHashes(values)
+	for name := range hashes {
+		if !strings.HasPrefix(name, "PGBACKREST_") {
+			delete(hashes, name)
 		}
 	}
-	for name := range before {
-		if strings.HasPrefix(name, "PGBACKREST_") {
-			if _, ok := after[name]; !ok {
-				return true
-			}
-		}
+	return hashes
+}
+
+// readBackupSecretHashes reads the credentials applied to Postgres, independent of a release.
+// A missing record is unknown and requires a restart when storage secrets exist.
+func (f *flow) readBackupSecretHashes(ctx context.Context) (map[string]string, error) {
+	path := f.root() + "/postgres/backup-secrets.json"
+	result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", readRemoteFileScript, "spinup-read", path}})
+	if err != nil {
+		return nil, fmt.Errorf("read applied backup secrets: %w\nTry: check the SSH connection and %s", err, path)
 	}
-	return false
+	if len(result.Stdout) == 0 {
+		return nil, nil
+	}
+	var hashes map[string]string
+	if err := json.Unmarshal(result.Stdout, &hashes); err != nil {
+		return nil, fmt.Errorf("decode applied backup secrets: %w\nTry: remove %s and deploy again to restart Postgres", err, path)
+	}
+	return hashes, nil
+}
+
+func (f *flow) writeBackupSecretHashes(ctx context.Context, hashes map[string]string) error {
+	path := f.root() + "/postgres/backup-secrets.json"
+	data, err := json.Marshal(hashes)
+	if err != nil {
+		return err
+	}
+	if err := f.vm.Upload(ctx, append(data, '\n'), path+".next", 0600); err != nil {
+		return fmt.Errorf("write applied backup secrets: %w\nTry: check the SSH connection and deploy again", err)
+	}
+	if _, err := f.cmd(ctx, false, "mv", "-f", "--", path+".next", path); err != nil {
+		return fmt.Errorf("install applied backup secrets: %w\nTry: check the SSH connection and deploy again", err)
+	}
+	return nil
 }

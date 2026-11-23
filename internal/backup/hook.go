@@ -69,7 +69,12 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 		out = io.Discard
 	}
 	o := DeployOptionsFrom(ctx)
+	flowOptions := deploy.HookOptionsFrom(ctx)
+	o.SkipBackup = o.SkipBackup || flowOptions.SkipBackup
 	dir := o.Dir
+	if dir == "" {
+		dir = flowOptions.Root
+	}
 	if dir == "" {
 		dir = "."
 	}

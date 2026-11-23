@@ -3,10 +3,8 @@ package deploy
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
-
-	"github.com/stopyellingatme/spinup/internal/remote"
-	"github.com/stopyellingatme/spinup/internal/secrets"
 )
 
 func TestPushSecretsNeedsAProject(t *testing.T) {
@@ -24,20 +22,58 @@ func TestPushSecretsNeedsAProject(t *testing.T) {
 // the find output "/opt/[REDACTED]/secrets/...", and the push failed with "unexpected entry".
 func TestUploaderKeepsPathsThatHoldASecretValue(t *testing.T) {
 	t.Parallel()
-	vm := &remote.Fake{}
-	vm.Expect("sh").Return("", "", 0)
-	vm.Expect("find").Return("/opt/demo/secrets/DATABASE_URL\n/opt/demo/secrets/OLD\n", "", 0)
-	vm.ExpectUpload("/opt/demo/secrets/BUCKET").Return("", "", 0)
-	vm.ExpectUpload("/opt/demo/secrets/DATABASE_URL").Return("", "", 0)
-	vm.Expect("rm", "-f", "--", "/opt/demo/secrets/OLD").Return("", "", 0)
-	values := map[string]string{"BUCKET": "demo", "DATABASE_URL": "URL"}
-	if err := secrets.Push(context.Background(), uploader{vm: vm}, "demo", values); err != nil {
-		t.Fatalf("Push() error = %v", err)
-	}
-	vm.AssertDone(t)
-	for _, call := range vm.Calls() {
-		if len(call.Redact) != 0 {
-			t.Errorf("remote command %v redacts %d values, and its output is parsed as paths", call.Argv[:1], len(call.Redact))
-		}
+	for _, caller := range []string{"deploy upload", "secrets push"} {
+		t.Run(caller, func(t *testing.T) {
+			t.Parallel()
+			x := newFx(t, false, "")
+			x.decrypted = maps.Clone(testSecrets)
+			x.decrypted["BUCKET"] = "todo"
+			x.decrypted["SECRET_NAME"] = "DATABASE_URL"
+			var f *flow
+			if caller == "deploy upload" {
+				x.expectLocalGit()
+				x.o.fill()
+				l, err := preflight(t.Context(), x.o, x.d, &x.out, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f = &flow{o: x.o, d: x.d, l: l, vm: x.vm, out: &x.out, release: testRelease, redact: redactValues(x.decrypted)}
+				x.expectUpstream("")
+				x.ok("mkdir", "-p", "--", testRelDir)
+				files, err := f.releaseFiles()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, file := range files {
+					x.vm.ExpectUpload(testRelDir + "/" + file.Path)
+				}
+			} else {
+				x.expectLock()
+			}
+			x.ok("sh")
+			x.vm.Expect("find", testRoot+"/secrets").Return(testRoot+"/secrets/DATABASE_URL\n"+testRoot+"/secrets/OLD\n", "", 0)
+			for _, name := range secretNames(x.decrypted) {
+				x.vm.ExpectUpload(testRoot + "/secrets/" + name)
+			}
+			x.ok("rm", "-f", "--", testRoot+"/secrets/OLD")
+			if f != nil {
+				x.vm.ExpectUpload(testRelDir + "/release.json")
+				if _, err := f.upload(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				x.expectUnlockAndClose()
+				if err := PushSecrets(t.Context(), x.o, x.d); err != nil {
+					t.Fatal(err)
+				}
+			}
+			x.vm.AssertDone(t)
+			x.exec.AssertDone(t)
+			for _, call := range x.vm.Calls() {
+				if call.Argv[0] == "find" && len(call.Redact) != 0 {
+					t.Errorf("find redacts values, but its output contains paths: %v", call.Redact)
+				}
+			}
+		})
 	}
 }

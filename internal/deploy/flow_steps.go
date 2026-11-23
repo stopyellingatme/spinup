@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -65,6 +66,8 @@ type flow struct {
 	// The switch then follows the release on the VM, not the current spinup.toml.
 	recorded    []ReleaseService
 	hasRecorded bool
+	// backupHashes holds uploaded storage hashes when a resume skips upload.
+	backupHashes map[string]string
 }
 
 func (f *flow) root() string       { return "/opt/" + f.l.app }
@@ -454,6 +457,12 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 		}
 		f.color, f.images = rel.Color, rel.Images
 		f.recorded, f.hasRecorded = rel.Services, true
+		f.backupHashes = make(map[string]string)
+		for name, hash := range rel.Secrets {
+			if strings.HasPrefix(name, "PGBACKREST_") {
+				f.backupHashes[name] = hash
+			}
+		}
 	}
 	if len(f.images) == 0 {
 		return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "the journal has no images of the release", Try: "run spinup deploy without --resume"}
@@ -469,16 +478,23 @@ func (f *flow) hooks(ctx context.Context) (string, error) {
 		return "", err
 	}
 	hooks := f.d.PreDeploy()
+	skipBackup, skipReason := f.o.SkipBackup, ""
 	if f.l.backups {
 		reason := ""
-		switch {
-		case cur == nil:
+		if cur == nil {
 			reason = "no release is recorded yet (first deploy)"
-		case backupSecretsChanged(cur, f.l.secrets):
-			reason = "storage secrets changed, the deploy will push them and restart Postgres"
+			hooks = slices.DeleteFunc(slices.Clone(hooks), func(h Hook) bool { return h.Name == "backup" })
+		} else {
+			applied, err := f.readBackupSecretHashes(ctx)
+			if err != nil {
+				return "", err
+			}
+			if backupSecretsChanged(applied, f.l.secrets) {
+				reason = "storage secrets changed, the deploy will push them and restart Postgres"
+				skipBackup, skipReason = true, reason
+			}
 		}
 		if reason != "" {
-			hooks = slices.DeleteFunc(slices.Clone(hooks), func(h Hook) bool { return h.Name == "backup" })
 			fmt.Fprintln(f.out, "backup: skipped, "+reason)
 		}
 	}
@@ -489,9 +505,12 @@ func (f *flow) hooks(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hctx := WithHookOptions(ctx, HookOptions{SkipBackup: f.o.SkipBackup, Root: f.l.root, PendingMigrations: pending})
+	hctx := WithHookOptions(ctx, HookOptions{SkipBackup: skipBackup, Root: f.l.root, PendingMigrations: pending})
 	f.hookResults = map[string]string{}
 	if err := RunHooks(hctx, hooks, &HookContext{Env: f.l.env, App: f.l.app, Release: f.release, Remote: f.vm, Out: f.out, Results: f.hookResults}); err != nil {
+		if skipReason != "" {
+			return "", &ui.Error{What: "Cannot deploy without a fresh backup", Why: skipReason + ": " + stripTry(err.Error()), Try: "push secrets with spinup secrets push. Deploy the storage change without unsafe migrations to restart Postgres. Then deploy the migrations separately", Err: err}
+		}
 		return "", err
 	}
 	names := make([]string, len(hooks))
@@ -699,12 +718,16 @@ fi`
 // A color switch never restarts it.
 func (f *flow) edge(ctx context.Context) (string, error) {
 	restartPostgres := false
+	wanted := f.backupHashes
+	if wanted == nil {
+		wanted = backupSecretHashes(f.l.secrets)
+	}
 	if f.l.backups {
-		cur, err := readRelease(ctx, f.vm, f.l.app, "")
+		applied, err := f.readBackupSecretHashes(ctx)
 		if err != nil {
 			return "", err
 		}
-		restartPostgres = backupSecretsChanged(cur, f.l.secrets)
+		restartPostgres = !maps.Equal(applied, wanted)
 	}
 	root, dir := f.root(), f.releaseDir()
 	if _, err := f.cmd(ctx, false, "sh", "-c", edgeSyncScript, "spinup-edge", root, dir); err != nil {
@@ -745,9 +768,17 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 	}
 	if restartPostgres {
 		fmt.Fprintln(f.out, "Restarting Postgres because PGBACKREST_* secrets changed")
+		// A failed recreation can still start Postgres with new credentials.
+		// Invalidate the old record before Docker can change the running container.
+		if _, err := f.cmd(ctx, false, "rm", "-f", "--", root+"/postgres/backup-secrets.json"); err != nil {
+			return "", fmt.Errorf("invalidate applied backup secrets: %w\nTry: check the SSH connection and deploy again", err)
+		}
 		argv := ComposeArgv(f.l.app, dir, files, "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", strconv.Itoa(seconds(f.o.HealthTimeout)), "postgres")
 		if _, err := f.cmd(ctx, true, argv...); err != nil {
 			return "", fmt.Errorf("restart Postgres after backup storage secrets changed: %w", brief(err))
+		}
+		if err := f.writeBackupSecretHashes(ctx, wanted); err != nil {
+			return "", err
 		}
 	}
 	fmt.Fprintln(f.out, "Starting Caddy and Postgres")
