@@ -16,89 +16,41 @@ import (
 	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
-// tunnelRunner preserves remote.New's SSH configuration and replaces the remote command.
-type tunnelRunner struct {
-	runner runexec.Runner
-	port   int
-}
+// openStartup bounds the forward and the Grafana health check. Tests shorten it.
+var openStartup = 10 * time.Second
 
-func (r tunnelRunner) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
-	// remote.Run appends exactly one quoted command after the destination.
-	c.Args = append([]string(nil), c.Args[:len(c.Args)-1]...)
-	index := len(c.Args) - 2 // the -- delimiter before the destination
-	forward := "127.0.0.1:" + strconv.Itoa(r.port) + ":127.0.0.1:3000"
-	flags := []string{"-N", "-o", "ExitOnForwardFailure=yes", "-L", forward}
-	c.Args = append(append(append([]string(nil), c.Args[:index]...), flags...), c.Args[index:]...)
-	return r.runner.Run(ctx, c)
-}
+// openAlive is the interval of the forward liveness check while the tunnel is open.
+var openAlive = 2 * time.Second
 
 func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) error {
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
+	started := time.Now()
+	port, closeForward, err := remote.ForwardLoopback(ctx, h, runner, remote.Options{AcceptNewHostKey: o.AcceptNewHostKey}, 3000)
 	if err != nil {
-		return failure("reserve tunnel port", err)
-	}
-	address := listener.Addr().String()
-	_, portString, err := net.SplitHostPort(address)
-	if err != nil {
-		_ = listener.Close()
-		return failure("read tunnel port", err)
-	}
-	port, err := strconv.Atoi(portString)
-	if err != nil {
-		_ = listener.Close()
-		return failure("read tunnel port", err)
-	}
-	if err = listener.Close(); err != nil {
-		return failure("release tunnel port", err)
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	vm := remote.New(h, tunnelRunner{runner: runner, port: port}, remote.Options{AcceptNewHostKey: o.AcceptNewHostKey, DisableMultiplexing: true})
-	type outcome struct {
-		result runexec.Result
-		err    error
-	}
-	done := make(chan outcome, 1)
-	go func() {
-		res, e := vm.Run(ctx, remote.Cmd{Argv: []string{"true"}, Stderr: o.ErrOut})
-		done <- outcome{res, e}
-	}()
-	// Always reap SSH after cancellation or a browser failure.
-	exited := false
-	defer func() {
-		cancel()
-		if !exited {
-			<-done
+		if ctx.Err() != nil {
+			return nil
 		}
-	}()
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-	timeout := time.NewTimer(15 * time.Second)
-	defer timeout.Stop()
+		// The forward error keeps the SSH diagnostics and its own Try line.
+		return fmt.Errorf("open Grafana tunnel failed: %w", err)
+	}
+	// Close only the forward of this invocation, also after cancellation or a browser failure.
+	defer func() { _ = closeForward() }()
+	address := "127.0.0.1:" + strconv.Itoa(port)
 	client := &http.Client{Timeout: 250 * time.Millisecond, Transport: &http.Transport{Proxy: nil}}
 	defer client.CloseIdleConnections()
-	tunnelFailure := func(action string, cause error, result runexec.Result) error {
-		if stderr := strings.TrimSpace(string(result.Stderr)); stderr != "" {
-			cause = fmt.Errorf("%w: %s", cause, stderr)
-		}
-		return failure(action, cause)
-	}
-	ready := false
-	for !ready {
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.NewTimer(openStartup - time.Since(started))
+	defer timeout.Stop()
+	for ready := false; !ready; {
 		select {
-		case result := <-done:
-			exited = true
-			if result.err == nil {
-				result.err = errors.New("SSH exited before the tunnel was ready")
-			}
-			return tunnelFailure("open Grafana tunnel", result.err, result.result)
 		case <-ctx.Done():
 			return nil
 		case <-timeout.C:
-			cancel()
-			result := <-done
-			exited = true
-			return tunnelFailure("open Grafana tunnel", errors.New("the Grafana health request through SSH did not succeed"), result.result)
+			cause := errors.New("the Grafana health request through SSH did not succeed")
+			if cerr := closeForward(); cerr != nil {
+				cause = fmt.Errorf("%w: %s", cause, withoutTry(cerr.Error()))
+			}
+			return failure("open Grafana tunnel", cause)
 		case <-ticker.C:
 			ready = grafanaReady(ctx, client, address)
 		}
@@ -110,19 +62,43 @@ func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) 
 			fmt.Fprintln(o.ErrOut, "Cannot open the browser. Open the printed URL manually.")
 		}
 	}
-	select {
-	case <-ctx.Done():
-		return nil
-	case result := <-done:
-		exited = true
-		if ctx.Err() != nil {
+	alive := time.NewTicker(openAlive)
+	defer alive.Stop()
+	for {
+		select {
+		case <-ctx.Done():
 			return nil
+		case <-alive.C:
+			if forwardListening(ctx, address) {
+				continue
+			}
+			cerr := closeForward()
+			if ctx.Err() != nil {
+				return nil
+			}
+			if cerr == nil {
+				cerr = errors.New("SSH exited while the tunnel was open")
+			}
+			return failure("run Grafana tunnel", errors.New(withoutTry(cerr.Error())))
 		}
-		if result.err == nil {
-			result.err = errors.New("SSH exited while the tunnel was open")
-		}
-		return tunnelFailure("run Grafana tunnel", result.err, result.result)
 	}
+}
+
+// forwardListening reports whether the local SSH listener still accepts connections.
+// SSH accepts a connection even when the VM service refuses it, so a refusal means SSH exited.
+func forwardListening(ctx context.Context, address string) bool {
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp4", address)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// withoutTry removes an embedded Try line before the error gets the Try line of failure.
+func withoutTry(s string) string {
+	before, _, _ := strings.Cut(s, "\nTry:")
+	return before
 }
 
 func grafanaReady(ctx context.Context, client *http.Client, address string) bool {
