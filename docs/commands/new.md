@@ -102,7 +102,7 @@ $ spinup new fast --module example.com/fast --package-manager bun --api-client h
 ...
 ```
 
-Turn on optional modules with `--modules`. The default is `ci,deploy`. Use `--modules=''` for none.
+Turn on optional modules with `--modules`. The default is `ci,deploy,console`. Use `--modules=''` for none.
 Run `spinup module list` to see the names.
 
 ```console
@@ -152,7 +152,7 @@ The output looks like this:
 ```json
 {
   "dir": "/home/you/scripted",
-  "packs": ["base", "api", "ci", "deploy"],
+  "packs": ["base", "api", "ci", "deploy", "console"],
   "files": 47
 }
 ```
@@ -163,7 +163,7 @@ The output looks like this:
 | --- | --- | --- |
 | `--api-only` | Create the Go API without a web app. | `--api-only` |
 | `--module <path>` | Set the Go module path. The API module adds `/api`. | `--module github.com/acme/todo` |
-| `--modules <names>` | Choose optional modules, separated by commas. Default: `ci,deploy`. | `--modules ci,deploy,secrets` |
+| `--modules <names>` | Choose optional modules, separated by commas. Default: `ci,deploy,console`. | `--modules ci,deploy,secrets` |
 | `--frontend-mode node\|embed` | Serve the web app from SvelteKit (`node`) or from the Go binary (`embed`). | `--frontend-mode embed` |
 | `--package-manager pnpm\|bun` | Choose the web package manager. | `--package-manager bun` |
 | `--api-client openapi-fetch\|heyapi` | Choose the generated web API client. | `--api-client heyapi` |
