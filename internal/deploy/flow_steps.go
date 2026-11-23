@@ -68,6 +68,8 @@ type flow struct {
 	hasRecorded bool
 	// backupHashes holds uploaded storage hashes when a resume skips upload.
 	backupHashes map[string]string
+	// completedPost preserves the result when a resume repeats console installation.
+	completedPost *string
 }
 
 func (f *flow) root() string       { return "/opt/" + f.l.app }
@@ -115,8 +117,10 @@ func (f *flow) run(ctx context.Context) (err error) {
 
 	start := 0
 	if f.o.Resume {
-		if start, err = f.resume(ctx); err != nil || start < 0 {
+		if start, err = f.resume(ctx); err != nil {
 			return err
+		} else if start < 0 {
+			return nil
 		}
 	} else if err := f.begin(ctx); err != nil {
 		return err
@@ -156,6 +160,13 @@ func (f *flow) run(ctx context.Context) (err error) {
 		if err := f.journal.Done(ctx, s.name, redactString(detail, f.redact)); err != nil {
 			return deployError(s.name, f.l.env.Name, err)
 		}
+	}
+	if f.l.console.selected {
+		stopHeartbeat()
+		if err := f.lock.Release(ctx); err != nil {
+			return err
+		}
+		f.sampleConsole(ctx)
 	}
 	fmt.Fprintf(f.out, "Deployed release %s to %s (%s color)\n", f.release, f.l.env.Name, f.color)
 	return nil
@@ -410,7 +421,7 @@ func (f *flow) begin(ctx context.Context) error {
 }
 
 // resume restores the state of the journaled release and returns the index of its next step.
-// It returns -1 when the release is complete.
+// It returns -1 when the release is complete and needs no console recovery.
 func (f *flow) resume(ctx context.Context) (int, error) {
 	entries, err := ReadJournal(ctx, f.vm, f.l.app)
 	if err != nil {
@@ -421,12 +432,12 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 	}
 	f.release = entries[len(entries)-1].Release
 	next, ok := NextStep(entries, Steps, f.release)
-	if !ok {
-		fmt.Fprintf(f.out, "Release %s is already deployed. Nothing to resume.\n", f.release)
-		return -1, nil
-	}
 	if !sameSHA(f.release, f.l.sha) {
 		return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "HEAD is " + f.l.sha[:12] + ", but the release was built from another commit", Try: "check out the commit of the release, or run spinup deploy without --resume"}
+	}
+	if !ok && !f.l.console.selected {
+		fmt.Fprintf(f.out, "Release %s is already deployed. Nothing to resume.\n", f.release)
+		return -1, nil
 	}
 	f.journal = &Journal{Remote: f.vm, App: f.l.app, Release: f.release, Now: f.d.Now}
 	done := func(step string) (string, bool) {
@@ -437,6 +448,9 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 			}
 		}
 		return detail, found
+	}
+	if detail, ok := done("post"); ok {
+		f.completedPost = &detail
 	}
 	for _, step := range []string{"build", "transport"} {
 		if detail, ok := done(step); ok && detail != "" {
@@ -466,6 +480,10 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 	}
 	if len(f.images) == 0 {
 		return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "the journal has no images of the release", Try: "run spinup deploy without --resume"}
+	}
+	if f.l.console.selected && (!ok || slices.Index(Steps, next) > slices.Index(Steps, "monitoring")) {
+		// Recover the console through the journal, including releases that completed post.
+		next = "monitoring"
 	}
 	fmt.Fprintf(f.out, "Resuming release %s at step %s\n", f.release, next)
 	return slices.Index(Steps, next), nil
@@ -984,6 +1002,9 @@ func (f *flow) record(ctx context.Context) (string, error) {
 
 // post runs the post-release hooks (step 11). The release is live, so a hook failure is a warning.
 func (f *flow) post(ctx context.Context) (string, error) {
+	if f.completedPost != nil {
+		return *f.completedPost, nil
+	}
 	hooks := f.d.PostRelease()
 	if len(hooks) == 0 {
 		return "no hooks", nil

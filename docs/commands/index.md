@@ -88,6 +88,8 @@ The [CLI reference](../site/commands/index.md) lists every flag of every command
 
 | I want to ... | Read |
 | --- | --- |
+| Open the operator overview | [console](console.md) |
+| Read the operator overview in the terminal | [status](status.md) |
 | Back up the database | [backup](backup.md) |
 | Restore, verify, or prune backups | [backup restore](backup-restore.md) |
 | Run backups on a schedule | [backup schedule](backup-schedule.md) |

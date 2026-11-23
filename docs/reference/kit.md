@@ -120,7 +120,22 @@ if err := config.Load(&s); err != nil {
 }
 ```
 
-For each field, `config.Load` reads `NAME`, or `NAME_FILE` that holds a path to a file. It then uses the `default` tag.
+For each field, `config.Load` reads `NAME`, then the file that `NAME_FILE` names, then `<SECRETS_DIR>/NAME`.
+Setting both `NAME` and `NAME_FILE` remains an error.
+Either explicit form takes precedence over the directory file.
+
+The default directory is `/run/secrets`. An empty `SECRETS_DIR` disables this rule.
+For a field with a prefix, such as an OIDC provider setting, `NAME` is the full name with the prefix (`AUTH_OIDC_GITHUB_CLIENT_SECRET`).
+The directory rule reads only a regular file with the exact field name, without path separators.
+It does not list the directory or follow a symlink for the file.
+
+A missing file or directory leaves the field absent. An unreadable file produces an error with its path and a `Try:` line.
+Both file forms remove one trailing newline, including CRLF.
+
+If no value exists, the loader uses the `default` tag.
+The `api` and `worker` containers use this rule. The web service does not.
+See [Secrets](../deploy/secrets.md#read-secrets-in-your-go-code) for the deployment steps.
+
 A field with `required:"true"` and no value is an error. The error lists every problem at once and never shows a value.
 In development (`SPINUP_ENV` empty or `dev`), it also reads `.env`.
 
@@ -375,7 +390,7 @@ If neither exists, the test skips. With `CI` set, it fails instead. See [Test yo
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `required value is missing` from `config.Load` | A required variable is not set. | Set it, or set `NAME_FILE` to a file that holds it. |
+| `required value is missing` from `config.Load` | A required variable is not set. | Set it, set `NAME_FILE`, or store `NAME` under `SECRETS_DIR`. |
 | `both X and X_FILE are set` | You set the variable and the file variable. | Keep one of the two. |
 | The test skips with no database | `DATABASE_URL` is empty and Docker is not running. | Start Docker, or set `DATABASE_URL` to a server where the role can create databases. |
 | `RequireRole` panics at start | The role name is not in `roles.Set`. | Use the constants of the `roles` package. |

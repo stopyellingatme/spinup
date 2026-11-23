@@ -185,6 +185,17 @@ done`
 
 // monitoring starts the independent monitoring project after the release is recorded.
 func (f *flow) monitoring(ctx context.Context) (detail string, err error) {
+	if err := f.installConsole(ctx); err != nil {
+		return "", err
+	}
+	detail, err = f.startMonitoring(ctx)
+	if err != nil {
+		return detail, err
+	}
+	return detail, f.reconcileConsole(ctx)
+}
+
+func (f *flow) startMonitoring(ctx context.Context) (detail string, err error) {
 	m := f.l.monitoring
 	if m.skip != "" {
 		return "skipped", nil

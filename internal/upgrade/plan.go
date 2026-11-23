@@ -177,6 +177,14 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 			d.Action, d.Reason = ActionKeep, "tombstone"
 		case tracked && !disk.exists && !rendered:
 			d.Action = ActionDelete
+		case tracked && entry.Class == manifest.Scaffold && regeneratedPath(name, newPacks):
+			d.Class, d.Template, d.Mode = entry.Class, entry.Template, disk.mode
+			d.Action, d.Reason = ActionKeep, generatedEjectedReason
+		case tracked && entry.Class == manifest.Managed && regeneratedPath(name, newPacks):
+			// Configuration and tool sources determine these files, rather than pack defaults.
+			// The apply step regenerates them after the configuration merge.
+			d.Class, d.Template = entry.Class, entry.Template
+			d.Action, d.Reason = ActionKeep, "generator-owned"
 		case tracked && generatorTemplate(entry.Template) && !renderedPackTemplate(older, name, entry.Template):
 			// A generator wrote this file last (ADR 0007 §1). Templates never re-render or
 			// delete it; for a pack file such as routes_gen.go the generator's version wins.
@@ -226,8 +234,9 @@ func BuildPlan(ctx context.Context, in PlanInput) (*Plan, error) {
 				d.Class, d.Template = entry.Class, entry.Template
 			}
 			// The dependency step reads the new render of a kept Go module file (goModKeepReason).
+			// Generation compares the pack default with disk before writing generator output.
 			// writePlan never writes Data for a keep.
-			if d.Reason != goModKeepReason {
+			if d.Reason != goModKeepReason && d.Reason != "generator-owned" {
 				d.Data = nil
 			}
 		}

@@ -80,13 +80,19 @@ Do not put the password in the URL.
 
 In development, you can put the variables in `.env`.
 
-For a deployed app, store the password as a secret. A deploy puts it in `/run/secrets/SMTP_PASSWORD`.
-Then add the other variables to the `api` service in `deploy/compose.yml`.
-With the `jobs` module, add the same lines to the `worker` service, because the worker sends the mail.
+For a deployed app, store the password as a secret with `spinup secrets set NAME --env <env>`.
+The mail module already loads a config field for `SMTP_PASSWORD`.
+For another app secret, declare its field in the app config struct.
+Then deploy. Both `api` and `worker` read each secret from `/run/secrets/<NAME>`.
+The web service does not use this rule.
+
+For settings that are not secrets, add the variables to the `api` service in `deploy/compose.yml`.
+With the `jobs` module, add the same variables to `worker`, because the worker sends the mail.
 
 <!-- doctest: skip -->
 ```console
-$ printf '%s' 'the-smtp-password' | spinup secrets set --env production SMTP_PASSWORD
+$ printf '%s' 'the-smtp-password' | spinup secrets set SMTP_PASSWORD --env production
+$ spinup deploy --env production
 ```
 
 ```yaml
@@ -94,12 +100,14 @@ services:
   api:
     environment:
       SMTP_URL: smtp+starttls://apikey@smtp.example.com:587
-      SMTP_PASSWORD_FILE: /run/secrets/SMTP_PASSWORD
       MAIL_FROM: hello@example.com
 ```
 
 {: .note }
-Edit `deploy/compose.yml` itself. If you define the `api` service again in `deploy/compose.override.yml`, Compose stops with `services.api conflicts with imported resource`. See [Secrets](deploy/secrets.md) for `spinup secrets`.
+For these settings, edit `deploy/compose.yml`, then run `spinup eject deploy/compose.yml` before deployment.
+After ejection, you maintain that file yourself.
+A second `api` service in `deploy/compose.override.yml` makes Compose stop with `services.api conflicts with imported resource`.
+See [Secrets](deploy/secrets.md) for app secrets that need no Compose change.
 
 ## Background delivery
 

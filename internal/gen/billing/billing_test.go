@@ -15,7 +15,7 @@ import (
 func TestPlan(t *testing.T) {
 	root := t.TempDir()
 	lock := manifest.New()
-	if _, err := plan(context.Background(), gen.Input{Root: root, Lock: lock}); err == nil || !strings.Contains(err.Error(), "Try: spinup module add billing") {
+	if _, err := Plan(context.Background(), gen.Input{Root: root, Lock: lock}); err == nil || !strings.Contains(err.Error(), "Try: spinup module add billing") {
 		t.Fatalf("error = %v", err)
 	}
 	lock.Packs = []string{"billing"}
@@ -23,7 +23,7 @@ func TestPlan(t *testing.T) {
 	if err := os.WriteFile(config, []byte("[billing]\n[[billing.plans]]\nname='free'\n[[billing.plans]]\nname='pro'\nprices=['pro_monthly']\nfeatures=['reports']\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := plan(context.Background(), gen.Input{Root: root, Lock: lock})
+	out, err := Plan(context.Background(), gen.Input{Root: root, Lock: lock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,10 +42,10 @@ func TestPlan(t *testing.T) {
 	if err := os.WriteFile(config, []byte("[billing]\n[[billing.plans]]\nname='free'\n[[billing.plans]]\nname='bad'\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := plan(context.Background(), gen.Input{Root: root, Lock: lock}); err == nil || !strings.Contains(err.Error(), "must have 1 to 8 prices") {
+	if _, err := Plan(context.Background(), gen.Input{Root: root, Lock: lock}); err == nil || !strings.Contains(err.Error(), "must have 1 to 8 prices") {
 		t.Fatalf("error = %v", err)
 	}
-	if _, err := plan(context.Background(), gen.Input{Args: []string{"extra"}}); err == nil || !strings.Contains(err.Error(), "Try: spinup g billing") {
+	if _, err := Plan(context.Background(), gen.Input{Args: []string{"extra"}}); err == nil || !strings.Contains(err.Error(), "Try: spinup g billing") {
 		t.Fatalf("error = %v", err)
 	}
 }

@@ -5,10 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -206,20 +212,72 @@ func TestTunnelArguments(t *testing.T) {
 	t.Setenv("SPINUP_SSH_CONFIG", "/tmp/ssh-config")
 	f := &runexec.Fake{}
 	f.Expect("ssh").Return("", "", 0)
-	vm := remote.New(remote.Host{Address: "vm", User: "deploy", Port: 2222}, tunnelRunner{runner: f, port: 12345}, remote.Options{CacheDir: "/tmp/su-monitor-test"})
-	if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"true"}}); err != nil {
-		t.Fatal(err)
+	err := open(context.Background(), Options{Out: io.Discard, ErrOut: io.Discard}, remote.Host{Address: "vm", User: "deploy", Port: 2222}, f)
+	if err == nil || !strings.Contains(err.Error(), "SSH exited before the forward was ready") {
+		t.Fatalf("error = %v", err)
 	}
 	args := f.Calls()[0].Args
-	for _, want := range []string{"-N", "ExitOnForwardFailure=yes", "127.0.0.1:12345:127.0.0.1:3000", "ControlPersist=60s", "BatchMode=yes", "ConnectTimeout=10", "2222", "/tmp/ssh-config"} {
-		if !strings.Contains(strings.Join(args, " "), want) {
-			t.Fatal(args)
+	t.Logf("ssh argv: %q", args)
+	forward := regexp.MustCompile(`^127\.0\.0\.1:[1-9][0-9]*:127\.0\.0\.1:3000$`)
+	got := append([]string(nil), args...)
+	for i := range got {
+		if i > 0 && got[i-1] == "-L" && forward.MatchString(got[i]) {
+			got[i] = "LOCAL:3000"
 		}
 	}
-	if !reflect.DeepEqual(args[len(args)-2:], []string{"--", "deploy@vm"}) {
-		t.Fatal(args)
+	want := []string{"-F", "/tmp/ssh-config", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no", "-p", "2222", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-N", "-o", "ExitOnForwardFailure=yes", "-L", "LOCAL:3000", "--", "deploy@vm"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %q, want %q", args, want)
 	}
 	f.AssertDone(t)
+}
+
+// TestTunnelCancellationArguments checks that cancellation stops only the SSH process of the
+// tunnel. It must not send "ssh -O exit", which would stop a shared master of another command.
+func TestTunnelCancellationArguments(t *testing.T) {
+	requireTunnelSocket(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var mu sync.Mutex
+	var calls [][]string
+	var stopped atomic.Bool
+	runner := tunnelFunc(func(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
+		mu.Lock()
+		calls = append(calls, append([]string(nil), c.Args...))
+		mu.Unlock()
+		if slices.Contains(c.Args, "-O") {
+			return runexec.Result{}, errors.New("the tunnel stopped a control master")
+		}
+		listener, err := serveForward(ctx, c.Args, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, `{"database":"ok"}`)
+		}))
+		if err != nil {
+			return runexec.Result{}, err
+		}
+		<-ctx.Done()
+		_ = listener.Close()
+		stopped.Store(true)
+		return runexec.Result{}, ctx.Err()
+	})
+	out := &readyOutput{healthy: new(atomic.Bool), cancel: cancel}
+	out.healthy.Store(true)
+	if err := open(ctx, Options{NoBrowser: true, Out: out, ErrOut: io.Discard}, remote.Host{Address: "vm"}, runner); err != nil {
+		t.Fatal(err)
+	}
+	if !stopped.Load() {
+		t.Fatal("open returned before its SSH process stopped")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 1 {
+		t.Fatalf("SSH calls = %q, want one owned forward", calls)
+	}
+	all := strings.Join(calls[0], " ")
+	for _, want := range []string{"ControlMaster=no", "ControlPath=none", "ControlPersist=no", "ExitOnForwardFailure=yes", "-N"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("argv %q misses %s", all, want)
+		}
+	}
 }
 
 func TestAuthenticatedFailure(t *testing.T) {
@@ -259,22 +317,6 @@ func TestRunProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("invalid host")
 	}
-}
-
-func TestTunnelCancellationArguments(t *testing.T) {
-	t.Parallel()
-	f := &runexec.Fake{}
-	f.Expect("ssh").Return("", "", 0)
-	vm := remote.New(remote.Host{Address: "vm"}, tunnelRunner{runner: f, port: 12345, cancel: true}, remote.Options{CacheDir: "/tmp/su-monitor-cancel"})
-	if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"true"}}); err != nil {
-		t.Fatal(err)
-	}
-	args := f.Calls()[0].Args
-	want := []string{"-O", "cancel", "-L", "127.0.0.1:12345:127.0.0.1:3000", "--", "vm"}
-	if !reflect.DeepEqual(args[len(args)-len(want):], want) {
-		t.Fatal(args)
-	}
-	f.AssertDone(t)
 }
 
 func TestProvisionedCustomSync(t *testing.T) {

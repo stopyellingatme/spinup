@@ -359,6 +359,7 @@ func TestFlowResumeRefusals(t *testing.T) {
 	}{
 		{"empty journal", "", "Nothing to resume", ui.ExitError},
 		{"other commit", strings.ReplaceAll(journalUpTo(t, "hooks"), testRelease, "20261015T080000Z-aaaaaaaaaaaa"), "Cannot resume", ui.ExitError},
+		{"complete other commit", strings.ReplaceAll(journalUpTo(t, "post"), testRelease, "20261015T080000Z-aaaaaaaaaaaa"), "Cannot resume", ui.ExitError},
 		{"complete", journalUpTo(t, "post"), "", ui.ExitOK},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -17,10 +17,11 @@ import (
 
 func init() {
 	registry.Register(gen.Generator{Name: "billing", Short: "Generate the app billing configuration", Example: `  # Rewrite the billing files from the [billing] table of spinup.toml
-  spinup g billing`, Run: plan})
+  spinup g billing`, Run: Plan})
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+// Plan returns the files generated from spinup.toml without writing them.
+func Plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate billing: expected no positional arguments\nTry: spinup g billing")
 	}

@@ -15,7 +15,7 @@ func newMonitor(app *App) *cobra.Command {
 	var accept bool
 	group.PersistentFlags().BoolVar(&accept, "accept-new-host-key", false, "accept a previously unknown SSH host key")
 	options := func(c *cobra.Command, action string) monitor.Options {
-		return monitor.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, Action: action, AcceptNewHostKey: accept, Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}
+		return monitor.Options{Dir: app.Flags.Dir, Env: app.Flags.Env, Action: action, AcceptNewHostKey: accept, JSON: app.Flags.JSON, Out: c.OutOrStdout(), ErrOut: c.ErrOrStderr()}
 	}
 	run := func(c *cobra.Command, o monitor.Options) error { return monitor.Run(c.Context(), o, monitor.Deps{}) }
 	var noBrowser bool

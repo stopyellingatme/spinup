@@ -41,7 +41,8 @@ Available Commands:
 
 ## Open Grafana
 
-`open` starts an SSH tunnel, prints a local URL, and opens your browser.
+`open` starts a separate SSH connection and checks Grafana through the tunnel.
+After Grafana answers the health request, the command prints a local URL and opens your browser.
 Keep the command running while you use Grafana. Press Ctrl-C to close the tunnel.
 The tunnel listens only on your loopback address.
 
@@ -104,14 +105,25 @@ todo-api GET /api/todos 12.4ms
 
 ## Work with alerts
 
-`alerts` lists the alerts that fire now and the rules that are pending.
+`alerts` lists firing alerts first, then pending alerts, then silenced alerts.
+Each line shows the state, alert name, severity if present, and summary.
+The command reads Prometheus directly through Grafana to preserve the names and summaries of built-in alerts.
+Use `--json` to print an array with the fields `state`, `name`, `severity`, and `summary`.
+
+Grafana suppression sets the state to `silenced` in both formats.
+The command matches forwarded alerts by `prometheus_alertname` and the other Prometheus labels.
+Alerts with no Grafana counterpart keep their Prometheus state.
+
 `silence` mutes one alert for a time. It takes one exact matcher, `label=value`, and prints the silence ID.
 `test-alert` sends a test alert called `SpinupTestAlert`.
 
 <!-- doctest: skip -->
 ```console
 $ spinup monitor alerts --env production
-...
+firing BackupStale warning No backup succeeded in 26 hours
+firing Heartbeat The monitoring stack is alive
+$ spinup monitor alerts --env production --json
+[{"state":"firing","name":"BackupStale","severity":"warning","summary":"No backup succeeded in 26 hours"},{"state":"firing","name":"Heartbeat","severity":"","summary":"The monitoring stack is alive"}]
 $ spinup monitor silence 'prometheus_alertname=HighErrorRate' --for 2h --env production
 5f1c2a1e-0d6b-4b8e-9d3a-7a9c1e2b3c4d
 $ spinup monitor test-alert --env production

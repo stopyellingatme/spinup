@@ -12,6 +12,7 @@ import (
 
 	run "github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/templates"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -37,7 +38,7 @@ func TestGenerateAndApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(result.Packs, []string{"base", "api", "ci", "deploy"}) {
+	if !reflect.DeepEqual(result.Packs, []string{"base", "api", "ci", "deploy", "console"}) {
 		t.Fatalf("packs=%q", result.Packs)
 	}
 	if _, err := os.Stat(result.Dir); !os.IsNotExist(err) {
@@ -100,6 +101,58 @@ func TestGenerateAndApply(t *testing.T) {
 	}
 	if _, err := Generate(context.Background(), o, nil); err == nil {
 		t.Fatal("accepted occupied directory")
+	}
+}
+
+func TestConsoleDefaultSelection(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		apiOnly bool
+		answers map[string]any
+		want    []string
+	}{
+		{"node default", false, nil, []string{"ci", "deploy", "console"}},
+		{"embed default", false, map[string]any{"frontend_mode": "embed"}, []string{"ci", "deploy", "console"}},
+		{"API default", true, nil, []string{"ci", "deploy", "console"}},
+		{"explicit omission", false, map[string]any{"modules": "ci,deploy"}, []string{"ci", "deploy"}},
+		{"API explicit console", true, map[string]any{"modules": "deploy,console"}, []string{"deploy", "console"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			answers := map[string]any{"module": "example.com/todo"}
+			for key, value := range tc.answers {
+				answers[key] = value
+			}
+			result, err := Generate(t.Context(), Options{Name: "todo", Dir: t.TempDir(), APIOnly: tc.apiOnly, Answers: answers}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(result.Lock.Answers["modules"], tc.want) {
+				t.Fatalf("modules = %v, want %v", result.Lock.Answers["modules"], tc.want)
+			}
+			wantConsole := slices.Contains(tc.want, "console")
+			if slices.Contains(result.Packs, "console") != wantConsole || slices.Contains(result.Lock.Packs, "console") != wantConsole {
+				t.Fatalf("console selection differs: packs=%v, lock=%v", result.Packs, result.Lock.Packs)
+			}
+			if !slices.Contains(result.Packs, "deploy") || slices.Contains(result.Packs, "web") == tc.apiOnly {
+				t.Fatalf("incorrect dependencies: %v", result.Packs)
+			}
+			for _, file := range result.Plan.Files {
+				if file.Path != "spinup.toml" {
+					continue
+				}
+				cfg, err := project.Parse(file.Data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !slices.Equal(cfg.Modules, tc.want) {
+					t.Fatalf("rendered modules = %v, want %v", cfg.Modules, tc.want)
+				}
+				return
+			}
+			t.Fatal("spinup.toml is missing from the plan")
+		})
 	}
 }
 

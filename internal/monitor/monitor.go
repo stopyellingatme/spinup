@@ -18,7 +18,7 @@ import (
 type Options struct {
 	Dir, Env, Action                             string
 	Service, Since, Query, TraceID, Matcher, For string
-	NoBrowser, AcceptNewHostKey                  bool
+	NoBrowser, AcceptNewHostKey, JSON            bool
 	Out, ErrOut                                  io.Writer
 }
 
@@ -104,30 +104,7 @@ func (c *client) run(ctx context.Context, o Options) error {
 	case "trace":
 		return c.trace(ctx, o.TraceID)
 	case "alerts":
-		data, err := c.api(ctx, "grafana", "GET", "/api/alertmanager/grafana/api/v2/alerts", nil)
-		if err != nil {
-			return err
-		}
-		var alerts []struct {
-			Labels map[string]string `json:"labels"`
-			Status struct {
-				State string `json:"state"`
-			} `json:"status"`
-		}
-		if err = json.Unmarshal(data, &alerts); err != nil {
-			return failure("decode alerts", err)
-		}
-		for _, a := range alerts {
-			if a.Status.State != "suppressed" {
-				state := a.Status.State
-				if state == "active" {
-					state = "firing"
-				}
-				fmt.Fprintf(c.out, "%s %s\n", state, a.Labels["alertname"])
-			}
-		}
-		// Grafana-managed rules expose Pending separately from Alertmanager's active alerts.
-		return c.pending(ctx)
+		return c.alerts(ctx, o)
 	case "silence":
 		return c.silence(ctx, o)
 	case "test-alert":
@@ -174,7 +151,7 @@ printf '%s\n' 'The container needs curl or wget.' >&2
 exit 1`
 
 func (c *client) api(ctx context.Context, service, method, path string, body any) ([]byte, error) {
-	if service == "loki" || service == "tempo" {
+	if service == "loki" || service == "tempo" || service == "prometheus" {
 		path = "/api/datasources/proxy/uid/" + service + path
 	}
 	id, err := c.container(ctx, "grafana")

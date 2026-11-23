@@ -16,7 +16,8 @@ exec spinup upgrade --plan --offline
 ! stdout 'Warning: migration version'
 ! stdout 'Applied migration'
 stdout 'api/db/kit/00005_users_role.sql'
-stdout 'Try: run spinup g roles after the upgrade\.'
+! stdout 'Try: run spinup g roles after the upgrade\.'
+! stdout 'default role set'
 exists .spinup/plan.json
 ! exists .spinup/upgrade/0.0.1
 

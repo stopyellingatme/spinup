@@ -197,6 +197,17 @@ It restarts after database failures and has no health check, because it has no H
 Set `worker` under `[replicas]` in the environment file to change how many run.
 See [Background jobs](build/jobs.md).
 
+## Console on deploy
+
+New apps select the `console` module by default. An explicit `--modules ci,deploy` list omits it.
+Existing apps keep their locked selection during upgrades. Read [Operator console](console.md) to adopt it and deploy once.
+If you ejected `deploy/Dockerfile.api`, review its console build and copy instructions before deployment.
+An ejected `deploy/compose.yml` does not prevent adoption.
+
+The deploy installs the console before monitoring and reconciles its relay after monitoring starts.
+The console remains available when monitoring fails. Resume the deploy after you repair the failure.
+After post completes, deploy forces a console sample after it releases the deploy lock.
+
 ## Monitoring on deploy
 
 If the app has the `monitoring` module, `spinup deploy` starts the monitoring stack after the release is recorded.
@@ -245,10 +256,18 @@ A CDN has public addresses. Without these three steps, all users share the addre
    ```
 
    Do not put these lines in `compose.override.yml`. `compose.yml` includes that file, and Compose rejects a service that both files define.
-   `compose.yml` is a managed file, so `spinup upgrade` shows a conflict when the template changes. Keep your lines when you resolve it.
+   These settings are not secrets, so they still need the Compose file.
+   After the edit, run `spinup eject deploy/compose.yml` before deployment. You then maintain that file yourself.
 3. Check it. Send a request with a forged `X-Forwarded-For` header. The API must use the address that the CDN wrote.
 
 See [Sign-in security](build/auth-security.md) for the rate limits.
+
+For an app secret, run `spinup secrets set NAME --env <env>`.
+Declare its field in the app config struct.
+Then deploy.
+The `api` and `worker` containers read `/run/secrets/NAME` through `config.Load`, without a Compose edit.
+The web service does not use this rule.
+See [Secrets](deploy/secrets.md#read-secrets-in-your-go-code).
 
 ## Hardening
 
@@ -260,7 +279,8 @@ Every service has these settings:
 - a health check (not `migrate`, which exits when the migrations finish)
 - log rotation: `json-file`, 10 MB, 3 files
 
-Only Caddy publishes ports (80, 443, and 443/udp). Postgres publishes none.
+Caddy publishes public ports (80, 443, and 443/udp). Postgres publishes none.
+The selected console publishes port 7410 only on VM loopback. Grafana also uses a loopback publication.
 `spinup doctor` runs a Compose security lint on every `deploy/compose*.yml` file.
 To check the rendered files by hand:
 

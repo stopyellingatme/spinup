@@ -17,10 +17,11 @@ import (
 
 func init() {
 	registry.Register(gen.Generator{Name: "flags", Short: "Generate the app flag set", Example: `  # Rewrite api/internal/flags/flags.gen.go from the [flags] tables of spinup.toml
-  spinup g flags`, Run: plan})
+  spinup g flags`, Run: Plan})
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+// Plan returns the files generated from spinup.toml without writing them.
+func Plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate flags: expected no positional arguments\nTry: spinup g flags")
 	}

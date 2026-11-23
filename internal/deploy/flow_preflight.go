@@ -53,6 +53,7 @@ type local struct {
 	jobs       bool               // the jobs module is on: compose.services.yml also feeds the worker
 	otel       bool               // the monitoring module is on with a profile other than none
 	files      []releaseFile
+	console    consoleStack
 	monitoring monitoringStack
 	migrations []migration
 	origin     string // PUBLIC_ORIGIN
@@ -106,6 +107,10 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 		if _, err := l.monitoring.env("", "", env.PublicURL); err != nil {
 			return nil, err
 		}
+	}
+
+	if l.console, err = loadConsole(root, config, env, l.origin); err != nil {
+		return nil, err
 	}
 
 	// A clean tree makes the release reproducible from its git SHA.

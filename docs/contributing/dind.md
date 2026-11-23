@@ -33,6 +33,7 @@ DIND_WEB=1 bash testdata/dind/run.sh
 | Option | Effect |
 | --- | --- |
 | `DIND_WEB=1` | Generate a full app (`api` and `web`). The web image build needs the network. |
+| `DIND_CONSOLE=1` | Run the console stage (`testdata/dind/console.sh`) instead of steps 2 to 8. The app adds the monitoring (lite), backups (pgdump), and console modules. |
 | `DIND_KEEP=1` | Keep the work directory and its logs. The trap still removes the VM. |
 | `GO=<path>` | Use this `go` binary. |
 

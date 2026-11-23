@@ -25,6 +25,8 @@
 # ssh, ssh-keygen, ssh-keyscan, sops, age-keygen, curl, and python3.
 # Set DIND_WEB=1 to generate a full app (api and web). The web image build needs the network.
 # Set DIND_KEEP=1 to keep the work directory and its logs. The trap still removes the VM.
+# Set DIND_CONSOLE=1 to run the console stage (testdata/dind/console.sh, ADR 0037) instead of
+# steps 2 to 8. The app then also has the monitoring (lite), backups (pgdump), and console modules.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,6 +38,7 @@ GO="${GO:-go}"
 
 app=spinup-dind-app
 web="${DIND_WEB:-}"
+console_on="${DIND_CONSOLE:-}"
 # The sidecar service of step 7. Before step 7, the app declares no service.
 svc="echo"
 svc_port=8090
@@ -74,6 +77,12 @@ cleanup() {
     echo "--- containers on the VM" >&2
     docker exec "$vm" docker ps -a --format '{{.Names}} {{.Status}}' >&2
     docker exec "$vm" sh -c 'cat /opt/'"$app"'/deploy.state 2>/dev/null' >"$logs/deploy.state" 2>&1
+    if [[ -n "$console_on" ]]; then
+      for c in "$app-console-console-1" "$app-console-console-query-1"; do
+        docker exec "$vm" docker logs "$c" >"$logs/$c.log" 2>&1
+      done
+      docker exec "$vm" sh -c 'cat /opt/'"$app"'/console/data/facts.json 2>/dev/null' >"$logs/facts.json" 2>&1
+    fi
   fi
   docker rm -f -v "$vm" >/dev/null 2>&1
   # Remove only the images of this run: the VM image and the release images in $work/images.
@@ -162,10 +171,19 @@ new_release() {
   (cd "$work/$app/api" && CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" GOWORK=off GOFLAGS=-mod=mod \
     "$GO" build -trimpath -ldflags "-s -w -X main.version=$rel" -o "$work/img/worker" ./cmd/worker) \
     >>"$logs/build-$sha.log" 2>&1 || { show_log "build-$sha"; fail "go build of the worker of release $rel failed"; }
+  if [[ -d "$work/$app/api/cmd/console" ]]; then
+    # The console module: the release image also holds /console, as in deploy/Dockerfile.api.
+    (cd "$work/$app/api" && CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" GOWORK=off GOFLAGS=-mod=mod \
+      "$GO" build -trimpath -ldflags "-s -w" -o "$work/img/console" ./cmd/console) \
+      >>"$logs/build-$sha.log" 2>&1 || { show_log "build-$sha"; fail "go build of the console of release $rel failed"; }
+  fi
   cp "$here/fixtures/Dockerfile.api" "$work/img/Dockerfile"
   if [[ -f "$work/img/worker" ]]; then
     # The jobs module: the release image also holds the worker binary, as in deploy/Dockerfile.api.
     printf 'COPY worker /worker\n' >>"$work/img/Dockerfile"
+  fi
+  if [[ -f "$work/img/console" ]]; then
+    printf 'COPY console /console\n' >>"$work/img/Dockerfile"
   fi
   echo "$app-api:$rel" >>"$work/images"
   if [[ -n "$web" ]]; then
@@ -384,9 +402,17 @@ step "generate the app"
 export SPINUP_KEYS_DIR="$work/keys"
 shape=(--api-only)
 if [[ -n "$web" ]]; then shape=(); fi
+modules=ci,deploy,secrets,jobs
+if [[ -n "$console_on" ]]; then
+  modules=ci,deploy,secrets,jobs,monitoring,backups,console
+  shape+=(--monitoring-profile lite)
+fi
 (cd "$work" && SPINUP_KIT_REPLACE="$repo/kit" ./spinup new "$app" ${shape[@]+"${shape[@]}"} --module example.com/dindapp \
-  --modules ci,deploy,secrets,jobs --no-git --non-interactive) >"$logs/new.log" 2>&1 ||
+  --modules "$modules" --no-git --non-interactive) >"$logs/new.log" 2>&1 ||
   { show_log new; fail "spinup new failed"; }
+if [[ -n "$console_on" ]]; then
+  printf '\n[backups]\nbackend = "pgdump"\n' >>"$work/$app/spinup.toml"
+fi
 cat >>"$work/$app/spinup.toml" <<EOF
 
 [env.staging]
@@ -415,6 +441,11 @@ printf '%s' "postgres://app:$db_password@postgres:5432/app?sslmode=disable" >"$w
 sp secrets-db secrets set --env staging DATABASE_URL <"$work/value" || { show_log secrets-db; fail "secrets set failed"; }
 printf '%s' "$db_password" >"$work/value"
 sp secrets-pg secrets set --env staging POSTGRES_PASSWORD <"$work/value" || { show_log secrets-pg; fail "secrets set failed"; }
+if [[ -n "$console_on" ]]; then
+  grafana_password="dind-grafana-$run_id"
+  printf '%s' "$grafana_password" >"$work/value"
+  sp secrets-grafana secrets set --env staging GRAFANA_ADMIN_PASSWORD <"$work/value" || { show_log secrets-grafana; fail "secrets set failed"; }
+fi
 rm -f "$work/value"
 commit "initial app"
 
@@ -441,6 +472,12 @@ chown deploy:deploy /opt/$app
 chmod 0700 /opt/$app/secrets
 EOF
 echo "    prepared /opt/$app on the VM (the suite's own setup)"
+
+if [[ -n "$console_on" ]]; then
+  # shellcheck source=testdata/dind/console.sh
+  source "$here/console.sh"
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------------------------
 step "2. deploy the first release"

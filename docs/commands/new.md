@@ -18,6 +18,7 @@ AGENTS.project.md
 CLAUDE.md
 README.md
 api
+console
 deploy
 renovate.json
 spinup.lock
@@ -45,13 +46,14 @@ The ports are the defaults. `spinup dev` picks other ports when these are busy.
 
 ## What you get
 
-The command writes 47 files for an API-only app and about 164 with the web app. The most important are:
+The command writes 50 files for an API-only app and 167 files with the web app. The most important are:
 
 | Path | What it holds |
 | --- | --- |
 | `spinup.toml` | The settings of your app. You edit this file. |
 | `spinup.lock` | A record of what spinup made. spinup edits this file. |
 | `api/` | The Go API, the SQL migrations, and the OpenAPI contract. |
+| `console/` | The Compose files for the operator console. |
 | `web/` | The SvelteKit app. |
 | `deploy/` | Docker Compose, Caddy, and the Dockerfiles. |
 | `.env` | Your local settings. The command makes it from `.env.example`, and Git ignores it. |
@@ -102,8 +104,9 @@ $ spinup new fast --module example.com/fast --package-manager bun --api-client h
 ...
 ```
 
-Turn on optional modules with `--modules`. The default is `ci,deploy`. Use `--modules=''` for none.
-Run `spinup module list` to see the names.
+Turn on optional modules with `--modules`. The default is `ci,deploy,console`. Use `--modules=''` for none.
+An explicit list replaces the default. Use `--modules ci,deploy` to omit the console.
+Run `spinup module list` to see the names. See [Operator console](../console.md) for existing apps.
 
 ```console
 $ spinup new blog --api-only --module example.com/blog --modules ci,deploy,secrets --no-git --non-interactive
@@ -152,8 +155,8 @@ The output looks like this:
 ```json
 {
   "dir": "/home/you/scripted",
-  "packs": ["base", "api", "ci", "deploy"],
-  "files": 47
+  "packs": ["base", "api", "ci", "deploy", "console"],
+  "files": 50
 }
 ```
 
@@ -163,7 +166,7 @@ The output looks like this:
 | --- | --- | --- |
 | `--api-only` | Create the Go API without a web app. | `--api-only` |
 | `--module <path>` | Set the Go module path. The API module adds `/api`. | `--module github.com/acme/todo` |
-| `--modules <names>` | Choose optional modules, separated by commas. Default: `ci,deploy`. | `--modules ci,deploy,secrets` |
+| `--modules <names>` | Choose optional modules, separated by commas. Default: `ci,deploy,console`. | `--modules ci,deploy,secrets` |
 | `--frontend-mode node\|embed` | Serve the web app from SvelteKit (`node`) or from the Go binary (`embed`). | `--frontend-mode embed` |
 | `--package-manager pnpm\|bun` | Choose the web package manager. | `--package-manager bun` |
 | `--api-client openapi-fetch\|heyapi` | Choose the generated web API client. | `--api-client heyapi` |

@@ -167,7 +167,57 @@ The [generated CI](../ci.md) page has the full setup.
 
 ## Read secrets in your Go code
 
-The kit reads a secret from the file that `NAME_FILE` names, or else from the variable `NAME`:
+For an app secret, run `spinup secrets set NAME --env <env>` with the value on standard input.
+Declare the field in the app config struct.
+Then deploy:
+
+```go
+type Settings struct {
+    config.Base
+    TiingoAPIKey string `env:"TIINGO_API_KEY" required:"true"`
+}
+
+var cfg Settings
+if err := config.Load(&cfg); err != nil {
+    return err
+}
+```
+
+<!-- doctest: skip -->
+```console
+$ printf '%s' 'the-api-key' | spinup secrets set TIINGO_API_KEY --env production
+$ spinup deploy --env production
+```
+
+The `api` and `worker` containers mount the secrets directory at `/run/secrets`.
+`config.Load` reads each field in this order:
+
+1. The variable `NAME`.
+2. The file that `NAME_FILE` names.
+3. The file `<dir>/NAME`, where `SECRETS_DIR` selects `<dir>`. The default directory is `/run/secrets`.
+4. The `default` tag, if no value exists.
+
+Setting both `NAME` and `NAME_FILE` is an error, as before.
+Either explicit form takes precedence over the directory file.
+Set `SECRETS_DIR` to an empty string to disable the directory rule.
+For a field with a prefix, such as an OIDC provider setting, `NAME` is the full name with the prefix (`AUTH_OIDC_GITHUB_CLIENT_SECRET`).
+
+The directory rule reads only regular files with the exact field name, without path separators.
+It does not list the directory or follow a symlink for the file.
+A missing file or directory is not an error.
+An unreadable file stops config loading and reports its path with a `Try:` line.
+Both file forms remove one trailing newline, including CRLF.
+
+This needs no list in `spinup.toml` and no change to `deploy/compose.yml`.
+The web service does not use this rule.
+For a setting that is not a secret, edit `deploy/compose.yml`.
+Then run `spinup eject deploy/compose.yml` before deployment.
+After ejection, you maintain that file yourself.
+
+### Read a secret without a config struct
+
+`kit/secrets` reads the file that `NAME_FILE` names, or else the variable `NAME`.
+It does not use the config directory rule:
 
 ```go
 import "github.com/stopyellingatme/spinup/kit/secrets"

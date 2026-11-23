@@ -13,7 +13,7 @@ This is a complete file with every table in use:
 
 ```toml
 behavior_version = 1
-modules = ["ci", "deploy", "auth", "backups", "monitoring"]
+modules = ["ci", "deploy", "auth", "backups", "monitoring", "console"]
 default_env = "staging"
 
 [app]
@@ -63,7 +63,7 @@ $ cat todo/spinup.toml
 # Select the kit behavior defaults.
 behavior_version = 1
 # Enable these optional modules.
-modules = [ "ci", "deploy" ]
+modules = [ "ci", "deploy", "console" ]
 
 [app]
 # Name the application.
@@ -95,7 +95,7 @@ Run `spinup module list` to see which are on.
 
 ```toml
 behavior_version = 1
-modules = ["ci", "deploy", "auth"]
+modules = ["ci", "deploy", "auth", "console"]
 default_env = "staging"
 ```
 

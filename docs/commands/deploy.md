@@ -308,7 +308,12 @@ This table is the full list. The [deploy overview](../deploy/index.md#how-a-depl
 | `switch` | Starts the new color, checks each replica, switches Caddy, drains the old color, and removes it. |
 | `smoke` | Requests `/healthz` and your smoke URLs. Checks that `/version` shows the new commit. |
 | `record` | Marks the release as current and keeps the last 5 releases. |
+| `monitoring` | Installs the selected console, starts monitoring, and reconciles the relay. |
 | `post` | Runs the post-release hooks. A failure is a warning, because the release is live. |
+
+After post completes, deploy forces a console sample after it releases the deploy lock.
+With the console selected, resume validates the recorded release and repeats the journaled monitoring and post steps, including completed releases.
+See [Operator console](../console.md) for installation, access, and delayed samples.
 
 An API-only app serves `/version` on `public_url`.
 In a full app, Caddy sends `/` to the web app, so the `smoke` step asks the API of the new color through the Caddy container.

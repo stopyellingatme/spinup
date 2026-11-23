@@ -16,10 +16,11 @@ import (
 
 func init() {
 	registry.Register(gen.Generator{Name: "roles", Short: "Generate the app role set", Example: `  # Rewrite api/internal/roles/roles.gen.go from the [auth] table of spinup.toml
-  spinup g roles`, Run: plan})
+  spinup g roles`, Run: Plan})
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+// Plan returns the files generated from spinup.toml without writing them.
+func Plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate roles: expected no positional arguments\nTry: spinup g roles")
 	}

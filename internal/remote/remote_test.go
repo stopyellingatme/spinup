@@ -175,7 +175,7 @@ func TestSSHConfigOverride(t *testing.T) {
 	t.Setenv("SPINUP_SSH_CONFIG", "/tmp/spinup-test-ssh-config")
 	fake := &runexec.Fake{}
 	fake.Expect("ssh").Return("", "", 0)
-	r := New(Host{Name: "staging", Address: "vm.example.com", Port: 22}, fake, Options{})
+	r := New(Host{Name: "staging", Address: "vm.example.com", Port: 22}, fake, Options{CacheDir: shortCache(t)})
 	if _, err := r.Run(context.Background(), Cmd{Argv: []string{"true"}}); err != nil {
 		t.Fatal(err)
 	}

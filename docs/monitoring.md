@@ -9,6 +9,9 @@ nav_order: 1
 The `monitoring` module runs Grafana, Prometheus, Loki, and an OpenTelemetry collector (Alloy) next to your app.
 You see logs, traces, metrics, and alerts in one place. Nothing in the stack is open to the internet.
 
+The [operator console](console.md) gives you a smaller overview through SSH. New apps select it by default.
+It works without monitoring. Monitoring adds alerts, log search, and Grafana links.
+
 ## See your logs and traces in Grafana
 
 On your laptop, one command starts your app with a local Grafana. It needs Docker.
@@ -36,6 +39,7 @@ $ spinup monitor open --env production
 
 `module add` works on a branch, so run the `git merge` command that it prints before you deploy. See [Upgrade](upgrading.md#add-modules).
 The deploy fails early if the `GRAFANA_ADMIN_PASSWORD` secret is missing. See [Secrets](deploy/secrets.md) to set up secrets for an environment.
+`monitor open` checks Grafana through a separate SSH connection before it prints the local URL.
 Keep `monitor open` running while you use Grafana. Press Ctrl-C to close the tunnel.
 Sign in as `admin`. See [Open Grafana](#open-grafana).
 
@@ -145,9 +149,20 @@ In Grafana, a log line links to its trace, and a span links to its log lines.
 
 ## How the data flows
 
-1. The API and web service send OpenTelemetry data to `http://alloy:4318` on the private app network. `spinup deploy` sets this endpoint.
+1. The API, worker, and web service send OpenTelemetry data to `http://alloy:4318` on the private app network. `spinup deploy` sets this endpoint.
 2. Alloy removes secrets from the data. Metrics go to Prometheus, logs go to Loki, and traces go to Tempo (`full` only).
 3. Prometheus evaluates the alert rules. Grafana sends the notifications. The stack has no Alertmanager.
+
+| Service | Sends |
+| --- | --- |
+| `<app>-api` | HTTP and database traces, HTTP and Go runtime metrics, and application logs. |
+| `<app>-worker` (jobs module) | Go runtime metrics, worker and job logs, and database traces. |
+| `<app>-web` (Node mode) | Server traces. The web service does not export logs or metrics over OTLP. |
+
+The API and worker also write JSON logs to stderr.
+Without `OTEL_EXPORTER_OTLP_ENDPOINT`, they do not export telemetry.
+The `lite` profile accepts OTLP traces and discards every span. Senders receive success, so the missing Tempo service causes no export error.
+The `full` profile stores traces in Tempo.
 
 Alloy also scrapes Loki, Grafana, Caddy, and itself. With `full`, it scrapes Tempo and the exporters, and it probes your `public_url`.
 A sidecar service that uses the Rust or Python template sends its traces to the same endpoint. One trace then crosses the API and the service. See [Sidecar services](services.md).
@@ -202,6 +217,10 @@ $ spinup monitor silence 'prometheus_alertname=HighErrorRate' --for 2h --env pro
 ...
 ```
 
+`monitor alerts` prints the state, real alert name, severity if present, and summary.
+Firing alerts appear first. Silenced alerts appear last with the state `silenced`.
+The command uses Grafana suppression to identify silenced alerts.
+Use `--json` to print an array of these fields with the same state values.
 To silence a built-in alert, match its `prometheus_alertname` label, as in the last command.
 Grafana sets the `alertname` label to the title of its forwarding rule, so that label is the same for every built-in alert.
 

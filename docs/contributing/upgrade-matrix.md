@@ -235,3 +235,8 @@ The corpus app in `testdata/corpus/kit-migrations/` has an app migration `00003_
 - [Roles](../build/roles.md) and [Audit trail](../audit.md)
 - [Release spinup](release.md)
 - [Behavior versions](../policy/behavior-version.md)
+
+## Add migration lint markers
+
+The codemod `0006_migration_lint_markers` adds marker comments to unchanged kit migration files.
+It reports customized files for a manual update.

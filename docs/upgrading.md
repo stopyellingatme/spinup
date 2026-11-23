@@ -103,6 +103,22 @@ $ spinup upgrade --yes
 
 spinup creates the branch `spinup/upgrade-<version>` in a separate worktree at `.spinup/upgrade/<version>`.
 It applies the template changes, runs codemods, updates Go and pnpm dependencies, and then builds and tests the result.
+
+Before verification, it regenerates billing, API keys, flags, and roles from `spinup.toml` for the modules that your app has.
+It also rebuilds MCP registrations from the tool files in `api/internal/mcp/`.
+The lock records these outputs, so `spinup check` accepts the generated files without a manual generation step.
+If a generator fails, the upgrade stops and names the generator command that helps you correct the inputs.
+
+The upgrade reports a conflict if you edited a generated file after spinup last wrote it.
+It keeps your content and names the generator command in a `Try:` line.
+Run that command in the worktree.
+Run `spinup upgrade --continue --yes` from the main checkout.
+
+If you want to replace your edits, abort the upgrade.
+Restart the upgrade with `--force-managed`.
+An ejected generated file stays unchanged, even with `--force-managed`.
+The plan lists it as `keep` with the reason `ejected: generator skipped`.
+
 Each step is its own commit, so you can read the history.
 Use `--to <version>` for an exact target. Without it, spinup picks the newest version it can load.
 If you skip several releases, the upgrade steps through each minor release in turn.
@@ -295,3 +311,6 @@ See [PostgreSQL upgrades](commands/maintenance-pg.md) and [In-place PostgreSQL u
 - [Support policy](policy/support.md) and [Kit compatibility](policy/kit-compat.md).
 - Flag reference: [upgrade](site/commands/upgrade.md), [self-update](site/commands/self-update.md), [module add](site/commands/module-add.md), [version](site/commands/version.md).
 - [Backups with WAL-G](backups-walg.md) and [Backups with pg_dump](backups-pgdump.md) before a risky upgrade.
+
+The codemod `0006_migration_lint_markers` adds lint markers to unchanged kit migrations.
+If you changed a kit migration, add the reported marker by hand before each unmarked dynamic SQL block.
