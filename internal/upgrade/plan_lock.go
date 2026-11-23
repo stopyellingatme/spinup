@@ -76,7 +76,7 @@ func NextLock(old *manifest.Lock, p *Plan, to *templates.Version, answers map[st
 			delete(next.Files, d.Path)
 		default:
 			// Tombstones and generator-owned files keep their old lock entry.
-			if slices.Contains(next.Tombstones, d.Path) || d.Reason == "tombstone" || d.Reason == "generator-owned" {
+			if slices.Contains(next.Tombstones, d.Path) || d.Reason == "tombstone" || d.Reason == "generator-owned" || d.Reason == generatedEjectedReason {
 				continue
 			}
 			file, ok := rendered.Get(d.Path)

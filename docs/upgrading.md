@@ -109,6 +109,16 @@ It also rebuilds MCP registrations from the tool files in `api/internal/mcp/`.
 The lock records these outputs, so `spinup check` accepts the generated files without a manual generation step.
 If a generator fails, the upgrade stops and names the generator command that helps you correct the inputs.
 
+The upgrade reports a conflict if you edited a generated file after spinup last wrote it.
+It keeps your content and names the generator command in a `Try:` line.
+Run that command in the worktree.
+Run `spinup upgrade --continue --yes` from the main checkout.
+
+If you want to replace your edits, abort the upgrade.
+Restart the upgrade with `--force-managed`.
+An ejected generated file stays unchanged, even with `--force-managed`.
+The plan lists it as `keep` with the reason `ejected: generator skipped`.
+
 Each step is its own commit, so you can read the history.
 Use `--to <version>` for an exact target. Without it, spinup picks the newest version it can load.
 If you skip several releases, the upgrade steps through each minor release in turn.

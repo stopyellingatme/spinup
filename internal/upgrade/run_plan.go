@@ -183,7 +183,7 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 		if err != nil {
 			return nil, err
 		}
-		if err := applyGeneratedPlan(ctx, temp, lock, plan); err != nil {
+		if err := applyGeneratedPlan(ctx, temp, lock, plan, o.ForceManaged); err != nil {
 			return nil, err
 		}
 		if err := plan.Format(r.Out); err != nil {

@@ -156,7 +156,13 @@ func unresolved(work string, paths []string) ([]string, error) {
 }
 
 func conflictError(work string, paths []string) error {
-	return &ui.Error{What: "Upgrade has conflicts", Why: strings.Join(paths, ", "), Try: "resolve the markers in " + work + ", then run spinup upgrade --continue", Code: ui.ExitConflicts}
+	hint := "resolve the markers in " + work + ", then run spinup upgrade --continue"
+	for _, file := range generatedFiles {
+		if slices.Contains(paths, file.path) {
+			hint += ". For " + file.path + ", run " + generatorCommand(file.pack) + " in the worktree, or restart with spinup upgrade --force-managed"
+		}
+	}
+	return &ui.Error{What: "Upgrade has conflicts", Why: strings.Join(paths, ", "), Try: hint, Code: ui.ExitConflicts}
 }
 
 // resolvePlanConflicts records the user's resolved content for subsequent phases.
