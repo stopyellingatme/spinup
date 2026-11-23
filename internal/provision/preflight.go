@@ -345,11 +345,39 @@ func suggestAlternatives(sizes []digitalocean.Size, regions []digitalocean.Regio
 			available = append(available, region.Slug)
 		}
 	}
-	slices.Sort(available)
-	if len(available) > 3 {
-		available = available[:3]
-	}
+	slices.SortFunc(available, func(a, b string) int {
+		ra, rb := regionRank(a, want.Region), regionRank(b, want.Region)
+		if ra != rb {
+			return ra - rb
+		}
+		return strings.Compare(a, b)
+	})
 	return alternatives, available
+}
+
+// regionContinents maps DigitalOcean city prefixes to continent groups.
+var regionContinents = map[string]string{
+	"nyc": "north-america", "sfo": "north-america", "tor": "north-america",
+	"ams": "europe", "fra": "europe", "lon": "europe",
+	"blr": "asia", "sgp": "asia", "syd": "oceania",
+}
+
+func regionPrefix(slug string) string {
+	if i := strings.IndexAny(slug, "0123456789"); i >= 0 {
+		return slug[:i]
+	}
+	return slug
+}
+
+func regionRank(slug, wanted string) int {
+	prefix, wantedPrefix := regionPrefix(slug), regionPrefix(wanted)
+	if prefix == wantedPrefix {
+		return 0
+	}
+	if group := regionContinents[wantedPrefix]; group != "" && group == regionContinents[prefix] {
+		return 1
+	}
+	return 2
 }
 
 func availableRegionSlugs(regions []digitalocean.Region) []string {
@@ -365,15 +393,23 @@ func availableRegionSlugs(regions []digitalocean.Region) []string {
 
 func sizeAlternativeTry(sizes []digitalocean.Size, regions []string) string {
 	parts := make([]string, 0, 2)
+	if len(regions) > 0 {
+		shown := regions
+		if len(shown) > 6 {
+			shown = shown[:6]
+		}
+		choice := "pass --region " + strings.Join(shown, ", ")
+		if len(regions) > len(shown) {
+			choice += fmt.Sprintf(" and %d more", len(regions)-len(shown))
+		}
+		parts = append(parts, choice)
+	}
 	if len(sizes) > 0 {
 		choices := make([]string, len(sizes))
 		for i, size := range sizes {
 			choices[i] = fmt.Sprintf("%s ($%.2f/month)", size.Slug, size.PriceMonthly)
 		}
 		parts = append(parts, "pass --size "+strings.Join(choices, ", "))
-	}
-	if len(regions) > 0 {
-		parts = append(parts, "pass --region "+strings.Join(regions, ", "))
 	}
 	if len(parts) == 0 {
 		return "pass another --size or --region"
