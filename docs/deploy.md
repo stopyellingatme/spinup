@@ -245,10 +245,18 @@ A CDN has public addresses. Without these three steps, all users share the addre
    ```
 
    Do not put these lines in `compose.override.yml`. `compose.yml` includes that file, and Compose rejects a service that both files define.
-   `compose.yml` is a managed file, so `spinup upgrade` shows a conflict when the template changes. Keep your lines when you resolve it.
+   These settings are not secrets, so they still need the Compose file.
+   After the edit, run `spinup eject deploy/compose.yml` before deployment. You then maintain that file yourself.
 3. Check it. Send a request with a forged `X-Forwarded-For` header. The API must use the address that the CDN wrote.
 
 See [Sign-in security](build/auth-security.md) for the rate limits.
+
+For an app secret, run `spinup secrets set NAME --env <env>`.
+Declare its field in the app config struct.
+Then deploy.
+The `api` and `worker` containers read `/run/secrets/NAME` through `config.Load`, without a Compose edit.
+The web service does not use this rule.
+See [Secrets](deploy/secrets.md#read-secrets-in-your-go-code).
 
 ## Hardening
 
