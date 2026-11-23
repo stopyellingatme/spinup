@@ -196,3 +196,41 @@ func TestDoctorOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestEjectUnavailableTemplate(t *testing.T) {
+	o, lock := fixture(t)
+	lock.TemplateVersion = "0.0.0-dev"
+	if err := lock.Save(filepath.Join(o.Dir, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	o.Source = testSource{err: templates.ErrVersionUnavailable}
+	if err := Eject(context.Background(), o, "file.txt"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := manifest.Load(filepath.Join(o.Dir, "spinup.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Files["file.txt"].Class != manifest.Scaffold {
+		t.Fatalf("class=%s", got.Files["file.txt"].Class)
+	}
+}
+
+func TestCheckUnavailableDevAdvice(t *testing.T) {
+	o, lock := fixture(t)
+	lock.TemplateVersion = "0.0.0-dev"
+	if err := lock.Save(filepath.Join(o.Dir, "spinup.lock")); err != nil {
+		t.Fatal(err)
+	}
+	o.Source = testSource{err: templates.ErrVersionUnavailable}
+	var output bytes.Buffer
+	_ = Check(context.Background(), o, false, ui.New(nil, &output, &output, ui.Options{}))
+	for _, want := range []string{"development build", "commit", "SPINUP_TEMPLATES_DIR"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("output=%s", &output)
+		}
+	}
+	if strings.Contains(output.String(), "cache warm") {
+		t.Fatalf("output=%s", &output)
+	}
+}

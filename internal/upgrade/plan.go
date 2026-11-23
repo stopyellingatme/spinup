@@ -14,6 +14,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/merge"
 	"github.com/stopyellingatme/spinup/internal/templates"
+	"github.com/stopyellingatme/spinup/internal/templates/store"
 	"github.com/stopyellingatme/spinup/internal/vfs"
 )
 
@@ -415,5 +416,9 @@ func requireBase(plan *Plan, old *templates.Version, from string) error {
 	if len(names) == 0 {
 		return nil
 	}
-	return fmt.Errorf("plan upgrade: template version %s is unavailable, so %d changed files have no merge base: %s\nTry: run spinup cache warm %s, or set SPINUP_TEMPLATES_DIR to a directory that holds that version", from, len(names), strings.Join(names, ", "), from)
+	advice := fmt.Sprintf("run spinup cache warm %s, or set SPINUP_TEMPLATES_DIR to a directory that holds that version", from)
+	if dev := store.DevelopmentAdvice(from); dev != "" {
+		advice = dev
+	}
+	return fmt.Errorf("plan upgrade: template version %s is unavailable, so %d changed files have no merge base: %s\nTry: %s", from, len(names), strings.Join(names, ", "), advice)
 }
