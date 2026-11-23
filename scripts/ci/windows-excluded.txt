@@ -9,6 +9,7 @@ backup/pgdump           # sh scripts, Unix file modes
 backup/walg             # needs /bin/sh
 ci                      # setup-spinup prints mixed path separators; generated scripts expect Unix modes
 cli                     # runs sh, ssh, git, and shellcheck flows; server commands need WSL2
+consoleclient           # reads the console through SSH forwards; server commands need WSL2
 deploy                  # sh scripts, ln -sfn, Unix file modes
 devloop                 # spinup dev needs Unix process groups
 doctest                 # runs the docs code blocks with Unix tools and a generated app

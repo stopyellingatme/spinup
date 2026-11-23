@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -213,6 +214,9 @@ func TestForwardLoopbackRetriesOccupiedPort(t *testing.T) {
 }
 
 func TestForwardLoopbackSSHExitsEarly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake ssh is a sh script; remote commands need WSL2")
+	}
 	requireLoopback(t)
 	dir := t.TempDir()
 	count := filepath.Join(dir, "count")
@@ -240,6 +244,9 @@ func TestForwardLoopbackSSHExitsEarly(t *testing.T) {
 }
 
 func TestForwardLoopbackProcessLifecycle(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake ssh is a sh script; remote commands need WSL2")
+	}
 	requireLoopback(t)
 	self, err := os.Executable()
 	if err != nil {
