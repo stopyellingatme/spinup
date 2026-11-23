@@ -141,7 +141,10 @@ func TestCollectorDropsSampleAfterConfigReplacement(t *testing.T) {
 			}()
 			t.Cleanup(func() {
 				_ = os.WriteFile(barrier+".resume", nil, 0600)
-				<-done
+				// Wait for the fake sample to end. Its result is asserted in the test body.
+				if err, ok := <-done; ok && err != nil {
+					t.Logf("the fake sample ended with: %v", err)
+				}
 			})
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()

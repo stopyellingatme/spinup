@@ -138,7 +138,7 @@ func (f *flow) planConsole() {
 		return
 	}
 	fmt.Fprintf(f.out, "  Install console/compose.console.yml, collect.sh, probe.conf, and .env in %s/console.\n", f.root())
-	fmt.Fprintln(f.out, "  Preserve console/data and its prior sample. Serialize configuration with sample.lock.")
+	fmt.Fprintln(f.out, "  Preserve console/data and its prior sample. Serialize configuration with config.lock.")
 	fmt.Fprintln(f.out, "  Use the recorded API image. Start console with up -d --no-deps --wait console.")
 	fmt.Fprintln(f.out, "  Verify Docker publishes only 127.0.0.1:7410. Install the user timer when available. Publish an initial sample.")
 	if f.l.console.spec.Profile == "lite" || f.l.console.spec.Profile == "full" {
