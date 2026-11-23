@@ -295,3 +295,6 @@ See [PostgreSQL upgrades](commands/maintenance-pg.md) and [In-place PostgreSQL u
 - [Support policy](policy/support.md) and [Kit compatibility](policy/kit-compat.md).
 - Flag reference: [upgrade](site/commands/upgrade.md), [self-update](site/commands/self-update.md), [module add](site/commands/module-add.md), [version](site/commands/version.md).
 - [Backups with WAL-G](backups-walg.md) and [Backups with pg_dump](backups-pgdump.md) before a risky upgrade.
+
+The codemod `0006_migration_lint_markers` adds lint markers to unchanged kit migrations.
+If you changed a kit migration, add the reported marker by hand before each unmarked dynamic SQL block.
