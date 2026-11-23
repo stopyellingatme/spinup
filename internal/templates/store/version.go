@@ -34,3 +34,12 @@ func validateVersion(version string) error {
 	}
 	return nil
 }
+
+// DevelopmentAdvice returns recovery advice for a development template version.
+// It returns an empty string for release versions.
+func DevelopmentAdvice(version string) string {
+	if version != "0.0.0-dev" {
+		return ""
+	}
+	return "a development build made this project. Build the CLI from the commit that made the project, or set SPINUP_TEMPLATES_DIR to a directory that holds that version"
+}

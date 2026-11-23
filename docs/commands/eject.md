@@ -48,6 +48,8 @@ $ spinup eject deploy/Caddyfile --dry-run
 
 ## Errors
 
+The command reads the file class from the lock. It does not need the locked templates.
+
 Only a managed file can be ejected. The command rejects scaffold files, seed files, and paths that the lock does not list:
 
 ```console
