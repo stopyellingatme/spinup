@@ -108,7 +108,7 @@ func (c *client) alerts(ctx context.Context, o Options) error {
 }
 
 // matchesPrometheusAlert compares the original labels with Grafana's forwarded labels.
-// Grafana replaces alertname with its rule title and adds its own labels.
+// Grafana replaces alertname with its rule title, replaces source, and adds its own labels.
 func matchesPrometheusAlert(original, forwarded map[string]string) bool {
 	if original["alertname"] == "" || forwarded["prometheus_alertname"] != original["alertname"] {
 		return false
@@ -116,6 +116,11 @@ func matchesPrometheusAlert(original, forwarded map[string]string) bool {
 	for name, value := range original {
 		if name == "alertname" {
 			name = "prometheus_alertname"
+		}
+		// The forwarding rule sets source=prometheus, and Grafana replaces a query label
+		// that has the same name. The original source value is therefore not comparable.
+		if name == "source" {
+			continue
 		}
 		if actual, ok := forwarded[name]; !ok || actual != value {
 			return false
