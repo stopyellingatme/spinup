@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -128,5 +129,51 @@ func TestMainModesEntrypoint(t *testing.T) {
 	}
 	if got.App != "todo" || got.Profile != "absent" || got.ObservedAt == nil || got.Alerts.State != "disabled" {
 		t.Fatalf("entrypoint: %s", &out)
+	}
+}
+
+func TestMainProjectOutputBoundary(t *testing.T) {
+	const collectorLimit = 393216
+	env := map[string]string{"CONSOLE_APP": "todo", "CONSOLE_ENV": "production", "CONSOLE_PROFILE": "none", "CONSOLE_BACKEND": "none", "CONSOLE_JOBS": "false", "CONSOLE_OBSERVED_AT": "2026-11-22T18:00:00Z"}
+	files := baseProbes()
+	run := func(name string) []byte {
+		t.Helper()
+		data, err := json.Marshal(container{Project: "todo", Service: "api", Name: name, State: "running"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		files["containers.ndjson"].Data = data
+		var stdout, stderr bytes.Buffer
+		runtime := mainRuntime{getenv: func(key string) string { return env[key] }, input: files, now: func() time.Time { return projectTime }}
+		if code := runMain([]string{"project"}, &stdout, &stderr, runtime); code != 0 {
+			t.Fatalf("project: %d %s", code, &stderr)
+		}
+		return stdout.Bytes()
+	}
+	baseSize := len(run("x"))
+	for _, extra := range []int{-1, 0, 1} {
+		t.Run(strconv.Itoa(extra), func(t *testing.T) {
+			output := run(strings.Repeat("x", 1+collectorLimit-baseSize+extra))
+			if len(output) > collectorLimit {
+				t.Fatalf("complete output is %d bytes, limit %d", len(output), collectorLimit)
+			}
+			if len(output) == 0 || output[len(output)-1] != '\n' {
+				t.Fatal("output lacks the encoder newline")
+			}
+			var got overview
+			if err := json.Unmarshal(output, &got); err != nil {
+				t.Fatal(err)
+			}
+			if extra <= 0 {
+				if len(output) != collectorLimit+extra || got.Containers.State != "ok" {
+					t.Fatalf("valid boundary sample changed: size=%d containers=%+v", len(output), got.Containers)
+				}
+			} else if got.Containers.State != "unavailable" || got.Containers.Reason == nil || *got.Containers.Reason != "invalid" {
+				t.Fatalf("oversized section retained: %+v", got.Containers)
+			}
+			if got.Disk.State != "ok" {
+				t.Fatal("size bound damaged an independent section")
+			}
+		})
 	}
 }

@@ -321,7 +321,8 @@ func boundHost(v *overview, at time.Time) {
 	slices.SortStableFunc(candidates, func(a, b candidate) int { return b.size - a.size })
 	for _, c := range candidates {
 		b, _ := json.Marshal(v)
-		if len(b) <= hostLimit {
+		// json.Encoder adds one final newline to the projected document.
+		if len(b) < hostLimit {
 			return
 		}
 		c.invalidate()

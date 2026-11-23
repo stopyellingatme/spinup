@@ -354,3 +354,30 @@ func TestConsoleReady(t *testing.T) {
 		}
 	})
 }
+
+// This history matches TestProjectHistoryLimits's empty and unknown metadata fixture.
+func TestValidOverviewProjectHistoryMetadata(t *testing.T) {
+	doc := overviewJSON(t)
+	history := `[{"id":"20261122T170000Z-0123456789ab","at":"2026-11-22T17:00:00Z","user":"","git_sha":null,"color":null,"result":"recorded"},{"id":"20261121T170000Z-abcdef012345","at":"2026-11-21T17:00:00Z","user":null,"git_sha":null,"color":null,"result":"recorded"}]`
+	doc["history"].(map[string]any)["data"] = json.RawMessage(history)
+	doc["containers"].(map[string]any)["data"] = []any{map[string]any{"project": "todo", "service": "caddy", "name": "todo-caddy-1", "state": "running", "health": nil}}
+	body, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := validOverview(body, "todo", "production", "lite"); !ok {
+		t.Fatal("projector history rejected")
+	}
+	for _, change := range []struct{ from, to string }{
+		{`"id":"20261122T170000Z-0123456789ab"`, `"id":""`},
+		{`"result":"recorded"`, `"result":""`},
+		{`"git_sha":null`, `"git_sha":""`},
+		{`"color":null`, `"color":""`},
+		{`"name":"todo-caddy-1"`, `"name":""`},
+		{`"user":""`, `"user":12`},
+	} {
+		if _, ok := validOverview([]byte(strings.Replace(string(body), change.from, change.to, 1)), "todo", "production", "lite"); ok {
+			t.Errorf("accepted %s", change.to)
+		}
+	}
+}

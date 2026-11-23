@@ -361,7 +361,9 @@ type field struct {
 	name string
 	kind kind
 	null bool
-	enum []string
+	// empty permits a known empty string, independently of null.
+	empty bool
+	enum  []string
 }
 
 var (
@@ -402,7 +404,7 @@ var records = map[string][]field{
 	},
 	"space": {{name: "total_bytes", kind: kindInt}, {name: "used_bytes", kind: kindInt}, {name: "available_bytes", kind: kindInt}},
 	"attempt": {
-		{name: "id"}, {name: "at", kind: kindTime}, {name: "user", null: true}, {name: "git_sha", null: true},
+		{name: "id"}, {name: "at", kind: kindTime}, {name: "user", null: true, empty: true}, {name: "git_sha", null: true},
 		{name: "color", null: true, enum: colors},
 		{name: "result", enum: []string{"failed", "succeeded", "incomplete", "recorded"}},
 	},
@@ -582,7 +584,7 @@ func str(m map[string]json.RawMessage, f field) (string, error) {
 		return text, nil
 	}
 	var s string
-	if json.Unmarshal(raw, &s) != nil || s == "" {
+	if json.Unmarshal(raw, &s) != nil || (s == "" && !f.empty) {
 		return "", fmt.Errorf("the key %s is not a nonempty string", f.name)
 	}
 	if f.kind == kindTime {
