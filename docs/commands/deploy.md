@@ -312,6 +312,7 @@ This table is the full list. The [deploy overview](../deploy/index.md#how-a-depl
 | `post` | Runs the post-release hooks. A failure is a warning, because the release is live. |
 
 After post completes, deploy forces a console sample after it releases the deploy lock.
+With the console selected, resume validates the recorded release and repeats the journaled monitoring and post steps, including completed releases.
 See [Operator console](../console.md) for installation, access, and delayed samples.
 
 An API-only app serves `/version` on `public_url`.
