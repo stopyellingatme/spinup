@@ -45,7 +45,7 @@ func newCollector(t *testing.T) *collectorFixture {
 		t.Fatal(err)
 	}
 	// Only the isolated copy uses recording utilities. Production ignores the caller's PATH.
-	source = []byte(strings.Replace(string(source), "PATH=/usr/sbin:/usr/bin:/sbin:/bin", "PATH="+f.bin+":/usr/bin:/bin:/opt/homebrew/bin", 1))
+	source = []byte(strings.Replace(string(source), "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "PATH="+f.bin+":/usr/bin:/bin:/opt/homebrew/bin", 1))
 	f.write("console/collect.sh", string(source), 0700)
 	probe, err := os.ReadFile("testdata/probe-bin/probe")
 	if err != nil {
