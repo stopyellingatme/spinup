@@ -75,6 +75,14 @@ func Load(dst any) error {
 // When neither NAME nor NAME_FILE is set, it reads SECRETS_DIR/NAME.
 // SECRETS_DIR defaults to /run/secrets. An empty value disables this fallback.
 func LoadFrom(dst any, lookup func(string) (string, bool), readFile func(string) ([]byte, error)) error {
+	return LoadFromPrefix(dst, "", lookup, readFile)
+}
+
+// LoadFromPrefix fills a struct pointer using prefixed environment names.
+// It resolves prefix+NAME, prefix+NAME_FILE, then SECRETS_DIR/(prefix+NAME).
+// SECRETS_DIR has no prefix. An empty value disables the directory fallback.
+// Defaults, required tags, and errors follow LoadFrom.
+func LoadFromPrefix(dst any, prefix string, lookup func(string) (string, bool), readFile func(string) ([]byte, error)) error {
 	value := reflect.ValueOf(dst)
 	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
 		return configErrors([]error{errors.New("configuration failed: destination must be a non-nil pointer to a struct")})
@@ -83,7 +91,7 @@ func LoadFrom(dst any, lookup func(string) (string, bool), readFile func(string)
 		return configErrors([]error{errors.New("configuration failed: lookup and readFile must be provided")})
 	}
 	var problems []error
-	walk(value.Elem(), lookup, readFile, &problems, make(map[reflect.Type]bool))
+	walk(value.Elem(), prefix, lookup, readFile, &problems, make(map[reflect.Type]bool))
 	return configErrors(problems)
 }
 
@@ -94,7 +102,7 @@ func configErrors(problems []error) error {
 	return fmt.Errorf("%w\nTry: correct the named environment variables or secret files and restart", errors.Join(problems...))
 }
 
-func walk(value reflect.Value, lookup func(string) (string, bool), readFile func(string) ([]byte, error), problems *[]error, visiting map[reflect.Type]bool) {
+func walk(value reflect.Value, prefix string, lookup func(string) (string, bool), readFile func(string) ([]byte, error), problems *[]error, visiting map[reflect.Type]bool) {
 	if visiting[value.Type()] {
 		return
 	}
@@ -121,13 +129,14 @@ func walk(value reflect.Value, lookup func(string) (string, bool), readFile func
 				field = field.Elem()
 			}
 			if field.Kind() == reflect.Struct {
-				walk(field, lookup, readFile, problems, visiting)
+				walk(field, prefix, lookup, readFile, problems, visiting)
 			}
 			continue
 		}
 		if name == "-" {
 			continue
 		}
+		name = prefix + name
 		if !field.CanSet() {
 			*problems = append(*problems, fmt.Errorf("%s: field is not exported", name))
 			continue

@@ -129,7 +129,7 @@ func loadOIDCProvider(name string) *oidcProvider {
 		Label  string `env:"LABEL"`
 	}
 	prefix := "AUTH_OIDC_" + strings.ToUpper(name) + "_"
-	err := config.LoadFrom(&c, func(key string) (string, bool) { return os.LookupEnv(prefix + key) }, os.ReadFile)
+	err := config.LoadFromPrefix(&c, prefix, os.LookupEnv, os.ReadFile)
 	if err == nil && !oidcOriginIssuerOK(c.Issuer) {
 		err = fmt.Errorf("%sISSUER is invalid", prefix)
 	}
