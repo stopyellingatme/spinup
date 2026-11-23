@@ -212,6 +212,9 @@ The Backups dashboard and the `BackupStale` alert show the age of the newest bac
 `BackupStale` fires when the newest backup is older than 26 hours.
 See [Monitoring](../monitoring.md#backup-metrics) for the metrics and alerts.
 
+If Docker created the metrics directory as root, `backup now` repairs its ownership through the deploy user's Docker access.
+The repair uses the local Postgres image and needs no `sudo` permission.
+
 To see the age of the newest backup now, read the `last backup` line of `backup status`.
 
 ## Troubleshooting
