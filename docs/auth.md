@@ -163,7 +163,16 @@ services:
 ```
 
 {: .note }
-Edit `deploy/compose.yml`, not `deploy/compose.override.yml`. Compose rejects a second `api` service. See [Deploy to your own server](deploy.md).
+`AUTH_REGISTRATION` is not a secret, so it still needs a Compose setting.
+After the edit, run `spinup eject deploy/compose.yml` before deployment. You then maintain that file yourself.
+Compose rejects a second `api` service in `deploy/compose.override.yml`.
+
+For an app secret, run `spinup secrets set NAME --env <env>`.
+Declare its field in the app config struct.
+Then deploy.
+The `api` and `worker` containers read `/run/secrets/NAME` through `config.Load`.
+The web service does not use this rule.
+See [Secrets](deploy/secrets.md).
 
 ### Secure a public site
 

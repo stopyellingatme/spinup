@@ -3,12 +3,16 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var defaultSecretsDir = "/run/secrets"
 
 // Base contains the common settings for a spinup API.
 type Base struct {
@@ -68,6 +72,8 @@ func Load(dst any) error {
 // LoadFrom fills a struct pointer using lookup and readFile.
 // It supports env, default, and required tags, including fields in embedded structs.
 // It reports all field errors together without exposing configuration values.
+// When neither NAME nor NAME_FILE is set, it reads SECRETS_DIR/NAME.
+// SECRETS_DIR defaults to /run/secrets. An empty value disables this fallback.
 func LoadFrom(dst any, lookup func(string) (string, bool), readFile func(string) ([]byte, error)) error {
 	value := reflect.ValueOf(dst)
 	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
@@ -128,14 +134,25 @@ func walk(value reflect.Value, lookup func(string) (string, bool), readFile func
 		}
 		raw, set := lookup(name)
 		path, fileSet := lookup(name + "_FILE")
+		fileLabel := name + "_FILE"
 		if set && fileSet {
 			*problems = append(*problems, fmt.Errorf("%s: both %s and %s_FILE are set", name, name, name))
 			continue
 		}
+		if !set && !fileSet {
+			var err error
+			path, err = secretPath(name, lookup)
+			if err != nil {
+				*problems = append(*problems, err)
+				continue
+			}
+			fileSet = path != ""
+			fileLabel = path
+		}
 		if fileSet {
 			data, err := readFile(path)
 			if err != nil {
-				*problems = append(*problems, fmt.Errorf("%s: cannot read %s_FILE", name, name))
+				*problems = append(*problems, fmt.Errorf("%s: cannot read %s", name, fileLabel))
 				continue
 			}
 			raw = strings.TrimSuffix(string(data), "\n")
@@ -158,6 +175,31 @@ func walk(value reflect.Value, lookup func(string) (string, bool), readFile func
 			*problems = append(*problems, fmt.Errorf("%s: %w", name, err))
 		}
 	}
+}
+
+func secretPath(name string, lookup func(string) (string, bool)) (string, error) {
+	dir, ok := lookup("SECRETS_DIR")
+	if !ok {
+		dir = defaultSecretsDir
+	}
+	if dir == "" {
+		return "", nil
+	}
+	if name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+		return "", fmt.Errorf("%s: secret name must not contain a path separator or name a directory", name)
+	}
+	path := filepath.Join(dir, name)
+	info, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("%s: cannot inspect secret file (%s)", name, path)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("%s: secret file is not a regular file (%s)", name, path)
+	}
+	return path, nil
 }
 
 func setValue(field reflect.Value, raw string) error {
