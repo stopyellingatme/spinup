@@ -264,6 +264,7 @@ $$;
 
 -- The module audits users. A missing table is skipped without an error.
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regclass('public.users') IS NOT NULL THEN
@@ -287,6 +288,7 @@ $$;
 -- when it runs after this migration. spinup g audit user_identities is needed only
 -- for an app whose 00004 file came from a spinup version before this change.
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regclass('public.user_identities') IS NOT NULL THEN

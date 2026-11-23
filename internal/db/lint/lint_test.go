@@ -165,3 +165,32 @@ func TestLintErrors(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestShippedMigrations(t *testing.T) {
+	root := filepath.Join("..", "..", "templates", "packs", "*", "files", "api", "db")
+	kitDirs, err := filepath.Glob(filepath.Join(root, "kit"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	appDirs, err := filepath.Glob(filepath.Join(root, "migrations"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(kitDirs) == 0 || len(appDirs) == 0 {
+		t.Fatal("missing shipped migration directories")
+	}
+	findings, err := LintDirs(append(kitDirs, appDirs...)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range findings {
+		t.Errorf("%s:%d: %s: %s", finding.File, finding.Line, finding.Rule, finding.Message)
+	}
+}
+
+func TestUnmarkedDynamicSQLIsReported(t *testing.T) {
+	findings, err := Lint("app.sql", goose("DO $$ BEGIN DROP TABLE todos; END $$;"))
+	if err != nil || len(findings) != 1 || findings[0].Rule != "unchecked-dynamic-sql" {
+		t.Fatalf("Lint() = %#v, %v", findings, err)
+	}
+}

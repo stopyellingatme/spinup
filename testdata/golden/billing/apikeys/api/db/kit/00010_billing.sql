@@ -58,6 +58,7 @@ CREATE TABLE billing_usage_reports (
 -- later, the doctor check billing-wired prints the attach statements
 -- (ADR 0032 section 7.1).
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regprocedure('public.audit_row_change()') IS NOT NULL THEN
