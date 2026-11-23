@@ -20,6 +20,7 @@ CREATE TABLE feature_flag_users (
 -- exist (the audit migration ran first). When the audit module comes later, the doctor
 -- check flags-wired prints the attach statements (ADR 0029 decision 11.7).
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regprocedure('public.audit_row_change()') IS NOT NULL THEN
