@@ -314,7 +314,7 @@ func TestConsolePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	x.vm.AssertDone(t)
-	for _, want := range []string{"sample.lock", "recorded API image", "127.0.0.1:7410", "final sample", "exact project and service labels"} {
+	for _, want := range []string{"config.lock", "recorded API image", "127.0.0.1:7410", "final sample", "exact project and service labels"} {
 		if !strings.Contains(x.out.String(), want) {
 			t.Fatalf("missing %s: %s", want, x.out.String())
 		}
