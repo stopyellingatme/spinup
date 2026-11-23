@@ -41,7 +41,7 @@ func TestSuggestAlternatives(t *testing.T) {
 	if got := sizeSlugs(gotSizes); !reflect.DeepEqual(got, []string{"s-2vcpu-4gb-amd", "s-4vcpu-8gb", "s-8vcpu-16gb"}) {
 		t.Errorf("size suggestions = %v", got)
 	}
-	if want := []string{"fra1", "sfo3"}; !reflect.DeepEqual(gotRegions, want) {
+	if want := []string{"sfo3", "fra1"}; !reflect.DeepEqual(gotRegions, want) {
 		t.Errorf("region suggestions = %v, want %v", gotRegions, want)
 	}
 }
@@ -216,7 +216,7 @@ func TestCheckSizeExplainsUnavailableChoices(t *testing.T) {
 	r := &run{base: base{d: Deps{Cloud: catalogClient(sizes, regions)}, env: "preview"}, envFile: deploy.EnvFile{}, size: "s-2vcpu-4gb", region: "nyc3"}
 	err := r.checkSize(context.Background())
 	ue := uiErr(t, err)
-	for _, want := range []string{"--size s-2vcpu-4gb-amd ($22.00/month)", "--region fra1, sfo3"} {
+	for _, want := range []string{"--size s-2vcpu-4gb-amd ($22.00/month)", "--region sfo3, fra1"} {
 		if !strings.Contains(ue.Try, want) {
 			t.Errorf("Try = %q, want %q", ue.Try, want)
 		}
@@ -293,5 +293,22 @@ func TestCommitFilesStagesScaffoldedEnvironment(t *testing.T) {
 	adds := f.exec.gitCalls("add")
 	if len(adds) != 1 || !strings.Contains(strings.Join(adds[0], " "), "deploy/environments/preview.toml") {
 		t.Fatalf("git add calls = %v, want the scaffolded environment file", adds)
+	}
+}
+
+func TestCheckSizeRanksNearbyRegions(t *testing.T) {
+	sizes := []digitalocean.Size{
+		{Slug: "s-2vcpu-4gb", Available: true},
+		{Slug: "alternative", Available: true, VCPUs: 2, Memory: 4096, PriceMonthly: 28, Regions: []string{"nyc3"}},
+	}
+	regions := []digitalocean.Region{{Slug: "nyc3", Available: true}}
+	for _, slug := range []string{"lon1", "sfo3", "blr1", "nyc2", "tor1", "ams3", "sfo2", "fra1"} {
+		regions = append(regions, digitalocean.Region{Slug: slug, Available: true, Sizes: []string{"s-2vcpu-4gb"}})
+	}
+	r := &run{base: base{d: Deps{Cloud: catalogClient(sizes, regions)}, env: "production"}, size: "s-2vcpu-4gb", region: "nyc3"}
+	ue := uiErr(t, r.checkSize(context.Background()))
+	want := "pass --region nyc2, sfo2, sfo3, tor1, ams3, blr1 and 2 more, or pass --size alternative ($28.00/month)"
+	if ue.Try != want {
+		t.Errorf("Try = %q, want %q", ue.Try, want)
 	}
 }
