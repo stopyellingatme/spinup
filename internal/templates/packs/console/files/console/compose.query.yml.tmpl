@@ -1,0 +1,40 @@
+[[- $profile := index . "monitoring_profile" -]]
+[[- if and (has "monitoring" .modules) (or (eq $profile "lite") (eq $profile "full")) -]]
+# Managed by spinup. Start the relay after the monitoring network exists.
+services:
+  console-query:
+    image: ${CONSOLE_IMAGE:?spinup deploy sets CONSOLE_IMAGE} # spinup:allow unpinned-image spinup deploy uses the recorded API image
+    entrypoint: ["/console", "query"]
+    profiles: [query]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    cpus: "0.25"
+    mem_limit: 48m
+    environment:
+      GOMEMLIMIT: 28MiB
+      CONSOLE_APP: ${CONSOLE_APP:?spinup deploy sets CONSOLE_APP}
+      CONSOLE_ENV: ${CONSOLE_ENV:?spinup deploy sets CONSOLE_ENV}
+      CONSOLE_PROFILE: ${CONSOLE_PROFILE:?spinup deploy sets CONSOLE_PROFILE}
+    networks: [console, monitoring]
+    healthcheck:
+      test: ["CMD", "/console", "healthcheck", "query"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  monitoring:
+    name: [[ .app_name ]]-monitoring
+    external: true
+[[- else -]]
+services: {}
+[[- end ]]

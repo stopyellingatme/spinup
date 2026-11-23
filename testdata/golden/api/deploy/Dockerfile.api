@@ -16,10 +16,12 @@ COPY . .
 RUN if [ -f /opt/kit/go.mod ]; then go mod edit -replace=github.com/stopyellingatme/spinup/kit=/opt/kit; fi
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/console ./cmd/console
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 ENV SPINUP_ENV=production
 COPY --from=build /out/api /api
+COPY --from=build /out/console /console
 USER nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

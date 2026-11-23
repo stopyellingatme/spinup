@@ -1,0 +1,43 @@
+# Managed by spinup. The console runs independently of the app and monitoring.
+name: [[ .app_name ]]-console
+
+services:
+  console:
+    image: ${CONSOLE_IMAGE:?spinup deploy sets CONSOLE_IMAGE} # spinup:allow unpinned-image spinup deploy uses the recorded API image
+    entrypoint: ["/console", "serve"]
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    cpus: "0.25"
+    mem_limit: 64m
+    environment:
+      GOMEMLIMIT: 40MiB
+      CONSOLE_APP: ${CONSOLE_APP:?spinup deploy sets CONSOLE_APP}
+      CONSOLE_ENV: ${CONSOLE_ENV:?spinup deploy sets CONSOLE_ENV}
+      CONSOLE_PROFILE: ${CONSOLE_PROFILE:?spinup deploy sets CONSOLE_PROFILE}
+      CONSOLE_ORIGIN: ${CONSOLE_ORIGIN:-}
+      CONSOLE_BACKEND: ${CONSOLE_BACKEND:?spinup deploy sets CONSOLE_BACKEND}
+      CONSOLE_JOBS: ${CONSOLE_JOBS:?spinup deploy sets CONSOLE_JOBS}
+    ports:
+      - "127.0.0.1:7410:7410/tcp"
+    volumes:
+      - /opt/[[ .app_name ]]/console/data:/data:ro
+    networks: [console]
+    healthcheck:
+      test: ["CMD", "/console", "healthcheck"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  console:
+    name: [[ .app_name ]]-console
+    driver: bridge
