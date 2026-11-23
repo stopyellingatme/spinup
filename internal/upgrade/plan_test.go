@@ -617,3 +617,19 @@ func TestPlanKeepsGeneratorOwnedFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestRequireBaseDevAdvice(t *testing.T) {
+	plan := &Plan{Files: []FileDecision{{Path: "file.txt", Action: ActionConflict, Reason: "no base version"}}}
+	err := requireBase(plan, nil, "0.0.0-dev")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"development build", "commit", "SPINUP_TEMPLATES_DIR"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error=%v", err)
+		}
+	}
+	if strings.Contains(err.Error(), "cache warm") {
+		t.Fatalf("error=%v", err)
+	}
+}

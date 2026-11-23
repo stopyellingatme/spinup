@@ -108,7 +108,26 @@ Any other `PGBACKREST_*` secret becomes a pgBackRest option.
 For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests for storage that has no virtual-host buckets.
 
 Last, deploy. The files above reach the VM only through `spinup deploy`.
-The deploy starts PostgreSQL with WAL archiving on, and it gives the `postgres` service the storage secrets.
+With the pgBackRest backend, preflight refuses a deploy when a required storage secret is absent or empty.
+The error names each missing secret and gives a `Try:` line before the deploy changes the VM.
+S3 repositories require the endpoint, bucket, and region secrets.
+They require static keys only when `repo1-s3-key-type` is absent or `shared`.
+Other authentication types, including `auto` and `web-id`, need neither static key.
+The passphrase is required only when `repo1-cipher-type` is not `none`.
+The default cipher type is `none`. The generated configuration selects `aes-256-cbc`.
+These options come from `pgbackrest.conf`, with values in the application stanza taking precedence over global values.
+The secrets `PGBACKREST_REPO1_S3_KEY_TYPE` and `PGBACKREST_REPO1_CIPHER_TYPE` override the configuration.
+The repository type comes from `repo1-type` in `pgbackrest.conf`, with `PGBACKREST_REPO1_TYPE` taking precedence.
+
+`--skip-backup` does not bypass this check, because PostgreSQL starts with WAL archiving enabled.
+The deploy uploads the secrets in `upload`, then restarts PostgreSQL in `edge` when any `PGBACKREST_*` hash changed.
+The restart includes added and removed secrets, and the deploy waits until PostgreSQL is healthy.
+PostgreSQL reads these secrets only at start.
+Unchanged secrets cause no restart when PostgreSQL has a record of the applied hashes.
+If that record is absent, the deploy restarts PostgreSQL once, even when no storage secrets remain.
+
+Before a resumed restart, the deploy checks that the VM secret hashes match the uploaded release.
+If they differ, run a new `spinup deploy` without `--resume`.
 Until you deploy, `backup now` fails with an S3 or stanza error.
 
 <!-- doctest: skip -->
@@ -182,11 +201,17 @@ To apply a new retention now, run `spinup backup prune`. See [backup restore](ba
 
 ## Back up before each deploy
 
-`spinup deploy` takes a `diff` backup before it changes the VM.
-If the backup fails, the deploy stops, so a bad deploy never starts without a restore point.
+`spinup deploy` takes a `diff` backup in `hooks`, before `upload` pushes the secrets and before migrations run.
+If the backup fails, the deploy stops.
 
 - An app without the `backups` module skips the backup.
-- The first deploy skips the backup, because the database does not run yet.
+- With no recorded release, the first deploy skips the backup, even when an earlier failed deploy left PostgreSQL running.
+- With pgBackRest, changed storage hashes skip the backup with a clear message.
+
+The comparison uses the applied hashes in `postgres/backup-secrets.json` and includes every `PGBACKREST_*` secret.
+When storage hashes differ, the deploy continues through `upload` and restarts PostgreSQL in `edge`.
+This deploy has no automatic backup before its migrations.
+Take a backup with `spinup backup now` after the deploy.
 
 {: .warning }
 The pre-deploy backup always uses pgBackRest, whatever `[backups] backend` says. With `pgdump` or `walg`, the second deploy fails because the VM has no pgBackRest repository. Take a backup with `spinup backup now`, then deploy with `--skip-backup`.
@@ -212,6 +237,9 @@ The Backups dashboard and the `BackupStale` alert show the age of the newest bac
 `BackupStale` fires when the newest backup is older than 26 hours.
 See [Monitoring](../monitoring.md#backup-metrics) for the metrics and alerts.
 
+If Docker created the metrics directory as root, `backup now` repairs its ownership through the deploy user's Docker access.
+The repair uses the local Postgres image and needs no `sudo` permission.
+
 To see the age of the newest backup now, read the `last backup` line of `backup status`.
 
 ## Troubleshooting
@@ -219,7 +247,8 @@ To see the age of the newest backup now, read the `last backup` line of `backup 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `select backup environment: --env is missing` | The command needs an environment. | Pass `--env production`. |
-| `backup now` fails with an S3 or stanza error | A storage secret is wrong or missing, or you did not deploy after you added the `backups` module. | Fix the secret with `spinup secrets set` and `spinup secrets push`. Then run `spinup deploy --env production`. |
+| `backup now` fails with an S3 or stanza error | A storage secret is wrong or missing, or you did not deploy after you added the `backups` module. | Fix the secret with `spinup secrets set`. Then run `spinup deploy --env production` to upload the secrets and restart PostgreSQL. |
+| The deploy refuses missing storage secrets | The pgBackRest backend needs the storage secrets before PostgreSQL can archive WAL. | Set every named secret, then deploy again. `--skip-backup` does not bypass this check. |
 | The second deploy fails in the backup step | The backend is `pgdump` or `walg`, and the pre-deploy backup uses pgBackRest. | Run `spinup backup now`, then `spinup deploy --skip-backup`. |
 | `/opt/<app>/backups` does not exist | The VM is not set up. | Run `spinup server bootstrap --env production`. |
 

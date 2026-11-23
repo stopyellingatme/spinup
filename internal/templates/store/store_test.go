@@ -417,3 +417,16 @@ func TestInvalidInputNeverDownloads(t *testing.T) {
 		t.Fatalf("error=%v", err)
 	}
 }
+
+func TestUnavailableDevAdvice(t *testing.T) {
+	s := &Store{}
+	err := s.unavailable("0.0.0-dev", errors.New("missing"))
+	for _, want := range []string{"development build", "commit", "SPINUP_TEMPLATES_DIR"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error=%v", err)
+		}
+	}
+	if strings.Contains(err.Error(), "cache warm") {
+		t.Fatalf("error=%v", err)
+	}
+}

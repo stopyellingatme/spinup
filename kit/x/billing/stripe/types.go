@@ -37,6 +37,8 @@ type CheckoutParams struct {
 	TrialDays int
 	// AutomaticTax and AllowPromotionCodes enable the corresponding Stripe options.
 	AutomaticTax, AllowPromotionCodes bool
+	// ManagedPayments lets the account default apply when true.
+	ManagedPayments bool
 	// Metadata contains application fields.
 	Metadata map[string]string
 	// Metered omits the quantity for the Price line item, because Price is a metered price.
@@ -110,6 +112,8 @@ type Product struct {
 	ID string `json:"id"`
 	// Name is the product name.
 	Name string `json:"name"`
+	// TaxCode identifies the product tax code.
+	TaxCode string `json:"tax_code"`
 	// Description describes the product.
 	Description string `json:"description"`
 }

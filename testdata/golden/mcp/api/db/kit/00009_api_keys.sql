@@ -33,6 +33,7 @@ CREATE TABLE api_key_usage (
 -- audit module comes later, the doctor check apikeys-wired prints the attach statements
 -- (ADR 0030 decision 5.1).
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regprocedure('public.audit_row_change()') IS NOT NULL THEN

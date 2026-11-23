@@ -594,3 +594,27 @@ func TestFidelityCheckoutLineItems(t *testing.T) {
 		t.Fatalf("a session with a licensed item is paid: %+v %v", done, err)
 	}
 }
+
+func TestManagedPaymentsDefault(t *testing.T) {
+	price := stripe.Price{ID: "price_1", Active: true, Recurring: &stripe.Recurring{UsageType: "licensed"}}
+	for _, taxCode := range []string{"", "txcd_1"} {
+		price.Product.TaxCode = taxCode
+		f := New(Options{Secret: "whsec_test", ManagedPaymentsDefault: true, Prices: []stripe.Price{price}})
+		c, err := stripe.New("sk_test_key", stripe.WithBaseURL("http://stripe.fake"), stripe.WithHTTPClient(&http.Client{Transport: f.Transport()}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		params := stripe.CheckoutParams{Customer: customer(t, c), Price: price.ID, SuccessURL: "https://app/s", CancelURL: "https://app/c"}
+		if _, err := c.CreateCheckoutSession(t.Context(), params, ""); err != nil {
+			t.Fatal(err)
+		}
+		params.ManagedPayments = true
+		_, err = c.CreateCheckoutSession(t.Context(), params, "")
+		if taxCode == "" && (err == nil || !strings.Contains(err.Error(), "Managed Payments")) {
+			t.Fatalf("expected Managed Payments error, got %v", err)
+		}
+		if taxCode != "" && err != nil {
+			t.Fatal(err)
+		}
+	}
+}

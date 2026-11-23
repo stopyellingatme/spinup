@@ -32,6 +32,9 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, p CheckoutParams, id
 	if p.TrialDays > 0 {
 		form.Set("subscription_data[trial_period_days]", strconv.Itoa(p.TrialDays))
 	}
+	if !p.ManagedPayments {
+		form.Set("managed_payments[enabled]", "false")
+	}
 	if p.AutomaticTax {
 		form.Set("automatic_tax[enabled]", "true")
 	}

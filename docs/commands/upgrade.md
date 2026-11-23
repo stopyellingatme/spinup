@@ -179,6 +179,7 @@ A component that you edited and that changed gets conflict markers and exit code
 | `--plan, --continue, and --abort are mutually exclusive` | Pass only one of them. |
 | Exit code 3 | A file conflicts. Resolve it, then run `spinup upgrade --continue --yes`. |
 | A verification error after the merge step | Fix the code in the worktree. Run `spinup upgrade --continue --yes`. |
+| The locked development template is unavailable | Build the CLI from the commit that made the project, or set `SPINUP_TEMPLATES_DIR` to a directory that holds that version. |
 | The target version is not available offline | Run `spinup cache warm <version>` online. |
 
 ```console

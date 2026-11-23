@@ -292,10 +292,16 @@ func (s *Store) unavailable(version string, reason error) error {
 	if s.options.Offline {
 		suggestion = "run once without --offline"
 	}
+	if advice := DevelopmentAdvice(version); advice != "" {
+		suggestion = advice
+	}
 	return fmt.Errorf("cannot load templates %q: %w: %w\nTry: %s", version, templates.ErrVersionUnavailable, reason, strings.TrimSpace(suggestion))
 }
 
 func (s *Store) invalidCache(version string, reason error) error {
+	if advice := DevelopmentAdvice(version); advice != "" {
+		return fmt.Errorf("cannot load templates %q: %w: %w\nTry: %s", version, templates.ErrVersionUnavailable, reason, advice)
+	}
 	return fmt.Errorf("cannot load templates %q: %w: %w\nTry: spinup cache clean", version, templates.ErrVersionUnavailable, reason)
 }
 

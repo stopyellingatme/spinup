@@ -221,7 +221,11 @@ func Check(ctx context.Context, o Options, allowBehind bool, out *ui.Printer) er
 				}
 			}
 			if _, err := source.Load(ctx, lock.TemplateVersion); err != nil {
-				problems = append(problems, Problem{Path: project.LockFile, State: "template-unavailable", Message: "locked template cannot load: " + err.Error(), Try: "spinup cache warm"})
+				advice := "spinup cache warm"
+				if dev := store.DevelopmentAdvice(lock.TemplateVersion); dev != "" {
+					advice = dev
+				}
+				problems = append(problems, Problem{Path: project.LockFile, State: "template-unavailable", Message: "locked template cannot load: " + err.Error(), Try: advice})
 			} else if err := checkBehind(ctx, source, lock, &problems); err != nil {
 				return err
 			}
@@ -339,8 +343,12 @@ func diskError(err error) error {
 }
 
 // Eject changes a managed file to scaffold ownership in the lock.
-func Eject(ctx context.Context, o Options, name string) error {
-	app, err := load(ctx, o)
+func Eject(_ context.Context, o Options, name string) error {
+	root, err := find(o.Dir)
+	if err != nil {
+		return err
+	}
+	lock, err := manifest.Load(filepath.Join(root, project.LockFile))
 	if err != nil {
 		return err
 	}
@@ -348,18 +356,18 @@ func Eject(ctx context.Context, o Options, name string) error {
 	if err != nil {
 		return err
 	}
-	entry, ok := app.lock.Files[name]
+	entry, ok := lock.Files[name]
 	if !ok || entry.Class != manifest.Managed {
 		return fmt.Errorf("cannot eject %q: the path is not managed\nTry: select a managed path with spinup diff --json", name)
 	}
 	entry.Class = manifest.Scaffold
-	if err := app.lock.SetFile(name, entry); err != nil {
+	if err := lock.SetFile(name, entry); err != nil {
 		return err
 	}
 	if o.DryRun {
 		return nil
 	}
-	return app.lock.Save(filepath.Join(app.root, project.LockFile))
+	return lock.Save(filepath.Join(root, project.LockFile))
 }
 
 // Restore writes a rendered file and clears its tombstone.

@@ -2,6 +2,7 @@ package billing
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -433,5 +434,22 @@ func TestSyncMapsAMeteredItemOrderToThePlan(t *testing.T) {
 	row = f.svc.rowOf(stripe.Subscription{ID: "sub_2", Status: "active", Items: []stripe.SubscriptionItem{item("team_monthly", "p3", "metered")}})
 	if row.plan != "team" || row.lookupKey != "team_monthly" {
 		t.Fatalf("row = %+v", row)
+	}
+}
+
+func TestManagedPaymentsProblem(t *testing.T) {
+	s := &Service{logger: slog.Default()}
+	w := httptest.NewRecorder()
+	s.stripeFailed(w, httptest.NewRequestWithContext(t.Context(), "POST", "/", nil), "create the Checkout session", &stripe.Error{Status: http.StatusBadRequest, Message: "Managed Payments requires a tax code"})
+	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "Managed Payments") || !strings.Contains(w.Body.String(), "Try:") || !strings.Contains(w.Body.String(), "tax code") {
+		t.Fatalf("response: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWithManagedPayments(t *testing.T) {
+	var o options
+	WithManagedPayments()(&o)
+	if !o.managedPayments {
+		t.Fatal("Managed Payments option was not applied")
 	}
 }
