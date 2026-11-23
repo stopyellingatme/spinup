@@ -2,10 +2,13 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stopyellingatme/spinup/internal/browser"
@@ -17,7 +20,6 @@ import (
 type tunnelRunner struct {
 	runner runexec.Runner
 	port   int
-	cancel bool
 }
 
 func (r tunnelRunner) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
@@ -26,9 +28,6 @@ func (r tunnelRunner) Run(ctx context.Context, c runexec.Cmd) (runexec.Result, e
 	index := len(c.Args) - 2 // the -- delimiter before the destination
 	forward := "127.0.0.1:" + strconv.Itoa(r.port) + ":127.0.0.1:3000"
 	flags := []string{"-N", "-o", "ExitOnForwardFailure=yes", "-L", forward}
-	if r.cancel {
-		flags = []string{"-O", "cancel", "-L", forward}
-	}
 	c.Args = append(append(append([]string(nil), c.Args[:index]...), flags...), c.Args[index:]...)
 	return r.runner.Run(ctx, c)
 }
@@ -54,16 +53,16 @@ func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) 
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	vm := remote.New(h, tunnelRunner{runner: runner, port: port}, remote.Options{AcceptNewHostKey: o.AcceptNewHostKey})
-	// Cancel this forward without closing a master connection used by another command.
-	defer func() {
-		cleanupCtx, stop := context.WithTimeout(context.Background(), 10*time.Second)
-		defer stop()
-		cleanup := remote.New(h, tunnelRunner{runner: runner, port: port, cancel: true}, remote.Options{AcceptNewHostKey: o.AcceptNewHostKey})
-		_, _ = cleanup.Run(cleanupCtx, remote.Cmd{Argv: []string{"true"}})
+	vm := remote.New(h, tunnelRunner{runner: runner, port: port}, remote.Options{AcceptNewHostKey: o.AcceptNewHostKey, DisableMultiplexing: true})
+	type outcome struct {
+		result runexec.Result
+		err    error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		res, e := vm.Run(ctx, remote.Cmd{Argv: []string{"true"}, Stderr: o.ErrOut})
+		done <- outcome{res, e}
 	}()
-	done := make(chan error, 1)
-	go func() { _, e := vm.Run(ctx, remote.Cmd{Argv: []string{"true"}, Stderr: o.ErrOut}); done <- e }()
 	// Always reap SSH after cancellation or a browser failure.
 	exited := false
 	defer func() {
@@ -76,25 +75,32 @@ func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) 
 	defer ticker.Stop()
 	timeout := time.NewTimer(15 * time.Second)
 	defer timeout.Stop()
+	client := &http.Client{Timeout: 250 * time.Millisecond, Transport: &http.Transport{Proxy: nil}}
+	defer client.CloseIdleConnections()
+	tunnelFailure := func(action string, cause error, result runexec.Result) error {
+		if stderr := strings.TrimSpace(string(result.Stderr)); stderr != "" {
+			cause = fmt.Errorf("%w: %s", cause, stderr)
+		}
+		return failure(action, cause)
+	}
 	ready := false
 	for !ready {
 		select {
-		case err = <-done:
+		case result := <-done:
 			exited = true
-			if err == nil {
-				err = errors.New("SSH exited before the tunnel was ready")
+			if result.err == nil {
+				result.err = errors.New("SSH exited before the tunnel was ready")
 			}
-			return failure("open Grafana tunnel", err)
+			return tunnelFailure("open Grafana tunnel", result.err, result.result)
 		case <-ctx.Done():
 			return nil
 		case <-timeout.C:
-			return failure("open Grafana tunnel", errors.New("SSH did not create the local listener"))
+			cancel()
+			result := <-done
+			exited = true
+			return tunnelFailure("open Grafana tunnel", errors.New("the Grafana health request through SSH did not succeed"), result.result)
 		case <-ticker.C:
-			conn, e := (&net.Dialer{Timeout: 100 * time.Millisecond}).DialContext(ctx, "tcp", address)
-			if e == nil {
-				_ = conn.Close()
-				ready = true
-			}
+			ready = grafanaReady(ctx, client, address)
 		}
 	}
 	url := "http://" + address
@@ -107,11 +113,30 @@ func open(ctx context.Context, o Options, h remote.Host, runner runexec.Runner) 
 	select {
 	case <-ctx.Done():
 		return nil
-	case err = <-done:
+	case result := <-done:
 		exited = true
-		if err != nil && ctx.Err() == nil {
-			return failure("run Grafana tunnel", err)
+		if ctx.Err() != nil {
+			return nil
 		}
-		return nil
+		if result.err == nil {
+			result.err = errors.New("SSH exited while the tunnel was open")
+		}
+		return tunnelFailure("run Grafana tunnel", result.err, result.result)
 	}
+}
+
+func grafanaReady(ctx context.Context, client *http.Client, address string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/api/health", nil)
+	if err != nil {
+		return false
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = res.Body.Close() }()
+	var health struct {
+		Database string `json:"database"`
+	}
+	return res.StatusCode == http.StatusOK && json.NewDecoder(res.Body).Decode(&health) == nil && health.Database == "ok"
 }
