@@ -17,7 +17,26 @@ fail() {
 case "$#:$*" in 0:|1:--if-old) ;; *) fail 'expected no arguments or --if-old' ;; esac
 console=$(cd -P -- "$(dirname -- "$0")" && pwd) || fail 'cannot locate the installation'
 root=$(dirname -- "$console")
+uid=$(id -u)
+gid=$(id -g)
+case "$uid:$gid" in *[!0-9:]*|0:*|:*|*:) fail 'the deploy UID must be nonzero' ;; esac
+[ ! -L "$console/sample.lock" ] || fail 'the sample lock is unsafe'
+exec 9> "$console/sample.lock"
+chmod 600 "$console/sample.lock"
+lock_code=0
+flock -n -E 75 9 || lock_code=$?
+case "$lock_code" in 0) ;; 75) exit 0 ;; *) fail 'cannot acquire the sample lock' ;; esac
+# Keep the opened configuration inode alive as this sample's generation marker.
+# Replacing probe.conf cannot reuse its inode while descriptor 7 remains open.
+lock_config() {
+    [ ! -L "$console/config.lock" ] || fail 'the configuration lock is unsafe'
+    exec 8> "$console/config.lock"
+    chmod 600 "$console/config.lock"
+    flock -x -w 3 8 || fail 'cannot acquire the configuration lock within 3 seconds'
+}
+lock_config
 [ -f "$console/probe.conf" ] && [ ! -L "$console/probe.conf" ] || fail 'probe.conf is missing or unsafe'
+exec 7< "$console/probe.conf"
 # Validate bytes before shell read, which could otherwise discard embedded NULs.
 python3 -I - "$console/probe.conf" <<'PY' || fail 'probe.conf is invalid'
 import re, sys, urllib.parse
@@ -58,16 +77,9 @@ PY
     IFS= read -r image
     IFS= read -r origin
     if IFS= read -r extra || [ -n "$extra" ]; then fail 'probe.conf has extra lines'; fi
-} < "$console/probe.conf"
-uid=$(id -u)
-gid=$(id -g)
-case "$uid:$gid" in *[!0-9:]*|0:*|:*|*:) fail 'the deploy UID must be nonzero' ;; esac
-[ ! -L "$console/sample.lock" ] || fail 'the sample lock is unsafe'
-exec 9> "$console/sample.lock"
-chmod 600 "$console/sample.lock"
-lock_code=0
-flock -n -E 75 9 || lock_code=$?
-case "$lock_code" in 0) ;; 75) exit 0 ;; *) fail 'cannot acquire the sample lock' ;; esac
+} <&7
+# Release the short lock before collecting any sources.
+exec 8>&-
 now=$(date -u +%s)
 if [ "${1-}" = --if-old ] && [ -f "$console/data/facts.json" ] && [ ! -L "$console/data/facts.json" ]; then
     if timeout -k 1 3 python3 -I -c '
@@ -302,5 +314,22 @@ capture projected 3 393216 docker run --rm --name "$projector" --pull never --ne
 [ -f "$stage/projected" ] && [ -s "$stage/projected" ] || fail 'the projector failed or exceeded its limit'
 cat "$stage/projected" > "$published"
 chmod 644 "$published"
-mv -f -- "$published" "$console/data/facts.json" || fail 'cannot replace facts.json'
+lock_config
+# Discard results if installation replaced the configuration, even with equal bytes.
+if ! python3 -I - "$console/probe.conf" <<'PYTHON'
+import os, sys
+try:
+    sys.exit(0 if os.path.samestat(os.fstat(7), os.stat(sys.argv[1])) else 1)
+except OSError:
+    sys.exit(1)
+PYTHON
+then
+    exec 8>&-
+    exit 0
+fi
+if ! mv -f -- "$published" "$console/data/facts.json"; then
+    exec 8>&-
+    fail 'cannot replace facts.json'
+fi
+exec 8>&-
 published=

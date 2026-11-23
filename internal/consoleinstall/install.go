@@ -129,17 +129,22 @@ func (s Spec) config() ([]byte, []byte) {
 const prepareScript = `set -eu
 umask 077
 [ "$(id -u)" != 0 ]
-[ ! -L "$1" ] && [ ! -L "$1/data" ] && [ ! -L "$1/sample.lock" ]
+[ ! -L "$1" ] && [ ! -L "$1/data" ] && [ ! -L "$1/sample.lock" ] && [ ! -L "$1/config.lock" ]
 mkdir -p -- "$1/data"
 chmod 755 "$1/data"
 mktemp -d "$1/.install.XXXXXXXX"`
 
-// publishScript serializes replacement with collectors, without invoking a collector.
+// publishScript bounds the wait for configuration reads and facts publication.
+// It never waits for collection under sample.lock.
 const publishScript = `set -eu
 umask 077
-exec 9> "$1/sample.lock"
-chmod 600 "$1/sample.lock"
-flock -x 9
+[ ! -L "$1/config.lock" ]
+exec 9> "$1/config.lock"
+chmod 600 "$1/config.lock"
+if ! flock -x -w 3 9; then
+  printf '%s\n' 'Cannot publish console configuration: the configuration lock was not acquired within 3 seconds.' 'Try: run spinup deploy --resume for this environment.' >&2
+  exit 1
+fi
 for name in compose.console.yml .env probe.conf collect.sh; do
   mv -f -- "$2/$name" "$1/$name"
 done`

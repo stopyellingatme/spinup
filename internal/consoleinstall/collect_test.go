@@ -310,14 +310,43 @@ func TestCollectorUtility(t *testing.T) {
 		}
 	case "date":
 		if slices.Contains(a, "+%s") {
+			if barrier := os.Getenv("COLLECTOR_BARRIER"); barrier != "" {
+				_ = os.WriteFile(barrier+".ready", nil, 0600)
+				for {
+					if _, err := os.Stat(barrier + ".resume"); err == nil {
+						break
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+			}
 			fmt.Print("1795370400\n")
 		} else {
 			fmt.Print("2026-11-22T18:00:00Z\n")
 		}
 	case "flock":
 		fd, _ := strconv.Atoi(a[len(a)-1])
-		if syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB) != nil {
-			exit = 75
+		if slices.Contains(a, "-u") {
+			if syscall.Flock(fd, syscall.LOCK_UN) != nil {
+				exit = 1
+			}
+			break
+		}
+		deadline := time.Now()
+		if i := slices.Index(a, "-w"); i >= 0 {
+			seconds, _ := strconv.Atoi(a[i+1])
+			deadline = deadline.Add(time.Duration(seconds) * time.Second)
+		} else if !slices.Contains(a, "-n") {
+			deadline = deadline.Add(time.Minute)
+		}
+		for syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+			if time.Now().After(deadline) {
+				exit = 1
+				if i := slices.Index(a, "-E"); i >= 0 {
+					exit, _ = strconv.Atoi(a[i+1])
+				}
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
 		}
 	case "stat":
 		info, err := os.Stat(a[len(a)-1])
@@ -684,7 +713,7 @@ func TestCollectorDisabled(t *testing.T) {
 func TestCollectorPermissions(t *testing.T) {
 	f := newCollector(t)
 	requireCollector(t, f)
-	for path, want := range map[string]os.FileMode{"console/data": 0755, "console/data/facts.json": 0644, "console/sample.lock": 0600, "console/probe.conf": 0600, "console/collect.sh": 0700} {
+	for path, want := range map[string]os.FileMode{"console/data": 0755, "console/data/facts.json": 0644, "console/sample.lock": 0600, "console/config.lock": 0600, "console/probe.conf": 0600, "console/collect.sh": 0700} {
 		info, err := os.Stat(filepath.Join(f.root, path))
 		if err != nil {
 			t.Fatal(err)
