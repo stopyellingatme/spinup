@@ -797,3 +797,40 @@ func httpGet(client *http.Client, url string) (*http.Response, error) {
 	}
 	return client.Do(req)
 }
+
+// This history matches TestProjectHistoryLimits's empty and unknown metadata fixture.
+func TestValidateProjectHistoryMetadata(t *testing.T) {
+	history := `[{"id":"20261122T170000Z-0123456789ab","at":"2026-11-22T17:00:00Z","user":"","git_sha":null,"color":null,"result":"recorded"},{"id":"20261121T170000Z-abcdef012345","at":"2026-11-21T17:00:00Z","user":null,"git_sha":null,"color":null,"result":"recorded"}]`
+	top, err := object([]byte(goldenOverview))
+	if err != nil {
+		t.Fatal(err)
+	}
+	section, err := object(top["history"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	section["data"] = json.RawMessage(history)
+	top["history"], err = json.Marshal(section)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(top)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validate(body, "todo", "production"); err != nil {
+		t.Fatalf("projector history rejected: %v", err)
+	}
+	for _, change := range []struct{ from, to string }{
+		{`"id":"20261122T170000Z-0123456789ab"`, `"id":""`},
+		{`"result":"recorded"`, `"result":""`},
+		{`"git_sha":null`, `"git_sha":""`},
+		{`"color":null`, `"color":""`},
+		{`"name":"todo-caddy-1"`, `"name":""`},
+		{`"user":""`, `"user":12`},
+	} {
+		if _, err := validate([]byte(strings.Replace(string(body), change.from, change.to, 1)), "todo", "production"); err == nil {
+			t.Errorf("accepted %s", change.to)
+		}
+	}
+}

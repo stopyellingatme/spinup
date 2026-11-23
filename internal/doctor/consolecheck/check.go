@@ -555,7 +555,8 @@ func validRuntime(b []byte, app string, query bool) bool {
 
 var sectionOrder = []string{"release", "containers", "alerts", "backup", "wal", "jobs", "disk", "memory", "history"}
 
-// Each field is required. A suffix permits null, and the prefix selects its scalar type.
+// Each field is required. The ? suffix permits null. The :t and :i kinds
+// select times and integers. The :e kind permits an empty string.
 var recordFields = map[string]string{
 	"release":    "id git_sha color created_at:t age_seconds:i previous_id?",
 	"containers": "project service name state health?",
@@ -565,7 +566,7 @@ var recordFields = map[string]string{
 	"jobs":       "queue state count:i",
 	"disk":       "total_bytes:i used_bytes:i available_bytes:i",
 	"memory":     "total_bytes:i used_bytes:i available_bytes:i",
-	"history":    "id at:t user? git_sha? color? result",
+	"history":    "id at:t user:e? git_sha? color? result",
 }
 
 func object(b []byte) (map[string]json.RawMessage, bool) {
@@ -734,7 +735,7 @@ func validField(m map[string]json.RawMessage, spec string) bool {
 		return json.Unmarshal(raw, &n) == nil && n >= 0
 	}
 	s, ok := text(m, key)
-	if !ok || s == "" {
+	if !ok || (s == "" && kind != "e") {
 		return false
 	}
 	if kind == "t" {
