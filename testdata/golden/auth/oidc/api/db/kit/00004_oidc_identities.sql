@@ -15,6 +15,7 @@ CREATE INDEX user_identities_user_id_idx ON user_identities (user_id);
 -- audit migration, this migration runs later and attaches the triggers itself.
 -- Without the audit module, audit_row_change does not exist and the block does nothing.
 -- +goose StatementBegin
+-- spinup:allow-destructive adds audit triggers only when absent
 DO $$
 BEGIN
     IF to_regprocedure('public.audit_row_change()') IS NOT NULL THEN
