@@ -97,28 +97,23 @@ func TestConsoleResume(t *testing.T) {
 				journal = strings.Join(lines, "\n")
 			}
 			x.vm.Expect("sh", "-c").Return(journal, "", 0)
-			if last != "post" {
-				expectConsoleRead(x, images)
-			} // Resume restores the uploaded release.
-			if last == "record" || last == "old journal" {
-				x.journal(1)
-			}
+			expectConsoleRead(x, images) // Resume restores the uploaded release.
+			x.journal(1)
 			expectConsoleRead(x, images)
 			expectConsoleWeb(x, false)
 			expectConsoleRead(x, images)
 			expectConsoleInactive(x)
-			if last == "record" || last == "old journal" {
-				x.journal(1)
-			}
-			if last != "post" {
-				x.journal(2)
-			}
+			x.journal(3)
 			expectConsoleFinal(x, false)
 			if err := x.run(); err != nil {
 				t.Fatal(err)
 			}
 			x.vm.AssertDone(t)
 			x.exec.AssertDone(t)
+			want := []string{"monitoring:started", "monitoring:done", "post:started", "post:done"}
+			if got := x.journalEvents(); !slices.Equal(got, want) {
+				t.Fatalf("journal = %v, want %v", got, want)
+			}
 			env := string(x.upload(testRoot + "/console/.install.fixture/.env"))
 			if !strings.Contains(env, `CONSOLE_IMAGE="todo-api:recorded"`) {
 				t.Fatalf("not the recorded API image: %s", env)
@@ -148,7 +143,7 @@ func TestConsoleResume(t *testing.T) {
 					if c.Argv[3] == "spinup-console-final-sample" && (unlockIndex < 0 || i < unlockIndex) {
 						t.Fatal("final collection held the deploy lock")
 					}
-					if samples == 2 && last != "post" && (postDone < 0 || i < postDone) {
+					if samples == 2 && (postDone < 0 || i < postDone) {
 						t.Fatal("final sample preceded post done")
 					}
 				}
@@ -157,6 +152,65 @@ func TestConsoleResume(t *testing.T) {
 				t.Fatalf("samples = %d", samples)
 			}
 		})
+	}
+}
+
+func TestConsoleResumeRecoveryFailure(t *testing.T) {
+	for _, last := range []string{"monitoring", "post"} {
+		t.Run(last, func(t *testing.T) {
+			x := newFx(t, false, "")
+			x.o.Resume = true
+			consoleFixture(t, x, "absent")
+			x.d.PostRelease = func() []Hook {
+				t.Error("console failure reached post hooks")
+				return nil
+			}
+			x.expectLocalGit()
+			x.expectConnect()
+			x.expectLock()
+			x.vm.Expect("sh", "-c").Return(journalUpTo(t, last), "", 0)
+			images := []Image{{Service: "api", Ref: "todo-api:recorded"}}
+			expectConsoleRead(x, images)
+			x.journal(1)
+			expectConsoleRead(x, images)
+			expectConsoleWeb(x, true)
+			x.journal(1)
+			x.expectUnlockAndClose()
+			if err := x.run(); err == nil || !strings.Contains(err.Error(), "start console") {
+				t.Fatalf("error = %v", err)
+			}
+			x.vm.AssertDone(t)
+			x.exec.AssertDone(t)
+			want := []string{"monitoring:started", "monitoring:failed"}
+			if got := x.journalEvents(); !slices.Equal(got, want) {
+				t.Fatalf("journal = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestConsoleResumeCompletedRejectsOtherSHA(t *testing.T) {
+	x := newFx(t, false, "")
+	x.o.Resume = true
+	consoleFixture(t, x, "absent")
+	x.expectLocalGit()
+	x.expectConnect()
+	x.expectLock()
+	journal := strings.ReplaceAll(journalUpTo(t, "post"), testRelease, "20261015T080000Z-aaaaaaaaaaaa")
+	x.vm.Expect("sh", "-c").Return(journal, "", 0)
+	x.expectUnlockAndClose()
+	if err := x.run(); err == nil || !strings.Contains(err.Error(), "Cannot resume") || !strings.Contains(err.Error(), "HEAD is "+testSHA[:12]) {
+		t.Fatalf("error = %v", err)
+	}
+	x.vm.AssertDone(t)
+	x.exec.AssertDone(t)
+	if len(x.journalEvents()) != 0 {
+		t.Fatal("a refused resume wrote the journal")
+	}
+	for _, upload := range x.vm.Uploads() {
+		if strings.Contains(upload.Path, "/console/") {
+			t.Fatalf("a refused resume installed %s", upload.Path)
+		}
 	}
 }
 
