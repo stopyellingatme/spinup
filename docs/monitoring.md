@@ -36,6 +36,7 @@ $ spinup monitor open --env production
 
 `module add` works on a branch, so run the `git merge` command that it prints before you deploy. See [Upgrade](upgrading.md#add-modules).
 The deploy fails early if the `GRAFANA_ADMIN_PASSWORD` secret is missing. See [Secrets](deploy/secrets.md) to set up secrets for an environment.
+`monitor open` checks Grafana through a separate SSH connection before it prints the local URL.
 Keep `monitor open` running while you use Grafana. Press Ctrl-C to close the tunnel.
 Sign in as `admin`. See [Open Grafana](#open-grafana).
 
@@ -202,6 +203,8 @@ $ spinup monitor silence 'prometheus_alertname=HighErrorRate' --for 2h --env pro
 ...
 ```
 
+`monitor alerts` prints the state, real alert name, severity if present, and summary.
+Firing alerts appear first. Use `--json` to print an array of these fields.
 To silence a built-in alert, match its `prometheus_alertname` label, as in the last command.
 Grafana sets the `alertname` label to the title of its forwarding rule, so that label is the same for every built-in alert.
 

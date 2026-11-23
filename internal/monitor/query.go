@@ -176,35 +176,6 @@ func (c *client) trace(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *client) pending(ctx context.Context) error {
-	data, err := c.api(ctx, "grafana", "GET", "/api/prometheus/grafana/api/v1/rules", nil)
-	if err != nil {
-		return err
-	}
-	var response struct {
-		Status string
-		Data   struct {
-			Groups []struct {
-				Rules []struct{ Name, State string }
-			}
-		}
-	}
-	if err = json.Unmarshal(data, &response); err != nil {
-		return failure("decode pending alerts", err)
-	}
-	if response.Status != "success" {
-		return failure("read pending alerts", fmt.Errorf("the Grafana request failed"))
-	}
-	for _, g := range response.Data.Groups {
-		for _, r := range g.Rules {
-			if strings.EqualFold(r.State, "pending") {
-				fmt.Fprintf(c.out, "pending %s\n", r.Name)
-			}
-		}
-	}
-	return nil
-}
-
 func (c *client) silence(ctx context.Context, o Options) error {
 	name, value, ok := strings.Cut(o.Matcher, "=")
 	if !ok || !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(name) || value == "" {

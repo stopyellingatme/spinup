@@ -23,6 +23,7 @@ func TestReadCommands(t *testing.T) {
 			f.Expect("docker", "ps").Return("abc123\n", "", 0)
 			f.Expect("sh", "-c").Return(tt.body, "", 0)
 			if tt.action == "alerts" {
+				expectAPI(f, `{"status":"success","data":{"alerts":[]}}`)
 				f.Expect("docker", "ps").Return("abc123", "", 0)
 				f.Expect("sh", "-c").Return(`{"status":"success","data":{"groups":[{"rules":[{"name":"Slow","state":"pending"}]}]}}`, "", 0)
 			}

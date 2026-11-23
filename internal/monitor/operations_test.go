@@ -206,18 +206,15 @@ func TestTunnelArguments(t *testing.T) {
 	t.Setenv("SPINUP_SSH_CONFIG", "/tmp/ssh-config")
 	f := &runexec.Fake{}
 	f.Expect("ssh").Return("", "", 0)
-	vm := remote.New(remote.Host{Address: "vm", User: "deploy", Port: 2222}, tunnelRunner{runner: f, port: 12345}, remote.Options{CacheDir: "/tmp/su-monitor-test"})
+	vm := remote.New(remote.Host{Address: "vm", User: "deploy", Port: 2222}, tunnelRunner{runner: f, port: 12345}, remote.Options{CacheDir: "/tmp/su-monitor-test", DisableMultiplexing: true})
 	if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"true"}}); err != nil {
 		t.Fatal(err)
 	}
 	args := f.Calls()[0].Args
-	for _, want := range []string{"-N", "ExitOnForwardFailure=yes", "127.0.0.1:12345:127.0.0.1:3000", "ControlPersist=60s", "BatchMode=yes", "ConnectTimeout=10", "2222", "/tmp/ssh-config"} {
-		if !strings.Contains(strings.Join(args, " "), want) {
-			t.Fatal(args)
-		}
-	}
-	if !reflect.DeepEqual(args[len(args)-2:], []string{"--", "deploy@vm"}) {
-		t.Fatal(args)
+	t.Logf("ssh argv: %q", args)
+	want := []string{"-F", "/tmp/ssh-config", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no", "-p", "2222", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-N", "-o", "ExitOnForwardFailure=yes", "-L", "127.0.0.1:12345:127.0.0.1:3000", "--", "deploy@vm"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("args = %q, want %q", args, want)
 	}
 	f.AssertDone(t)
 }
@@ -259,22 +256,6 @@ func TestRunProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("invalid host")
 	}
-}
-
-func TestTunnelCancellationArguments(t *testing.T) {
-	t.Parallel()
-	f := &runexec.Fake{}
-	f.Expect("ssh").Return("", "", 0)
-	vm := remote.New(remote.Host{Address: "vm"}, tunnelRunner{runner: f, port: 12345, cancel: true}, remote.Options{CacheDir: "/tmp/su-monitor-cancel"})
-	if _, err := vm.Run(context.Background(), remote.Cmd{Argv: []string{"true"}}); err != nil {
-		t.Fatal(err)
-	}
-	args := f.Calls()[0].Args
-	want := []string{"-O", "cancel", "-L", "127.0.0.1:12345:127.0.0.1:3000", "--", "vm"}
-	if !reflect.DeepEqual(args[len(args)-len(want):], want) {
-		t.Fatal(args)
-	}
-	f.AssertDone(t)
 }
 
 func TestProvisionedCustomSync(t *testing.T) {

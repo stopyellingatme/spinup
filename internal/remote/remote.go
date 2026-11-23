@@ -67,6 +67,8 @@ type Runner interface {
 // Options configures host key acceptance and the local cache location.
 type Options struct {
 	AcceptNewHostKey bool
+	// DisableMultiplexing gives a long-running tunnel its own SSH connection.
+	DisableMultiplexing bool
 	// CacheDir overrides os.UserCacheDir. The spinup/ssh directory is created below it.
 	CacheDir string
 }
@@ -111,6 +113,9 @@ func New(h Host, r runexec.Runner, o Options) Runner {
 		return s
 	}
 	s.args = []string{"-o", "ControlMaster=auto", "-o", "ControlPath=" + control, "-o", "ControlPersist=60s"}
+	if o.DisableMultiplexing {
+		s.args = []string{"-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no"}
+	}
 	if h.Port != 0 {
 		s.args = append(s.args, "-p", strconv.Itoa(h.Port))
 	}
