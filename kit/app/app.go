@@ -23,6 +23,7 @@ import (
 	"github.com/stopyellingatme/spinup/kit/devtools"
 	"github.com/stopyellingatme/spinup/kit/httpx"
 	"github.com/stopyellingatme/spinup/kit/logx"
+	"github.com/stopyellingatme/spinup/kit/telemetry"
 )
 
 // App owns an HTTP handler, named commands, and lifecycle hooks.
@@ -223,7 +224,8 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		if run, ok := a.commands[args[0]]; ok {
 			return run(ctx, args[1:])
 		}
-		if args[0] == "healthcheck" {
+		// telemetry.Setup skips this command, so the health check never waits for a collector.
+		if telemetry.IsHealthCheck(args) {
 			return a.healthcheck(ctx)
 		}
 		commands := strings.Join(sortedNames(a.commands), ", ")

@@ -11,6 +11,8 @@ import (
 // healthcheck is the built-in "healthcheck" command. Container images without a shell or
 // curl (distroless) use it as their Docker health check: it asks the running server on the
 // same container for /healthz and fails unless it answers 200 within two seconds.
+// telemetry.Setup does not start telemetry for this command (telemetry.IsHealthCheck): the
+// exit flush to a collector that does not answer exceeds the Docker limit of 3 seconds.
 func (a *App) healthcheck(ctx context.Context) error {
 	_, port, err := net.SplitHostPort(a.addr)
 	if err != nil || port == "" {

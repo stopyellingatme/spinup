@@ -50,10 +50,28 @@ func Tracer(name string) trace.Tracer { return otel.Tracer(name) }
 // Meter returns the named meter from the current provider.
 func Meter(name string) metric.Meter { return otel.Meter(name) }
 
+// HealthCheckCommand is the name of the built-in command that app.Run dispatches for the
+// Docker health check of the API container.
+const HealthCheckCommand = "healthcheck"
+
+// IsHealthCheck reports whether args, the process arguments after the program name, run the
+// health check command. Setup returns a no-op shutdown for this command. The health check has
+// a short Docker limit (3 seconds), and the exit flush to a collector that does not answer
+// takes about 20 seconds. The collector also starts after the API is healthy on a first
+// deploy. A health check that exports telemetry thus makes each replica unhealthy.
+func IsHealthCheck(args []string) bool {
+	return len(args) > 0 && args[0] == HealthCheckCommand
+}
+
 // Setup installs traces, metrics, logs, and W3C propagation when an OTLP endpoint exists.
 // Without OTEL_EXPORTER_OTLP_ENDPOINT, it changes nothing and returns a no-op shutdown.
+// When the process command is the health check (see IsHealthCheck), it also changes nothing
+// and returns a no-op shutdown, so the health check never waits for a collector.
 // Call the returned shutdown after application work finishes to flush all signals.
 func Setup(ctx context.Context, o Options) (func(context.Context) error, error) {
+	if len(os.Args) > 0 && IsHealthCheck(os.Args[1:]) {
+		return func(context.Context) error { return nil }, nil
+	}
 	return setup(ctx, o, nil)
 }
 
