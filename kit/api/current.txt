@@ -383,12 +383,14 @@ kit/pdf const MaxBytes = 20 << 20
 kit/pdf func Serve(http.ResponseWriter, *http.Response, error, string) error
 kit/secrets func Load(string) (string, error)
 kit/secrets func Must(string) string
+kit/telemetry const HealthCheckCommand = "healthcheck"
 kit/telemetry field Options.Environment string
 kit/telemetry field Options.ServiceName string
 kit/telemetry field Options.ServiceVersion string
 kit/telemetry func ConfigurePool(*pgxpool.Config)
 kit/telemetry func Enabled() bool
 kit/telemetry func HTTPMiddleware(string) func(http.Handler) http.Handler
+kit/telemetry func IsHealthCheck([]string) bool
 kit/telemetry func Meter(string) metric.Meter
 kit/telemetry func Setup(context.Context, Options) (func(context.Context) error, error)
 kit/telemetry func SlogHandler(slog.Handler) slog.Handler
