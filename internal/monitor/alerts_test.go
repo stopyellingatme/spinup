@@ -71,7 +71,55 @@ func TestAlertsFiringFirst(t *testing.T) {
 	if err := c.run(context.Background(), Options{Action: "alerts"}); err != nil {
 		t.Fatal(err)
 	}
-	want := "firing Custom critical A custom rule fired\nfiring Heartbeat The monitoring stack is alive\npending Soon Almost firing\npending Slow warning A slow request\n"
+	want := "firing Custom critical A custom rule fired\nfiring Heartbeat The monitoring stack is alive\npending Soon Almost firing\npending Slow warning A slow request\nsilenced Hidden\n"
+	if out.String() != want {
+		t.Fatalf("alerts = %q, want %q", out.String(), want)
+	}
+	f.AssertDone(t)
+}
+
+func TestAlertsSilenced(t *testing.T) {
+	t.Parallel()
+	for _, jsonOutput := range []bool{false, true} {
+		name := "text"
+		if jsonOutput {
+			name = "json"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := &remote.Fake{}
+			expectAPI(f, `[{"labels":{"alertname":"Prometheus alert","prometheus_alertname":"BackupStale","source":"prometheus","severity":"warning","alertstate":"firing","grafana_folder":"spinup"},"status":{"state":"suppressed"}},{"labels":{"alertname":"Prometheus alert","prometheus_alertname":"Heartbeat","source":"prometheus"},"status":{"state":"active"}}]`)
+			expectAPI(f, dogfoodAlerts)
+			expectAPI(f, `{"status":"success","data":{"groups":[]}}`)
+			var out bytes.Buffer
+			c := client{vm: f, app: "todo", out: &out}
+			if err := c.run(context.Background(), Options{Action: "alerts", JSON: jsonOutput}); err != nil {
+				t.Fatal(err)
+			}
+			want := "firing Heartbeat The monitoring stack is alive\nsilenced BackupStale warning No backup succeeded in 26 hours\n"
+			if jsonOutput {
+				want = `[{"state":"firing","name":"Heartbeat","severity":"","summary":"The monitoring stack is alive"},{"state":"silenced","name":"BackupStale","severity":"warning","summary":"No backup succeeded in 26 hours"}]` + "\n"
+			}
+			if out.String() != want {
+				t.Fatalf("alerts = %q, want %q", out.String(), want)
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+
+func TestAlertsSilenceMatchesLabels(t *testing.T) {
+	t.Parallel()
+	f := &remote.Fake{}
+	expectAPI(f, `[{"labels":{"alertname":"Prometheus alert","prometheus_alertname":"BackupStale","source":"prometheus","job":"backup","instance":"one"},"status":{"state":"suppressed"}},{"labels":{"alertname":"BackupStale","job":"backup","instance":"two"},"status":{"state":"suppressed"}}]`)
+	expectAPI(f, `{"status":"success","data":{"alerts":[{"state":"firing","labels":{"alertname":"BackupStale","job":"backup","instance":"one"}},{"state":"firing","labels":{"alertname":"BackupStale","job":"backup","instance":"two"}},{"state":"pending","labels":{"alertname":"BackupStale","job":"other","instance":"one"}}]}}`)
+	expectAPI(f, `{"status":"success","data":{"groups":[]}}`)
+	var out bytes.Buffer
+	c := client{vm: f, app: "todo", out: &out}
+	if err := c.run(context.Background(), Options{Action: "alerts"}); err != nil {
+		t.Fatal(err)
+	}
+	want := "firing BackupStale\npending BackupStale\nsilenced BackupStale\nsilenced BackupStale\n"
 	if out.String() != want {
 		t.Fatalf("alerts = %q, want %q", out.String(), want)
 	}

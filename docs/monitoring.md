@@ -215,7 +215,9 @@ $ spinup monitor silence 'prometheus_alertname=HighErrorRate' --for 2h --env pro
 ```
 
 `monitor alerts` prints the state, real alert name, severity if present, and summary.
-Firing alerts appear first. Use `--json` to print an array of these fields.
+Firing alerts appear first. Silenced alerts appear last with the state `silenced`.
+The command uses Grafana suppression to identify silenced alerts.
+Use `--json` to print an array of these fields with the same state values.
 To silence a built-in alert, match its `prometheus_alertname` label, as in the last command.
 Grafana sets the `alertname` label to the title of its forwarding rule, so that label is the same for every built-in alert.
 

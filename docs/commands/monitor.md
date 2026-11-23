@@ -105,10 +105,14 @@ todo-api GET /api/todos 12.4ms
 
 ## Work with alerts
 
-`alerts` lists firing alerts first, then pending alerts.
+`alerts` lists firing alerts first, then pending alerts, then silenced alerts.
 Each line shows the state, alert name, severity if present, and summary.
 The command reads Prometheus directly through Grafana to preserve the names and summaries of built-in alerts.
 Use `--json` to print an array with the fields `state`, `name`, `severity`, and `summary`.
+
+Grafana suppression sets the state to `silenced` in both formats.
+The command matches forwarded alerts by `prometheus_alertname` and the other Prometheus labels.
+Alerts with no Grafana counterpart keep their Prometheus state.
 
 `silence` mutes one alert for a time. It takes one exact matcher, `label=value`, and prints the silence ID.
 `test-alert` sends a test alert called `SpinupTestAlert`.
