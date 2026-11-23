@@ -253,6 +253,10 @@ On SIGINT or SIGTERM the worker stops taking new jobs and waits for running jobs
 It waits `SHUTDOWN_TIMEOUT` (default 20 seconds) and then cancels them.
 So make a long job check `ctx.Done()`.
 
+With the monitoring module, the worker sends its logs, Go runtime metrics, and database traces to Alloy as `<app>-worker`.
+The worker also writes JSON logs to stderr. Without `OTEL_EXPORTER_OTLP_ENDPOINT`, it does not export telemetry.
+See [Monitoring](../monitoring.md#how-the-data-flows) for the signals that each service sends.
+
 ## See failed jobs
 
 The worker logs each failed attempt. In development, the log appears in the `spinup dev` output.

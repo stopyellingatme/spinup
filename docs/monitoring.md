@@ -145,9 +145,20 @@ In Grafana, a log line links to its trace, and a span links to its log lines.
 
 ## How the data flows
 
-1. The API and web service send OpenTelemetry data to `http://alloy:4318` on the private app network. `spinup deploy` sets this endpoint.
+1. The API, worker, and web service send OpenTelemetry data to `http://alloy:4318` on the private app network. `spinup deploy` sets this endpoint.
 2. Alloy removes secrets from the data. Metrics go to Prometheus, logs go to Loki, and traces go to Tempo (`full` only).
 3. Prometheus evaluates the alert rules. Grafana sends the notifications. The stack has no Alertmanager.
+
+| Service | Sends |
+| --- | --- |
+| `<app>-api` | HTTP and database traces, HTTP and Go runtime metrics, and application logs. |
+| `<app>-worker` (jobs module) | Go runtime metrics, worker and job logs, and database traces. |
+| `<app>-web` (Node mode) | Server traces. The web service does not export logs or metrics over OTLP. |
+
+The API and worker also write JSON logs to stderr.
+Without `OTEL_EXPORTER_OTLP_ENDPOINT`, they do not export telemetry.
+The `lite` profile accepts OTLP traces and discards every span. Senders receive success, so the missing Tempo service causes no export error.
+The `full` profile stores traces in Tempo.
 
 Alloy also scrapes Loki, Grafana, Caddy, and itself. With `full`, it scrapes Tempo and the exporters, and it probes your `public_url`.
 A sidecar service that uses the Rust or Python template sends its traces to the same endpoint. One trace then crosses the API and the service. See [Sidecar services](services.md).

@@ -38,9 +38,23 @@ otelcol.receiver.otlp "app" {
 		logs    = [otelcol.processor.transform.redact.input]
 [[- if $full ]]
 		traces  = [otelcol.processor.transform.redact.input]
+[[- else ]]
+		traces  = [otelcol.processor.filter.discard_traces.input]
 [[- end ]]
 	}
-}
+}[[ if not $full ]]
+
+// A trace consumer registers the OTLP trace endpoints. Drop every span in lite,
+// so senders receive success without a Tempo service.
+otelcol.processor.filter "discard_traces" {
+	error_mode = "ignore"
+	traces {
+		span = ["true"]
+	}
+	output {
+		traces = []
+	}
+}[[ end ]]
 
 // The redaction stage (docs/adr/0010-m6-contracts.md §1). The kit logx redactor masks secret
 // values before export. This stage is the second line: it removes every attribute whose key

@@ -30,6 +30,19 @@ otelcol.receiver.otlp "app" {
 	output {
 		metrics = [otelcol.processor.transform.redact.input]
 		logs    = [otelcol.processor.transform.redact.input]
+		traces  = [otelcol.processor.filter.discard_traces.input]
+	}
+}
+
+// A trace consumer registers the OTLP trace endpoints. Drop every span in lite,
+// so senders receive success without a Tempo service.
+otelcol.processor.filter "discard_traces" {
+	error_mode = "ignore"
+	traces {
+		span = ["true"]
+	}
+	output {
+		traces = []
 	}
 }
 
