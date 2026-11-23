@@ -1,0 +1,3 @@
+name = "console"
+description = "Operator overview of one deployed app."
+requires = ["deploy"]

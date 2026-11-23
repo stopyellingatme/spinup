@@ -36,7 +36,7 @@ func TestGoldenBase(t *testing.T) {
 	}
 	if cfg.App.Name != "todo" || cfg.App.Module != "example.com/todo" ||
 		cfg.BehaviorVersion != 1 || cfg.Monitoring.Profile != "lite" ||
-		!reflect.DeepEqual(cfg.Modules, []string{"ci", "deploy"}) {
+		!reflect.DeepEqual(cfg.Modules, []string{"ci", "deploy", "console"}) {
 		t.Fatalf("unexpected project configuration: %+v", cfg)
 	}
 }

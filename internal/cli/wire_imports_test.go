@@ -16,6 +16,7 @@ import (
 	_ "github.com/stopyellingatme/spinup/internal/doctor/checks"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/clientdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/composelint"
+	_ "github.com/stopyellingatme/spinup/internal/doctor/consolecheck"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagsdrift"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/flagswired"
 	_ "github.com/stopyellingatme/spinup/internal/doctor/gendrift"
