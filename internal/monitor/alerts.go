@@ -33,12 +33,15 @@ func (c *client) alerts(ctx context.Context, o Options) error {
 	alerts := []alert{}
 	for _, a := range active {
 		// Read forwarded alerts from Prometheus to preserve their names and summaries.
-		if a.Status.State == "suppressed" || a.Labels["source"] == "prometheus" || a.Labels["prometheus_alertname"] != "" {
+		if a.Labels["source"] == "prometheus" || a.Labels["prometheus_alertname"] != "" {
 			continue
 		}
 		state := a.Status.State
-		if state == "active" {
+		switch state {
+		case "active":
 			state = "firing"
+		case "suppressed":
+			state = "silenced"
 		}
 		alerts = append(alerts, alert{state, a.Labels["alertname"], a.Labels["severity"], a.Annotations["summary"]})
 	}
@@ -63,14 +66,26 @@ func (c *client) alerts(ctx context.Context, o Options) error {
 		return failure("read Prometheus alerts", fmt.Errorf("the Prometheus request failed"))
 	}
 	for _, a := range prometheus.Data.Alerts {
-		alerts = append(alerts, alert{a.State, a.Labels["alertname"], a.Labels["severity"], a.Annotations["summary"]})
+		state := a.State
+		for _, forwarded := range active {
+			if forwarded.Status.State == "suppressed" && matchesPrometheusAlert(a.Labels, forwarded.Labels) {
+				state = "silenced"
+				break
+			}
+		}
+		alerts = append(alerts, alert{state, a.Labels["alertname"], a.Labels["severity"], a.Annotations["summary"]})
 	}
 	pending, err := c.pending(ctx)
 	if err != nil {
 		return err
 	}
 	alerts = append(alerts, pending...)
-	sort.SliceStable(alerts, func(i, j int) bool { return alerts[i].State == "firing" && alerts[j].State != "firing" })
+	sort.SliceStable(alerts, func(i, j int) bool {
+		if alerts[i].State == "silenced" || alerts[j].State == "silenced" {
+			return alerts[i].State != "silenced" && alerts[j].State == "silenced"
+		}
+		return alerts[i].State == "firing" && alerts[j].State != "firing"
+	})
 	if o.JSON {
 		if err = json.NewEncoder(c.out).Encode(alerts); err != nil {
 			return failure("write alerts", err)
@@ -90,6 +105,23 @@ func (c *client) alerts(ctx context.Context, o Options) error {
 		}
 	}
 	return nil
+}
+
+// matchesPrometheusAlert compares the original labels with Grafana's forwarded labels.
+// Grafana replaces alertname with its rule title and adds its own labels.
+func matchesPrometheusAlert(original, forwarded map[string]string) bool {
+	if original["alertname"] == "" || forwarded["prometheus_alertname"] != original["alertname"] {
+		return false
+	}
+	for name, value := range original {
+		if name == "alertname" {
+			name = "prometheus_alertname"
+		}
+		if actual, ok := forwarded[name]; !ok || actual != value {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *client) pending(ctx context.Context) ([]alert, error) {
