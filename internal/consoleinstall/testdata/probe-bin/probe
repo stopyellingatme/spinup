@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$COLLECTOR_TEST_BINARY" -test.run '^TestCollectorUtility$' -- "${0##*/}" "$@"
