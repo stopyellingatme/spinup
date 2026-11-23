@@ -115,8 +115,17 @@ func (f *flow) run(ctx context.Context) (err error) {
 
 	start := 0
 	if f.o.Resume {
-		if start, err = f.resume(ctx); err != nil || start < 0 {
+		if start, err = f.resume(ctx); err != nil {
 			return err
+		} else if start < 0 {
+			if f.l.console.selected {
+				stopHeartbeat()
+				if err := f.lock.Release(ctx); err != nil {
+					return err
+				}
+				f.sampleConsole(ctx)
+			}
+			return nil
 		}
 	} else if err := f.begin(ctx); err != nil {
 		return err
@@ -156,6 +165,13 @@ func (f *flow) run(ctx context.Context) (err error) {
 		if err := f.journal.Done(ctx, s.name, redactString(detail, f.redact)); err != nil {
 			return deployError(s.name, f.l.env.Name, err)
 		}
+	}
+	if f.l.console.selected {
+		stopHeartbeat()
+		if err := f.lock.Release(ctx); err != nil {
+			return err
+		}
+		f.sampleConsole(ctx)
 	}
 	fmt.Fprintf(f.out, "Deployed release %s to %s (%s color)\n", f.release, f.l.env.Name, f.color)
 	return nil
@@ -422,6 +438,11 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 	f.release = entries[len(entries)-1].Release
 	next, ok := NextStep(entries, Steps, f.release)
 	if !ok {
+		if f.l.console.selected {
+			if _, err := f.monitoring(ctx); err != nil {
+				return 0, deployError("monitoring", f.l.env.Name, err)
+			}
+		}
 		fmt.Fprintf(f.out, "Release %s is already deployed. Nothing to resume.\n", f.release)
 		return -1, nil
 	}
@@ -466,6 +487,11 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 	}
 	if len(f.images) == 0 {
 		return 0, &ui.Error{What: "Cannot resume release " + f.release, Why: "the journal has no images of the release", Try: "run spinup deploy without --resume"}
+	}
+	if f.l.console.selected && slices.Index(Steps, next) > slices.Index(Steps, "monitoring") {
+		if _, err := f.monitoring(ctx); err != nil {
+			return 0, deployError("monitoring", f.l.env.Name, err)
+		}
 	}
 	fmt.Fprintf(f.out, "Resuming release %s at step %s\n", f.release, next)
 	return slices.Index(Steps, next), nil
