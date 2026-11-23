@@ -727,7 +727,16 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		restartPostgres = !maps.Equal(applied, wanted)
+		restartPostgres = applied == nil || !maps.Equal(applied, wanted)
+		if restartPostgres && f.backupHashes != nil {
+			actual, err := f.remoteBackupSecretHashes(ctx)
+			if err != nil {
+				return "", err
+			}
+			if !maps.Equal(actual, wanted) {
+				return "", fmt.Errorf("cannot resume: PGBACKREST_* secret files on the VM differ from the uploaded release\nTry: run a new spinup deploy without --resume")
+			}
+		}
 	}
 	root, dir := f.root(), f.releaseDir()
 	if _, err := f.cmd(ctx, false, "sh", "-c", edgeSyncScript, "spinup-edge", root, dir); err != nil {

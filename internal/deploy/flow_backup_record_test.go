@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -18,13 +21,21 @@ import (
 type backupRecordVM struct {
 	remote.Fake
 	current, applied, staged []byte
+	remoteHashes             string
 	restarts                 int
 	mode                     fs.FileMode
 	failRestart, failBase    bool
+	failHash                 bool
 }
 
 // Run simulates a failed deploy while keeping the applied record separate from the current release.
 func (v *backupRecordVM) Run(_ context.Context, c remote.Cmd) (runexec.Result, error) {
+	if slices.Contains(c.Argv, "spinup-backup-hashes") {
+		if v.failHash {
+			return runexec.Result{}, errors.New("sha256sum failed")
+		}
+		return runexec.Result{Stdout: []byte(v.remoteHashes)}, nil
+	}
 	if slices.Contains(c.Argv, testRoot+"/current/release.json") {
 		return runexec.Result{Stdout: v.current}, nil
 	}
@@ -144,7 +155,7 @@ func TestBackupSecretsResumeUsesUploadedHashes(t *testing.T) {
 	if next, err := f.resume(t.Context()); err != nil || Steps[next] != "edge" {
 		t.Fatalf("resume: next = %d, error = %v", next, err)
 	}
-	vm := &backupRecordVM{}
+	vm := &backupRecordVM{remoteHashes: uploaded["PGBACKREST_REPO1_CIPHER_PASS"] + "  PGBACKREST_REPO1_CIPHER_PASS\n"}
 	f.vm = vm
 	if _, err := f.edge(t.Context()); err != nil {
 		t.Fatal(err)
@@ -158,4 +169,108 @@ func TestBackupSecretsResumeUsesUploadedHashes(t *testing.T) {
 	}
 	x.vm.AssertDone(t)
 	x.exec.AssertDone(t)
+}
+
+// TestBackupSecretsResumeRejectsChangedVMSecrets refuses hashes that Postgres will not load.
+func TestBackupSecretsResumeRejectsChangedVMSecrets(t *testing.T) {
+	t.Parallel()
+	for _, change := range []string{"changed", "added", "removed", "hash failure", "invalid checksum"} {
+		t.Run(change, func(t *testing.T) {
+			t.Parallel()
+			values := map[string]string{"PGBACKREST_REPO1_PATH": "uploaded-path"}
+			wanted := backupSecretHashes(values)
+			switch change {
+			case "changed":
+				values["PGBACKREST_REPO1_PATH"] = "pushed-path"
+			case "added":
+				values["PGBACKREST_LOG_LEVEL_CONSOLE"] = "detail"
+			case "removed":
+				delete(values, "PGBACKREST_REPO1_PATH")
+			}
+			vm := &backupRecordVM{applied: []byte("{}")}
+			for name, hash := range backupSecretHashes(values) {
+				vm.remoteHashes += fmt.Sprintf("%s  %s\n", hash, name)
+			}
+			vm.failHash = change == "hash failure"
+			if change == "invalid checksum" {
+				vm.remoteHashes = "invalid checksum\n"
+			}
+			x := newFx(t, false, "")
+			x.o.fill()
+			f := &flow{o: x.o, l: &local{app: "todo", backups: true}, vm: vm, out: &x.out, release: testRelease, backupHashes: wanted}
+			_, err := f.edge(t.Context())
+			if err == nil || !strings.Contains(err.Error(), "PGBACKREST_*") || !strings.Contains(err.Error(), "Try: run a new spinup deploy without --resume") {
+				t.Fatalf("resume error = %v", err)
+			}
+			if vm.restarts != 0 || string(vm.applied) != "{}" || len(vm.staged) != 0 {
+				t.Fatal("resume changed Postgres or its record after the VM secrets changed")
+			}
+			for _, value := range []string{"uploaded-path", "pushed-path", "detail"} {
+				if strings.Contains(err.Error()+x.out.String(), value) {
+					t.Fatal("resume exposed a secret value")
+				}
+			}
+		})
+	}
+}
+
+// TestRemoteBackupSecretHashes checks the actual shell command against the manifest hash format.
+func TestRemoteBackupSecretHashes(t *testing.T) {
+	t.Parallel()
+	for _, empty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty=%t", empty), func(t *testing.T) {
+			t.Parallel()
+			root := filepath.Join(t.TempDir(), "VM with spaces")
+			if err := os.MkdirAll(filepath.Join(root, "secrets"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			values := map[string]string{"API_TOKEN": "unrelated"}
+			if !empty {
+				values["PGBACKREST_REPO1_PATH"] = "line one\nline two\n"
+				values["PGBACKREST_REPO1_CIPHER_PASS"] = ""
+			}
+			for name, value := range values {
+				if err := os.WriteFile(filepath.Join(root, "secrets", name), []byte(value), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f := &flow{l: &local{app: "app"}, vm: localVM{root: root}}
+			got, err := f.remoteBackupSecretHashes(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !maps.Equal(got, backupSecretHashes(values)) {
+				t.Fatalf("remote hashes = %v, want %v", got, backupSecretHashes(values))
+			}
+		})
+	}
+}
+
+// TestBackupSecretsEmptyAfterFailedRestart recovers a removed override without any remaining backup secrets.
+func TestBackupSecretsEmptyAfterFailedRestart(t *testing.T) {
+	t.Parallel()
+	x := newFx(t, false, "")
+	x.o.fill()
+	vm := &backupRecordVM{applied: []byte("{}"), failRestart: true}
+	l := &local{app: "todo", backups: true, secrets: map[string]string{"PGBACKREST_REPO1_PATH": "/new-backups"}}
+	f := &flow{o: x.o, l: l, vm: vm, out: &x.out, release: testRelease}
+	if _, err := f.edge(t.Context()); err == nil {
+		t.Fatal("expected a failed health wait after Postgres started with the path override")
+	}
+	if vm.applied != nil {
+		t.Fatal("failed restart left an applied record")
+	}
+	delete(l.secrets, "PGBACKREST_REPO1_PATH")
+	if _, err := f.edge(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if vm.restarts != 2 || string(vm.applied) != "{}\n" || vm.mode != 0600 {
+		t.Fatalf("restarts = %d, record = %q, mode = %o, want a restart and an empty record", vm.restarts, vm.applied, vm.mode)
+	}
+	if _, err := f.edge(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if vm.restarts != 2 {
+		t.Fatal("a recorded empty set caused another restart")
+	}
 }
