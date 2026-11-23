@@ -37,7 +37,7 @@ func backupFixture(t *testing.T, x *fx, backend, repoType string) {
 	}
 	writeTree(t, x.root, map[string]string{
 		"deploy/compose.backups.yml":        "services: {}\n",
-		"deploy/pgbackrest/pgbackrest.conf": "[global]\nrepo1-type=" + repoType + "\n",
+		"deploy/pgbackrest/pgbackrest.conf": "[global]\nrepo1-cipher-type=aes-256-cbc\nrepo1-type=" + repoType + "\n",
 	})
 	x.decrypted = maps.Clone(testSecrets)
 }
@@ -119,6 +119,50 @@ func TestBackupSecretsPreflightOtherBackends(t *testing.T) {
 	}
 }
 
+// TestBackupSecretsAuthenticationAndCipher checks the effective authentication and encryption options before deployment.
+func TestBackupSecretsAuthenticationAndCipher(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, config string
+		values       map[string]string
+		missing      string
+	}{
+		{name: "auto credentials", config: "repo1-s3-key-type=auto\nrepo1-cipher-type=none\n"},
+		{name: "web identity credentials", config: "repo1-s3-key-type=web-id\nrepo1-cipher-type=none\n"},
+		{name: "secret selects auto", config: "repo1-s3-key-type=shared\n", values: map[string]string{"PGBACKREST_REPO1_S3_KEY_TYPE": "auto"}},
+		{name: "stanza selects auto", config: "repo1-s3-key-type=shared\n[todo]\nrepo1-s3-key-type=auto\n"},
+		{name: "shared needs keys", config: "repo1-s3-key-type=shared\n", missing: "PGBACKREST_REPO1_S3_KEY"},
+		{name: "default shared needs keys", missing: "PGBACKREST_REPO1_S3_KEY"},
+		{name: "secret selects shared", config: "repo1-s3-key-type=auto\n", values: map[string]string{"PGBACKREST_REPO1_S3_KEY_TYPE": "shared"}, missing: "PGBACKREST_REPO1_S3_KEY"},
+		{name: "cipher needs password", config: "repo1-s3-key-type=auto\nrepo1-cipher-type=aes-256-cbc\n", missing: "PGBACKREST_REPO1_CIPHER_PASS"},
+		{name: "secret disables cipher", config: "repo1-s3-key-type=auto\nrepo1-cipher-type=aes-256-cbc\n", values: map[string]string{"PGBACKREST_REPO1_CIPHER_TYPE": "none"}},
+		{name: "secret enables cipher", config: "repo1-s3-key-type=auto\n", values: map[string]string{"PGBACKREST_REPO1_CIPHER_TYPE": "aes-256-cbc"}, missing: "PGBACKREST_REPO1_CIPHER_PASS"},
+		{name: "stanza disables cipher", config: "repo1-s3-key-type=auto\nrepo1-cipher-type=aes-256-cbc\n[todo]\nrepo1-cipher-type=none\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			x := newFx(t, false, "")
+			backupFixture(t, x, "pgbackrest", "s3")
+			writeTree(t, x.root, map[string]string{"deploy/pgbackrest/pgbackrest.conf": "[global]\nrepo1-type=s3\n" + tc.config})
+			for _, name := range backupStorageNames[1:4] {
+				x.decrypted[name] = "storage-value"
+			}
+			maps.Copy(x.decrypted, tc.values)
+			x.expectLocalGit()
+			x.o.fill()
+			_, err := preflight(t.Context(), x.o, x.d, &x.out, false)
+			if tc.missing == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.missing) {
+				t.Fatalf("error = %v, want missing %s", err, tc.missing)
+			}
+			x.exec.AssertDone(t)
+		})
+	}
+}
+
 func TestBackupHooksSkipBeforeSecretUpload(t *testing.T) {
 	t.Parallel()
 	for _, first := range []bool{true, false} {
@@ -142,12 +186,18 @@ func TestBackupHooksSkipBeforeSecretUpload(t *testing.T) {
 				current = string(data)
 			}
 			x.expectReadCurrent(current)
-			// The backup must not query or invoke the database before new secrets reach the VM.
+			if !first {
+				x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/postgres/backup-secrets.json").Return("", "", 0)
+				expectAppliedMigrations(x.vm, "1\n2\n")
+			}
 			if _, err := f.hooks(t.Context()); err != nil {
 				t.Fatal(err)
 			}
-			if len(x.hookCtx) != 0 {
-				t.Fatal("backup hook ran before storage secrets were uploaded")
+			if first && len(x.hookCtx) != 0 {
+				t.Fatal("backup hook ran on the first deploy")
+			}
+			if !first && (len(x.hookOpts) != 1 || !x.hookOpts[0].SkipBackup) {
+				t.Fatal("changed secrets bypassed the safety check of the backup hook")
 			}
 			want := "no release is recorded"
 			if !first {
@@ -163,7 +213,7 @@ func TestBackupHooksSkipBeforeSecretUpload(t *testing.T) {
 
 func TestBackupSecretsRestartPostgres(t *testing.T) {
 	t.Parallel()
-	for _, change := range []string{"first deploy", "added", "changed", "removed", "unchanged", "unrelated", "unhealthy restart"} {
+	for _, change := range []string{"first deploy", "unknown existing deployment", "added", "changed", "removed", "unchanged", "unrelated", "unhealthy restart"} {
 		t.Run(change, func(t *testing.T) {
 			t.Parallel()
 			x := newFx(t, false, "")
@@ -208,11 +258,11 @@ func TestBackupSecretsRestartPostgres(t *testing.T) {
 			if _, err := f.upload(t.Context()); err != nil {
 				t.Fatal(err)
 			}
-			data, _ := json.Marshal(Release{Secrets: SecretHashes(before)})
-			if change == "first deploy" {
+			data, _ := json.Marshal(backupSecretHashes(before))
+			if change == "first deploy" || change == "unknown existing deployment" {
 				data = nil
 			}
-			x.expectReadCurrent(string(data))
+			x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/postgres/backup-secrets.json").Return(string(data), "", 0)
 			x.ok("sh", "-c", edgeSyncScript)
 			x.expectUpstream("")
 			x.vm.ExpectUpload(testRoot + "/caddy/upstream.caddy")
@@ -222,11 +272,14 @@ func TestBackupSecretsRestartPostgres(t *testing.T) {
 			composeFiles := []string{testRelDir + "/compose.edge.yml", testRelDir + "/compose.backups.yml"}
 			restart := change != "unchanged" && change != "unrelated"
 			if restart {
+				x.ok("rm", "-f", "--", testRoot+"/postgres/backup-secrets.json")
 				argv := ComposeArgv("todo", testRelDir, composeFiles, "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "4", "postgres")
 				if change == "unhealthy restart" {
 					x.vm.Expect(argv...).Return("", "postgres is unhealthy", 1)
 				} else {
 					x.ok(argv...)
+					x.vm.ExpectUpload(testRoot + "/postgres/backup-secrets.json.next")
+					x.ok("mv", "-f", "--", testRoot+"/postgres/backup-secrets.json.next", testRoot+"/postgres/backup-secrets.json")
 				}
 			}
 			if change != "unhealthy restart" {
@@ -264,12 +317,52 @@ func TestBackupHooksKeepsBackupWithUnchangedSecrets(t *testing.T) {
 	f := &flow{o: x.o, d: x.d, l: l, vm: x.vm, out: &x.out, errOut: &x.errOut, release: testRelease}
 	data, _ := json.Marshal(Release{Secrets: SecretHashes(x.decrypted)})
 	x.expectReadCurrent(string(data))
+	applied, _ := json.Marshal(backupSecretHashes(x.decrypted))
+	x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/postgres/backup-secrets.json").Return(string(applied), "", 0)
 	expectAppliedMigrations(x.vm, "1\n2\n")
 	if _, err := f.hooks(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if len(x.hookCtx) != 1 || strings.Contains(x.out.String(), "skipped") {
 		t.Fatalf("backup hook calls = %d, output = %s", len(x.hookCtx), x.out.String())
+	}
+	x.vm.AssertDone(t)
+}
+
+// TestBackupHooksRefusesUnsafeAutomaticSkip checks that a storage change cannot bypass the migration guard.
+func TestBackupHooksRefusesUnsafeAutomaticSkip(t *testing.T) {
+	t.Parallel()
+	x := newFx(t, false, "")
+	backupFixture(t, x, "pgbackrest", "posix")
+	x.decrypted["PGBACKREST_REPO1_CIPHER_PASS"] = "storage-value"
+	before := backupSecretHashes(x.decrypted)
+	x.decrypted["PGBACKREST_LOG_LEVEL_CONSOLE"] = "detail"
+	writeTree(t, x.root, map[string]string{"api/db/migrations/00003_delete.sql": "-- +goose Up\nDELETE FROM invoices;\n"})
+	x.expectLocalGit()
+	x.o.fill()
+	l, err := preflight(t.Context(), x.o, x.d, &x.out, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.d.PreDeploy = func() []Hook {
+		return []Hook{{Name: "backup", Run: func(ctx context.Context, _ *HookContext) error {
+			o := HookOptionsFrom(ctx)
+			if !o.SkipBackup || !slices.Equal(o.PendingMigrations, []string{"00003_delete.sql"}) {
+				t.Fatalf("automatic skip options = %+v", o)
+			}
+			return errors.New("pending migration 00003_delete.sql lacks the safe marker")
+		}}}
+	}
+	f := &flow{o: x.o, d: x.d, l: l, vm: x.vm, out: &x.out, release: testRelease}
+	current, _ := json.Marshal(Release{Secrets: SecretHashes(x.decrypted)})
+	x.expectReadCurrent(string(current))
+	applied, _ := json.Marshal(before)
+	x.vm.Expect("sh", "-c", readRemoteFileScript, "spinup-read", testRoot+"/postgres/backup-secrets.json").Return(string(applied), "", 0)
+	expectAppliedMigrations(x.vm, "1\n2\n")
+	_, err = f.hooks(t.Context())
+	var ue *ui.Error
+	if !errors.As(err, &ue) || !strings.Contains(ue.Why, "00003_delete.sql") || !strings.Contains(ue.Try, "spinup secrets push") || !strings.Contains(ue.Try, "restart Postgres") {
+		t.Fatalf("unsafe automatic skip: error = %v", err)
 	}
 	x.vm.AssertDone(t)
 }
