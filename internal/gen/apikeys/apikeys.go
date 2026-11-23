@@ -17,10 +17,11 @@ import (
 
 func init() {
 	registry.Register(gen.Generator{Name: "apikeys", Short: "Generate the app API key configuration", Example: `  # Rewrite api/internal/apikeys/apikeys.gen.go from the [apikeys] table of spinup.toml
-  spinup g apikeys`, Run: plan})
+  spinup g apikeys`, Run: Plan})
 }
 
-func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
+// Plan returns the files generated from spinup.toml without writing them.
+func Plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if len(in.Args) != 0 {
 		return nil, fmt.Errorf("cannot generate apikeys: expected no positional arguments\nTry: spinup g apikeys")
 	}

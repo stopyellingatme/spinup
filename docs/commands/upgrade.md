@@ -104,6 +104,12 @@ Without a terminal, it needs `--yes`.
 The worktree is `.spinup/upgrade/<target>` and the branch is `spinup/upgrade-<target>`.
 Each step commits the template changes and the lock as separate commits.
 
+Before verification, the upgrade regenerates billing, API keys, flags, and roles from `spinup.toml` for your modules.
+It rebuilds MCP registrations from the tool files in `api/internal/mcp/` and records the generated hashes in `spinup.lock`.
+The preview compares the final generated content with your files.
+If the content stays the same, the preview counts the file as `unchanged`.
+If a generator fails, the upgrade stops with its error and a `Try:` line that names the generator command.
+
 ## If files conflict
 
 If a file has changes that spinup cannot merge, the command exits with code 3 and lists the files.

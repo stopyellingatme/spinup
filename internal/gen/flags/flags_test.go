@@ -18,12 +18,12 @@ func TestPlan(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, project.ConfigFile), []byte("[auth]\nroles = [\"owner\"]\nadmin_role = \"owner\"\ndefault_role = \"owner\"\n[flags.demo]\ndescription = \"Demo\"\npublic = true\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := plan(context.Background(), gen.Input{Root: root, Lock: manifest.New()}); err == nil || err.Error() != "cannot generate flags: the app has no flags module\nTry: spinup module add flags" {
+	if _, err := Plan(context.Background(), gen.Input{Root: root, Lock: manifest.New()}); err == nil || err.Error() != "cannot generate flags: the app has no flags module\nTry: spinup module add flags" {
 		t.Fatalf("error = %v", err)
 	}
 	lock := manifest.New()
 	lock.Packs = []string{"flags"}
-	out, err := plan(context.Background(), gen.Input{Root: root, Lock: lock})
+	out, err := Plan(context.Background(), gen.Input{Root: root, Lock: lock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestRunUnchanged(t *testing.T) {
 		}
 	}
 	var output strings.Builder
-	result, err := run.Run(context.Background(), gen.Generator{Name: "flags", Run: plan}, nil, nil, run.Options{Root: root, Out: &output})
+	result, err := run.Run(context.Background(), gen.Generator{Name: "flags", Run: Plan}, nil, nil, run.Options{Root: root, Out: &output})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestRunUnchanged(t *testing.T) {
 }
 
 func TestPositionalArgument(t *testing.T) {
-	_, err := plan(context.Background(), gen.Input{Args: []string{"extra"}})
+	_, err := Plan(context.Background(), gen.Input{Args: []string{"extra"}})
 	want := "cannot generate flags: expected no positional arguments\nTry: spinup g flags"
 	if err == nil || err.Error() != want {
 		t.Fatalf("error = %v, want %q", err, want)
@@ -79,7 +79,7 @@ func TestUnknownFieldKeepsTryLine(t *testing.T) {
 	}
 	lock := manifest.New()
 	lock.Packs = []string{"flags"}
-	_, err := plan(context.Background(), gen.Input{Root: root, Lock: lock})
+	_, err := Plan(context.Background(), gen.Input{Root: root, Lock: lock})
 	if err == nil || !strings.Contains(err.Error(), "Try: correct [flags.demo] in spinup.toml") || strings.Contains(err.Error(), "inside a spinup project") {
 		t.Fatalf("err = %v", err)
 	}

@@ -354,15 +354,15 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 					return err
 				}
 			}
-			if err := step.Plan.Format(r.Out); err != nil {
-				return err
-			}
 			step.Lock, err = NextLock(step.Lock, step.Plan, step.To, step.Answers, newPacks)
 			if err != nil {
 				return err
 			}
 			step.Lock.CLIVersion = r.CLIVersion
-			if err := writePlan(step.Worktree, step.Plan); err != nil {
+			if err := applyGeneratedPlan(ctx, step.Worktree, step.Lock, step.Plan); err != nil {
+				return err
+			}
+			if err := step.Plan.Format(r.Out); err != nil {
 				return err
 			}
 			if err := callPhase(ctx, phases.Apply, step); err != nil {
@@ -440,6 +440,9 @@ func (r *Runner) resume(ctx context.Context, state *runState) error {
 			}
 		}
 		if state.Status == "lock" {
+			if err := regenerate(ctx, step.Worktree, step.Lock, step.Plan, nil); err != nil {
+				return err
+			}
 			if err := step.Lock.Save(filepath.Join(step.Worktree, "spinup.lock")); err != nil {
 				return err
 			}

@@ -103,6 +103,12 @@ $ spinup upgrade --yes
 
 spinup creates the branch `spinup/upgrade-<version>` in a separate worktree at `.spinup/upgrade/<version>`.
 It applies the template changes, runs codemods, updates Go and pnpm dependencies, and then builds and tests the result.
+
+Before verification, it regenerates billing, API keys, flags, and roles from `spinup.toml` for the modules that your app has.
+It also rebuilds MCP registrations from the tool files in `api/internal/mcp/`.
+The lock records these outputs, so `spinup check` accepts the generated files without a manual generation step.
+If a generator fails, the upgrade stops and names the generator command that helps you correct the inputs.
+
 Each step is its own commit, so you can read the history.
 Use `--to <version>` for an exact target. Without it, spinup picks the newest version it can load.
 If you skip several releases, the upgrade steps through each minor release in turn.

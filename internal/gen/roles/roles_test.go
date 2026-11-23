@@ -19,7 +19,7 @@ func TestPlanCustomRoles(t *testing.T) {
 	root := t.TempDir()
 	writeConfig(t, root, "[auth]\nroles = [\"owner\", \"front_desk\"]\nadmin_role = \"owner\"\ndefault_role = \"front_desk\"\n")
 
-	out, err := plan(context.Background(), gen.Input{Root: root, Lock: authLock()})
+	out, err := Plan(context.Background(), gen.Input{Root: root, Lock: authLock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestPlanRefusals(t *testing.T) {
 			if tt.config != "" {
 				writeConfig(t, root, tt.config)
 			}
-			_, err := plan(context.Background(), gen.Input{Root: root, Lock: tt.lock})
+			_, err := Plan(context.Background(), gen.Input{Root: root, Lock: tt.lock})
 			if err == nil || !strings.Contains(err.Error(), tt.want) || !strings.Contains(err.Error(), "Try:") {
 				t.Fatalf("error = %v", err)
 			}
@@ -71,7 +71,7 @@ func TestRunDoesNothingForCurrentFile(t *testing.T) {
 	writeRolesFile(t, root, project.RenderRolesFile((&project.Config{}).AuthRoles()))
 
 	var output strings.Builder
-	result, err := run.Run(context.Background(), gen.Generator{Name: "roles", Run: plan}, nil, nil, run.Options{Root: root, Out: &output})
+	result, err := run.Run(context.Background(), gen.Generator{Name: "roles", Run: Plan}, nil, nil, run.Options{Root: root, Out: &output})
 	if err != nil {
 		t.Fatal(err)
 	}
