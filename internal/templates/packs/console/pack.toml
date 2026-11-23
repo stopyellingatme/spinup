@@ -1,3 +1,18 @@
 name = "console"
 description = "Operator overview of one deployed app."
 requires = ["deploy"]
+
+[[files]]
+path = "api/cmd/console/main.go"
+source = "files/api/cmd/console/main.go.tmpl"
+class = "managed"
+
+[[files]]
+path = "console/compose.console.yml"
+source = "files/console/compose.console.yml.tmpl"
+class = "managed"
+
+[[files]]
+path = "console/compose.query.yml"
+source = "files/console/compose.query.yml.tmpl"
+class = "managed"
