@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -95,7 +96,7 @@ func requireTunnelSocket(t *testing.T) {
 	}
 }
 
-func TestOpenWaitsForGrafanaHealth(t *testing.T) {
+func TestMonitorOpenWaitsForGrafanaHealth(t *testing.T) {
 	requireTunnelSocket(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -152,7 +153,7 @@ func TestOpenWaitsForGrafanaHealth(t *testing.T) {
 	}
 }
 
-func TestOpenReportsSSHStderr(t *testing.T) {
+func TestMonitorOpenReportsSSHStderr(t *testing.T) {
 	requireTunnelSocket(t)
 	f := &runexec.Fake{}
 	f.Expect("ssh").Return("", "forwarding request rejected", 0)
@@ -161,4 +162,93 @@ func TestOpenReportsSSHStderr(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 	f.AssertDone(t)
+}
+
+// serveForward plays the local side of "ssh -L": it listens on the forwarded local address.
+func serveForward(ctx context.Context, args []string, h http.Handler) (io.Closer, error) {
+	address := ""
+	for i, arg := range args {
+		if arg == "-L" && i+1 < len(args) {
+			local, _, _ := strings.Cut(strings.TrimPrefix(args[i+1], "127.0.0.1:"), ":")
+			address = "127.0.0.1:" + local
+		}
+	}
+	if address == "" {
+		return nil, errors.New("no -L forward in the SSH arguments")
+	}
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: h}
+	go func() { _ = server.Serve(listener) }()
+	return server, nil
+}
+
+func TestMonitorOpenTimesOutWithoutGrafana(t *testing.T) {
+	requireTunnelSocket(t)
+	old := openStartup
+	openStartup = 300 * time.Millisecond
+	t.Cleanup(func() { openStartup = old })
+	var stopped atomic.Bool
+	runner := tunnelFunc(func(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
+		server, err := serveForward(ctx, c.Args, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		if err != nil {
+			return runexec.Result{}, err
+		}
+		<-ctx.Done()
+		_ = server.Close()
+		stopped.Store(true)
+		return runexec.Result{}, ctx.Err()
+	})
+	var out bytes.Buffer
+	err := open(context.Background(), Options{NoBrowser: true, Out: &out, ErrOut: io.Discard}, remote.Host{Address: "vm"}, runner)
+	if err == nil || !strings.Contains(err.Error(), "the Grafana health request through SSH did not succeed") {
+		t.Fatalf("error = %v", err)
+	}
+	if out.Len() != 0 || !stopped.Load() {
+		t.Fatalf("output=%q, SSH stopped=%v", out.String(), stopped.Load())
+	}
+}
+
+type signalOutput struct {
+	bytes.Buffer
+	once  sync.Once
+	ready chan struct{}
+}
+
+func (w *signalOutput) Write(b []byte) (int, error) {
+	n, err := w.Buffer.Write(b)
+	w.once.Do(func() { close(w.ready) })
+	return n, err
+}
+
+func TestMonitorOpenReportsSSHExitWhileOpen(t *testing.T) {
+	requireTunnelSocket(t)
+	old := openAlive
+	openAlive = 20 * time.Millisecond
+	t.Cleanup(func() { openAlive = old })
+	out := &signalOutput{ready: make(chan struct{})}
+	runner := tunnelFunc(func(ctx context.Context, c runexec.Cmd) (runexec.Result, error) {
+		server, err := serveForward(ctx, c.Args, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, `{"database":"ok"}`)
+		}))
+		if err != nil {
+			return runexec.Result{}, err
+		}
+		select {
+		case <-out.ready:
+		case <-ctx.Done():
+		}
+		_ = server.Close()
+		return runexec.Result{Stderr: []byte("Connection to vm closed by remote host."), ExitCode: 255}, &runexec.ExitError{Code: 255}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := open(ctx, Options{NoBrowser: true, Out: out, ErrOut: io.Discard}, remote.Host{Address: "vm"}, runner)
+	if err == nil || !strings.Contains(err.Error(), "Connection to vm closed by remote host.") || ctx.Err() != nil {
+		t.Fatalf("error = %v", err)
+	}
 }
