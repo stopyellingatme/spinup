@@ -200,6 +200,7 @@ The `api` and `worker` containers mount the secrets directory at `/run/secrets`.
 Setting both `NAME` and `NAME_FILE` is an error, as before.
 Either explicit form takes precedence over the directory file.
 Set `SECRETS_DIR` to an empty string to disable the directory rule.
+For a field with a prefix, such as an OIDC provider setting, `NAME` is the full name with the prefix (`AUTH_OIDC_GITHUB_CLIENT_SECRET`).
 
 The directory rule reads only regular files with the exact field name, without path separators.
 It does not list the directory or follow a symlink for the file.

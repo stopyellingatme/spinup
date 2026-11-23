@@ -210,6 +210,7 @@ kit/config field Base.Port int
 kit/config field Base.ShutdownTimeout time.Duration
 kit/config func Load(any) error
 kit/config func LoadFrom(any, func(string) (string, bool), func(string) ([]byte, error)) error
+kit/config func LoadFromPrefix(any, string, func(string) (string, bool), func(string) ([]byte, error)) error
 kit/config method Base.Behavior(int) bool
 kit/config type Base struct
 kit/db const DefaultAppName = "spinup-app"

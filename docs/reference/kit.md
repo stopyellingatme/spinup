@@ -125,6 +125,7 @@ Setting both `NAME` and `NAME_FILE` remains an error.
 Either explicit form takes precedence over the directory file.
 
 The default directory is `/run/secrets`. An empty `SECRETS_DIR` disables this rule.
+For a field with a prefix, such as an OIDC provider setting, `NAME` is the full name with the prefix (`AUTH_OIDC_GITHUB_CLIENT_SECRET`).
 The directory rule reads only a regular file with the exact field name, without path separators.
 It does not list the directory or follow a symlink for the file.
 
