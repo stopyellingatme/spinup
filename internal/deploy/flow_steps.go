@@ -68,6 +68,8 @@ type flow struct {
 	hasRecorded bool
 	// backupHashes holds uploaded storage hashes when a resume skips upload.
 	backupHashes map[string]string
+	// completedPost preserves the result when a resume repeats console installation.
+	completedPost *string
 }
 
 func (f *flow) root() string       { return "/opt/" + f.l.app }
@@ -446,6 +448,9 @@ func (f *flow) resume(ctx context.Context) (int, error) {
 			}
 		}
 		return detail, found
+	}
+	if detail, ok := done("post"); ok {
+		f.completedPost = &detail
 	}
 	for _, step := range []string{"build", "transport"} {
 		if detail, ok := done(step); ok && detail != "" {
@@ -997,6 +1002,9 @@ func (f *flow) record(ctx context.Context) (string, error) {
 
 // post runs the post-release hooks (step 11). The release is live, so a hook failure is a warning.
 func (f *flow) post(ctx context.Context) (string, error) {
+	if f.completedPost != nil {
+		return *f.completedPost, nil
+	}
 	hooks := f.d.PostRelease()
 	if len(hooks) == 0 {
 		return "no hooks", nil
