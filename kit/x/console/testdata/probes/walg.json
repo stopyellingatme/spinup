@@ -1,0 +1,31 @@
+[
+  {
+    "backup_name": "base_000000010000000000000002_D_000000010000000000000001",
+    "time": "2026-10-15T03:00:12Z",
+    "wal_file_name": "000000010000000000000002",
+    "start_time": "2026-10-15T03:00:00Z",
+    "finish_time": "2026-10-15T03:00:12Z",
+    "hostname": "postgres",
+    "data_dir": "/var/lib/postgresql/18/docker",
+    "pg_version": 180006,
+    "start_lsn": 33554472,
+    "finish_lsn": 33554752,
+    "is_permanent": false,
+    "system_identifier": 7520000000000000000,
+    "uncompressed_size": 2048,
+    "compressed_size": 1024
+  },
+  {
+    "backup_name": "base_000000010000000000000001",
+    "time": "2026-10-14T03:00:10Z",
+    "wal_file_name": "000000010000000000000001",
+    "start_time": "2026-10-14T03:00:00Z",
+    "finish_time": "2026-10-14T03:00:10Z",
+    "hostname": "postgres",
+    "data_dir": "/var/lib/postgresql/18/docker",
+    "pg_version": 180006,
+    "is_permanent": false,
+    "uncompressed_size": 4096,
+    "compressed_size": 2000
+  }
+]
