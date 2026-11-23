@@ -1,0 +1,470 @@
+# App gate: the console module (ADR 0037). An API-only app with deploy, monitoring, jobs, and
+# console builds with the local kit. The real API image holds /console. Both console Compose files
+# render and pass Compose validation with the image reference. The image's project mode turns a
+# fixture into an overview with exact numbers and nulls. The serve mode answers its own healthcheck
+# in an active container, and the relay answers its own. The DinD suite (DIND_CONSOLE=1) checks the
+# VM sources, the tunnels, and the app failures.
+# The image build needs Docker and the network (the pinned base images and the Go modules).
+[!exec:docker] skip 'docker is required for the API image'
+[!exec:curl] skip 'curl is required to call the console'
+[!exec:python3] skip 'python3 is required to check the JSON documents'
+
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new gateconsole --api-only --modules ci,deploy,monitoring,jobs,console --monitoring-profile lite --module example.com/gateconsole --no-git --non-interactive
+cd gateconsole
+exists api/cmd/console/main.go console/compose.console.yml console/compose.query.yml
+grep '^modules = .*"console"' spinup.toml
+grep 'RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/console ./cmd/console' deploy/Dockerfile.api
+grep 'COPY --from=build /out/console /console' deploy/Dockerfile.api
+grep 'console-query:' console/compose.query.yml
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "console-wired",\s+"status": "ok"'
+
+# Build and vet the generated commands: the API, the worker, and the console.
+cd api
+exec go build ./...
+exec go vet ./...
+exec go build -o $WORK/gate-api ./cmd/api
+exec go build -o $WORK/gate-worker ./cmd/worker
+exec go build -o $WORK/gate-console ./cmd/console
+cd ..
+# The console accepts only its five argument lists. Others exit 2.
+! exec $WORK/gate-console
+stderr 'Cannot run console: the arguments are invalid\.'
+! exec $WORK/gate-console serve extra
+stderr 'Try: use serve, query, project, healthcheck, or healthcheck query\.'
+
+# Build the real image, render and validate both Compose files, and run the three image modes.
+exec bash $WORK/console.sh
+stdout '^console: image holds /console, and an unknown mode exits 2$'
+stdout '^console: compose\.console\.yml renders with the image, loopback 7410, and the console bridge only$'
+stdout '^console: compose\.query\.yml renders the relay on the console and external monitoring networks$'
+stdout '^console: an absent monitoring profile renders services: \{\} and no relay$'
+stdout '^console: project mode keeps exact numbers and nulls$'
+stdout '^console: project mode marks a failed probe unavailable with the sample time$'
+stdout '^console: serve passes its healthcheck, and Docker reports healthy$'
+stdout '^console: the overview serves the sample, and the alerts are source_down without the relay upstream$'
+stdout '^console: a foreign Host gets 403, and no mutation route exists$'
+stdout '^console: the relay passes healthcheck query, and the web healthcheck fails without a server$'
+
+-- console.sh --
+# console.sh builds the API image of the gate app with spinup build, renders both console Compose
+# files, and runs the project, serve, query, and healthcheck modes of the image. A trap removes the
+# containers, the network, and the image, also when a check fails.
+set -euo pipefail
+
+app=gateconsole
+tag="gate-$$"
+image="$app-api:$tag"
+containers=()
+networks=()
+started=""
+
+cleanup() {
+  local status=$?
+  set +e
+  for c in ${containers[@]+"${containers[@]}"}; do
+    if [[ $status -ne 0 ]]; then
+      echo "--- docker logs $c" >&2
+      docker logs "$c" >&2
+    fi
+  done
+  if [[ -n $started ]]; then
+    [[ $status -eq 0 ]] || gate_compose --profile query logs --no-color >&2
+    gate_compose --profile query down -v --remove-orphans >/dev/null 2>&1
+  fi
+  for c in ${containers[@]+"${containers[@]}"}; do docker rm -f -v "$c" >/dev/null 2>&1; done
+  for n in ${networks[@]+"${networks[@]}"}; do docker network rm "$n" >/dev/null 2>&1; done
+  docker image rm -f "$image" >/dev/null 2>&1
+  exit "$status"
+}
+trap cleanup EXIT
+
+fail() {
+  echo "console.sh: $*" >&2
+  exit 1
+}
+
+arch="$(docker version --format '{{.Server.Arch}}')"
+spinup build --image --target api --tag "$tag" --platform "linux/$arch" >&2
+docker image inspect "$image" >/dev/null || fail "spinup build did not produce $image"
+
+# The console binary is in the image, and it refuses an unknown mode with exit 2.
+status=0
+docker run --rm --network none --entrypoint /console "$image" unknown >/dev/null 2>&1 || status=$?
+[[ $status == 2 ]] || fail "the image's /console exited $status for an unknown mode, want 2"
+echo "console: image holds /console, and an unknown mode exits 2"
+
+# Render both files the way deploy does: the project directory holds the literal .env file.
+project="$WORK/project"
+mkdir -p "$project"
+cp console/compose.console.yml console/compose.query.yml "$project/"
+cat >"$project/.env" <<EOF
+CONSOLE_IMAGE="$image"
+CONSOLE_APP="$app"
+CONSOLE_ENV="production"
+CONSOLE_PROFILE="lite"
+CONSOLE_BACKEND="none"
+CONSOLE_JOBS="true"
+CONSOLE_ORIGIN="https://gate.example.com"
+EOF
+compose() { docker compose -p "$app-console" --project-directory "$project" "$@"; }
+compose -f "$project/compose.console.yml" config --quiet
+compose -f "$project/compose.console.yml" config --format json >"$WORK/base.json"
+compose -f "$project/compose.console.yml" -f "$project/compose.query.yml" --profile query config --quiet
+compose -f "$project/compose.console.yml" -f "$project/compose.query.yml" --profile query config --format json >"$WORK/query.json"
+[[ "$(compose -f "$project/compose.console.yml" config --images)" == "$image" ]] ||
+  fail "compose.console.yml does not resolve to the image $image"
+python3 -I "$WORK/check.py" compose "$WORK/base.json" "$WORK/query.json" "$image" "$app"
+echo "console: compose.console.yml renders with the image, loopback 7410, and the console bridge only"
+echo "console: compose.query.yml renders the relay on the console and external monitoring networks"
+
+# Without monitoring, the pack renders an empty overlay. Ordinary startup still names only the web service.
+(cd "$WORK" && spinup new "$app-absent" --api-only --modules deploy,console --module example.com/absent --no-git --non-interactive >/dev/null)
+[[ "$(cat "$WORK/$app-absent/console/compose.query.yml")" == "services: {}" ]] ||
+  fail "the overlay without monitoring is not services: {}"
+cp "$WORK/$app-absent/console/compose.query.yml" "$WORK/absent-query.yml"
+compose -f "$project/compose.console.yml" -f "$WORK/absent-query.yml" --profile query config --format json >"$WORK/absent.json"
+python3 -I "$WORK/check.py" absent "$WORK/absent.json"
+echo "console: an absent monitoring profile renders services: {} and no relay"
+
+# project mode: the collector's flags, a private fixture directory, and the deploy UID.
+uid="$(id -u)"
+gid="$(id -g)"
+input="$WORK/input"
+chmod 0700 "$input"
+project_run() {
+  local observed=$1
+  docker run --rm --pull never --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+    --pids-limit 32 --cpus 0.25 --memory 48m --log-driver none --user "$uid:$gid" --env GOMEMLIMIT=24MiB \
+    --env CONSOLE_APP="$app" --env CONSOLE_ENV=production --env CONSOLE_PROFILE=lite --env CONSOLE_BACKEND=none \
+    --env CONSOLE_JOBS=true --env CONSOLE_ORIGIN=https://gate.example.com --env CONSOLE_OBSERVED_AT="$observed" \
+    --mount "type=bind,src=$input,dst=/input,readonly" --entrypoint /console "$image" project </dev/null
+}
+project_run 2026-11-01T12:00:00Z >"$WORK/projected.json"
+python3 -I "$WORK/check.py" project "$WORK/projected.json"
+echo "console: project mode keeps exact numbers and nulls"
+
+printf 'timeout\n' >"$input/disk.txt.err"
+project_run 2026-11-01T12:00:00Z >"$WORK/failed.json"
+rm -f "$input/disk.txt.err"
+python3 -I "$WORK/check.py" failed "$WORK/failed.json"
+echo "console: project mode marks a failed probe unavailable with the sample time"
+
+# serve and query modes run through real Compose with the rendered files. A small override
+# replaces only the host-specific values: the data bind source, an ephemeral loopback port, and
+# unique network names. The healthchecks, limits, users, and entrypoints stay as rendered.
+data="$WORK/data"
+mkdir -p "$data"
+chmod 0755 "$data"
+now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+project_run "$now" >"$data/facts.json"
+chmod 0644 "$data/facts.json"
+run_project="$app-console-gate-$$"
+monitoring_net="$app-monitoring-gate-$$"
+cat >"$project/override.yml" <<EOF
+services:
+  console:
+    ports: !override
+      - "127.0.0.1::7410"
+    volumes: !override
+      - type: bind
+        source: $data
+        target: /data
+        read_only: true
+networks:
+  console:
+    name: $run_project
+EOF
+cat >"$project/override-query.yml" <<EOF
+networks:
+  monitoring:
+    name: $monitoring_net
+EOF
+gate_compose() {
+  docker compose -p "$run_project" --project-directory "$project" -f "$project/compose.console.yml" \
+    -f "$project/compose.query.yml" -f "$project/override.yml" -f "$project/override-query.yml" "$@"
+}
+started=1
+gate_compose up -d --no-deps --wait --wait-timeout 90 console >&2 || fail "the console service did not become healthy"
+web="$run_project-console-1"
+containers+=("$web")
+[[ "$(docker inspect -f '{{.State.Health.Status}}' "$web")" == healthy ]] || fail "Docker does not report the console healthy"
+docker exec "$web" /console healthcheck || fail "the healthcheck mode fails in the active container"
+port="$(docker port "$web" 7410/tcp | head -n 1 | sed 's/.*://')"
+[[ "$(docker port "$web" 7410/tcp | head -n 1)" == 127.0.0.1:* ]] || fail "the console port is not on 127.0.0.1"
+body="$(curl -fsS -m 5 "http://127.0.0.1:$port/healthz")"
+[[ $body == ok ]] || fail "/healthz answered '$body', want ok"
+python3 -I "$WORK/check.py" inspect-web "$(docker inspect "$web")" "$run_project"
+echo "console: serve passes its healthcheck, and Docker reports healthy"
+
+# The page has no relay here: alerts are unavailable, and every host section is the sample.
+curl -fsS -m 10 -D "$WORK/overview.headers" -o "$WORK/overview.json" "http://127.0.0.1:$port/api/v1/overview"
+python3 -I "$WORK/check.py" overview "$WORK/overview.json" "$data/facts.json" "$now"
+tr -d '\r' <"$WORK/overview.headers" | grep -qix 'cache-control: no-store' || fail "the overview has no Cache-Control: no-store"
+tr -d '\r' <"$WORK/overview.headers" | grep -qi "^content-security-policy: default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'$" ||
+  fail "the overview has the wrong Content-Security-Policy"
+curl -fsS -m 10 -o "$WORK/overview.html" "http://127.0.0.1:$port/"
+grep -q '<h1>gateconsole <span>(production)</span></h1>' "$WORK/overview.html" || fail "the HTML overview does not name the app"
+grep -q 'spinup monitor open --env production' "$WORK/overview.html" || fail "the HTML overview has no Grafana command without a forward"
+grep -q 'Roll back to the previous release' "$WORK/overview.html" || fail "the HTML overview hides rollback with a known previous release"
+if grep -q 'Back up now' "$WORK/overview.html"; then fail "the HTML overview shows backup without backups"; fi
+echo "console: the overview serves the sample, and the alerts are source_down without the relay upstream"
+
+code="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' -H 'Host: console.example.com' "http://127.0.0.1:$port/api/v1/overview")"
+[[ $code == 403 ]] || fail "a foreign Host answered $code, want 403"
+code="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/api/v1/actions/rollback")"
+[[ $code == 404 ]] || fail "an action route answered $code, want 404"
+echo "console: a foreign Host gets 403, and no mutation route exists"
+
+# The relay joins the console bridge and the external monitoring network, which must exist first.
+docker network create "$monitoring_net" >/dev/null
+networks+=("$monitoring_net")
+gate_compose --profile query up -d --no-deps --wait --wait-timeout 90 console-query >&2 || fail "the relay did not become healthy"
+relay="$run_project-console-query-1"
+containers+=("$relay")
+docker exec "$relay" /console healthcheck query || fail "the relay does not pass /console healthcheck query"
+python3 -I "$WORK/check.py" inspect-relay "$(docker inspect "$relay")" "$run_project" "$monitoring_net"
+if docker exec "$web" /console healthcheck query 2>/dev/null; then fail "healthcheck query passes in the web container, which has no relay"; fi
+if docker run --rm --network none --entrypoint /console "$image" healthcheck 2>/dev/null; then
+  fail "the web healthcheck passes without a server"
+fi
+echo "console: the relay passes healthcheck query, and the web healthcheck fails without a server"
+
+# The relay now answers for Prometheus. Prometheus is absent, so alerts stay source_down.
+curl -fsS -m 10 -o "$WORK/overview-relay.json" "http://127.0.0.1:$port/api/v1/overview"
+python3 -I "$WORK/check.py" alerts-down "$WORK/overview-relay.json"
+
+# Idle memory of the two services, for the record.
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' "$web" "$relay" | sed 's/^/console: idle memory /' >&2
+
+-- check.py --
+# check.py <mode> <files...> checks one console document. It exits 1 with the first difference.
+import json
+import sys
+
+mode = sys.argv[1]
+
+
+def load(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def fail(message):
+    print("check.py %s: %s" % (mode, message), file=sys.stderr)
+    sys.exit(1)
+
+
+def expect(label, got, want):
+    if type(got) is not type(want) or got != want:
+        fail("%s: got %r (%s), want %r (%s)" % (label, got, type(got).__name__, want, type(want).__name__))
+
+
+def integer(label, value):
+    if type(value) is not int:
+        fail("%s is %r, want an integer" % (label, value))
+    return value
+
+
+SECTIONS = ["release", "containers", "alerts", "backup", "wal", "jobs", "disk", "memory", "history"]
+KEYS = ["version", "app", "env", "profile", "observed_at"] + SECTIONS
+
+
+def shape(doc):
+    if sorted(doc) != sorted(KEYS):
+        fail("top-level keys %r" % sorted(doc))
+    for name in SECTIONS:
+        if sorted(doc[name]) != ["at", "data", "reason", "state"]:
+            fail("section %s keys %r" % (name, sorted(doc[name])))
+
+
+def host_sections(doc, observed):
+    """The fixture of check mode project, observed at the given time."""
+    expect("version", doc["version"], 1)
+    expect("app", doc["app"], "gateconsole")
+    expect("env", doc["env"], "production")
+    expect("profile", doc["profile"], "lite")
+    expect("observed_at", doc["observed_at"], observed)
+    for name in ["release", "containers", "jobs", "disk", "memory", "history"]:
+        expect(name + ".state", doc[name]["state"], "ok")
+        expect(name + ".reason", doc[name]["reason"], None)
+        expect(name + ".at", doc[name]["at"], observed)
+    rel = doc["release"]["data"]
+    expect("release.id", rel["id"], "20261101T110000Z-0123456789ab")
+    expect("release.git_sha", rel["git_sha"], "0123456789abcdef0123456789abcdef01234567")
+    expect("release.color", rel["color"], "blue")
+    expect("release.created_at", rel["created_at"], "2026-11-01T11:00:00Z")
+    expect("release.previous_id", rel["previous_id"], "20261031T090000Z-abcdef012345")
+    containers = doc["containers"]["data"]
+    expect("containers", containers, [
+        {"project": "gateconsole", "service": "postgres", "name": "gateconsole-postgres-1", "state": "running", "health": "healthy"},
+        {"project": "gateconsole-blue", "service": "api", "name": "gateconsole-blue-api-1", "state": "running", "health": "healthy"},
+        {"project": "gateconsole-blue", "service": "worker", "name": "gateconsole-blue-worker-1", "state": "exited", "health": None},
+        {"project": "gateconsole-console", "service": "console", "name": "gateconsole-console-console-1", "state": "running", "health": "starting"},
+    ])
+    expect("jobs", doc["jobs"]["data"], [
+        {"queue": "default", "state": "available", "count": 3},
+        {"queue": "default", "state": "completed", "count": 12},
+        {"queue": "mail", "state": "retryable", "count": 1},
+    ])
+    expect("disk", doc["disk"]["data"], {"total_bytes": 52521566208, "used_bytes": 10737418240, "available_bytes": 39610982400})
+    expect("memory", doc["memory"]["data"], {"total_bytes": 4123168768, "used_bytes": 1051168768, "available_bytes": 3072000000})
+    expect("history", doc["history"]["data"], [
+        {"id": "20261101T110000Z-0123456789ab", "at": "2026-11-01T11:00:00Z", "user": "operator", "git_sha": "0123456789abcdef0123456789abcdef01234567", "color": "blue", "result": "succeeded"},
+        {"id": "20261101T100000Z-fedcba987654", "at": "2026-11-01T10:00:05Z", "user": None, "git_sha": None, "color": None, "result": "failed"},
+        {"id": "20261031T090000Z-abcdef012345", "at": "2026-10-31T09:00:00Z", "user": "operator", "git_sha": "abcdef012345abcdef012345abcdef012345abcd", "color": "green", "result": "recorded"},
+    ])
+    for name, reason in [("backup", "no_backups"), ("wal", "no_backups")]:
+        expect(name, doc[name], {"state": "disabled", "reason": reason, "at": None, "data": None})
+
+
+if mode == "compose":
+    base, query, image, app = load(sys.argv[2]), load(sys.argv[3]), sys.argv[4], sys.argv[5]
+    expect("base services", sorted(base["services"]), ["console"])
+    web = base["services"]["console"]
+    expect("image", web["image"], image)
+    expect("entrypoint", web["entrypoint"], ["/console", "serve"])
+    expect("user", web["user"], "65532:65532")
+    expect("read_only", web["read_only"], True)
+    expect("cap_drop", web["cap_drop"], ["ALL"])
+    expect("security_opt", web["security_opt"], ["no-new-privileges:true"])
+    expect("pids_limit", web["pids_limit"], 32)
+    expect("cpus", float(web["cpus"]), 0.25)
+    expect("mem_limit", int(web["mem_limit"]), 64 << 20)
+    expect("ports", [(p["host_ip"], str(p["published"]), p["target"], p["protocol"]) for p in web["ports"]],
+           [("127.0.0.1", "7410", 7410, "tcp")])
+    expect("networks", sorted(web["networks"]), ["console"])
+    expect("bridge", base["networks"]["console"]["name"], app + "-console")
+    expect("bridge driver", base["networks"]["console"]["driver"], "bridge")
+    expect("volumes", [(v["type"], v["source"], v["target"], v.get("read_only")) for v in web["volumes"]],
+           [("bind", "/opt/%s/console/data" % app, "/data", True)])
+    expect("environment", sorted(web["environment"]), sorted(["GOMEMLIMIT", "CONSOLE_APP", "CONSOLE_ENV", "CONSOLE_PROFILE", "CONSOLE_ORIGIN", "CONSOLE_BACKEND", "CONSOLE_JOBS"]))
+    expect("GOMEMLIMIT", web["environment"]["GOMEMLIMIT"], "40MiB")
+    expect("healthcheck", web["healthcheck"]["test"], ["CMD", "/console", "healthcheck"])
+    expect("restart", web["restart"], "unless-stopped")
+    expect("query services", sorted(query["services"]), ["console", "console-query"])
+    relay = query["services"]["console-query"]
+    expect("relay image", relay["image"], image)
+    expect("relay entrypoint", relay["entrypoint"], ["/console", "query"])
+    expect("relay profiles", relay["profiles"], ["query"])
+    expect("relay ports", relay.get("ports"), None)
+    expect("relay volumes", relay.get("volumes"), None)
+    expect("relay networks", sorted(relay["networks"]), ["console", "monitoring"])
+    expect("relay mem_limit", int(relay["mem_limit"]), 48 << 20)
+    expect("relay GOMEMLIMIT", relay["environment"]["GOMEMLIMIT"], "28MiB")
+    expect("relay environment", sorted(relay["environment"]), sorted(["GOMEMLIMIT", "CONSOLE_APP", "CONSOLE_ENV", "CONSOLE_PROFILE"]))
+    expect("relay healthcheck", relay["healthcheck"]["test"], ["CMD", "/console", "healthcheck", "query"])
+    expect("monitoring network", query["networks"]["monitoring"]["name"], app + "-monitoring")
+    expect("monitoring external", query["networks"]["monitoring"]["external"], True)
+elif mode == "absent":
+    doc = load(sys.argv[2])
+    expect("services", sorted(doc["services"]), ["console"])
+    expect("networks", sorted(doc["networks"]), ["console"])
+elif mode == "project":
+    doc = load(sys.argv[2])
+    shape(doc)
+    host_sections(doc, "2026-11-01T12:00:00Z")
+    expect("release.age_seconds", doc["release"]["data"]["age_seconds"], 3600)
+    # The projector does not query Prometheus: the page replaces this section on each request.
+    expect("alerts", doc["alerts"], {"state": "unavailable", "reason": "missing", "at": None, "data": None})
+elif mode == "failed":
+    doc = load(sys.argv[2])
+    shape(doc)
+    expect("disk", doc["disk"], {"state": "unavailable", "reason": "timeout", "at": "2026-11-01T12:00:00Z", "data": None})
+    expect("memory.state", doc["memory"]["state"], "ok")
+elif mode == "overview":
+    doc, facts, now = load(sys.argv[2]), load(sys.argv[3]), sys.argv[4]
+    shape(doc)
+    host_sections(doc, now)
+    integer("release.age_seconds", doc["release"]["data"]["age_seconds"])
+    for name in SECTIONS:
+        if name != "alerts":
+            expect(name, doc[name], facts[name])
+    alerts = doc["alerts"]
+    expect("alerts.state", alerts["state"], "unavailable")
+    expect("alerts.reason", alerts["reason"], "source_down")
+    expect("alerts.data", alerts["data"], None)
+    if not isinstance(alerts["at"], str) or not alerts["at"].endswith("Z"):
+        fail("alerts.at is %r, want the attempt time" % alerts["at"])
+elif mode == "alerts-down":
+    alerts = load(sys.argv[2])["alerts"]
+    expect("alerts.state", alerts["state"], "unavailable")
+    expect("alerts.reason", alerts["reason"], "source_down")
+elif mode in ("inspect-web", "inspect-relay"):
+    c = json.loads(sys.argv[2])[0]
+    host, config = c["HostConfig"], c["Config"]
+    expect("user", config["User"], "65532:65532")
+    expect("read-only root", host["ReadonlyRootfs"], True)
+    expect("cap drop", host["CapDrop"], ["ALL"])
+    expect("security opt", host["SecurityOpt"], ["no-new-privileges:true"])
+    expect("pids limit", host["PidsLimit"], 32)
+    expect("cpus", host["NanoCpus"], 250000000)
+    expect("privileged", host["Privileged"], False)
+    expect("network mode", host["NetworkMode"] in ("default", "bridge", "host", "none"), False)
+    if "docker.sock" in json.dumps(c["Mounts"]):
+        fail("a Docker socket is mounted")
+    for e in config["Env"]:
+        if "PASSWORD" in e or "SECRET" in e or "DATABASE_URL" in e:
+            fail("a secret-like variable is set: %s" % e.split("=", 1)[0])
+    if mode == "inspect-web":
+        expect("memory", host["Memory"], 64 << 20)
+        expect("networks", sorted(c["NetworkSettings"]["Networks"]), [sys.argv[3]])
+        expect("mounts", [(m["Destination"], m["RW"]) for m in c["Mounts"]], [("/data", False)])
+        # The image exposes 8080 for the API. Docker lists it with no binding.
+        ports = {p: b for p, b in c["NetworkSettings"]["Ports"].items() if b}
+        expect("published ports", sorted(ports), ["7410/tcp"])
+        expect("host ip", [b["HostIp"] for b in ports["7410/tcp"]], ["127.0.0.1"])
+        expect("GOMEMLIMIT", "GOMEMLIMIT=40MiB" in config["Env"], True)
+        expect("healthcheck", config["Healthcheck"]["Test"], ["CMD", "/console", "healthcheck"])
+        expect("entrypoint", config["Entrypoint"], ["/console", "serve"])
+    else:
+        expect("memory", host["Memory"], 48 << 20)
+        expect("networks", sorted(c["NetworkSettings"]["Networks"]), sorted([sys.argv[3], sys.argv[4]]))
+        expect("mounts", c["Mounts"], [])
+        expect("published ports", [p for p, b in (c["NetworkSettings"]["Ports"] or {}).items() if b], [])
+        expect("GOMEMLIMIT", "GOMEMLIMIT=28MiB" in config["Env"], True)
+        expect("healthcheck", config["Healthcheck"]["Test"], ["CMD", "/console", "healthcheck", "query"])
+        expect("entrypoint", config["Entrypoint"], ["/console", "query"])
+else:
+    fail("unknown mode")
+
+-- input/release.json --
+{"release":"20261101T110000Z-0123456789ab","app":"gateconsole","env":"production","git_sha":"0123456789abcdef0123456789abcdef01234567","color":"blue","created_at":"2026-11-01T11:00:00Z","user":"operator"}
+-- input/releases.json --
+[{"release":"20261101T110000Z-0123456789ab","app":"gateconsole","env":"production","git_sha":"0123456789abcdef0123456789abcdef01234567","color":"blue","created_at":"2026-11-01T11:00:00Z","user":"operator"},{"release":"20261031T090000Z-abcdef012345","app":"gateconsole","env":"production","git_sha":"abcdef012345abcdef012345abcdef012345abcd","color":"green","created_at":"2026-10-31T09:00:00Z","user":"operator"}]
+-- input/upstream.caddy --
+reverse_proxy {
+	{block}
+	dynamic a {
+		name {args[0]}-blue
+		port {args[1]}
+		refresh 1s
+	}
+	lb_policy round_robin
+	lb_try_duration 5s
+	lb_try_interval 50ms
+	transport http {
+		dial_timeout 250ms
+	}
+}
+-- input/deploy.state --
+{"release":"20261101T100000Z-fedcba987654","step":"upload","status":"started","at":"2026-11-01T10:00:05Z","detail":""}
+{"release":"20261101T100000Z-fedcba987654","step":"upload","status":"failed","at":"2026-11-01T10:00:09Z","detail":"private journal prose"}
+{"release":"20261101T110000Z-0123456789ab","step":"hooks","status":"started","at":"2026-11-01T11:00:01Z","detail":""}
+{"release":"20261101T110000Z-0123456789ab","step":"post","status":"done","at":"2026-11-01T11:02:00Z","detail":""}
+-- input/containers.ndjson --
+{"project":"gateconsole-console","service":"console","name":"gateconsole-console-console-1","state":"running","health":"starting"}
+{"project":"gateconsole-blue","service":"worker","name":"gateconsole-blue-worker-1","state":"exited","health":null}
+{"project":"gateconsole","service":"postgres","name":"gateconsole-postgres-1","state":"running","health":"healthy"}
+{"project":"gateconsole-blue","service":"api","name":"gateconsole-blue-api-1","state":"running","health":"healthy"}
+-- input/jobs.json --
+[{"queue":"default","state":"available","count":3},{"queue":"default","state":"completed","count":12},{"queue":"mail","state":"retryable","count":1}]
+-- input/disk.txt --
+Filesystem     1024-blocks     Used Available Capacity Mounted on
+/dev/vda1         51290592 10485760  38682600      22% /
+-- input/memory.txt --
+MemTotal:        4026532 kB
+MemFree:          812000 kB
+MemAvailable:    3000000 kB
+Buffers:           64000 kB

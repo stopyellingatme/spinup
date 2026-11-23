@@ -72,13 +72,17 @@ func expectInstall(r *remote.Fake, s Spec, mapping string, timer bool) {
 		}
 		r.Expect("systemctl", "--user", "daemon-reload").Return("", "", 0)
 		r.Expect("systemctl", "--user", "enable", "--now", "spinup-"+s.App+"-console-sample.timer").Return("", "", 0)
-	} else if mapping == loopbackMapping {
+	} else if mapping == loopbackMapping || mapping == exposedMapping {
 		r.Expect("sh", "-c", timerProbeScript).Return("", "", 0)
 	}
 	r.Expect("rm", "-rf", "--", stage).Return("", "", 0)
 }
 
 const loopbackMapping = `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7410"}]}`
+
+// exposedMapping is the mapping of the real API image: it exposes 8080, so Docker lists that
+// port with no binding next to the published console port.
+const exposedMapping = `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7410"}],"8080/tcp":null}`
 
 func TestConsoleInstall(t *testing.T) {
 	for _, timer := range []bool{false, true} {
@@ -114,8 +118,19 @@ func TestConsoleInstall(t *testing.T) {
 	}
 }
 
+// TestConsoleInstallExposedImagePort accepts an exposed image port that Docker does not publish.
+func TestConsoleInstallExposedImagePort(t *testing.T) {
+	s, base, _ := composeFixture(t, "absent")
+	r := &remote.Fake{}
+	expectInstall(r, s, exposedMapping, false)
+	if err := Install(context.Background(), r, s, base); err != nil {
+		t.Fatal(err)
+	}
+	r.AssertDone(t)
+}
+
 func TestConsoleInstallActualMapping(t *testing.T) {
-	for _, mapping := range []string{`{}`, `{"7410/tcp":[{"HostIp":"0.0.0.0","HostPort":"7410"}]}`, `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7411"}]}`, `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7410"},{"HostIp":"::","HostPort":"7410"}]}`} {
+	for _, mapping := range []string{`{}`, `{"7410/tcp":[{"HostIp":"0.0.0.0","HostPort":"7410"}]}`, `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7410"}],"8080/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}]}`, `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7411"}]}`, `{"7410/tcp":[{"HostIp":"127.0.0.1","HostPort":"7410"},{"HostIp":"::","HostPort":"7410"}]}`} {
 		s, base, _ := composeFixture(t, "absent")
 		r := &remote.Fake{}
 		expectInstall(r, s, mapping, false)
@@ -193,4 +208,18 @@ func TestConsoleRefreshInitial(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.AssertDone(t)
+}
+
+// TestCollectorPath keeps /usr/local/bin on the fixed PATH of the collector. A Docker CLI there
+// (the docker:dind VM, static installs) serves the deploy, so it must also serve every probe.
+func TestCollectorPath(t *testing.T) {
+	for line := range strings.SplitSeq(string(collector), "\n") {
+		if value, ok := strings.CutPrefix(line, "PATH="); ok {
+			if value != "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" {
+				t.Fatalf("collector PATH = %q, want the Debian default with /usr/local/bin", value)
+			}
+			return
+		}
+	}
+	t.Fatal("the collector sets no fixed PATH")
 }

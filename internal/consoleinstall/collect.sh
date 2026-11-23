@@ -2,7 +2,8 @@
 # Fixed host collector. Configuration is data, never shell code.
 set +x
 set -eu
-PATH=/usr/sbin:/usr/bin:/sbin:/bin
+# The default PATH of Debian and of systemd user units. The deploy finds docker on the same PATH.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 LC_ALL=C
 TZ=UTC

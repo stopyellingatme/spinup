@@ -4,3 +4,6 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 AllowUsers deploy
+# Debian and Ubuntu permit local forwards by default. Alpine sets AllowTcpForwarding no.
+# spinup console open, spinup status, and spinup monitor open forward VM loopback ports.
+AllowTcpForwarding local

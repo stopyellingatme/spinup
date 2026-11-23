@@ -206,8 +206,15 @@ func Install(ctx context.Context, r remote.Runner, s Spec, base []byte) error {
 	if err := json.Unmarshal(result.Stdout, &ports); err != nil {
 		return failure("check console port", err)
 	}
+	// The API image exposes 8080, so Docker lists it with no binding. Only bound ports are published.
+	published := 0
+	for _, b := range ports {
+		if len(b) > 0 {
+			published++
+		}
+	}
 	binding := ports["7410/tcp"]
-	if len(ports) != 1 || len(binding) != 1 || binding[0].HostIP != "127.0.0.1" || binding[0].HostPort != "7410" {
+	if published != 1 || len(binding) != 1 || binding[0].HostIP != "127.0.0.1" || binding[0].HostPort != "7410" {
 		return failure("check console port", fmt.Errorf("the Docker engine did not publish only 127.0.0.1:7410:7410/tcp"))
 	}
 	return installTimer(ctx, r, s, dir)
