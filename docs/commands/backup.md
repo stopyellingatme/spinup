@@ -123,7 +123,11 @@ The repository type comes from `repo1-type` in `pgbackrest.conf`, with `PGBACKRE
 The deploy uploads the secrets in `upload`, then restarts PostgreSQL in `edge` when any `PGBACKREST_*` hash changed.
 The restart includes added and removed secrets, and the deploy waits until PostgreSQL is healthy.
 PostgreSQL reads these secrets only at start.
-Unchanged secrets cause no restart.
+Unchanged secrets cause no restart when PostgreSQL has a record of the applied hashes.
+If that record is absent, the deploy restarts PostgreSQL once, even when no storage secrets remain.
+
+Before a resumed restart, the deploy checks that the VM secret hashes match the uploaded release.
+If they differ, run a new `spinup deploy` without `--resume`.
 Until you deploy, `backup now` fails with an S3 or stanza error.
 
 <!-- doctest: skip -->
@@ -204,7 +208,7 @@ If the backup fails, the deploy stops.
 - With no recorded release, the first deploy skips the backup, even when an earlier failed deploy left PostgreSQL running.
 - With pgBackRest, changed storage hashes skip the backup with a clear message.
 
-The comparison uses the hashes in the current `release.json` and includes every `PGBACKREST_*` secret.
+The comparison uses the applied hashes in `postgres/backup-secrets.json` and includes every `PGBACKREST_*` secret.
 When storage hashes differ, the deploy continues through `upload` and restarts PostgreSQL in `edge`.
 This deploy has no automatic backup before its migrations.
 Take a backup with `spinup backup now` after the deploy.

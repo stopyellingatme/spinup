@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -89,7 +90,7 @@ func backupSecretHashes(values map[string]string) map[string]string {
 }
 
 // readBackupSecretHashes reads the credentials applied to Postgres, independent of a release.
-// A missing record is unknown and requires a restart when storage secrets exist.
+// A nil map means no record. An empty, non-nil map records that no storage secrets were applied.
 func (f *flow) readBackupSecretHashes(ctx context.Context) (map[string]string, error) {
 	path := f.root() + "/postgres/backup-secrets.json"
 	result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", readRemoteFileScript, "spinup-read", path}})
@@ -105,6 +106,36 @@ func (f *flow) readBackupSecretHashes(ctx context.Context) (map[string]string, e
 	}
 	return hashes, nil
 }
+
+// remoteBackupSecretHashes uses SHA-256 of the file bytes, the same form as SecretHashes.
+// secrets.Push writes the value bytes without a newline. The command prints only hashes and names.
+func (f *flow) remoteBackupSecretHashes(ctx context.Context) (map[string]string, error) {
+	result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", backupSecretHashesScript, "spinup-backup-hashes", f.root() + "/secrets"}})
+	if err != nil {
+		return nil, fmt.Errorf("cannot resume: hash PGBACKREST_* secret files on the VM: %w\nTry: run a new spinup deploy without --resume", err)
+	}
+	hashes := make(map[string]string)
+	for line := range strings.SplitSeq(strings.TrimSuffix(string(result.Stdout), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := backupSecretHashLine.FindStringSubmatch(line)
+		if parts == nil {
+			return nil, fmt.Errorf("cannot resume: unexpected checksum output for PGBACKREST_* secret files\nTry: run a new spinup deploy without --resume")
+		}
+		hashes[parts[2]] = parts[1]
+	}
+	return hashes, nil
+}
+
+var backupSecretHashLine = regexp.MustCompile(`^([0-9a-f]{64})  (PGBACKREST_[A-Z0-9_]*)$`)
+
+// backupSecretHashesScript expands only backup secret names and passes each file as a separate argument.
+const backupSecretHashesScript = `set -eu
+cd -- "$1"
+set -- PGBACKREST_*
+if [ "$1" = 'PGBACKREST_*' ] && [ ! -e "$1" ]; then exit 0; fi
+sha256sum -- "$@"`
 
 func (f *flow) writeBackupSecretHashes(ctx context.Context, hashes map[string]string) error {
 	path := f.root() + "/postgres/backup-secrets.json"

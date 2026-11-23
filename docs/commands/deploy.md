@@ -319,12 +319,18 @@ The deploy decrypts the secrets on your machine with sops and writes one file fo
 It removes files for names that no longer exist.
 Secret values never enter an image, a Compose file, `.env`, the journal, or the output.
 The file `release.json` keeps only the SHA-256 of each value.
+
 For pgBackRest, a changed, added, or removed `PGBACKREST_*` secret causes a PostgreSQL restart after `upload`.
 The deploy compares hashes against `postgres/backup-secrets.json`, which records the secrets applied to PostgreSQL.
 It writes this file with mode `0600` after PostgreSQL restarts and passes its health check.
 The file contains only hashes and remains accurate if a later step fails before the release becomes current.
-When a resumed deploy skips upload, it uses the hashes from the uploaded release.
-If the file is absent and storage secrets exist, the deploy restarts PostgreSQL once and writes the file.
+
+Before a resumed restart, the deploy compares the VM secret hashes with the uploaded release.
+If they differ, resume stops before the restart.
+Run a new `spinup deploy` without `--resume` to upload the current secrets.
+If the record is absent, the deploy restarts PostgreSQL once, even when no storage secrets remain.
+After the health check passes, it records the applied hashes, including an empty set.
+
 Unchanged storage hashes cause no restart.
 To change a secret without a deploy, read [`spinup secrets push`](secrets.md#push-secrets-to-the-vm).
 
