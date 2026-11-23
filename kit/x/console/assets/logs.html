@@ -1,0 +1,18 @@
+{{define "log-form"}}
+<form action="/logs" method="get">
+{{if .Port}}<input type="hidden" name="grafana_port" value="{{.Port}}">{{end}}
+<div><label for="service">Service</label><input id="service" name="service" value="{{.Filter.Service}}" maxlength="128" placeholder="All services"></div>
+<div><label for="level">Level</label><select id="level" name="level"><option value="">All levels</option><option{{if eq .Filter.Level "debug"}} selected{{end}}>debug</option><option{{if eq .Filter.Level "info"}} selected{{end}}>info</option><option{{if eq .Filter.Level "warn"}} selected{{end}}>warn</option><option{{if eq .Filter.Level "error"}} selected{{end}}>error</option></select></div>
+<div><label for="since">Window</label><select id="since" name="since"><option{{if eq .Filter.Since "15m"}} selected{{end}}>15m</option><option{{if or (eq .Filter.Since "1h") (eq .Filter.Since "")}} selected{{end}}>1h</option><option{{if eq .Filter.Since "6h"}} selected{{end}}>6h</option><option{{if eq .Filter.Since "24h"}} selected{{end}}>24h</option></select></div>
+<div class="search-text"><label for="text">Literal text (maximum 256 UTF-8 bytes)</label><input id="text" name="text" value="{{.Filter.Text}}" maxlength="256"></div><button type="submit">Search logs</button>
+</form>
+{{end}}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Logs · {{.App}}</title><link rel="stylesheet" href="/assets/console.css"></head>
+<body><a class="skip" href="#main">Skip to results</a><header><p class="eyebrow">SPINUP / CONSOLE</p><h1>Logs <span>{{.App}} ({{.Env}})</span></h1><nav aria-label="Console"><a href="{{.OverviewURL}}">Overview</a><a href="{{.LogsURL}}" aria-current="page">Logs</a></nav></header>
+<main id="main"><section class="tools"><h2>Search</h2>{{template "log-form" .}}</section>
+{{with .Logs}}<section class="tools"><h2>Results</h2><p>Window: <time>{{.Start.Format "2006-01-02T15:04:05.999999999Z07:00"}}</time> to <time>{{.End.Format "2006-01-02T15:04:05.999999999Z07:00"}}</time></p><pre>{{.Query}}</pre>
+{{range .Entries}}<article class="log"><h3><time>{{.At.Format "2006-01-02T15:04:05.999999999Z07:00"}}</time> · {{.Service}} · {{if .Level}}{{.Level}}{{else}}unknown{{end}}</h3><pre>{{.Line}}</pre></article>{{else}}<p>No matching lines.</p>{{end}}
+{{if .More}}<p>More matches exist. The page shows the newest 100 lines.</p>{{end}}</section>{{end}}
+<section class="tools"><h2>Related tools</h2>{{if .ExploreURL}}<a href="{{.ExploreURL}}">Explore in Grafana</a>{{end}}<pre>{{.GrafanaCommand}}</pre><pre>{{.LogCommand}}</pre><a href="https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/monitor.md">Documentation</a></section>
+</main><footer class="page-footer">Read-only log search · Times use UTC.</footer></body></html>

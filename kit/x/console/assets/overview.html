@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{.App}} · Console</title><link rel="stylesheet" href="/assets/console.css"></head>
+<body>
+<a class="skip" href="#main">Skip to observations</a>
+<header><p class="eyebrow">SPINUP / CONSOLE</p><h1>{{.App}} <span>({{.Env}})</span></h1><p>Observed: <time>{{.Observed}}</time></p>
+<nav aria-label="Console"><a href="{{.OverviewURL}}" aria-current="page">Overview</a><a href="{{.LogsURL}}">Logs</a>{{if .AppURL}}<a href="{{.AppURL}}">{{.App}}</a>{{end}}</nav></header>
+<main id="main">
+<div class="observations">
+{{range .Tiles}}
+<section class="tile" aria-label="{{.Caption}}"><header><h2>{{.Caption}}</h2><span class="state {{.State}}">{{.State}}{{if .Reason}}: {{.Reason}}{{end}}</span></header>
+<p class="sample">Sample: <time>{{.At}}</time></p>
+{{range .Rows}}<dl class="fields">{{range .}}<dt>{{.Name}}</dt><dd>{{.Value}}</dd>{{end}}</dl>{{else}}{{if or (eq .State "ok") (eq .State "stale")}}<p>none</p>{{else}}<p>No observation: {{.Reason}}</p>{{end}}{{end}}
+<footer><a href="{{.Docs}}">Documentation</a><details><summary>Terminal commands</summary><pre>{{.Command}}</pre><pre>{{.OverviewCommand}}</pre></details></footer>
+</section>
+{{end}}
+</div>
+<section class="tools"><h2>Grafana</h2>{{if .Dashboards}}<nav aria-label="Dashboards">{{range .Dashboards}}<a href="{{.URL}}">{{.Caption}}</a>{{end}}</nav>{{end}}<pre>{{.GrafanaCommand}}</pre><pre>spinup status --env {{.Env}}</pre><a href="https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/monitoring.md">Documentation</a></section>
+<section class="tools"><h2>Logs</h2>{{template "log-form" .}}<pre>{{.LogCommand}}</pre><pre>spinup status --env {{.Env}}</pre><a href="https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/monitor.md">Documentation</a></section>
+{{if or .BackupCommand .RollbackCommand}}<section class="tools"><h2>Workstation commands</h2><p>Run these commands on your workstation.</p>{{if .BackupCommand}}<h3>Back up now</h3><pre>spinup backup now --type full --env {{.Env}}</pre>{{end}}{{if .RollbackCommand}}<h3>Roll back to the previous release</h3><pre>spinup rollback --env {{.Env}}</pre>{{end}}</section>{{end}}
+</main><footer class="page-footer">Read-only observations · Times use UTC. Refresh the page to read the latest sample.</footer>
+</body></html>
