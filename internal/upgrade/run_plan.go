@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/migrate"
@@ -104,6 +105,9 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 	if err := addPlanMigrationPaths(r.Root, paths); err != nil {
 		return nil, fmt.Errorf("inspect project migrations for planning: %w\nTry: check permissions on api/db/migrations and api/db/kit", err)
 	}
+	if err := addPlanGeneratorPaths(r.Root, paths); err != nil {
+		return nil, err
+	}
 	for _, version := range versions {
 		to, loadErr := r.Source.Load(ctx, version)
 		if loadErr != nil {
@@ -175,6 +179,13 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 				return nil, err
 			}
 		}
+		lock, err = NextLock(lock, plan, to, answers, newPacks)
+		if err != nil {
+			return nil, err
+		}
+		if err := applyGeneratedPlan(ctx, temp, lock, plan); err != nil {
+			return nil, err
+		}
 		if err := plan.Format(r.Out); err != nil {
 			return nil, err
 		}
@@ -182,18 +193,34 @@ func (r *Runner) preview(ctx context.Context, lock *manifest.Lock, versions []st
 			return nil, err
 		}
 		report.Steps = append(report.Steps, plan)
-		if err := writePlan(temp, plan); err != nil {
-			return nil, err
-		}
 		if err := r.previewMigrations(migrationCtx, migrate.After); err != nil {
-			return nil, err
-		}
-		lock, err = NextLock(lock, plan, to, answers, newPacks)
-		if err != nil {
 			return nil, err
 		}
 	}
 	return report, nil
+}
+
+// addPlanGeneratorPaths includes generator inputs that need not appear in the lock.
+func addPlanGeneratorPaths(source string, paths map[string]bool) error {
+	paths[project.ConfigFile] = true
+	root, err := os.OpenRoot(source)
+	if err != nil {
+		return fmt.Errorf("open generator inputs for planning: %w\nTry: check the project permissions", err)
+	}
+	defer root.Close()
+	entries, err := fs.ReadDir(root.FS(), "api/internal/mcp")
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect MCP inputs for planning: %w\nTry: check permissions on api/internal/mcp", err)
+	}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".go") {
+			paths["api/internal/mcp/"+entry.Name()] = true
+		}
+	}
+	return nil
 }
 
 func addPlanMigrationPaths(source string, paths map[string]bool) error {

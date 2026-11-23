@@ -1,0 +1,90 @@
+# The upgrade regenerates module configuration and tool registrations before verification.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+mkversion 0.0.1 overlay
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new demo --modules auth,jobs,billing,apikeys,flags,mcp --module example.com/demo --non-interactive
+cd demo
+exec sh -c 'cat ../declarations.toml >> spinup.toml'
+exec spinup g billing
+exec spinup g apikeys
+exec spinup g flags
+exec spinup g roles
+exec spinup g mcp tool lookup_order
+cp api/internal/billing/billing.gen.go $WORK/billing.go
+cp api/internal/apikeys/apikeys.gen.go $WORK/apikeys.go
+cp api/internal/flags/flags.gen.go $WORK/flags.go
+cp api/internal/roles/roles.gen.go $WORK/roles.go
+cp api/internal/mcp/tools_gen.go $WORK/tools.go
+cp web/src/lib/billing.gen.ts $WORK/billing.ts
+cp web/src/lib/apikeys.gen.ts $WORK/apikeys.ts
+cp web/src/lib/flags.gen.ts $WORK/flags.ts
+exec git add -A
+exec git commit -q -m 'Configure plans, flags, roles, and tools'
+
+# Equal final content must not appear in the overwrite list.
+exec spinup upgrade --plan --offline
+! stdout '  api/internal/billing/billing.gen.go'
+! stdout '  api/internal/apikeys/apikeys.gen.go'
+! stdout '  api/internal/flags/flags.gen.go'
+! stdout '  api/internal/mcp/tools_gen.go'
+! stdout '  web/src/lib/billing.gen.ts'
+! stdout '  web/src/lib/flags.gen.ts'
+exec spinup upgrade --yes --no-verify --offline
+cd .spinup/upgrade/0.0.1
+cmp api/internal/billing/billing.gen.go $WORK/billing.go
+cmp api/internal/apikeys/apikeys.gen.go $WORK/apikeys.go
+cmp api/internal/flags/flags.gen.go $WORK/flags.go
+cmp api/internal/roles/roles.gen.go $WORK/roles.go
+cmp api/internal/mcp/tools_gen.go $WORK/tools.go
+cmp web/src/lib/billing.gen.ts $WORK/billing.ts
+cmp web/src/lib/apikeys.gen.ts $WORK/apikeys.ts
+cmp web/src/lib/flags.gen.ts $WORK/flags.ts
+grep 'PlanPro' api/internal/billing/billing.gen.go
+grep 'new_dashboard' api/internal/flags/flags.gen.go
+grep 'registerLookupOrder\(s, d\)' api/internal/mcp/tools_gen.go
+exec spinup check --offline
+exec git status --porcelain
+! stdout .
+
+-- declarations.toml --
+
+[auth]
+roles = ["admin", "member", "manager"]
+admin_role = "admin"
+default_role = "member"
+
+[apikeys.plans.free]
+per_minute = 10
+per_day = 100
+
+[apikeys.plans.pro]
+per_minute = 100
+per_day = 1000
+
+[[billing.plans]]
+name = "free"
+
+[[billing.plans]]
+name = "pro"
+prices = ["pro_monthly"]
+
+[flags.new_dashboard]
+description = "Show the new dashboard"
+default = true
+public = true
+
+-- overlay/packs/billing/files/api/internal/billing/billing.gen.go --
+// Changed billing pack default.
+package billing
+
+-- overlay/packs/apikeys/files/api/internal/apikeys/apikeys.gen.go --
+// Changed API key pack default.
+package apikeys
+
+-- overlay/packs/flags/files/api/internal/flags/flags.gen.go --
+// Changed flag pack default.
+package flags
+
+-- overlay/packs/mcp/files/api/internal/mcp/tools_gen.go.tmpl --
+// Changed MCP pack default.
+package mcp
