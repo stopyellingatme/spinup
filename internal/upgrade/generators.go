@@ -34,7 +34,7 @@ func regeneratedPath(path string, packs []string) bool {
 
 // applyGeneratedPlan applies the packs, then replaces their defaults with generator output.
 // The decisions compare the final output with the files before either write.
-func applyGeneratedPlan(ctx context.Context, root string, lock *manifest.Lock, plan *Plan) error {
+func applyGeneratedPlan(ctx context.Context, root string, lock *manifest.Lock, plan *Plan, force bool) error {
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return fmt.Errorf("open generator inputs: %w\nTry: restore the upgrade worktree", err)
@@ -49,17 +49,24 @@ func applyGeneratedPlan(ctx context.Context, root string, lock *manifest.Lock, p
 		if err != nil {
 			return err
 		}
+		if disk.exists {
+			// Preserve the owner's exact bytes, including line endings, on a conflict.
+			disk.data, err = dir.ReadFile(file.path)
+			if err != nil {
+				return fmt.Errorf("read generator output %q: %w\nTry: check the file permissions", file.path, err)
+			}
+		}
 		original[file.path] = disk
 	}
 	if err := writePlan(root, plan); err != nil {
 		return err
 	}
-	return regenerate(ctx, root, lock, plan, original)
+	return regenerate(ctx, root, lock, plan, original, force)
 }
 
 // regenerate also runs before the lock commit, after codemods and conflict resolution.
-// A nil original records the output without changing the previously reported decisions.
-func regenerate(ctx context.Context, root string, lock *manifest.Lock, plan *Plan, original map[string]planDisk) error {
+// A nil original checks current files before the lock commit.
+func regenerate(ctx context.Context, root string, lock *manifest.Lock, plan *Plan, original map[string]planDisk, force bool) error {
 	configConflict, mcpConflict := false, false
 	for _, file := range plan.Files {
 		if file.Action == ActionConflict {
@@ -97,16 +104,50 @@ func regenerate(ctx context.Context, root string, lock *manifest.Lock, plan *Pla
 		}
 		output, err := g.run(ctx, gen.Input{Root: root, Lock: lock})
 		if err != nil {
-			command := "spinup g " + g.name
-			if g.name == "mcp" {
-				command += " tool <name>"
-			}
+			command := generatorCommand(g.name)
 			return fmt.Errorf("upgrade generator %s failed: %w\nTry: correct the inputs and run %s", g.name, err, command)
 		}
 		var generated vfs.Plan
 		for _, file := range output.Plan.Files {
 			entry, tracked := lock.Files[file.Path]
 			if !tracked || entry.Class != manifest.Managed || slices.Contains(lock.Tombstones, file.Path) {
+				continue
+			}
+			var decision *FileDecision
+			for i := range plan.Files {
+				if plan.Files[i].Path == file.Path {
+					decision = &plan.Files[i]
+					break
+				}
+			}
+			if decision == nil {
+				continue
+			}
+			disk, ok := original[file.Path]
+			if !ok {
+				dir, err := os.OpenRoot(root)
+				if err != nil {
+					return fmt.Errorf("open generator output: %w\nTry: restore the upgrade worktree", err)
+				}
+				disk, err = readPlanDisk(dir, file.Path)
+				_ = dir.Close()
+				if err != nil {
+					return err
+				}
+			}
+			matchesOutput := bytes.Equal(manifest.Normalize(disk.data), manifest.Normalize(file.Data))
+			// A resolved owner conflict can retain custom content. Never regenerate it again.
+			if strings.HasPrefix(decision.Reason, generatedConflictReason) && !matchesOutput {
+				continue
+			}
+			if !force && disk.exists && !matchesOutput && manifest.Hash(disk.data) != entry.Hash && !bytes.Equal(manifest.Normalize(disk.data), manifest.Normalize(decision.Data)) {
+				decision.Action, decision.Data, decision.Mode = ActionConflict, disk.data, disk.mode
+				decision.Reason = generatedConflictReason + ". Try: " + generatorCommand(g.name) + " in the worktree, or restart with spinup upgrade --force-managed"
+				if original != nil {
+					if err := generated.Add(vfs.File{Path: file.Path, Data: disk.data, Mode: disk.mode}); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			file.Mode = 0644
@@ -121,18 +162,11 @@ func regenerate(ctx context.Context, root string, lock *manifest.Lock, plan *Pla
 			if original == nil {
 				continue
 			}
-			for i := range plan.Files {
-				d := &plan.Files[i]
-				if d.Path != file.Path {
-					continue
-				}
-				d.Action, d.Data, d.Mode, d.Reason = ActionOverwrite, file.Data, file.Mode, ""
-				disk := original[file.Path]
-				if !disk.exists {
-					d.Action = ActionCreate
-				} else if bytes.Equal(disk.data, manifest.Normalize(file.Data)) && disk.mode == file.Mode {
-					d.Action = ActionUnchanged
-				}
+			decision.Action, decision.Data, decision.Mode, decision.Reason = ActionOverwrite, file.Data, file.Mode, ""
+			if !disk.exists {
+				decision.Action = ActionCreate
+			} else if matchesOutput && disk.mode == file.Mode {
+				decision.Action = ActionUnchanged
 			}
 		}
 		if _, err := vfs.Apply(root, generated, vfs.ApplyOptions{}); err != nil {
@@ -140,4 +174,18 @@ func regenerate(ctx context.Context, root string, lock *manifest.Lock, plan *Pla
 		}
 	}
 	return nil
+}
+
+const generatedEjectedReason = "ejected: generator skipped"
+const generatedConflictReason = "owner edited generated file"
+
+func generatorCommand(name string) string {
+	if name == "auth" {
+		name = "roles"
+	}
+	command := "spinup g " + name
+	if name == "mcp" {
+		command += " tool <name>"
+	}
+	return command
 }
