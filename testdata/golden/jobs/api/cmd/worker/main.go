@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,7 +17,10 @@ import (
 	"github.com/stopyellingatme/spinup/kit/db"
 	"github.com/stopyellingatme/spinup/kit/jobs"
 	"github.com/stopyellingatme/spinup/kit/logx"
+	"github.com/stopyellingatme/spinup/kit/telemetry"
 )
+
+var version = "dev"
 
 func main() {
 	if err := run(); err != nil {
@@ -25,19 +29,31 @@ func main() {
 	}
 }
 
-func run() error {
+func run() (err error) {
 	var cfg config.Base
 	if err := config.Load(&cfg); err != nil {
 		return err
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	shutdown, err := telemetry.Setup(ctx, telemetry.Options{ServiceName: "todo-worker", ServiceVersion: version, Environment: cfg.Env})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		err = errors.Join(err, shutdown(shutdownCtx))
+	}()
 	level := slog.LevelInfo
 	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
 	logger := logx.New(os.Stderr, logx.Options{Level: level})
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	if telemetry.Enabled() {
+		logger = slog.New(telemetry.SlogHandler(logger.Handler()))
+		slog.SetDefault(logger)
+	}
 
 	pool, err := db.Open(ctx, cfg.DatabaseURL, db.WithAppName("todo"+"-worker"), db.WithMaxConns(cfg.DatabaseMaxConns))
 	if err != nil {
