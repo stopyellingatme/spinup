@@ -469,6 +469,19 @@ func (f *flow) hooks(ctx context.Context) (string, error) {
 		return "", err
 	}
 	hooks := f.d.PreDeploy()
+	if f.l.backups {
+		reason := ""
+		switch {
+		case cur == nil:
+			reason = "no release is recorded yet (first deploy)"
+		case backupSecretsChanged(cur, f.l.secrets):
+			reason = "storage secrets changed, the deploy will push them and restart Postgres"
+		}
+		if reason != "" {
+			hooks = slices.DeleteFunc(slices.Clone(hooks), func(h Hook) bool { return h.Name == "backup" })
+			fmt.Fprintln(f.out, "backup: skipped, "+reason)
+		}
+	}
 	if len(hooks) == 0 {
 		return "no hooks", nil
 	}
@@ -685,6 +698,14 @@ fi`
 // edge syncs the Caddy and Postgres configuration and starts the base project (Caddy and Postgres).
 // A color switch never restarts it.
 func (f *flow) edge(ctx context.Context) (string, error) {
+	restartPostgres := false
+	if f.l.backups {
+		cur, err := readRelease(ctx, f.vm, f.l.app, "")
+		if err != nil {
+			return "", err
+		}
+		restartPostgres = backupSecretsChanged(cur, f.l.secrets)
+	}
 	root, dir := f.root(), f.releaseDir()
 	if _, err := f.cmd(ctx, false, "sh", "-c", edgeSyncScript, "spinup-edge", root, dir); err != nil {
 		return "", fmt.Errorf("copy the Caddy and Postgres configuration: %w", err)
@@ -721,6 +742,13 @@ func (f *flow) edge(ctx context.Context) (string, error) {
 	}
 	if _, err := f.cmd(ctx, false, "sh", "-c", edgeInstallScript, "spinup-edge-install", root); err != nil {
 		return "", fmt.Errorf("install the Caddyfile: %w", err)
+	}
+	if restartPostgres {
+		fmt.Fprintln(f.out, "Restarting Postgres because PGBACKREST_* secrets changed")
+		argv := ComposeArgv(f.l.app, dir, files, "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", strconv.Itoa(seconds(f.o.HealthTimeout)), "postgres")
+		if _, err := f.cmd(ctx, true, argv...); err != nil {
+			return "", fmt.Errorf("restart Postgres after backup storage secrets changed: %w", brief(err))
+		}
 	}
 	fmt.Fprintln(f.out, "Starting Caddy and Postgres")
 	up := ComposeArgv(f.l.app, dir, files, "up", "-d", "--wait", "--wait-timeout", strconv.Itoa(seconds(f.o.HealthTimeout)))

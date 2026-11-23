@@ -149,7 +149,6 @@ func TestHook(t *testing.T) {
 		{name: "no backups module", out: "does not use the backups module", script: func(*remote.Fake) {}},
 		{name: "first deploy", backups: true, out: "first deploy", script: func(f *remote.Fake) {
 			releaseHistory(f, "")
-			f.Expect(psRunning...).Return("", "", 0)
 		}},
 		{name: "diff backup", backups: true, out: "backup: 20261015-082351F_20261015-082353D (diff)", script: func(f *remote.Fake) {
 			releaseHistory(f, "[{}]")

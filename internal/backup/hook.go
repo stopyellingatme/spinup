@@ -58,7 +58,7 @@ func DeployOptionsFrom(ctx context.Context) DeployOptions {
 // Hook is the pre-deploy hook: it takes a diff backup before every deploy.
 //
 //   - A project without the backups module skips it.
-//   - A VM without a recorded release and a running postgres container skips it.
+//   - A VM without a recorded release skips it, even when postgres is running.
 //   - --skip-backup skips it, unless a pending migration lacks the -- spinup:safe marker.
 func Hook(ctx context.Context, c *deploy.HookContext) error {
 	if c == nil {
@@ -101,15 +101,15 @@ func Hook(ctx context.Context, c *deploy.HookContext) error {
 	if err != nil {
 		return fmt.Errorf("pre-deploy backup: determine whether this is the first deploy: %w", err)
 	}
+	if len(releases) == 0 {
+		_, _ = fmt.Fprintln(out, "backup: skipped, no release is recorded yet (first deploy)")
+		return nil
+	}
 	running, err := postgresRunning(ctx, c.Remote, app)
 	if err != nil {
 		return err
 	}
 	if !running {
-		if len(releases) == 0 {
-			_, _ = fmt.Fprintln(out, "backup: skipped, the database does not run yet (first deploy)")
-			return nil
-		}
 		if o.SkipBackup {
 			unsafe, err := unsafePendingSpaces(root, nil, nil)
 			if err != nil {

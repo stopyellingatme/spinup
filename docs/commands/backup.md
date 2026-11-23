@@ -108,7 +108,17 @@ Any other `PGBACKREST_*` secret becomes a pgBackRest option.
 For example, `PGBACKREST_REPO1_S3_URI_STYLE=path` selects path-style requests for storage that has no virtual-host buckets.
 
 Last, deploy. The files above reach the VM only through `spinup deploy`.
-The deploy starts PostgreSQL with WAL archiving on, and it gives the `postgres` service the storage secrets.
+With the pgBackRest backend, preflight refuses a deploy when a required storage secret is absent or empty.
+The error names each missing secret and gives a `Try:` line before the deploy changes the VM.
+The required secrets are `PGBACKREST_REPO1_CIPHER_PASS` and all five S3 secrets in the table above.
+For a repository type other than S3, only the passphrase is required.
+The repository type comes from `repo1-type` in `pgbackrest.conf`, with `PGBACKREST_REPO1_TYPE` taking precedence.
+
+`--skip-backup` does not bypass this check, because PostgreSQL starts with WAL archiving enabled.
+The deploy uploads the secrets in `upload`, then restarts PostgreSQL in `edge` when any `PGBACKREST_*` hash changed.
+The restart includes added and removed secrets, and the deploy waits until PostgreSQL is healthy.
+PostgreSQL reads these secrets only at start.
+Unchanged secrets cause no restart.
 Until you deploy, `backup now` fails with an S3 or stanza error.
 
 <!-- doctest: skip -->
@@ -182,11 +192,17 @@ To apply a new retention now, run `spinup backup prune`. See [backup restore](ba
 
 ## Back up before each deploy
 
-`spinup deploy` takes a `diff` backup before it changes the VM.
-If the backup fails, the deploy stops, so a bad deploy never starts without a restore point.
+`spinup deploy` takes a `diff` backup in `hooks`, before `upload` pushes the secrets and before migrations run.
+If the backup fails, the deploy stops.
 
 - An app without the `backups` module skips the backup.
-- The first deploy skips the backup, because the database does not run yet.
+- With no recorded release, the first deploy skips the backup, even when an earlier failed deploy left PostgreSQL running.
+- With pgBackRest, changed storage hashes skip the backup with a clear message.
+
+The comparison uses the hashes in the current `release.json` and includes every `PGBACKREST_*` secret.
+When storage hashes differ, the deploy continues through `upload` and restarts PostgreSQL in `edge`.
+This deploy has no automatic backup before its migrations.
+Take a backup with `spinup backup now` after the deploy.
 
 {: .warning }
 The pre-deploy backup always uses pgBackRest, whatever `[backups] backend` says. With `pgdump` or `walg`, the second deploy fails because the VM has no pgBackRest repository. Take a backup with `spinup backup now`, then deploy with `--skip-backup`.
@@ -219,7 +235,8 @@ To see the age of the newest backup now, read the `last backup` line of `backup 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `select backup environment: --env is missing` | The command needs an environment. | Pass `--env production`. |
-| `backup now` fails with an S3 or stanza error | A storage secret is wrong or missing, or you did not deploy after you added the `backups` module. | Fix the secret with `spinup secrets set` and `spinup secrets push`. Then run `spinup deploy --env production`. |
+| `backup now` fails with an S3 or stanza error | A storage secret is wrong or missing, or you did not deploy after you added the `backups` module. | Fix the secret with `spinup secrets set`. Then run `spinup deploy --env production` to upload the secrets and restart PostgreSQL. |
+| The deploy refuses missing storage secrets | The pgBackRest backend needs the storage secrets before PostgreSQL can archive WAL. | Set every named secret, then deploy again. `--skip-backup` does not bypass this check. |
 | The second deploy fails in the backup step | The backend is `pgdump` or `walg`, and the pre-deploy backup uses pgBackRest. | Run `spinup backup now`, then `spinup deploy --skip-backup`. |
 | `/opt/<app>/backups` does not exist | The VM is not set up. | Run `spinup server bootstrap --env production`. |
 

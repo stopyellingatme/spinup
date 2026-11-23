@@ -49,6 +49,7 @@ type local struct {
 	secrets    map[string]string
 	web        bool
 	sidecars   []services.Service // the [[services]] of spinup.toml (ADR 0022 §2)
+	backups    bool               // the backups module uses pgBackRest
 	jobs       bool               // the jobs module is on: compose.services.yml also feeds the worker
 	otel       bool               // the monitoring module is on with a profile other than none
 	files      []releaseFile
@@ -92,6 +93,7 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 	}
 	l := &local{root: root, app: config.App.Name, env: env, behavior: config.EffectiveBehaviorVersion(), sidecars: config.Services}
 	l.jobs = slices.Contains(config.Modules, "jobs")
+	l.backups = usesPGBackRest(config)
 	// The same rule as the OTel block of the api service in deploy/compose.yml.
 	l.otel = slices.Contains(config.Modules, "monitoring") && config.Monitoring.Profile != "none"
 	if l.origin, l.site, err = publicOrigin(env.PublicURL, env.Host); err != nil {
@@ -166,6 +168,19 @@ func preflight(ctx context.Context, o Options, d Deps, out io.Writer, confirm bo
 		if _, ok := l.secrets[name]; !ok {
 			return nil, preflightError("the secret "+name+" is missing in secrets/"+env.Name+".enc.yaml", "run spinup secrets set --env "+env.Name+" "+name)
 		}
+	}
+	backupNeed, err := backupSecrets(root, config, l.secrets)
+	if err != nil {
+		return nil, err
+	}
+	var missing []string
+	for _, name := range backupNeed {
+		if strings.TrimSpace(l.secrets[name]) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return nil, preflightError("required backup storage secrets are missing in secrets/"+env.Name+".enc.yaml: "+strings.Join(missing, ", "), "run spinup secrets set --env "+env.Name+" <NAME> for each missing secret, then deploy again")
 	}
 	// A service mounts each of its secrets as one file. A missing file fails the start of
 	// the color, so check the names before anything changes on the VM.

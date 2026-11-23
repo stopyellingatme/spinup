@@ -248,6 +248,15 @@ $ spinup deploy --env staging --platform linux/arm64
 Before a deploy that has migrations, a hook makes a database backup.
 `--skip-backup` skips it.
 The hook still refuses when a migration lacks the `-- spinup:safe` marker.
+With pgBackRest, this flag does not bypass the required storage secrets.
+Preflight names every absent or empty storage secret and refuses before the deploy changes the VM.
+See the [required storage secrets](backup.md#set-up-pgbackrest-backups).
+
+With no recorded release, the backup is skipped even when PostgreSQL already runs after a failed first deploy.
+Changed `PGBACKREST_*` hashes also skip the backup, so the deploy can upload new storage secrets.
+The deploy prints the reason, uploads the secrets, then restarts PostgreSQL and waits until it is healthy.
+This deploy has no automatic backup before migrations.
+Take a backup with `spinup backup now` after the deploy.
 
 <!-- doctest: skip -->
 ```console
@@ -288,10 +297,10 @@ This table is the full list. The [deploy overview](../deploy/index.md#how-a-depl
 | `preflight` | Checks the git tree, `spinup check`, `db lint`, the environment, and the secrets. |
 | `build` | Builds the `api` and `web` images. The tag is the release ID. |
 | (lock) | Takes the lock on the VM. A held lock gives exit code 5. |
-| `hooks` | Runs the pre-deploy hooks, for example the backup. |
+| `hooks` | Runs pre-deploy hooks. Skips the backup before the first release or when pgBackRest storage hashes changed. |
 | `transport` | Moves the images to the VM. |
 | `upload` | Writes the release directory and pushes the secrets. |
-| `edge` | Updates and starts Caddy and PostgreSQL. |
+| `edge` | Updates and starts Caddy and PostgreSQL. Restarts PostgreSQL for changed `PGBACKREST_*` hashes and waits until it is healthy. |
 | `migrate` | Runs the migrations while the old release still serves. |
 | `switch` | Starts the new color, checks each replica, switches Caddy, drains the old color, and removes it. |
 | `smoke` | Requests `/healthz` and your smoke URLs. Checks that `/version` shows the new commit. |
@@ -307,6 +316,9 @@ The deploy decrypts the secrets on your machine with sops and writes one file fo
 It removes files for names that no longer exist.
 Secret values never enter an image, a Compose file, `.env`, the journal, or the output.
 The file `release.json` keeps only the SHA-256 of each value.
+For pgBackRest, a changed, added, or removed `PGBACKREST_*` secret causes a PostgreSQL restart after `upload`.
+The deploy compares hashes against the current `release.json`, including when it resumes at `edge`.
+Unchanged storage hashes cause no restart.
 To change a secret without a deploy, read [`spinup secrets push`](secrets.md#push-secrets-to-the-vm).
 
 ```
