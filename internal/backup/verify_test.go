@@ -50,7 +50,9 @@ func TestPGBackRestVerifyCleanup(t *testing.T) {
 			vm.AssertDone(t)
 			calls := vm.Calls()
 			create := strings.Join(calls[3].Argv, " ")
-			for _, want := range []string{"--network todo-backup", "todo-postgres:pinned", "dst=/run/secrets,readonly", "dst=/var/lib/pgbackrest,readonly", "archive_mode=off", "restore_command=", "--set=" + restoreLabel} {
+			for _, want := range []string{"--network todo-backup", "todo-postgres:pinned", "dst=/run/secrets,readonly", "dst=/var/lib/pgbackrest,readonly", "archive_mode=off", "restore_command=", "--set=" + restoreLabel,
+				// The backup directory is read-only, so the restore needs its own spool (dogfood finding 53).
+				"--spool-path=/tmp/pgbackrest-spool"} {
 				if !strings.Contains(create, want) {
 					t.Errorf("create omitted %s: %s", want, create)
 				}

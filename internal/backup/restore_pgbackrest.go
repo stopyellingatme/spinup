@@ -52,6 +52,9 @@ func (p *PGBackRest) resolveTarget(ctx context.Context, t Target) (Target, error
 	return listedTarget(bs, t, "pgBackRest")
 }
 
+// restoreSpoolArg moves the spool of a restore container out of the read-only backup directory.
+const restoreSpoolArg = "--spool-path=/tmp/pgbackrest-spool"
+
 func restoreArgs(app string, t Target) []string {
 	args := []string{"--stanza=" + app}
 	if t.Label != "" {
@@ -195,6 +198,10 @@ func (p *PGBackRest) restoreContainer(ctx context.Context, t Target, verify bool
 	recovery := SecretLoader + `set -e; pgbackrest "$@" restore; exec postgres -c config_file=/etc/postgresql/postgresql.conf -c archive_mode=off -c ` + remote.Quote("restore_command="+SecretLoader+"exec pgbackrest --archive-async=n --stanza="+p.App+" archive-get %f %p")
 	args = append(args, "--entrypoint", "sh", live.Config.Image, "-c", script, "spinup-restore", live.Config.User, mount, live.Config.User, "sh", "-c", recovery, "pgbackrest")
 	args = append(args, restoreArgs(p.App, t)...)
+	// pgbackrest restore clears the archive spool. The configured spool is in the backup
+	// directory, which this container mounts read-only, so the restore stopped with error 61
+	// on each server that had archived WAL. Give the restore its own spool in the container.
+	args = append(args, restoreSpoolArg)
 	if _, err = p.remoteCommand(ctx, args...); err != nil {
 		return result, err
 	}
