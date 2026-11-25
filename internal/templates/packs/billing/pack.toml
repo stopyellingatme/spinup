@@ -23,6 +23,11 @@ source = "files/web/src/lib/server/billing.ts"
 class = "managed"
 
 [[files]]
+path = "web/src/lib/server/billing.test.ts"
+source = "files/web/src/lib/server/billing.test.ts"
+class = "managed"
+
+[[files]]
 path = "web/src/routes/pricing/+page.server.ts"
 source = "files/web/src/routes/pricing/+page.server.ts"
 class = "scaffold"
