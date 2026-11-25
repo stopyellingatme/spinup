@@ -632,10 +632,21 @@ func TestCollectorAtomic(t *testing.T) {
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "/bin/sh", filepath.Join(f.dir, "collect.sh"))
 		cmd.Env = f.env
+		// The sampler gets its own process group. The slow fake docker outlives the
+		// sampler, and it must stop before the test removes the directory.
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
-		defer func() { _ = cmd.Process.Kill() }()
+		group := cmd.Process.Pid
+		t.Cleanup(func() {
+			_ = syscall.Kill(-group, syscall.SIGKILL)
+			for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+				if err := syscall.Kill(-group, 0); err != nil {
+					return
+				}
+			}
+		})
 		deadline := time.Now().Add(10 * time.Second)
 		ready := false
 		for time.Now().Before(deadline) {
