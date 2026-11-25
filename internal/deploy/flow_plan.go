@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	textdiff "github.com/rogpeppe/go-internal/diff"
+
+	"github.com/stopyellingatme/spinup/internal/remote"
 )
 
 // readCurrentScript writes the current release directory as a tar stream. No current release writes nothing.
@@ -59,9 +61,12 @@ func (f *flow) plan(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	result, err := f.cmd(ctx, false, "sh", "-c", readCurrentScript, "spinup-current", f.root()+"/current")
+	// The tar stream is binary. The redaction replaces text, so it would change the length of a
+	// file that contains a secret value and make the stream invalid. The plan prints the file
+	// diff through f.out, which redacts it.
+	result, err := f.vm.Run(ctx, remote.Cmd{Argv: []string{"sh", "-c", readCurrentScript, "spinup-current", f.root() + "/current"}})
 	if err != nil {
-		return fmt.Errorf("read the current release: %w", err)
+		return errors.New("read the current release: " + redactString(err.Error(), f.redact))
 	}
 	remoteFiles, err := untar(result.Stdout)
 	if err != nil {

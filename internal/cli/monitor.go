@@ -51,7 +51,7 @@ func newMonitor(app *App) *cobra.Command {
 		o.Service, o.Since, o.Query = service, since, query
 		return run(c, o)
 	}}
-	logs.Flags().StringVar(&service, "service", "", "filter by the service_name label")
+	logs.Flags().StringVar(&service, "service", "", "filter by the service_name label (api also selects <app>-api)")
 	logs.Flags().StringVar(&since, "since", "1h", "query this duration into the past")
 	logs.Flags().StringVar(&query, "query", "", "use this LogQL query instead of the service filter")
 	group.AddCommand(logs)

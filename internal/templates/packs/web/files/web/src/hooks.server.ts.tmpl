@@ -1,4 +1,4 @@
-import type { Handle, HandleFetch } from '@sveltejs/kit/hooks';
+import type { Handle, HandleFetch, HandleServerError } from '@sveltejs/kit/hooks';
 import { API_URL } from '$app/env/private';
 
 // The Go API, without a trailing slash.
@@ -66,6 +66,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 	if (event.locals.user) response.headers.set('Cache-Control', 'no-store');
 	return response;
+};
+
+// Print each error that the code did not expect, with its request. SvelteKit answers only
+// "Internal Error" for such an error, so this line is the place to find the cause. In a deployed
+// app the line is also in the log store (`spinup monitor logs --service web`). The other kinds
+// (`error()`, a page that does not exist, a refused form) are usual answers, so they print nothing.
+// This hook must never throw.
+export const handleError: HandleServerError = ({ error, kind, event }) => {
+	if (kind !== 'unknown') return;
+	console.error(`${event.request.method} ${event.url.pathname}: error:`, error);
 };
 
 // The API limits the auth routes for each client. Node is the TCP peer of the API, so this hook

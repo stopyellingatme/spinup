@@ -91,6 +91,8 @@ npm:
   "@opentelemetry/api": 1.9.1
   "@opentelemetry/sdk-node": 0.223.0
   "@opentelemetry/exporter-trace-otlp-http": 0.223.0
+  "@opentelemetry/api-logs": 0.223.0                 # same release as sdk-node; the web error and warning lines
+  "@opentelemetry/exporter-logs-otlp-http": 0.223.0
   "@opentelemetry/instrumentation-undici": 0.33.0   # required: without it fetch to Go carries no traceparent
   "@opentelemetry/auto-instrumentations-node": 0.81.0
   import-in-the-middle: 3.5.2

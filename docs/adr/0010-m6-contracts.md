@@ -25,4 +25,4 @@ The M6 units run in parallel. These decisions fix the contracts between them.
 
 ## 4. Web tracing (unit M6.4)
 
-SvelteKit server tracing with `@opentelemetry/sdk-node`, the OTLP HTTP trace exporter, and `@opentelemetry/instrumentation-undici` (ADR 0002 rule 8), in `web/src/instrumentation.server.ts`, on when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The packages are in the web `package.json` (main loop).
+SvelteKit server tracing with `@opentelemetry/sdk-node`, the OTLP HTTP trace exporter, and `@opentelemetry/instrumentation-undici` (ADR 0002 rule 8), in `web/src/instrumentation.server.ts`, on when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The packages are in the web `package.json` (main loop). Amendment (dogfood finding 51): the same file also sends each `console.error` and `console.warn` line as an OTLP log record (`@opentelemetry/exporter-logs-otlp-http`, `web/src/lib/server/log.ts`), and the `handleError` hook prints each unexpected error with its request. Before this, an error of the web server was only in `docker logs`.

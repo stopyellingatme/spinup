@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -248,6 +249,13 @@ func redactValues(values map[string]string) []string {
 		return out[i] < out[j]
 	})
 	return out
+}
+
+// deployRedactValues returns the values that a deploy redacts. The app name is in each path
+// and container name. A secret that equals it, for example a bucket name, must not hide the
+// name in the output.
+func deployRedactValues(app string, secrets map[string]string) []string {
+	return slices.DeleteFunc(redactValues(secrets), func(v string) bool { return strings.TrimSpace(v) == app })
 }
 
 // deployError is a step failure with the resume hint.

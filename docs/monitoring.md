@@ -143,7 +143,8 @@ $ spinup monitor trace --env production 0123456789abcdef0123456789abcdef
 ...
 ```
 
-`--service` filters on the `service_name` label. `--query` takes a LogQL query and replaces that filter.
+`--service` filters on the `service_name` label. The short name `api` also selects `todo-api`. `--query` takes a LogQL query and replaces that filter.
+Each line shows the attributes of the log record, for example the path and the status of a request.
 Traces need the `full` profile. Every log line that belongs to a trace carries a `trace_id` that you can paste into `monitor trace`.
 In Grafana, a log line links to its trace, and a span links to its log lines.
 
@@ -157,9 +158,11 @@ In Grafana, a log line links to its trace, and a span links to its log lines.
 | --- | --- |
 | `<app>-api` | HTTP and database traces, HTTP and Go runtime metrics, and application logs. |
 | `<app>-worker` (jobs module) | Go runtime metrics, worker and job logs, and database traces. |
-| `<app>-web` (Node mode) | Server traces. The web service does not export logs or metrics over OTLP. |
+| `<app>-web` (Node mode) | Server traces, and each `console.error` and `console.warn` line as a log. The web service does not export metrics. |
 
 The API and worker also write JSON logs to stderr.
+
+The web service sends its error and warning lines only. The `handleError` hook in `web/src/hooks.server.ts` prints each error that the code did not expect, with the method and the path of the request. To read these lines, run `spinup monitor logs --env production --service web`.
 Without `OTEL_EXPORTER_OTLP_ENDPOINT`, they do not export telemetry.
 The `lite` profile accepts OTLP traces and discards every span. Senders receive success, so the missing Tempo service causes no export error.
 The `full` profile stores traces in Tempo.
@@ -245,7 +248,7 @@ Fix the problem, then run `spinup deploy --resume --env production`.
 | `WalArchiveLag`, `WalArchiveFailing` | full | The last WAL archive is older than 15 minutes, or an archive fails. |
 | `PublicURLDown`, `CertificateExpiresSoon` | full | The public URL fails, or its certificate expires in under 14 days. |
 
-The alerts cover the API. The web service sends traces only, so no alert watches web requests.
+The alerts cover the API. The web service sends no metrics, so no alert watches web requests.
 
 ### Add your own alert
 
