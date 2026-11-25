@@ -1,11 +1,34 @@
 package webtool
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/stopyellingatme/spinup/internal/exec"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 )
+
+// BuildDir is the name of the build output directory, relative to web/.
+const BuildDir = "build"
+
+// ClientDir returns the directory of the client assets inside a build output
+// directory. It returns build/client when that is a directory, and build
+// otherwise. A stat error other than a missing path is returned.
+func ClientDir(build string) (string, error) {
+	client := filepath.Join(build, "client")
+	info, err := os.Stat(client)
+	if errors.Is(err, os.ErrNotExist) {
+		return build, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return build, nil
+	}
+	return client, nil
+}
 
 // Tool describes the package manager and client generator of a web app.
 type Tool struct{ manager, client string }

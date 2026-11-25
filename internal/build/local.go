@@ -110,7 +110,7 @@ func buildWeb(ctx context.Context, root string, lock *manifest.Lock, o Options, 
 		_, err := fmt.Fprintln(o.Out, "Copy web/build to api/internal/webdist/dist, replacing old assets")
 		return err
 	}
-	source := filepath.Join(root, "web", "build")
+	source := filepath.Join(root, "web", webtool.BuildDir)
 	dest := filepath.Join(root, "api", "internal", "webdist", "dist")
 	info, err := os.Stat(source)
 	if err != nil {

@@ -93,6 +93,55 @@ class MeasureTests(unittest.TestCase):
             self.assertEqual(json.loads(out)["br_bytes"], 420)
 
 
+class AssetsTests(unittest.TestCase):
+    def test_other_prefix_under_client(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "client/assets/a.js", 10)
+            write(d, "client/assets/a.js.br", 4)
+            write(d, "client/_app/immutable/z.js", 999)
+            r = bundle.measure(d, assets="assets")
+            self.assertEqual((r["files"], r["raw_bytes"], r["br_bytes"]), (1, 10, 4))
+            self.assertEqual(r["largest"][0]["file"], "assets/a.js")
+
+    def test_other_prefix_at_top(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "static/js/a.js", 10)
+            r = bundle.measure(d, assets="static/js/")
+            self.assertEqual(r["largest"][0]["file"], "static/js/a.js")
+            rc, out, _ = run_main(["--assets", "static/js", "measure", d])
+            self.assertEqual((rc, json.loads(out)["raw_bytes"]), (0, 10))
+            rc, out, _ = run_main(["measure", d, "--assets=static/js"])
+            self.assertEqual((rc, json.loads(out)["raw_bytes"]), (0, 10))
+
+    def test_default_does_not_see_other_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "assets/a.js", 10)
+            with self.assertRaises(bundle.BundleError) as cm:
+                bundle.measure(d)
+            self.assertIn("_app/immutable", str(cm.exception))
+
+    def test_first_load_with_other_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "client/assets/a.js", 50)
+            write(d, "client/assets/a.js.br", 7)
+            page = '<script src="/assets/a.js"></script>'
+            self.assertEqual(bundle.first_load_br_bytes(page, "/", d, assets="assets"), (7, 1))
+
+    def test_rejected_values(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "assets/a.js", 10)
+            for bad in ("", "  ", "/assets", "\\assets", "a\\..\\b", "C:/assets", "..", "a/../b", "../x", ".", "/"):
+                with self.assertRaises(bundle.BundleError, msg=bad) as cm:
+                    bundle.measure(d, assets=bad)
+                self.assertTrue(cm.exception.hint, bad)
+                rc, _, err = run_main(["--assets", bad, "measure", d])
+                self.assertEqual(rc, 2, bad)
+                self.assertIn("Try:", err)
+            rc, _, err = run_main(["measure", d, "--assets"])
+            self.assertEqual(rc, 2)
+            self.assertIn("Try:", err)
+
+
 class CheckTests(unittest.TestCase):
     def budgets(self, d, data):
         p = Path(d) / "budgets.json"
