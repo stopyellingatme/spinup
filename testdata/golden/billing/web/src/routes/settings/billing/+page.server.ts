@@ -31,6 +31,7 @@ export const actions: Actions = {
 		if (!form.valid) return fail(400, { form });
 		const result = await portal(fetch);
 		if (!result.ok) return message(form, result.errors.form ?? Object.values(result.errors.fields).join(' '), { status: result.status as ErrorStatus });
-		redirect(303, result.data.url);
+		// Stripe hosts this page on its own origin. SvelteKit needs the permission for that origin.
+		redirect(303, result.data.url, { external: true });
 	}
 };

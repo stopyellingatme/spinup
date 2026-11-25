@@ -27,6 +27,7 @@ export const actions: Actions = {
 			if (result.errors.fields.price) return setError(form, 'price', result.errors.fields.price, { status });
 			return message(form, result.errors.form ?? Object.values(result.errors.fields).join(' '), { status });
 		}
-		redirect(303, result.data.url);
+		// Stripe hosts this page on its own origin. SvelteKit needs the permission for that origin.
+		redirect(303, result.data.url, { external: true });
 	}
 };

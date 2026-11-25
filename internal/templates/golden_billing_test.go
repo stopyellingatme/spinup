@@ -60,6 +60,9 @@ func TestGoldenBilling(t *testing.T) {
 			"api/cmd/worker/main.go":           {"kitbilling.New", "kitbilling.WithRoles(roles.Set)", "kitbilling.WithPublicOrigin(billingEnv.PublicOrigin)", "billingSvc.Register(w)"},
 			"deploy/compose.yml":               {"STRIPE_SECRET_KEY_FILE: /run/secrets/STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/STRIPE_WEBHOOK_SECRET"},
 			"web/src/routes/+layout.server.ts": {"locals.user ? await getBilling(fetch) : null"},
+			// SvelteKit 3 refuses a redirect to Stripe without this permission.
+			"web/src/routes/pricing/+page.server.ts":          {"redirect(303, result.data.url, { external: true })"},
+			"web/src/routes/settings/billing/+page.server.ts": {"redirect(303, result.data.url, { external: true })"},
 		} {
 			data, err := fs.ReadFile(fsys, filepath.ToSlash(filepath.Join(prefix, path)))
 			if err != nil {

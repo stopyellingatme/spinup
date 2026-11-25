@@ -376,6 +376,7 @@ All `/api/me/billing` routes need a cookie session (`a.RequireUser`, and the api
 | `api/internal/billing/billing.gen.go` | managed | `var Config = kitbilling.Config{...}`, plan and feature constants |
 | `web/src/lib/billing.gen.ts` | managed | plan and feature names as types, `hasFeature` |
 | `web/src/lib/server/billing.ts` | managed | the API calls for the pages |
+| `web/src/lib/server/billing.test.ts` | managed | the vitest tests of the Stripe redirects |
 | `web/src/routes/pricing/+page.svelte`, `+page.server.ts` | scaffold | public plans, Subscribe buttons |
 | `web/src/routes/settings/billing/+page.svelte`, `+page.server.ts` | scaffold | the plan, the status, Upgrade, Manage billing, the success-page sync |
 
