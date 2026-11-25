@@ -28,7 +28,7 @@ spinup monitor logs [flags]
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--query` | `` | use this LogQL query instead of the service filter |
-| `--service` | `` | filter by the service_name label |
+| `--service` | `` | filter by the service_name label (api also selects <app>-api) |
 | `--since` | `1h` | query this duration into the past |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |

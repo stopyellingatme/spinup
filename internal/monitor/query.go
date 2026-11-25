@@ -24,7 +24,7 @@ func (c *client) logs(ctx context.Context, o Options) error {
 	query := o.Query
 	if query == "" {
 		if o.Service != "" {
-			query = "{service_name=" + strconv.Quote(o.Service) + "}"
+			query = serviceSelector(c.app, o.Service)
 		} else {
 			query = `{service_name=~".+"}`
 		}
@@ -37,7 +37,12 @@ func (c *client) logs(ctx context.Context, o Options) error {
 	}
 	var response struct {
 		Status string
-		Data   struct{ Result []struct{ Values [][]string } }
+		Data   struct {
+			Result []struct {
+				Stream map[string]string
+				Values [][]string
+			}
+		}
 	}
 	if err = json.Unmarshal(data, &response); err != nil {
 		return failure("decode logs", err)
@@ -46,8 +51,9 @@ func (c *client) logs(ctx context.Context, o Options) error {
 		return failure("query logs", fmt.Errorf("the Loki query failed"))
 	}
 	type line struct {
-		at   int64
-		text string
+		at     int64
+		text   string
+		labels map[string]string
 	}
 	var lines []line
 	for _, stream := range response.Data.Result {
@@ -59,14 +65,87 @@ func (c *client) logs(ctx context.Context, o Options) error {
 			if e != nil {
 				return failure("decode log timestamp", e)
 			}
-			lines = append(lines, line{at, v[1]})
+			lines = append(lines, line{at, v[1], stream.Stream})
 		}
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].at < lines[j].at })
+	enc := json.NewEncoder(c.out)
 	for _, l := range lines {
-		fmt.Fprintf(c.out, "%s %s\n", time.Unix(0, l.at).UTC().Format(time.RFC3339Nano), l.text)
+		at := time.Unix(0, l.at).UTC().Format(time.RFC3339Nano)
+		if o.JSON {
+			entry := logEntry{Time: at, Service: l.labels["service_name"], Level: logLevel(l.labels), Message: l.text, Attributes: l.labels}
+			if err = enc.Encode(entry); err != nil {
+				return failure("write logs", err)
+			}
+			continue
+		}
+		fields := []string{at}
+		if service := l.labels["service_name"]; service != "" {
+			fields = append(fields, service)
+		}
+		if level := logLevel(l.labels); level != "" {
+			fields = append(fields, level)
+		}
+		fields = append(fields, l.text)
+		fmt.Fprintln(c.out, strings.Join(append(fields, logAttributes(l.labels)...), " "))
 	}
 	return nil
+}
+
+// logEntry is one line of `monitor logs --json`.
+type logEntry struct {
+	Time       string            `json:"time"`
+	Service    string            `json:"service,omitempty"`
+	Level      string            `json:"level,omitempty"`
+	Message    string            `json:"message"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
+// serviceSelector builds the stream selector for --service. The deploy pack names a service
+// <app>-<service>, so the short name `api` also selects `<app>-api`.
+func serviceSelector(app, service string) string {
+	if app == "" || strings.HasPrefix(service, app+"-") {
+		return "{service_name=" + strconv.Quote(service) + "}"
+	}
+	return "{service_name=~" + strconv.Quote(regexp.QuoteMeta(service)+"|"+regexp.QuoteMeta(app+"-"+service)) + "}"
+}
+
+// hiddenLogLabels are the labels that the text output does not print as attributes. They name
+// the stream or repeat the level, and they make each line long. The JSON output has all labels.
+var hiddenLogLabels = map[string]bool{
+	"service_name": true, "service_instance_id": true, "service_version": true, "deployment_environment_name": true,
+	"host_name": true, "scope_name": true, "observed_timestamp": true, "flags": true, "span_id": true,
+	"detected_level": true, "severity_text": true, "severity_number": true, "level": true,
+}
+
+func logLevel(labels map[string]string) string {
+	for _, key := range []string{"severity_text", "detected_level", "level"} {
+		if v := labels[key]; v != "" {
+			return strings.ToUpper(v)
+		}
+	}
+	return ""
+}
+
+// logAttributes returns the attributes of a log line as sorted key=value fields. An API log
+// line has its data there: the message of a request is only "HTTP request".
+func logAttributes(labels map[string]string) []string {
+	var keys []string
+	for key := range labels {
+		if !hiddenLogLabels[key] {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	fields := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := labels[key]
+		if value == "" || strings.ContainsAny(value, " \t\n\"=") {
+			value = strconv.Quote(value)
+		}
+		fields = append(fields, key+"="+value)
+	}
+	return fields
 }
 
 type span struct {

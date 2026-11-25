@@ -442,8 +442,10 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 	x.o.Confirm = project.Confirm{} // --plan never asks
 	current := Release{Release: "20261014T080000Z-ffffffffffff", Color: Blue, MigrationVersion: "6", Images: []Image{{Service: "api", Ref: "todo-api:20261014T080000Z-ffffffffffff"}}, Secrets: SecretHashes(map[string]string{"DATABASE_URL": "old-value", "POSTGRES_PASSWORD": testSecrets["POSTGRES_PASSWORD"], "REMOVED": "x"})}
 	currentJSON, _ := json.Marshal(current)
+	// A file on the VM can contain a secret value, for example a bucket name. The tar stream is
+	// binary, so it must not go through the redaction (jostar finding 52).
 	tarball := tarOf(t, map[string]string{
-		"compose.yml":      "name: todo-${SPINUP_COLOR}\nold: true\n",
+		"compose.yml":      "name: todo-${SPINUP_COLOR}\nold: true\nkey: " + testSecrets["POSTGRES_PASSWORD"] + "\n",
 		"compose.edge.yml": "name: todo\n",
 		"release.json":     string(currentJSON),
 		"old.caddy":        "x",
@@ -481,7 +483,7 @@ func TestFlowPlanMakesNoWrite(t *testing.T) {
 		"api: todo-api:20261014T080000Z-ffffffffffff -> todo-api:" + testRelease,
 		"Migrations: 2 pending\n  00002_more.sql\n  00004_drop.sql",
 		"  added API_TOKEN", "  changed DATABASE_URL", "  removed REMOVED",
-		"  changed compose.yml", "-old: true", "  added Caddyfile", "  removed old.caddy", "  added upstream.caddy",
+		"  changed compose.yml", "-old: true", "-key: ***", "  added Caddyfile", "  removed old.caddy", "  added upstream.caddy",
 		"Nothing changed on the VM (--plan).",
 	} {
 		if !strings.Contains(out, want) {
@@ -670,6 +672,10 @@ func TestReleaseHelpers(t *testing.T) {
 	values := redactValues(map[string]string{"A": "abc", "B": "secret-long", "C": " padded-value\n"})
 	if !slices.Equal(values, []string{" padded-value\n", "padded-value", "secret-long"}) {
 		t.Fatalf("redact values = %q", values)
+	}
+	// A secret that equals the app name must not hide the app name (jostar finding 52).
+	if values := deployRedactValues("todo", map[string]string{"BUCKET": "todo", "PADDED": "todo\n", "B": "secret-long"}); !slices.Equal(values, []string{"secret-long"}) {
+		t.Fatalf("deploy redact values = %q", values)
 	}
 }
 

@@ -143,7 +143,8 @@ $ spinup monitor trace --env production 0123456789abcdef0123456789abcdef
 ...
 ```
 
-`--service` filters on the `service_name` label. `--query` takes a LogQL query and replaces that filter.
+`--service` filters on the `service_name` label. The short name `api` also selects `todo-api`. `--query` takes a LogQL query and replaces that filter.
+Each line shows the attributes of the log record, for example the path and the status of a request.
 Traces need the `full` profile. Every log line that belongs to a trace carries a `trace_id` that you can paste into `monitor trace`.
 In Grafana, a log line links to its trace, and a span links to its log lines.
 

@@ -36,7 +36,7 @@ func Deploy(ctx context.Context, o Options, d Deps) error {
 	if err != nil {
 		return err
 	}
-	values := redactValues(l.secrets)
+	values := deployRedactValues(l.app, l.secrets)
 	out.values, errOut.values = values, values
 	f := &flow{o: o, d: d, l: l, out: out, errOut: errOut, redact: values}
 	if o.Plan {

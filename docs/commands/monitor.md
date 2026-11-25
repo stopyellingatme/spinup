@@ -78,7 +78,7 @@ todo_monitoring_loki_data 412.3MB
 <!-- doctest: skip -->
 ```console
 $ spinup monitor logs --env production --service todo-api --since 15m
-2026-10-15T08:23:52.114Z {"level":"INFO","msg":"request","path":"/api/todos","status":200,"trace_id":"0123456789abcdef0123456789abcdef"}
+2026-10-15T08:23:52.114Z todo-api INFO HTTP request method=GET path=/api/todos status=200 trace_id=0123456789abcdef0123456789abcdef
 ...
 $ spinup monitor logs --env production --query '{service_name="todo-api"} |= "error"'
 ...
@@ -86,9 +86,12 @@ $ spinup monitor logs --env production --query '{service_name="todo-api"} |= "er
 
 | Flag | Meaning | Example |
 | --- | --- | --- |
-| `--service` | Show one service (the `service_name` label) | `--service todo-api` |
+| `--service` | Show one service (the `service_name` label). The short name `api` also selects `todo-api`. | `--service todo-api` |
 | `--since` | How far back to look. The default is `1h`. | `--since 15m` |
 | `--query` | A LogQL query. It replaces `--service`. | `--query '{service_name="todo-api"} \|= "error"'` |
+
+Each line has the time, the service, the level, the message, and the attributes of the log record as `key=value`.
+With `--json`, the command prints one JSON object for each line, with `time`, `service`, `level`, `message`, and `attributes`.
 
 ## Follow a trace
 

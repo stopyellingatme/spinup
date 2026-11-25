@@ -80,3 +80,49 @@ func TestLogsSelectNewestAndPrintChronologically(t *testing.T) {
 	}
 	f.AssertDone(t)
 }
+
+// The data of an API log line is in its attributes: the message of a request is only "HTTP request".
+// Loki returns the attributes as stream labels (jostar finding 51).
+func TestLogsPrintServiceLevelAndAttributes(t *testing.T) {
+	t.Parallel()
+	const response = `{"status":"success","data":{"result":[{"stream":{"service_name":"todo-api","severity_text":"INFO","detected_level":"info","path":"/api/me/billing","status":"500","error":"no such price","span_id":"7032bf8252c686b2","trace_id":"543fde5753470b8990637d2e5cdced3f","host_name":"dcf503211e57"},"values":[["1000000000","HTTP request"]]}]}}`
+	for _, tc := range []struct {
+		name string
+		json bool
+		want string
+	}{
+		{"text", false, "1970-01-01T00:00:01Z todo-api INFO HTTP request error=\"no such price\" path=/api/me/billing status=500 trace_id=543fde5753470b8990637d2e5cdced3f\n"},
+		{"json", true, `{"time":"1970-01-01T00:00:01Z","service":"todo-api","level":"INFO","message":"HTTP request","attributes":{"detected_level":"info","error":"no such price","host_name":"dcf503211e57","path":"/api/me/billing","service_name":"todo-api","severity_text":"INFO","span_id":"7032bf8252c686b2","status":"500","trace_id":"543fde5753470b8990637d2e5cdced3f"}}` + "\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := &remote.Fake{}
+			f.Expect("docker", "ps").Return("abc123", "", 0)
+			f.Expect().Return(response, "", 0)
+			var out bytes.Buffer
+			c := client{vm: f, app: "todo", out: &out, now: func() time.Time { return time.Unix(3600, 0) }}
+			if err := c.logs(context.Background(), Options{Since: "1h", JSON: tc.json}); err != nil {
+				t.Fatal(err)
+			}
+			if out.String() != tc.want {
+				t.Fatalf("logs = %q, want %q", out.String(), tc.want)
+			}
+			f.AssertDone(t)
+		})
+	}
+}
+
+// The deploy pack names a service <app>-<service>. The short name must select it too.
+func TestServiceSelector(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ app, service, want string }{
+		{"todo", "todo-api", `{service_name="todo-api"}`},
+		{"todo", "api", `{service_name=~"api|todo-api"}`},
+		{"todo", "a.b", `{service_name=~"a\\.b|todo-a\\.b"}`},
+		{"", "api", `{service_name="api"}`},
+	} {
+		if got := serviceSelector(tc.app, tc.service); got != tc.want {
+			t.Errorf("serviceSelector(%q, %q) = %s, want %s", tc.app, tc.service, got, tc.want)
+		}
+	}
+}
