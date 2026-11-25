@@ -9,6 +9,7 @@ backup/pgdump           # sh scripts, Unix file modes
 backup/walg             # needs /bin/sh
 ci                      # setup-spinup prints mixed path separators; generated scripts expect Unix modes
 cli                     # runs sh, ssh, git, and shellcheck flows; server commands need WSL2
+consoleclient           # reads the console through SSH forwards; server commands need WSL2
 deploy                  # sh scripts, ln -sfn, Unix file modes
 devloop                 # spinup dev needs Unix process groups
 doctest                 # runs the docs code blocks with Unix tools and a generated app
@@ -18,6 +19,7 @@ gen/resource            # golden trees for a generated app and pnpm
 maintain/pg             # sh scripts and a remote shell fake
 maintain/pgupgrade      # sh scripts
 plugin/rpc              # builds plugin test binaries without the .exe suffix
+remote                  # SSH control sockets need a short Unix path; the tests use /tmp and sh scripts as ssh
 server                  # server commands require WSL2 on Windows
 templates               # generated app goldens, pnpm, sh, and server bootstrap
 testutil/scripttest     # txtar scripts use sh, git, and pnpm; the run is too slow
