@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a change or a new feature.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Say what you cannot do now, or what is hard to do.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The change you propose
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other ways you considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Part of spinup
+      options:
+        - CLI
+        - kit
+        - templates
+        - deploy
+        - monitoring
+        - upgrade
+        - docs
+    validations:
+      required: true
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Pull request
+      options:
+        - label: I can send a pull request.
