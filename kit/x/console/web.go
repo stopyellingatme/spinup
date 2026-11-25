@@ -561,7 +561,7 @@ func webRows(raw json.RawMessage) [][]webField {
 func webDashboards(profile, port string) []webLink {
 	links := []webLink{{"HTTP RED", "spinup-http-red"}, {"Go runtime", "spinup-go-runtime"}, {"Caddy", "spinup-caddy"}, {"Backups", "spinup-backups"}, {"Deploys", "spinup-deploys"}}
 	if profile == "full" {
-		links = append(links, webLink{"Host", "rYdddlPWk"}, webLink{"Containers", "pMEd7m0Mz"}, webLink{"PostgreSQL", "000000039"})
+		links = append(links, webLink{"Host", "rYdddlPWk"}, webLink{"Containers", "spinup-containers"}, webLink{"PostgreSQL", "000000039"})
 	}
 	for i := range links {
 		links[i].URL = "http://127.0.0.1:" + port + "/d/" + links[i].URL

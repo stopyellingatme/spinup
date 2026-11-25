@@ -255,7 +255,7 @@ func TestWebLinks(t *testing.T) {
 		if !strings.Contains(body, "spinup monitor open --env production") || !strings.Contains(body, "spinup monitor logs --env production --since 1h --query") {
 			t.Error("overview tool commands are missing")
 		}
-		paths := []string{"spinup-http-red", "spinup-go-runtime", "spinup-caddy", "spinup-backups", "spinup-deploys", "rYdddlPWk", "pMEd7m0Mz", "000000039"}
+		paths := []string{"spinup-http-red", "spinup-go-runtime", "spinup-caddy", "spinup-backups", "spinup-deploys", "rYdddlPWk", "spinup-containers", "000000039"}
 		for i, uid := range paths {
 			want := (profile == "lite" && i < 5) || profile == "full"
 			if strings.Contains(body, "http://127.0.0.1:18765/d/"+uid) != want {
@@ -314,7 +314,7 @@ func TestWebLinks(t *testing.T) {
 		}
 		uids[doc.UID] = true
 	}
-	for _, uid := range []string{"spinup-http-red", "spinup-go-runtime", "spinup-caddy", "spinup-backups", "spinup-deploys", "rYdddlPWk", "pMEd7m0Mz", "000000039"} {
+	for _, uid := range []string{"spinup-http-red", "spinup-go-runtime", "spinup-caddy", "spinup-backups", "spinup-deploys", "rYdddlPWk", "spinup-containers", "000000039"} {
 		if !uids[uid] {
 			t.Errorf("dashboard %s is not shipped", uid)
 		}
