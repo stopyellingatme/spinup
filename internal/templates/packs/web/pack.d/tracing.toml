@@ -7,3 +7,16 @@ path = "web/src/instrumentation.server.ts"
 source = "files/web/src/instrumentation.server.ts"
 class = "scaffold"
 when = "frontend_mode != 'embed'"
+
+# The error and warning lines of the web server go to the log store as OTLP log records.
+[[files]]
+path = "web/src/lib/server/log.ts"
+source = "files/web/src/lib/server/log.ts"
+class = "managed"
+when = "frontend_mode != 'embed'"
+
+[[files]]
+path = "web/src/lib/server/log.test.ts"
+source = "files/web/src/lib/server/log.test.ts"
+class = "managed"
+when = "frontend_mode != 'embed'"

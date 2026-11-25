@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The web server (Node mode) sends each `console.error` and `console.warn` line to the log store as an OTLP log record, and a new `handleError` hook in `web/src/hooks.server.ts` prints each unexpected error with its request. Read the lines with `spinup monitor logs --service web`. The web app gets two npm packages: `@opentelemetry/api-logs` and `@opentelemetry/exporter-logs-otlp-http`.
+- `spinup monitor logs`: `--service api` selects `<app>-api`, the text output shows the service, the level, and the attributes of each line, and `--json` prints one JSON object for each line.
+- `spinup deploy --plan` no longer fails with a tar error when a secret value is a short common string, such as the app name.
 - The kit sets `Cache-Control: private, no-cache` on a response when the handler sets no `Cache-Control` (ADR 0034). `httpx.PublicCache` is the opt-in for a shareable answer.
 - The SvelteKit node server sends a Content-Security-Policy with a nonce (ADR 0036). A page with its own inline script needs `nonce="%sveltekit.nonce%"`. A form that redirects to another origin must use `use:enhance`, because the policy has `form-action 'self'`. The billing pages do this.
 - The doctor check `client-drift` now fails (it warned before). The generated CI workflow fails on a stale API client.
