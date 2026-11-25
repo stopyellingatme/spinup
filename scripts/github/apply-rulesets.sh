@@ -13,8 +13,9 @@
 # with the same name, then prints a unified diff of the normalized live ruleset against the
 # normalized file. The dry run only reads from GitHub.
 #
-# Normalization keeps name, target, enforcement, conditions, bypass_actors (sorted), and rules
-# (sorted by type, required_status_checks sorted by context). The server adds default values
+# Normalization sorts the object keys. It keeps name, target, enforcement, conditions,
+# bypass_actors (sorted), and rules (sorted by type, required_status_checks sorted by
+# context). The server adds default values
 # to rule parameters. To make "in sync" reliable, the script projects the live parameters of
 # each rule onto the keys that the file sets. A key that the file does not set never causes a
 # difference. A live rule type that the file does not list does cause a difference.
@@ -114,7 +115,7 @@ for file in "${files[@]}"; do
 	managed_names+=("$name")
 	rel=".github/rulesets/$(basename "$file")"
 	id="$(jq -r --arg n "$name" '[.[] | select(.name == $n)][0].id // empty' <<<"$live_list")"
-	jq --argjson spec "$(cat "$file")" "$normalize" "$file" >"$tmp/want.json"
+	jq -S --argjson spec "$(cat "$file")" "$normalize" "$file" >"$tmp/want.json"
 
 	if [ -z "$id" ]; then
 		echo "missing: $name ($rel) does not exist in $repo"
@@ -127,7 +128,7 @@ for file in "${files[@]}"; do
 	fi
 
 	gh_or_die "read the ruleset $name" "repos/$repo/rulesets/$id"
-	jq --argjson spec "$(cat "$file")" "$normalize" <<<"$out" >"$tmp/have.json"
+	jq -S --argjson spec "$(cat "$file")" "$normalize" <<<"$out" >"$tmp/have.json"
 	if diff -u --label "live/$name" --label "file/$rel" "$tmp/have.json" "$tmp/want.json" >"$tmp/diff"; then
 		echo "in sync: $name"
 	else
