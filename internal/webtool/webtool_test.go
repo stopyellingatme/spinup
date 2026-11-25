@@ -1,6 +1,7 @@
 package webtool
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -34,5 +35,32 @@ func TestCommands(t *testing.T) {
 				t.Fatalf("pnpm web command: %+v", cmd)
 			}
 		})
+	}
+}
+
+func TestClientDir(t *testing.T) {
+	build := t.TempDir()
+	got, err := ClientDir(build)
+	if err != nil || got != build {
+		t.Fatalf("missing client: got %q, %v", got, err)
+	}
+	client := filepath.Join(build, "client")
+	if err := os.WriteFile(client, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ClientDir(build); err != nil || got != build {
+		t.Fatalf("client file: got %q, %v", got, err)
+	}
+	if err := os.Remove(client); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(client, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ClientDir(build); err != nil || got != client {
+		t.Fatalf("client dir: got %q, %v", got, err)
+	}
+	if BuildDir != "build" {
+		t.Fatalf("BuildDir = %q", BuildDir)
 	}
 }

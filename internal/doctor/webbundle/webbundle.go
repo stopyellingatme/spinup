@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/stopyellingatme/spinup/internal/doctor"
+	"github.com/stopyellingatme/spinup/internal/webtool"
 )
 
 const (
@@ -47,7 +48,7 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 	if err != nil {
 		return failure("cannot inspect web: %v", err)
 	}
-	build := filepath.Join(web, "build")
+	build := filepath.Join(web, webtool.BuildDir)
 	if _, err := os.Stat(build); errors.Is(err, os.ErrNotExist) {
 		return skip("web/build is missing: build the web app first")
 	} else if err != nil {
@@ -57,10 +58,8 @@ func runCheck(_ context.Context, c *doctor.Context) doctor.Result {
 	if err != nil {
 		return failure("cannot read web/bundle-budget.json: %v", err)
 	}
-	client := filepath.Join(build, "client")
-	if _, err := os.Stat(client); errors.Is(err, os.ErrNotExist) {
-		client = build
-	} else if err != nil {
+	client, err := webtool.ClientDir(build)
+	if err != nil {
 		return failure("cannot inspect client assets: %v", err)
 	}
 	raw, brotli, assets, err := bundle(client)

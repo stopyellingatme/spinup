@@ -3,12 +3,15 @@
 Python 3 standard library only. Run it as `python3 -I scripts/perf/bundle.py`.
 
 Usage:
-  bundle.py measure <build-dir>                 print the bundle bytes as JSON
-  bundle.py check <build-dir> <budgets.json>    exit 1 when the bundle is above a budget
+  bundle.py [--assets <rel>] measure <build-dir>                 print the bundle bytes as JSON
+  bundle.py [--assets <rel>] check <build-dir> <budgets.json>    exit 1 when the bundle is above a budget
 
 <build-dir> is `web/build` of a node build (the client files are in `client/`) or of an
 embed build (the client files are at the top). The script counts the `.js` and `.css` files
-under `_app/immutable/`. The `.br` and `.gz` siblings are not in `raw_bytes`. They are summed
+under `_app/immutable/`. The option `--assets <rel>` names another directory for the hashed
+assets. <rel> is a relative POSIX path of one or more segments, such as `assets`. It cannot be
+absolute, empty, or have a `..` segment. Python callers pass `assets=<rel>` to `client_root`,
+`measure`, and `first_load_br_bytes`. The `.br` and `.gz` siblings are not in `raw_bytes`. They are summed
 apart in `br_bytes` and `gz_bytes`. When a file has no sibling, the browser gets the plain
 file, so the plain size counts in that sum.
 
@@ -25,7 +28,7 @@ import urllib.parse
 from pathlib import Path
 
 ASSET_SUFFIXES = (".js", ".css")
-IMMUTABLE = ("_app", "immutable")
+DEFAULT_ASSETS = "_app/immutable"
 LARGEST = 5
 BUDGET_KEYS = (("raw_bytes", "web_bundle_raw_bytes"), ("br_bytes", "web_bundle_br_bytes"))
 
@@ -38,18 +41,36 @@ class BundleError(Exception):
         self.hint = hint
 
 
-def client_root(build_dir):
+def assets_parts(assets=DEFAULT_ASSETS):
+    """The path segments of the assets directory. Rejects an empty, absolute, or `..` path."""
+    hint = 'pass a relative path such as "_app/immutable" or "assets"'
+    if not isinstance(assets, str) or not assets.strip():
+        raise BundleError("the assets path is empty, and it must name a directory of the build", hint)
+    if "\\" in assets:
+        raise BundleError(f"the assets path {assets!r} has a backslash, and it must use / between segments", hint)
+    if assets.startswith("/") or (len(assets) > 1 and assets[1] == ":"):
+        raise BundleError(f"the assets path {assets!r} is absolute, and it must be relative to the build", hint)
+    parts = [p for p in assets.split("/") if p not in ("", ".")]
+    if ".." in parts:
+        raise BundleError(f"the assets path {assets!r} has a .. segment, and it must stay inside the build", hint)
+    if not parts:
+        raise BundleError(f"the assets path {assets!r} has no directory name", hint)
+    return tuple(parts)
+
+
+def client_root(build_dir, assets=DEFAULT_ASSETS):
     """The directory that the browser sees as `/`: `client/` of a node build, else build_dir."""
+    parts = assets_parts(assets)
     build_dir = Path(build_dir)
     if not build_dir.is_dir():
         raise BundleError(f"{build_dir} is not a directory, so there is no build to measure",
                           "build the web app first (pnpm build), then pass its build directory")
     client = build_dir / "client"
-    if (client / Path(*IMMUTABLE)).is_dir():
+    if (client / Path(*parts)).is_dir():
         return client
-    if (build_dir / Path(*IMMUTABLE)).is_dir():
+    if (build_dir / Path(*parts)).is_dir():
         return build_dir
-    raise BundleError(f"{build_dir} has no {'/'.join(IMMUTABLE)} directory (also not under client/)",
+    raise BundleError(f"{build_dir} has no {'/'.join(parts)} directory (also not under client/)",
                       "pass web/build of a finished SvelteKit build")
 
 
@@ -65,10 +86,10 @@ def file_sizes(path):
             "gz_bytes": _sibling_size(path, ".gz")}
 
 
-def measure(build_dir):
+def measure(build_dir, assets=DEFAULT_ASSETS):
     """The bundle bytes of build_dir. Returns a dict that `measure` prints as JSON."""
-    root = client_root(build_dir)
-    immutable = root / Path(*IMMUTABLE)
+    root = client_root(build_dir, assets)
+    immutable = root / Path(*assets_parts(assets))
     files = []
     for p in sorted(immutable.rglob("*")):
         if p.is_file() and not p.is_symlink() and p.suffix in ASSET_SUFFIXES:
@@ -179,12 +200,12 @@ def page_targets(page_html, page_path="/"):
     return out
 
 
-def first_load_br_bytes(page_html, page_path, build_dir):
+def first_load_br_bytes(page_html, page_path, build_dir, assets=DEFAULT_ASSETS):
     """The brotli bytes of the script targets of a page (the plain size when a file has no .br).
 
     Returns (bytes, number of files). Raises BundleError when a target is not in the build.
     """
-    root = client_root(build_dir)
+    root = client_root(build_dir, assets)
     total = 0
     paths = page_targets(page_html, page_path)
     for path in paths:
@@ -200,19 +221,43 @@ def first_load_br_bytes(page_html, page_path, build_dir):
 # Command line
 # ---------------------------------------------------------------------------
 
-USAGE = ("usage: bundle.py measure <build-dir>\n"
-         "       bundle.py check <build-dir> <budgets.json>")
+USAGE = ("usage: bundle.py [--assets <rel>] measure <build-dir>\n"
+         "       bundle.py [--assets <rel>] check <build-dir> <budgets.json>\n"
+         f"  --assets <rel>  the hashed assets directory of the build (default {DEFAULT_ASSETS})")
+
+
+def _split_assets(argv):
+    """(assets, rest) of argv. Raises BundleError when --assets has no value."""
+    assets, rest, i = DEFAULT_ASSETS, [], 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--assets":
+            if i + 1 >= len(argv):
+                raise BundleError("--assets has no value", 'write --assets <rel>, such as --assets "_app/immutable"')
+            assets, i = argv[i + 1], i + 2
+        elif a.startswith("--assets="):
+            assets, i = a[len("--assets="):], i + 1
+        else:
+            rest.append(a)
+            i += 1
+    return assets, rest
 
 
 def main(argv):
     if len(argv) >= 1 and argv[0] in ("-h", "--help"):
         print(USAGE)
         return 0
+    try:
+        assets, argv = _split_assets(argv)
+        assets_parts(assets)
+    except BundleError as e:
+        print(f"bundle.py: {e}\nTry: {e.hint}", file=sys.stderr)
+        return 2
     if not argv or (argv[0], len(argv)) not in (("measure", 2), ("check", 3)):
         print(f"{USAGE}\nTry: bundle.py measure web/build", file=sys.stderr)
         return 2
     try:
-        result = measure(argv[1])
+        result = measure(argv[1], assets)
         if argv[0] == "measure":
             print(json.dumps(result, indent=2))
             return 0
