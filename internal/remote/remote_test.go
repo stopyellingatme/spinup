@@ -114,10 +114,6 @@ func TestUploadUsesStdin(t *testing.T) {
 func shortCache(t *testing.T) string {
 	t.Helper()
 	// t.TempDir paths on macOS can exceed the SSH socket limit.
-	// Windows has no /tmp, and its tests open no control socket.
-	if runtime.GOOS == "windows" {
-		return t.TempDir()
-	}
 	dir, err := os.MkdirTemp("/tmp", "su-ssh-")
 	if err != nil {
 		t.Fatal(err)

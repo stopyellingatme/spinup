@@ -19,6 +19,7 @@ gen/resource            # golden trees for a generated app and pnpm
 maintain/pg             # sh scripts and a remote shell fake
 maintain/pgupgrade      # sh scripts
 plugin/rpc              # builds plugin test binaries without the .exe suffix
+remote                  # SSH control sockets need a short Unix path; the tests use /tmp and sh scripts as ssh
 server                  # server commands require WSL2 on Windows
 templates               # generated app goldens, pnpm, sh, and server bootstrap
 testutil/scripttest     # txtar scripts use sh, git, and pnpm; the run is too slow
