@@ -97,8 +97,9 @@ It then pushes `kit/v0.8.0-rc.1` on the same commit.
 A failure before the final step leaves the kit tag unpublished.
 Correct the failure before another attempt.
 
-The repository has no root `LICENSE` file yet (see the [v1.0 checklist](v1-checklist.md)).
-The archive uses the optional `LICENSE*` glob and tolerates its absence.
+Each archive holds `LICENSE`, `THIRD_PARTY_NOTICES.md`, and `CHANGELOG.md`.
+The tags `v*`, `kit/v*`, and `plugin-sdk/v*` cannot be moved or deleted (see [Repository rules](repository-rules.md)).
+Thus a bad tag needs a new version.
 The archives use `scripts/release/README.md` as their README.
 
 A file `kit/MIGRATION.json` lists the steps that an app owner must do when the kit changes. Here is a short example:
@@ -171,6 +172,14 @@ After you push a kit tag, do these steps:
 A pre-release kit tag has the form `kit/v0.1.0-alpha.<n>`.
 The number `<n>` is the commit count, as `make install` uses.
 The release check fails when the major or minor version of the kit pin differs from the CLI candidate.
+
+## First release
+
+Before the first release, spinup has no install script, no Homebrew cask, and no `self-update`. The docs say so. Do these steps with the first release:
+
+1. Change the quick start and the Status section of `README.md`, so that they use the install script again.
+2. Change `docs/get-started/install.md`, so that it leads with the install script again.
+3. Check the version prefix in the `make install` target of the `Makefile` against the kit minor in `kit/api/minor.txt`.
 
 ## Bump the kit minor
 

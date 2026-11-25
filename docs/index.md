@@ -12,7 +12,9 @@ Generated files stay easy to read and easy to upgrade, because spinup knows whic
 ## Quick start
 
 ```sh
-curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/install.sh | sh
+git clone https://github.com/stopyellingatme/spinup.git
+make -C spinup install
+export PATH="$PWD/spinup/bin:$PATH"
 spinup new todo --module example.com/todo
 cd todo
 spinup dev
@@ -28,7 +30,7 @@ API      http://localhost:8080
 Mailpit  http://localhost:8025
 ```
 
-The first command installs spinup. You can also use Homebrew, and you need Go, Node, and Docker. Read [Install spinup](get-started/install.md).
+The first three lines build spinup from source. The install script and Homebrew work after the first release. You need Go, Node, and Docker. Read [Install spinup](get-started/install.md).
 You want every step with its output? Read [Your first app](get-started/first-app.md).
 
 ## What you get
