@@ -14,6 +14,8 @@
 #   WORKFLOW            the workflow file name, for example ci.yml
 #   MAX_AGE_DAYS        how far back to look (default 14)
 #
+# Only a run whose head repository is this repository counts as proof. A fork run does not.
+#
 # A run that skipped through this gate also ends in success. That is correct, because the
 # tree that it skipped had passed before it.
 set -uo pipefail
@@ -44,7 +46,7 @@ since="$(date -u -d "-$max_age days" +%F 2>/dev/null || date -u -v-"$max_age"d +
 # Do not use unique_by: it sorts by SHA and loses the newest-first order.
 candidates="$(gh api -X GET "repos/$repo/actions/workflows/$workflow/runs" \
 	-f status=success -f "created=>=$since" -f per_page=50 \
-	--jq "[.workflow_runs[] | select(.id != $run_id) | {sha: .head_sha, id: .id}]
+	--jq "[.workflow_runs[] | select(.id != $run_id and .head_repository.full_name == \"$repo\") | {sha: .head_sha, id: .id}]
 	      | reduce .[] as \$r ([]; if any(.[]; .sha == \$r.sha) then . else . + [\$r] end)
 	      | .[] | \"\(.sha) \(.id)\"")" ||
 	run_all "cannot list the successful runs of $workflow"

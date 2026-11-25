@@ -198,3 +198,15 @@ func TestKitCompatCorpusSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestRepositoryWorkflowsPassVerify(t *testing.T) {
+	t.Parallel()
+	root := testutil.RepoRoot(t)
+	report, err := ci.Verify(context.Background(), ci.VerifyOptions{Root: root, LookPath: func(string) (string, error) { return "", &spexec.NotFoundError{Name: "actionlint"} }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("the workflows of this repository have findings: %v", report.Findings)
+	}
+}
