@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Embed mode: the Content-Security-Policy of the shell now has the directives of node mode. `app.WithSPA` adds `form-action 'self'`, `img-src 'self' data:`, `font-src 'self' data:`, and `connect-src 'self'` (ADR 0039, stage 0). Before, a form in the page could post to another origin. A form that posts to another origin now needs a policy of its own.
+- Embed mode: the managed `web/vite.config.js` sets the version name of the build to a hash of the build inputs. Two builds of the same inputs now give the same `index.html`, the same script hash, and the same Go binary content. Before, the build time changed them with each build.
 - The web server (Node mode) sends each `console.error` and `console.warn` line to the log store as an OTLP log record, and a new `handleError` hook in `web/src/hooks.server.ts` prints each unexpected error with its request. Read the lines with `spinup monitor logs --service web`. The web app gets two npm packages: `@opentelemetry/api-logs` and `@opentelemetry/exporter-logs-otlp-http`.
 - `spinup monitor logs`: `--service api` selects `<app>-api`, the text output shows the service, the level, and the attributes of each line, and `--json` prints one JSON object for each line.
 - `spinup backup verify` and `spinup backup restore --into new` (pgBackRest) no longer stop with error 61 on a server that has archived WAL. The restore container now has its own spool path.

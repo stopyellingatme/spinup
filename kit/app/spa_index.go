@@ -79,6 +79,9 @@ func indexSPA(files fs.FS, immutable string) (map[string]spaFile, string) {
 	return public, csp
 }
 
+// spaCSP gives the policy of the shell. The directives equal the node-mode policy of the web
+// pack, with script hashes in place of the nonce. form-action has no default-src fallback, so the
+// policy names it.
 func spaCSP(index []byte) string {
 	var policy strings.Builder
 	policy.WriteString("default-src 'self'; script-src 'self'")
@@ -88,7 +91,7 @@ func spaCSP(index []byte) string {
 	for {
 		switch tokens.Next() {
 		case html.ErrorToken:
-			policy.WriteString("; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
+			policy.WriteString("; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
 			return policy.String()
 		case html.StartTagToken:
 			token := tokens.Token()

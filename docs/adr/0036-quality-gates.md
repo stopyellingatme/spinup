@@ -39,6 +39,7 @@ The owner wants CI runner minutes kept low. Each gate here runs in an existing j
 2. A unit may split `style-src` into `style-src-elem 'self'` and `style-src-attr 'unsafe-inline'` only when `make e2e` passes with it.
 3. The scaffold `hooks.server.ts` does not change. It sets `frame-ancestors 'none'` only when the response has no CSP.
 4. Embed mode: `WithSPA` sends `script-src 'self'` plus one `'sha256-...'` source for each inline script of `index.html`. `'unsafe-inline'` stays only in `style-src`.
+   Amended on 2026-11-25 (ADR 0039, stage 0): the other directives equal the directives of node mode in item 1. Before, the embed policy had no `form-action`, `img-src`, `font-src`, and `connect-src`.
 5. Trusted Types are deferred. The behaviour of shadcn and bits-ui under them is not verified.
 
 ### 3. XSS tests

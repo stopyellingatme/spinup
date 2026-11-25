@@ -1,6 +1,6 @@
 # ADR 0039: embed mode with sign-in and resource pages (spike)
 
-Status: accepted as a finding (2026-11-25). The implementation is not scheduled. The owner has not confirmed the ruling of section 6.  
+Status: accepted (2026-11-25). The owner confirmed the ruling of section 6 on 2026-11-25. Stage 0 of section 7 is done. Stage 1 to stage 4 are approved and not built.  
 Extends: ADR 0014 (embed mode), ADR 0038 (Solid 2 investigation, section E10)  
 Spike: branch `spike/embed-auth`, commit `a89ba5d`. The branch is a reference. Do not merge it. Do not delete it.
 
@@ -100,9 +100,10 @@ The password rule changes, and it is not a loss. The password stays in the field
 
 ## 6. Decision
 
-Go on feasibility. Do not implement in this run. The owner has not scheduled the work.
+Go on feasibility. The spike run implemented nothing.
+On 2026-11-25 the owner confirmed the ruling and approved the work, on the condition that each stage is an improvement. Stage 0 followed on the same day.
 Embed mode can hold the `auth` module and resource pages on SvelteKit 3. The refusals of ADR 0014 can go in a later milestone.
-This ADR does not remove them. Until that milestone, the refusals stay as they are.
+Stage 0 does not remove them. Until stage 2 and stage 3 merge, the refusals stay as they are.
 
 Reasons:
 
@@ -131,10 +132,10 @@ Rejected alternatives:
 
 Do the stages in this order. The first stage helps embed mode without sign-in.
 
-**Stage 0, the kit and the embed pack of today.**
-- Add `form-action 'self'` to the shell policy in `kit/app/spa_index.go`.
-- Decide `img-src` and `font-src` with `data:`.
-- Give the embed build a stable `kit.version.name`. The build time in `index.html` changes the script hash for each build. Two builds of one tree gave two hashes. The value is not decided.
+**Stage 0, the kit and the embed pack of today (done on 2026-11-25).**
+- The shell policy in `kit/app/spa_index.go` has the directives of node mode (ADR 0036, section 2, item 1), with the script hashes in place of the nonce. It adds `form-action 'self'`, `img-src 'self' data:`, `font-src 'self' data:`, and `connect-src 'self'`.
+- The embed `vite.config.js` sets `version.name` to a hash of the build inputs: `src/`, `static/`, `package.json`, the lockfile, `vite.config.js`, and each `PUBLIC_` value. Before, the build time in `index.html` changed the script hash for each build.
+- Node mode keeps the build time as the version name. Its policy uses a nonce, so the script hash is not a concern there. Not changed.
 
 **Stage 1, the web pack.**
 - Add the embed root `+layout.ts` with the session and flags load.
@@ -177,7 +178,6 @@ Do the stages in this order. The first stage helps embed mode without sign-in.
 The owner decides these.
 
 - When the work starts, and which modules the first release holds.
-- The value of the stable `kit.version.name`.
 - Whether a signed-out `GET /api/session` keeps the 401 or gets another answer. The 401 gives one console error line for each signed-out page load.
 - Whether the kit gets a route that clears the session cookie when the sign-out call fails.
 - The refresh policy of the public flags in the browser. The spike reads them in the root load, not on client navigation.
@@ -191,4 +191,4 @@ The owner decides these.
 - The reset pages, OIDC, the history pages, apikeys, billing, and mcp.
 - Browser traces.
 - A signed-in node page measurement. The node CSP came from a build with no API behind it.
-- A stable `kit.version.name`. The spike did not change it.
+- A stable version name in node mode. Stage 0 changed embed mode only.

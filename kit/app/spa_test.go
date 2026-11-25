@@ -174,7 +174,7 @@ func TestSPACSP(t *testing.T) {
 				sum := sha256.Sum256([]byte(normalized))
 				script += " 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
 			}
-			want := "default-src 'self'; " + script + "; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+			want := "default-src 'self'; " + script + "; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			for _, path := range []string{"/index.html", "/deep/link", "/other.html"} {
 				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 				req.Header.Set("Accept-Encoding", "br")

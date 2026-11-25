@@ -136,8 +136,11 @@ Scripts with a `src` attribute add no hash.
 HTML responses, including the fallback and compressed variants, send this Content Security Policy:
 
 ```text
-default-src 'self'; script-src 'self' <hashes>; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+default-src 'self'; script-src 'self' <hashes>; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
+
+The directives equal the policy of node mode, with the hashes in place of the nonce (see [the web app](web.md)).
+A form can post only to the origin of the app.
 
 Each `<hashes>` entry has the form `'sha256-<base64>'`.
 When `index.html` has no inline scripts, the script directive is `script-src 'self'`.
@@ -145,6 +148,11 @@ The script directive never permits `'unsafe-inline'`.
 The style directive retains `'unsafe-inline'`.
 
 The smoke spec CSP test needs the embed binary. The embed Vite dev server sends no CSP.
+
+The managed `web/vite.config.js` sets the version name of the build to a hash of the build inputs.
+The inputs are `src/`, `static/`, `package.json`, the lockfile, `vite.config.js`, and each `PUBLIC_` value.
+So two builds of the same inputs give the same files, the same script hash, and the same `ETag` of `index.html`.
+The default of SvelteKit is the build time, which changes these values with each build.
 
 A Go build without the `embedweb` tag contains only a stub.
 Use `spinup build` and not `go build` to get the web files.
