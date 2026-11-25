@@ -1,8 +1,8 @@
 # ADR 0039: embed mode with sign-in and resource pages (spike)
 
-Status: accepted as a finding (2026-11-25). The implementation is not scheduled.  
-Extends: ADR 0014 (embed mode), ADR 0034 (web performance), ADR 0036 (quality gates), ADR 0038 (Solid 2 investigation)  
-Spike: branch `spike/embed-auth`, commit `eb97b60`. The branch is a reference. Do not merge it. Do not delete it.
+Status: accepted as a finding (2026-11-25). The implementation is not scheduled. The owner has not confirmed the ruling of section 6.  
+Extends: ADR 0014 (embed mode), ADR 0038 (Solid 2 investigation, section E10)  
+Spike: branch `spike/embed-auth`, commit `a89ba5d`. The branch is a reference. Do not merge it. Do not delete it.
 
 ## 1. Context
 
@@ -24,8 +24,9 @@ The spike generated an app with `ci`, `auth`, `flags`, and `live`, plus the `tod
 The API change is two lines in `main.go` and the `webdist` package. The Go API was already the authority for sessions, CSRF, and validation.
 The shell, sign-in, register, sign-out, the guards, the flags, the admin flags page, the todo pages, and live data work in the one binary.
 
-10 of the 16 tests pass. 6 fail. The changed copies in `variant/` pass 23 probes and tests, with 0 failures.
-The main loop ran `run.sh` again on 2026-11-25. It gave exit 0 and "0 mismatches" against the record. `shell.spec.ts` and `auth.spec.ts` with `--repeat-each=10` gave 40 passed and 0 failed.
+10 of the 16 tests pass. 6 fail. The probes and the changed copies of specs in `variant/` gave 23 passed and 0 failed.
+One agent built the spike. A second agent reviewed it, and its 7 findings are fixed or recorded.
+The orchestrator then ran `spikes/embed-auth/run.sh` from a clean directory on 2026-11-25. It gave exit 0 and "0 mismatches" against the record. `shell.spec.ts` and `auth.spec.ts` with `--repeat-each=10` gave 40 passed and 0 failed.
 
 | Test | Result | Reason |
 |---|---|---|
@@ -109,7 +110,7 @@ Reasons:
 2. The API change is two lines in `main.go` plus the `webdist` package.
 3. Each loss is known and has evidence.
 
-The costs that this decision accepts:
+The costs of an implementation:
 
 1. **Two page families.** Each pack with pages (auth, flags, apikeys, billing) and the resource generator hold a node family and an embed family.
    Each later page feature is written two times. The golden trees of embed mode grow.
