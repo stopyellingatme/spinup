@@ -257,6 +257,10 @@ jobs:
         run: |
           go run ./cmd/spinup tools install
           echo "$SPINUP_TOOLS_DIR" >> "$GITHUB_PATH"
+      # The console collector tests run the collector script under GNU timeout, and
+      # macOS has no timeout command. Homebrew coreutils installs one.
+      - name: Install coreutils
+        run: brew install --quiet coreutils
       # The testscript package runs near 10 minutes on macOS, so raise the
       # default timeout of each package to the one that make script uses.
       - name: Test the CLI with the race detector
