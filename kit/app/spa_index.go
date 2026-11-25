@@ -22,7 +22,7 @@ type spaFile struct {
 	contentType string
 }
 
-func indexSPA(files fs.FS) (map[string]spaFile, string) {
+func indexSPA(files fs.FS, immutable string) (map[string]spaFile, string) {
 	index := make(map[string]spaFile)
 	csp := spaCSP(nil)
 	if files == nil {
@@ -47,7 +47,7 @@ func indexSPA(files fs.FS) (map[string]spaFile, string) {
 		_, br := index[name+".br"]
 		_, gzip := index[name+".gz"]
 		file := spaFile{br: br, gzip: gzip, contentType: mime.TypeByExtension(path.Ext(name))}
-		if !strings.HasPrefix(name, "_app/immutable/") {
+		if !strings.HasPrefix(name, immutable) {
 			data, err := fs.ReadFile(files, name)
 			if err != nil {
 				continue

@@ -86,6 +86,7 @@ return a.Run(ctx, os.Args[1:])
 | `WithShutdown(func)` | Runs when the server stops, in reverse order. |
 | `WithAPIDocs(fs)` | Serves the API reference page. In production it needs `SPINUP_API_DOCS=true`. |
 | `WithSPA(fs)` | Serves a static web app from the binary. The embed mode uses it. |
+| `WithSPAOptions(fs, SPAOptions{...})` | Does the same for a build with another asset layout. `AssetDir` and `ImmutablePrefix` name the directories. The defaults are `_app/` and `_app/immutable/`. |
 
 `a.Handler()` returns the full handler. Use it in tests.
 
