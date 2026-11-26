@@ -105,6 +105,11 @@ func TestEmbedAuth(t *testing.T) {
 			if mail {
 				testResetEmbed(t, tree)
 			}
+			// The root layout imports the reset token module, which takes the token before the router
+			// reads the first address. Without mail it has no reset token module to import.
+			if layout := embedFile(t, tree, "web/src/routes/+layout.ts"); strings.Contains(layout, "import '#lib/reset-token.js';") != mail {
+				t.Errorf("+layout.ts imports the reset token module: %v, want %v", !mail, mail)
+			}
 			// The reset link of embed mode holds the token in the fragment, so no render has a
 			// header middleware or a token route.
 			for _, name := range []string{"api/cmd/api/main.go", "api/cmd/api/reset.go"} {
@@ -276,7 +281,7 @@ func testResetEmbed(t *testing.T, tree fs.FS) {
 	confirm := embedFile(t, tree, "web/src/routes/reset/confirm/+page.svelte")
 	for _, want := range []string{
 		"/api/auth/reset/confirm",
-		"takeResetToken()",
+		"const token = $derived(data.token);",
 		"token === null",
 		"The reset link is not valid. Request a new link.",
 		`<meta name="referrer" content="no-referrer" />`,
@@ -302,7 +307,21 @@ func testResetEmbed(t *testing.T, tree fs.FS) {
 			}
 		}
 	}
-	if helper := embedFile(t, tree, "web/src/lib/reset-token.ts"); !strings.Contains(helper, "history.replaceState(history.state, '', location.pathname + location.search)") {
-		t.Errorf("reset-token.ts does not remove the fragment with replaceState")
+	helper := embedFile(t, tree, "web/src/lib/reset-token.ts")
+	for _, want := range []string{
+		"history.replaceState(history.state, '', location.pathname + location.search)",
+		"if (location.hash === '') return held;",
+		"window.location?.pathname === '/reset/confirm') takeResetToken();",
+	} {
+		if !strings.Contains(helper, want) {
+			t.Errorf("reset-token.ts lacks %q", want)
+		}
+	}
+	// The universal load takes the token: it runs also when the root layout hides the page.
+	if load := embedFile(t, tree, "web/src/routes/reset/confirm/+page.ts"); !strings.Contains(load, "export const load: PageLoad = () => ({ token: takeResetToken() });") {
+		t.Errorf("the reset confirm load does not take the token:\n%s", load)
+	}
+	if strings.Contains(confirm, "takeResetToken") {
+		t.Errorf("the reset confirm page takes the token itself: only the load takes it")
 	}
 }

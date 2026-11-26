@@ -5,6 +5,11 @@ import { FLAGS_DEP, SESSION_DEP } from '#lib/auth.js';
 import { readSession, session } from '#lib/session.svelte.js';
 // The session watch opens its channel when this module loads, before the first session read.
 import '#lib/session-watch.js';
+[[- if has "mail" .modules ]]
+// The reset token module takes the token of a reset link from the fragment when it loads. The root
+// layout loads before the router reads the first address (ADR 0039, section 10.10).
+import '#lib/reset-token.js';
+[[- end ]]
 import type { LayoutLoad } from './$types';
 
 export const ssr = false;
