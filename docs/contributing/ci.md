@@ -37,6 +37,7 @@ On a push, the `gate` job runs `scripts/ci/tree-gate.sh`.
 The script compares the git tree of the pushed commit with the trees of the successful CI runs of the last 14 days.
 If a tree matches, every other job skips, and the run summary names the run that passed.
 If the script cannot decide, it fails open and every job runs.
+The tree gate does not count a run from a fork as a pass.
 
 A pull request run tests the head commit of the branch, not the merge commit.
 Thus, when you push the tree of a green pull request to `main`, CI does not test it again.
@@ -51,6 +52,21 @@ gh workflow run ci.yml --ref main
 The `test-macos` job waits for `lint`, `actionlint`, `test`, `windows`, and `upgrade`.
 If one of them fails, the macOS job does not start.
 Fix the Linux or Windows failure first, and the next run shows the macOS result.
+
+## Required checks
+
+The ruleset `main-merge` requires six checks before a pull request can merge.
+The checks are `lint`, `actionlint`, `test`, `windows`, `upgrade`, and `test-macos`.
+GitHub counts a skipped check as a pass, so a skipped `test-macos` does not block a merge.
+Do not rename these jobs. Do not add a filter to the `pull_request` trigger of `ci.yml`.
+If you must rename a job or add a filter, change `.github/rulesets/main-merge.json` in the same pull request.
+See [Repository rules](repository-rules.md).
+
+## Pull requests from forks
+
+A maintainer must approve each run of a pull request from a fork.
+The token of the run is read-only. The run cannot read secrets.
+Each pull request has its own caches, so a fork cannot change the cache of `main`.
 
 ## Other workflows
 
@@ -91,6 +107,7 @@ gh api --paginate "repos/stopyellingatme/spinup/actions/runs?created=>=$since&pe
 
 ## See also
 
+- [Repository rules](repository-rules.md)
 - [Upgrade matrix](upgrade-matrix.md)
 - [Docker-in-Docker deploy suite](dind.md)
 - [Browser end-to-end suite](e2e.md)

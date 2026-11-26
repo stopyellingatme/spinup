@@ -174,7 +174,7 @@ func TestSPACSP(t *testing.T) {
 				sum := sha256.Sum256([]byte(normalized))
 				script += " 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
 			}
-			want := "default-src 'self'; " + script + "; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+			want := "default-src 'self'; " + script + "; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			for _, path := range []string{"/index.html", "/deep/link", "/other.html"} {
 				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 				req.Header.Set("Accept-Encoding", "br")
@@ -329,5 +329,116 @@ func TestSPASplitAcceptEncoding(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusOK || w.Header().Get("Content-Encoding") != "" || w.Body.String() != "0123456789" {
 		t.Fatalf("response = %d %v %q, want the plain file", w.Code, w.Header(), w.Body.String())
+	}
+}
+
+// TestSPAOptions covers a Vite layout: hashed files in assets/, no _app directory.
+func TestSPAOptions(t *testing.T) {
+	t.Parallel()
+	files := fstest.MapFS{
+		"index.html":                  {Data: []byte(`<!doctype html><script type="module" src="/assets/app-abc.js"></script>`)},
+		"assets/app-abc.js":           {Data: []byte("console.log('app')")},
+		"assets/app-abc.js.br":        {Data: []byte("brotli app")},
+		"_app/old.js":                 {Data: []byte("not an asset dir here")},
+		"favicon.svg":                 {Data: []byte("<svg/>")},
+		"assets/app-abc.js.gz":        {Data: []byte("gzip app")},
+		"assets/not-a-shell-fallback": {Data: []byte("x")},
+	}
+	a := New(WithLogger(discardLogger()), WithSPAOptions(files, SPAOptions{AssetDir: "assets/", ImmutablePrefix: "assets/"}))
+	get := func(path, encoding string) *httptest.ResponseRecorder {
+		r := httptest.NewRequestWithContext(t.Context(), "GET", path, nil)
+		if encoding != "" {
+			r.Header.Set("Accept-Encoding", encoding)
+		}
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, r)
+		return w
+	}
+	w := get("/assets/app-abc.js", "br")
+	if w.Code != 200 || w.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" || w.Header().Get("ETag") != "" || w.Header().Get("Content-Encoding") != "br" || w.Body.String() != "brotli app" {
+		t.Fatalf("hashed asset = %d %v %s", w.Code, w.Header(), w.Body)
+	}
+	if w := get("/assets/missing.js", ""); w.Code != 404 || strings.Contains(w.Body.String(), "<script") {
+		t.Fatalf("missing asset = %d %s", w.Code, w.Body)
+	}
+	w = get("/deep/link", "")
+	if w.Code != 200 || w.Header().Get("ETag") == "" || w.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("shell = %d %v", w.Code, w.Header())
+	}
+	if csp := w.Header().Get("Content-Security-Policy"); !strings.HasPrefix(csp, "default-src 'self'; script-src 'self';") {
+		t.Fatalf("csp = %q", csp)
+	}
+	// The default layout is not an asset directory here: _app/ paths fall back to the shell.
+	if w := get("/_app/missing.js", ""); w.Code != 200 {
+		t.Fatalf("_app path = %d", w.Code)
+	}
+}
+
+// TestSPAOptionsDirs checks that a directory option without slashes matches only that directory.
+func TestSPAOptionsDirs(t *testing.T) {
+	t.Parallel()
+	tests := []struct{ in, fallback, want string }{
+		{"", "_app/", "_app/"},
+		{"/", "_app/", "_app/"},
+		{".", "_app/", "_app/"},
+		{"..", "_app/", "_app/"},
+		{"assets", "_app/", "assets/"},
+		{"/assets/", "_app/", "assets/"},
+		{"assets//", "_app/", "assets/"},
+		{"static/hashed", "_app/", "static/hashed/"},
+		{"../assets", "_app/", "assets/"},
+	}
+	for _, tt := range tests {
+		if got := spaDir(tt.in, tt.fallback); got != tt.want {
+			t.Errorf("spaDir(%q, %q) = %q, want %q", tt.in, tt.fallback, got, tt.want)
+		}
+	}
+	files := fstest.MapFS{
+		"index.html":         {Data: []byte("<!doctype html>")},
+		"assets/app-abc.js":  {Data: []byte("a")},
+		"assets-old/keep.js": {Data: []byte("b")},
+	}
+	a := New(WithLogger(discardLogger()), WithSPAOptions(files, SPAOptions{AssetDir: "/assets", ImmutablePrefix: "assets"}))
+	get := func(path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", path, nil))
+		return w
+	}
+	if w := get("/assets/app-abc.js"); w.Code != 200 || w.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Fatalf("hashed asset = %d %v", w.Code, w.Header())
+	}
+	if w := get("/assets-old/keep.js"); w.Code != 200 || w.Header().Get("Cache-Control") != "no-cache" || w.Header().Get("ETag") == "" {
+		t.Fatalf("sibling directory = %d %v, want a file that revalidates", w.Code, w.Header())
+	}
+	if w := get("/assets-old/missing.js"); w.Code != 200 {
+		t.Fatalf("missing file in a sibling directory = %d, want the shell", w.Code)
+	}
+}
+
+// TestSPAOptionsSplit checks that AssetDir and ImmutablePrefix are independent: the 404 rule
+// follows AssetDir, and the cache rule follows ImmutablePrefix.
+func TestSPAOptionsSplit(t *testing.T) {
+	t.Parallel()
+	files := fstest.MapFS{
+		"index.html":             {Data: []byte("<!doctype html>")},
+		"assets/hashed/a-abc.js": {Data: []byte("a")},
+		"assets/b.js":            {Data: []byte("b")},
+	}
+	a := New(WithLogger(discardLogger()), WithSPAOptions(files, SPAOptions{AssetDir: "assets/", ImmutablePrefix: "assets/hashed/"}))
+	get := func(path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), "GET", path, nil))
+		return w
+	}
+	if w := get("/assets/hashed/a-abc.js"); w.Code != 200 || w.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" || w.Header().Get("ETag") != "" {
+		t.Fatalf("hashed file = %d %v, want immutable and no ETag", w.Code, w.Header())
+	}
+	if w := get("/assets/b.js"); w.Code != 200 || w.Header().Get("Cache-Control") != "no-cache" || w.Header().Get("ETag") == "" {
+		t.Fatalf("plain asset = %d %v, want no-cache and an ETag", w.Code, w.Header())
+	}
+	for _, path := range []string{"/assets/missing.js", "/assets/hashed/missing.js"} {
+		if w := get(path); w.Code != 404 {
+			t.Fatalf("%s = %d, want 404", path, w.Code)
+		}
 	}
 }

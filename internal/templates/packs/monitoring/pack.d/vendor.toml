@@ -11,9 +11,3 @@ path = "monitoring/grafana/dashboards/stack/vendor/postgresql.json"
 source = "files/monitoring/grafana/dashboards/stack/vendor/postgresql.json"
 class = "managed"
 when = "monitoring_profile == 'full'"
-
-[[files]]
-path = "monitoring/grafana/dashboards/stack/vendor/cadvisor.json"
-source = "files/monitoring/grafana/dashboards/stack/vendor/cadvisor.json"
-class = "managed"
-when = "monitoring_profile == 'full'"

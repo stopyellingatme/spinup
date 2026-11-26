@@ -251,7 +251,7 @@ Use `http://127.0.0.1:<grafana_port>` as the Grafana origin. An absent forward s
 Grafana authenticates the browser itself.
 
 Use these dashboard paths on that same origin. Lite and full expose `/d/spinup-http-red`, `/d/spinup-go-runtime`, `/d/spinup-caddy`, `/d/spinup-backups`, and `/d/spinup-deploys`.
-Full also exposes `/d/rYdddlPWk`, `/d/pMEd7m0Mz`, and `/d/000000039`.
+Full also exposes `/d/rYdddlPWk`, `/d/spinup-containers`, and `/d/000000039`.
 Use the resolved app origin for the app link. Accept only absolute HTTP(S) origins without user information, query, or fragment.
 Use the fixed documentation prefix `https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/`. This is the value of `render.DocsBase`. The table gives the exact tile captions and commands.
 Substitute the validated environment name for `<env>`. Also show the overview command on every overview tile.

@@ -144,6 +144,13 @@ source = "files/monitoring/grafana/dashboards/stack/deploys.json"
 class = "managed"
 when = "monitoring_profile != 'none'"
 
+# The container dashboard reads the cAdvisor metrics, which only the full profile runs.
+[[files]]
+path = "monitoring/grafana/dashboards/stack/containers.json"
+source = "files/monitoring/grafana/dashboards/stack/containers.json"
+class = "managed"
+when = "monitoring_profile == 'full'"
+
 # Your own dashboards. spinup never changes this folder after `spinup new`.
 [[files]]
 path = "monitoring/grafana/dashboards/custom/.gitkeep"

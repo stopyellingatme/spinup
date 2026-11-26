@@ -9,6 +9,7 @@ has_toc: false
 
 These pages are for people who work on spinup itself.
 If you want to build an app with spinup, start with [Get started](../get-started/index.md).
+To send a change, read [CONTRIBUTING.md](https://github.com/stopyellingatme/spinup/blob/main/CONTRIBUTING.md) first.
 
 Build, test, and check the code with `make`. The Makefile is the only check contract.
 
@@ -75,4 +76,5 @@ If you change a command or a feature, add or update its page under `docs/`, and 
 | Run the live DigitalOcean test | [Run the DigitalOcean live test](do-live-test.md) |
 | Register the DigitalOcean OAuth client or change the fake API | [DigitalOcean OAuth client](digitalocean-client.md) |
 | See which CI jobs run and what they cost | [CI workflows and their cost](ci.md) |
+| Read the rules of the repository, and change a required check | [Repository rules](repository-rules.md) |
 | Fix a script test that fails under load | [Script test isolation](script-test-isolation.md) |

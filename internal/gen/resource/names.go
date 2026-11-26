@@ -64,6 +64,7 @@ type inflection struct {
 // The singular rules of github.com/jinzhu/inflection v1.0.0 (MIT), which sqlc
 // uses for model names, in the order that library applies them. Only the
 // lower-case rules matter, because table names are lower-case snake case.
+// See THIRD_PARTY_NOTICES.md.
 var (
 	sqlcUncountable = []string{"equipment", "information", "rice", "money", "species", "series", "fish", "sheep", "jeans", "police"}
 	sqlcIrregular   = [][2]string{{"people", "person"}, {"men", "man"}, {"children", "child"}, {"sexes", "sex"}, {"moves", "move"}, {"mombies", "mombie"}}

@@ -22,7 +22,7 @@ type spaFile struct {
 	contentType string
 }
 
-func indexSPA(files fs.FS) (map[string]spaFile, string) {
+func indexSPA(files fs.FS, immutable string) (map[string]spaFile, string) {
 	index := make(map[string]spaFile)
 	csp := spaCSP(nil)
 	if files == nil {
@@ -47,7 +47,7 @@ func indexSPA(files fs.FS) (map[string]spaFile, string) {
 		_, br := index[name+".br"]
 		_, gzip := index[name+".gz"]
 		file := spaFile{br: br, gzip: gzip, contentType: mime.TypeByExtension(path.Ext(name))}
-		if !strings.HasPrefix(name, "_app/immutable/") {
+		if !strings.HasPrefix(name, immutable) {
 			data, err := fs.ReadFile(files, name)
 			if err != nil {
 				continue
@@ -79,6 +79,9 @@ func indexSPA(files fs.FS) (map[string]spaFile, string) {
 	return public, csp
 }
 
+// spaCSP gives the policy of the shell. The directives equal the node-mode policy of the web
+// pack, with script hashes in place of the nonce. form-action has no default-src fallback, so the
+// policy names it.
 func spaCSP(index []byte) string {
 	var policy strings.Builder
 	policy.WriteString("default-src 'self'; script-src 'self'")
@@ -88,7 +91,7 @@ func spaCSP(index []byte) string {
 	for {
 		switch tokens.Next() {
 		case html.ErrorToken:
-			policy.WriteString("; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
+			policy.WriteString("; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
 			return policy.String()
 		case html.StartTagToken:
 			token := tokens.Token()

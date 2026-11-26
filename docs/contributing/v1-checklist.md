@@ -7,7 +7,7 @@ nav_order: 3
 # v1.0 checklist
 
 This page lists what must be true before spinup v1.0, and how to check each item.
-The status was last verified on 2026-11-01.
+The status was last verified on 2026-11-25.
 Update the status in the same pull request that changes it. To re-check the release items, run `git tag -l`.
 
 ```sh
@@ -28,11 +28,11 @@ The v1.0 gate has four items.
 
 A maintainer must do these steps. They need accounts, secrets, or decisions that only the owner has.
 
-- [ ] **Tag v0.2 and v0.3.** `git tag -l 'v0.*'` and `git tag -l 'kit/v0.*'` list both tags, and `scripts/release/check.sh <version>` passes. See [Release spinup](release.md). Today only the pre-release tag `kit/v0.1.0-alpha.418` and the tag `go-freeze-r0` exist.
+- [ ] **Tag v0.2 and v0.3.** `git tag -l 'v0.*'` and `git tag -l 'kit/v0.*'` list both tags, and `scripts/release/check.sh <version>` passes. See [Release spinup](release.md). Today only the pre-release kit tags `kit/v0.1.0-alpha.418`, `kit/v0.1.0-alpha.782`, `kit/v0.1.0-alpha.902`, and `kit/v0.1.0-alpha.955`, and the tag `go-freeze-r0` exist.
 - [ ] **Freeze the corpus.** `testdata/corpus/<version>/` holds the real output of each release. The upgrade matrix runs it. Release corpora start at v0.3.
 - [ ] **Create the signing key.** Run `go run ./scripts/release/keygen`. Store the private key in the secret `SPINUP_TEMPLATES_SIGNING_KEY`, and add the public key to `store.TrustedKeys`. Today `store.TrustedKeys` is empty.
-- [ ] **Add a LICENSE file.** The file `LICENSE` must exist at the repository root. Today it does not exist. The owner must choose the license.
-- [ ] **Turn on private vulnerability reporting.** The repository is public and the Pages workflow publishes the docs. In the repository settings, turn on private vulnerability reporting. Today it is off.
+- [x] **Add a LICENSE file.** The file `LICENSE` exists at the repository root. The license is MIT. See [ADR 0040](../adr/0040-open-source.md).
+- [x] **Turn on private vulnerability reporting.** The repository is public and the Pages workflow publishes the docs. Private vulnerability reporting is on.
 - [ ] **Create the Homebrew tap.** The repository `stopyellingatme/homebrew-tap` exists, and the secret `HOMEBREW_TAP_TOKEN` has write access.
 - [ ] **Name a second owner.** `MAINTAINERS.md` lists two owners and the release rota. Today it lists one owner.
 - [ ] **Run the end-to-end suites.** `make e2e`, `make dind`, `make app-gate`, and `make vuln` pass on the release commit. They need Docker and network access.
@@ -46,8 +46,8 @@ A maintainer must do these steps. They need accounts, secrets, or decisions that
 
 ## Order of work
 
-1. Add `LICENSE`, the second owner, and the signing key. Commit them.
-2. Create the tap repository. Turn on private vulnerability reporting.
+1. Add the second owner and the signing key. Commit them.
+2. Create the tap repository.
 3. Tag v0.2. Freeze its corpus. Install it on the dogfood app.
 4. Tag v0.3 a month later. Upgrade the dogfood app from v0.2 to v0.3 with local edits.
 5. Check that the kit has no breaking change across both minors.

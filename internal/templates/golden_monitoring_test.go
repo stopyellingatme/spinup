@@ -240,9 +240,9 @@ func checkMonitoringTree(t *testing.T, fsys fs.FS, full bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The vendored dashboards need the full exporters, so only the full profile renders them.
+	// The container dashboard and the vendored dashboards need the full exporters, so only the full profile renders them.
 	if want := map[bool]int{false: 5, true: 8}[full]; len(dashboards) < want {
-		t.Errorf("dashboards = %v, want spinup's five (plus the three vendored ones in full)", dashboards)
+		t.Errorf("dashboards = %v, want spinup's five (plus the containers dashboard and the two vendored ones in full)", dashboards)
 	}
 	for _, name := range dashboards {
 		var dashboard struct {

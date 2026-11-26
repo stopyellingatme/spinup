@@ -1,4 +1,4 @@
-# example
+# Example plugin
 
 This plugin provides the declarative `example-note <Name>` generator.
 The host applies its plan and records ownership in `spinup.lock`.

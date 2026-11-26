@@ -42,6 +42,7 @@ archives:
       - src: scripts/release/README.md
         strip_parent: true
       - LICENSE*
+      - THIRD_PARTY_NOTICES*
       - CHANGELOG*
 
 sboms:

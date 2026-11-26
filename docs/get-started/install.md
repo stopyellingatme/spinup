@@ -9,17 +9,18 @@ nav_order: 1
 Install the `spinup` binary with one command. It takes about a minute.
 Then check that your machine has the tools that a generated app needs.
 
-```sh
-curl -fsSL https://github.com/stopyellingatme/spinup/releases/latest/download/install.sh | sh
-spinup version
+There is no release yet. Build spinup from source:
+
+<!-- doctest: skip -->
+```console
+$ git clone https://github.com/stopyellingatme/spinup.git
+$ make -C spinup install
+$ export PATH="$PWD/spinup/bin:$PATH"
+$ spinup version
 ```
 
-The script puts `spinup` in `~/.local/bin`.
-If `spinup version` says "command not found", add that folder to your `PATH`:
-
-```sh
-export PATH="$HOME/.local/bin:$PATH"   # add this line to ~/.zshrc or ~/.bashrc
-```
+[Build from source](#build-from-source) explains each step.
+After the first release, the script and Homebrew work as the next sections show.
 
 ## Tools you need
 
@@ -32,6 +33,7 @@ spinup runs these tools on your machine. `spinup doctor` checks that they are pr
 | pnpm | 12, through corepack | Installs the web packages |
 | Docker | 27 or later. `spinup doctor` checks only that the daemon runs. | Runs PostgreSQL and Mailpit in development, and builds images for a deploy |
 | git | 2.44 or later | Tracks your app, and `spinup module add` and `spinup upgrade` need it |
+| make | Any version | Runs `make install`, which builds spinup from source |
 
 Node 24 includes corepack. Run `corepack enable` once, and `pnpm` works at the version that your app pins.
 You do not install the Go tools of the app (`sqlc`, `goose`, `oapi-codegen`, `air`) yourself. The app pins them in `api/tools.mod`, and `go tool` runs them.
@@ -39,7 +41,45 @@ You do not install the Go tools of the app (`sqlc`, `goose`, `oapi-codegen`, `ai
 {: .note }
 You build only an API? Then you do not need Node or pnpm. Create the app with `--api-only`.
 
+## Build from source
+
+Build from source until the first release. The build needs Go, git, and `make`.
+The first build downloads the Go modules, so it needs the network.
+
+<!-- doctest: skip -->
+```console
+$ git clone https://github.com/stopyellingatme/spinup.git
+$ make -C spinup install
+$ export PATH="$PWD/spinup/bin:$PATH"
+$ spinup version
+```
+
+`make install` builds `spinup/bin/spinup`. It stops if the git tree has uncommitted changes.
+It prints the version and the folder that holds the templates of this build.
+
+The version of a source build is `0.1.0-alpha.<n>`, where `<n>` is the number of commits in the clone.
+Each new commit gives a new version. A new app pins a prerelease tag of the kit.
+
+`make install` saves the templates of each build in `~/.cache/spinup/dev-templates/<version>`.
+Keep these folders. A later `spinup upgrade` needs the templates of the version that made the app.
+Set `SPINUP_TEMPLATES_DIR` to the `dev-templates` folder. Then run the command from the app folder:
+
+<!-- doctest: skip -->
+```console
+$ export SPINUP_TEMPLATES_DIR=~/.cache/spinup/dev-templates
+$ spinup upgrade
+```
+
+To save the templates in another folder, pass `DEV_TEMPLATES=<folder>` to `make install`.
+Then set `SPINUP_TEMPLATES_DIR` to that folder.
+
+Do not use a shallow clone (`git clone --depth`). A shallow clone has few commits, so the version number is too low.
+If the clone is shallow, run `git fetch --unshallow`. Then build again.
+
 ## Install with the script
+
+{: .note }
+This works from the first release. Until then, build from source.
 
 The script downloads the release for your system, checks its SHA-256 sum, and installs the binary.
 It checks the signature too when `cosign` is on your `PATH`.
@@ -62,6 +102,9 @@ You prefer to read the script before you run it? Download `install.sh` from the 
 The script needs `curl`, `tar`, and `sha256sum` or `shasum`.
 
 ## Install with Homebrew
+
+{: .note }
+This works from the first release. Until then, build from source.
 
 Homebrew installs spinup as a cask from the `stopyellingatme/tap` tap:
 
@@ -93,6 +136,9 @@ See [Doctor checks](../reference/doctor-checks.md) for what each check does.
 
 ## Update
 
+{: .note }
+This works from the first release. Until then, build from source.
+
 `spinup self-update` downloads the newest stable release, checks it, and replaces the binary.
 
 <!-- doctest: skip -->
@@ -120,6 +166,7 @@ Remove the binary. Your apps keep working, because a generated app does not need
 
 ```sh
 rm ~/.local/bin/spinup            # installed with the script
+rm -r spinup/bin                  # built from source
 brew uninstall --cask spinup      # installed with Homebrew
 ```
 

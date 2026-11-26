@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Read the docs
+    url: https://stopyellingatme.github.io/spinup/
+    about: Guides, command pages, and the reference for spinup.
+  - name: Troubleshooting
+    url: https://stopyellingatme.github.io/spinup/troubleshooting.html
+    about: Fixes for the most common problems.
+  - name: Report a vulnerability or a conduct problem
+    url: https://github.com/stopyellingatme/spinup/security/advisories/new
+    about: Use this private form. Do not open a public issue. For a conduct report, start the title with "Conduct:".

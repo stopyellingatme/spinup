@@ -6,6 +6,8 @@ kit/apidocs field Options.Title string
 kit/apidocs func Mount(*http.ServeMux, Options)
 kit/apidocs type Options struct
 kit/app const DrainTimeout = 5 * time.Second
+kit/app field SPAOptions.AssetDir string
+kit/app field SPAOptions.ImmutablePrefix string
 kit/app func Main(*App)
 kit/app func New(...Option) *App
 kit/app func WithAPIDocs(fs.FS) Option
@@ -23,12 +25,14 @@ kit/app func WithRequestTimeout(time.Duration) Option
 kit/app func WithRequestTimeoutExempt(func(*http.Request) bool) Option
 kit/app func WithRoutes(func(mux *http.ServeMux)) Option
 kit/app func WithSPA(fs.FS) Option
+kit/app func WithSPAOptions(fs.FS, SPAOptions) Option
 kit/app func WithShutdown(func(ctx context.Context) error) Option
 kit/app func WithVersion(string) Option
 kit/app ptrmethod App.Handler() http.Handler
 kit/app ptrmethod App.Run(context.Context, []string) error
 kit/app type App struct
 kit/app type Option func(*App)
+kit/app type SPAOptions struct
 kit/audit const DefaultLimit = 50
 kit/audit const KindOperator = "operator"
 kit/audit const KindSystem = "system"

@@ -275,7 +275,7 @@ Grafana has two folders.
 
 | Folder | Holds | You edit it? |
 | --- | --- | --- |
-| Stack | HTTP RED, Go runtime, Caddy, Backups, and Deploys. With `full`, also Node Exporter Full, cAdvisor, and PostgreSQL. | No. spinup replaces these on upgrade. |
+| Stack | HTTP RED, Go runtime, Caddy, Backups, and Deploys. With `full`, also Containers (from cAdvisor), Node Exporter Full, and PostgreSQL. | No. spinup replaces these on upgrade. |
 | Custom | Your dashboards, from `monitoring/grafana/dashboards/custom/`. | Yes. |
 
 To keep a dashboard you built in the Grafana editor, export it into `custom/`:

@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a problem in spinup or in an app that spinup made.
+labels: [bug]
+body:
+  - type: textarea
+    id: version
+    attributes:
+      label: spinup version
+      description: Paste the output of `spinup version`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: spinup doctor output
+      description: Paste the output of `spinup doctor --quick`. If the command cannot run, skip this field.
+      render: text
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - kit
+        - templates
+        - deploy
+        - monitoring
+        - upgrade
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: Write the commands, in order, that show the problem.
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What you expected and what happened
+      description: Include the full error and its `Try:` line.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and architecture
+      placeholder: macOS 15 arm64
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Secrets
+      options:
+        - label: I removed secrets, host names, and private paths.
+          required: true

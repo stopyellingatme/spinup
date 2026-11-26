@@ -156,3 +156,4 @@ Each link points to a Markdown page. Read "Get started" first. The section "Opti
 - [Script test isolation](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/script-test-isolation.md): Each testscript gets its own `HOME`, so scripts cannot change each other's files or caches.
 - [Performance loop](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/performance.md): The performance loop measures spinup and a generated app, and it finds regressions.
 - [CI workflows and their cost](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/ci.md): This page tells you which GitHub Actions workflows run, when they run, and how they keep runner minutes low.
+- [Repository rules](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/contributing/repository-rules.md): This page describes the rules that GitHub enforces on the spinup repository.
