@@ -152,11 +152,22 @@ func runLive(_ context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	page := filepath.Join(spec.Root, pagesDir(spec.Name), "+page.svelte")
 	if _, err := os.Stat(page); err == nil {
-		next = append(next, "import { liveRefresh } from '#lib/live.svelte.js';\nliveRefresh('"+spec.Name.PluralSnake()+"');")
+		next = append(next, liveRefreshAdvice(spec, in.Lock.Answers["frontend_mode"] == "embed"))
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("cannot inspect list page: %w\nTry: check the file permissions", err)
 	}
 	return addLive(spec, in, &gen.Output{Next: next, PostSteps: []gen.PostStep{gen.PostGofmt}})
+}
+
+// liveRefreshAdvice returns the list page code that refreshes on a patch. In
+// embed mode the refresh reruns only the loads of the resource, not the
+// session load of the root (ADR 0039 §10.5).
+func liveRefreshAdvice(spec Spec, embed bool) string {
+	feed := spec.Name.PluralSnake()
+	if embed {
+		return "import { liveRefresh } from '#lib/live.svelte.js';\nimport { RESOURCE_DEP } from './form';\nliveRefresh('" + feed + "', { invalidate: RESOURCE_DEP });"
+	}
+	return "import { liveRefresh } from '#lib/live.svelte.js';\nliveRefresh('" + feed + "');"
 }
 
 func liveKey(spec Spec) string {

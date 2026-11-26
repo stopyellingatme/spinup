@@ -600,9 +600,12 @@ assert.equal(problemMessage(undefined, 502), 'The API returned status 502.');
 assert.equal(problemMessage({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Taken.' }, 409), 'Taken.');
 `
 
-func TestEmbedRefusesResourcePages(t *testing.T) {
+// TestEmbedResourcePages checks the page family of an embed app (ADR 0039
+// §10.5): the eleven browser scaffolds and no server file, the plain API-only
+// plan, and the guards of the role and ownership variants.
+func TestEmbedResourcePages(t *testing.T) {
 	t.Parallel()
-	root := webApp(t)
+	root := authApp(t)
 	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
 	if err != nil {
 		t.Fatal(err)
@@ -611,18 +614,56 @@ func TestEmbedRefusesResourcePages(t *testing.T) {
 	if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
 		t.Fatal(err)
 	}
-	for _, apiOnly := range []bool{false, true} {
-		args := []string{}
-		if apiOnly {
-			args = append(args, "--api-only")
-		}
+	for _, args := range [][]string{nil, {"--shared"}, {"--api-only"}} {
 		out, err := run(t.Context(), gen.Input{Root: root, Args: goldenArgs, Flags: flagSet(t, args...)})
-		if apiOnly {
-			if err != nil || out == nil {
-				t.Fatalf("API-only resource: %v", err)
-			}
-		} else if err == nil || !strings.Contains(err.Error(), "Try:") || !strings.Contains(err.Error(), "embed") {
-			t.Fatalf("resource pages: %v", err)
+		if err != nil {
+			t.Fatalf("%v: %v", args, err)
 		}
+		apiOnly := slices.Contains(args, "--api-only")
+		var pages []string
+		for _, path := range out.Plan.Paths() {
+			if strings.HasPrefix(path, "web/src/routes/") {
+				pages = append(pages, path)
+			}
+			if strings.HasSuffix(path, ".server.ts") {
+				t.Errorf("%v: plan has the server file %s", args, path)
+			}
+		}
+		if apiOnly {
+			if len(pages) != 0 || slices.Contains(out.PostSteps, gen.PostClient) {
+				t.Errorf("--api-only planned pages: %v %v", pages, out.PostSteps)
+			}
+			continue
+		}
+		if !slices.Equal(pages, embedTodoPages) {
+			t.Errorf("%v: pages = %v\nwant %v", args, pages, embedTodoPages)
+		}
+		for _, name := range embedLoads {
+			f, _ := out.Plan.Get("web/src/routes/todos/" + name)
+			if !strings.Contains(string(f.Data), "import { requireUser } from '#lib/auth.js';") || !strings.Contains(string(f.Data), "requireUser(user, url);") {
+				t.Errorf("%v: %s has no user guard:\n%s", args, name, f.Data)
+			}
+		}
+	}
+	spec, err := ParseSpec(root, goldenArgs, "resource")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec.Roles = []string{"manager", "staff"}
+	plan, _, err := planPages(t.Context(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guards := 0
+	for _, name := range embedLoads {
+		f, _ := plan.Get("web/src/routes/todos/" + name)
+		data := string(f.Data)
+		if !strings.Contains(data, "import { requireRole } from '#lib/auth.js';") || strings.Contains(data, "requireUser(") {
+			t.Errorf("%s has no role guard:\n%s", name, data)
+		}
+		guards += strings.Count(data, "requireRole(user, url, 'manager', 'staff');")
+	}
+	if guards != len(embedLoads) {
+		t.Errorf("found %d role guards, want %d", guards, len(embedLoads))
 	}
 }

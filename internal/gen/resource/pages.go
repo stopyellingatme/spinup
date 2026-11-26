@@ -29,12 +29,39 @@ func init() {
 // part no longer writes. Destroy still removes them when they are unchanged.
 var legacyPageFiles = []string{"form.ts"}
 
-// pageDestroyPaths returns the current page paths plus the legacy ones.
+// pageDestroyPaths returns the page paths of both families plus the legacy
+// ones, each one time (ADR 0039 §10.5).
 func pageDestroyPaths(name fields.Name) []string {
 	paths := pagePaths(name)
 	paths = append(paths, pagesDir(name)+"/[id]/history/+page.server.ts", pagesDir(name)+"/[id]/history/+page.svelte")
 	for _, f := range legacyPageFiles {
 		paths = append(paths, pagesDir(name)+"/"+f)
+	}
+	for _, f := range embedPageFiles {
+		if path := pagesDir(name) + "/" + f.path; !slices.Contains(paths, path) {
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+// OtherFamilyPagePaths returns the page paths that only the page family of the
+// other frontend mode writes: the server loads of node mode in an embed app,
+// and the browser loads of embed mode in a node app. A legacy path is not in
+// the list. spinup destroy removes such a path only when the lock records
+// gen/resource as its template, so a node-only path never claims an unrelated
+// tracked file in embed mode (ADR 0039 §10.5).
+func OtherFamilyPagePaths(name fields.Name, embed bool) []string {
+	own, other := pageFiles, embedPageFiles
+	if embed {
+		own, other = embedPageFiles, pageFiles
+	}
+	var paths []string
+	for _, f := range other {
+		if slices.ContainsFunc(own, func(o pageFile) bool { return o.path == f.path }) || slices.Contains(legacyPageFiles, f.path) {
+			continue
+		}
+		paths = append(paths, pagesDir(name)+"/"+f.path)
 	}
 	return paths
 }
@@ -43,9 +70,13 @@ func pageDestroyPaths(name fields.Name) []string {
 // web/src/routes/line-items.
 func pagesDir(name fields.Name) string { return "web/src/routes/" + name.PluralKebab() }
 
+// pageFile is one file of a page family: its path relative to pagesDir and its
+// template.
+type pageFile struct{ path, source string }
+
 // pageFiles maps the files of the pages part, relative to pagesDir, to their
 // templates.
-var pageFiles = []struct{ path, source string }{
+var pageFiles = []pageFile{
 	{"+page.server.ts", listServerTS},
 	{"+page.svelte", listSvelte},
 	{"[id]/+page.server.ts", itemServerTS},
@@ -55,6 +86,23 @@ var pageFiles = []struct{ path, source string }{
 	{"fields.svelte", fieldsSvelte},
 	{"new/+page.server.ts", newServerTS},
 	{"new/+page.svelte", newSvelte},
+	{"schema.ts", schemaTS},
+}
+
+// embedPageFiles maps the eleven files of the browser page family of embed
+// mode to their templates (ADR 0039 §10.5). The family reuses the fields and
+// the schema of node mode.
+var embedPageFiles = []pageFile{
+	{"+page.svelte", embedListSvelte},
+	{"+page.ts", embedListTS},
+	{"[id]/+page.svelte", embedItemSvelte},
+	{"[id]/+page.ts", embedItemTS},
+	{"[id]/edit/+page.svelte", embedEditSvelte},
+	{"[id]/edit/+page.ts", embedEditTS},
+	{"fields.svelte", fieldsSvelte},
+	{"form.ts", embedFormTS},
+	{"new/+page.svelte", embedNewSvelte},
+	{"new/+page.ts", embedNewTS},
 	{"schema.ts", schemaTS},
 }
 
@@ -88,8 +136,17 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 	if err != nil {
 		return vfs.Plan{}, nil, err
 	}
+	// The lock selects the page family. Embed mode has no SvelteKit server,
+	// so its pages load and write through the Go API in the browser.
+	files := pageFiles
 	if lock.Answers["frontend_mode"] == "embed" {
-		return vfs.Plan{}, nil, fmt.Errorf("cannot generate resource pages in embed mode: the pages require SvelteKit form actions\nTry: pass --api-only, or use an app with --frontend-mode node")
+		files = embedPageFiles
+		if spec.Audit.On {
+			// History pages need a SvelteKit server. planHistoryPages gives the error.
+			if _, err := planHistoryPages(spec); err != nil {
+				return vfs.Plan{}, nil, err
+			}
+		}
 	}
 	if err := checkPageInputs(spec.Root, spec.Audit.On); err != nil {
 		return vfs.Plan{}, nil, err
@@ -97,7 +154,7 @@ func planPages(_ context.Context, spec Spec) (vfs.Plan, []gen.PostStep, error) {
 	data := newPageData(spec)
 	data.Auth = slices.Contains(lock.Packs, "auth") || len(spec.Roles) > 0
 	var plan vfs.Plan
-	for _, f := range pageFiles {
+	for _, f := range files {
 		out, err := renderPage(f.path, f.source, data)
 		if err != nil {
 			return vfs.Plan{}, nil, err
@@ -230,6 +287,9 @@ type pageData struct {
 	Route string
 	// APIPath is the API path of the list, such as /api/line_items.
 	APIPath string
+	// Dep is the dependency key of the browser loads in embed mode, such as
+	// app:resource:line-items.
+	Dep string
 	// Auth is true when the app has the auth module: every load and action
 	// requires a signed-in user.
 	Auth bool
@@ -275,6 +335,7 @@ func newPageData(spec Spec) pageData {
 		PluralWords: words(spec.Name.PluralSnake()),
 		Route:       "/" + spec.Name.PluralKebab(),
 		APIPath:     "/api/" + spec.Name.PluralSnake(),
+		Dep:         "app:resource:" + spec.Name.PluralKebab(),
 		Roles:       slices.Clone(spec.Roles),
 	}
 	d.RoleLiterals = roleLiterals(d.Roles)

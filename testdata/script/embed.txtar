@@ -21,10 +21,15 @@ exec spinup g page about
 exec spinup g page settings --server
 exists web/src/routes/settings/+page.svelte web/src/routes/settings/+page.ts
 ! exists web/src/routes/settings/+page.server.ts
-! exec spinup g resource todo title:string --dry-run
-stderr 'embed mode'
-stderr 'Try:'
+# A resource in embed mode plans the browser pages (ADR 0039 §10.5). A dry run writes nothing.
+exec spinup g resource todo title:string --dry-run
+stdout 'create web/src/routes/todos/\+page.ts \(scaffold\)'
+stdout 'create web/src/routes/todos/form.ts \(scaffold\)'
+stdout 'create web/src/routes/todos/\[id\]/edit/\+page.ts \(scaffold\)'
+stdout 'update web/src/lib/nav.gen.ts \(managed\)'
+! stdout '\+page.server.ts'
 ! exists api/db/migrations/00002_create_todos.sql
+! exists web/src/routes/todos
 cd ..
 ! exec spinup new invalid --module example.com/invalid --frontend-mode embed --modules auth --no-git --non-interactive
 stderr 'cannot use auth in embed mode'
