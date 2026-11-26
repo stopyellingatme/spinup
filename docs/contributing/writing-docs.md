@@ -135,6 +135,9 @@ The `parent` is the `title` of a section page:
 Do not edit `docs/site/`. Run `spinup docs reference --out docs/site` after you change a command.
 A command's examples come from the `Example` field of its cobra command.
 
+The site has a light scheme and a dark scheme. It follows the color scheme of the browser.
+The file `docs/_includes/head_custom.html` selects the scheme. The site has no button for it.
+
 ## The llms.txt index
 
 The generated `docs/llms.txt` file indexes the Markdown pages for agents.
