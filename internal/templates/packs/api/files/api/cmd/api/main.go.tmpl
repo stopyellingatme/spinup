@@ -234,6 +234,9 @@ func run() (err error) {
   app.WithCommand("user", auth.UserCommand(authn)),
 [[- if has "mail" .modules ]]
   app.WithRoutes(resetRoutes),
+[[- if eq (index . "frontend_mode") "embed" ]]
+  app.WithMiddleware(resetPageHeaders),
+[[- end ]]
 [[- end ]]
 [[- end ]]
 [[- if has "flags" .modules ]]
