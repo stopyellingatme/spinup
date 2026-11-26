@@ -34,7 +34,7 @@ export function takeResetToken(
 	return held;
 }
 
-// The root session module imports this module, so this code runs before the router reads the
+// The root layout load imports this module, so this code runs before the router reads the
 // address of the first document. The router then never sees the token: page.url has no fragment,
 // and the history entry that the router writes after the loads does not put it back in the address
 // bar. The page load gets the held token. This also works when the root layout hides the page
