@@ -10,16 +10,16 @@
 //   OTEL_RESOURCE_ATTRIBUTES   extra resource attributes
 //   OTEL_TRACES_SAMPLER        the sampler (default: parentbased_always_on)
 //   OTEL_TRACES_SAMPLER_ARG    the sampling ratio for the traceidratio samplers (0 to 1)
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
-import { logs, NodeSDK } from '@opentelemetry/sdk-node';
-import { captureConsole } from './lib/server/log.js';
 import { name as packageName } from '../package.json';
 
 const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
 
 if (endpoint) {
+	const { OTLPLogExporter } = await import('@opentelemetry/exporter-logs-otlp-http');
+	const { OTLPTraceExporter } = await import('@opentelemetry/exporter-trace-otlp-http');
+	const { UndiciInstrumentation } = await import('@opentelemetry/instrumentation-undici');
+	const { logs, NodeSDK } = await import('@opentelemetry/sdk-node');
+	const { captureConsole } = await import('./lib/server/log.js');
 	const sdk = new NodeSDK({
 		serviceName: process.env.OTEL_SERVICE_NAME?.trim() || packageName,
 		traceExporter: new OTLPTraceExporter(),
