@@ -17,6 +17,12 @@ type BodyRules struct {
 	Known []string
 }
 
+type jsonBodyReplay struct {
+	io.Reader
+	io.Closer
+	data bytes.Buffer
+}
+
 // CheckJSONBody validates one JSON object with exact field names and the given rules.
 // It rejects duplicate names at any depth and invalid UTF-8 with status 400.
 // Non-object values and missing or null required fields produce status 422.
@@ -33,17 +39,19 @@ func CheckJSONBody(r *http.Request, rules BodyRules) error {
 	}
 	// Record consumed bytes so every return path preserves the original body.
 	body := r.Body
-	var data bytes.Buffer
+	replay := &jsonBodyReplay{Closer: body}
 	defer func() {
-		r.Body = struct {
-			io.Reader
-			io.Closer
-		}{io.MultiReader(&data, body), body}
+		replay.Reader = io.MultiReader(&replay.data, body)
+		r.Body = replay
 	}()
-	decoder := takeJSONDecoder(io.TeeReader(body, &data))
+	decoder := takeJSONDecoder(io.TeeReader(body, &replay.data))
 	defer putJSONDecoder(decoder)
 	kind := decoder.PeekKind()
-	present := make([]bool, len(rules.Required))
+	var small [16]bool
+	present := small[:]
+	if len(rules.Required) > len(small) {
+		present = make([]bool, len(rules.Required))
+	}
 	unknown := false
 	if kind == '{' {
 		if _, err := decoder.ReadToken(); err != nil {

@@ -268,6 +268,40 @@ func TestAccessLogPanic(t *testing.T) {
 	}
 }
 
+func TestNestedAccessLogPanic(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&out, nil))
+	loggers := []string{"outer", "middle", "inner"}
+	middleware := []Middleware{Recover(logger)}
+	for _, name := range loggers {
+		middleware = append(middleware, AccessLog(logger.With("logger", name)))
+	}
+	h := Chain(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("private")
+	}), middleware...)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/healthz?secret=hidden", nil))
+	decoder := json.NewDecoder(&out)
+	var recovery map[string]any
+	if err := decoder.Decode(&recovery); err != nil || recovery["level"] != "ERROR" || w.Code != http.StatusInternalServerError {
+		t.Fatalf("recovery record %v, status %d, error %v", recovery, w.Code, err)
+	}
+	for _, name := range loggers {
+		var record map[string]any
+		if err := decoder.Decode(&record); err != nil {
+			t.Fatal(err)
+		}
+		if record["logger"] != name || record["status"] != float64(w.Code) ||
+			record["bytes"] != float64(w.Body.Len()) || record["level"] != "INFO" || record["path"] != "/healthz" {
+			t.Fatalf("record %v, want logger %q, status %d, bytes %d", record, name, w.Code, w.Body.Len())
+		}
+	}
+	if decoder.More() {
+		t.Fatal("unexpected access log record")
+	}
+}
+
 func TestResponseController(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()

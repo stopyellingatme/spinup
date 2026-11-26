@@ -17,22 +17,28 @@ import (
 )
 
 type spaFile struct {
-	br, gzip    bool
-	etag        string
-	contentType string
+	br, gzip     spaVariant
+	etag         string
+	contentType  string
+	cacheControl string
+}
+
+type spaVariant struct {
+	name string
+	etag string
 }
 
 func indexSPA(files fs.FS, immutable string) (map[string]spaFile, string) {
-	index := make(map[string]spaFile)
 	csp := spaCSP(nil)
 	if files == nil {
-		return index, csp
+		return nil, csp
 	}
+	index := make(map[string]struct{})
 	var names []string
 	// WalkDir visits names in lexical order. Keep siblings out of the public index.
 	_ = fs.WalkDir(files, ".", func(name string, entry fs.DirEntry, err error) error {
 		if err == nil && entry.Type().IsRegular() {
-			index[name] = spaFile{}
+			index[name] = struct{}{}
 			names = append(names, name)
 		}
 		return nil
@@ -44,16 +50,31 @@ func indexSPA(files fs.FS, immutable string) (map[string]spaFile, string) {
 				continue
 			}
 		}
-		_, br := index[name+".br"]
-		_, gzip := index[name+".gz"]
-		file := spaFile{br: br, gzip: gzip, contentType: mime.TypeByExtension(path.Ext(name))}
-		if !strings.HasPrefix(name, immutable) {
+		file := spaFile{contentType: mime.TypeByExtension(path.Ext(name))}
+		br, gzip := name+".br", name+".gz"
+		if _, ok := index[br]; ok {
+			file.br.name = br
+		}
+		if _, ok := index[gzip]; ok {
+			file.gzip.name = gzip
+		}
+		isImmutable := strings.HasPrefix(name, immutable)
+		file.cacheControl = "public, max-age=31536000, immutable"
+		if !isImmutable {
+			file.cacheControl = "no-cache"
 			data, err := fs.ReadFile(files, name)
 			if err != nil {
 				continue
 			}
 			sum := sha256.Sum256(data)
-			file.etag = hex.EncodeToString(sum[:16])
+			tag := hex.EncodeToString(sum[:16])
+			file.etag = "\"" + tag + "\""
+			if file.br.name != "" {
+				file.br.etag = "\"" + tag + ".br\""
+			}
+			if file.gzip.name != "" {
+				file.gzip.etag = "\"" + tag + ".gz\""
+			}
 			if name == "index.html" {
 				csp = spaCSP(data)
 			}

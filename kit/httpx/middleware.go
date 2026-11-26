@@ -64,8 +64,19 @@ func validRequestID(id string) bool {
 type recoveryKey struct{}
 
 type recoveryState struct {
-	response *responseWriter
-	after    []func()
+	response responseWriter
+	first    accessLogRecord
+	more     []accessLogRecord
+}
+
+type accessLogRecord struct {
+	logger  *slog.Logger
+	request *http.Request
+	start   time.Time
+}
+
+func (record accessLogRecord) log(response *responseWriter) {
+	accessRecord(record.logger, record.request, response, record.start, nil)
 }
 
 // Recover converts handler panics to a 500 problem and logs one error with the ID.
@@ -77,12 +88,15 @@ func Recover(l *slog.Logger) Middleware {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			response := &responseWriter{ResponseWriter: w}
-			state := &recoveryState{response: response}
+			state := &recoveryState{response: responseWriter{ResponseWriter: w}}
+			response := &state.response
 			defer func() {
 				defer func() {
-					for _, after := range state.after {
-						after()
+					if state.first.logger != nil {
+						state.first.log(response)
+					}
+					for _, record := range state.more {
+						record.log(response)
 					}
 				}()
 				if value := recover(); value != nil {
@@ -114,7 +128,12 @@ func AccessLog(l *slog.Logger) Middleware {
 			if state, ok := r.Context().Value(recoveryKey{}).(*recoveryState); ok {
 				// Recovery writes its problem after the inner handler unwinds.
 				// Delay this record so it includes the final status and bytes.
-				state.after = append(state.after, func() { accessRecord(l, r, state.response, start, nil) })
+				record := accessLogRecord{logger: l, request: r, start: start}
+				if state.first.logger == nil {
+					state.first = record
+				} else {
+					state.more = append(state.more, record)
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
