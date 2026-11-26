@@ -296,7 +296,7 @@ const embedListSvelte = `<script lang="ts">
 `
 
 const embedItemSvelte = `<script lang="ts">
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -330,6 +330,12 @@ const embedItemSvelte = `<script lang="ts">
 	let deleting: number | null = $state(null);
 	let failure = $state('');
 
+	// A visit of this page ends when the id changes or the page closes. A late answer of an older
+	// visit changes nothing on the page that the user sees now, and it does not move the user. The
+	// id alone is not enough: the user can go from one [[ .Words ]] to another and back.
+	let visit = 0;
+	onDestroy(() => visit++);
+
 	// SvelteKit keeps this page when only the id changes. The dialog and the error of the old
 	// [[ .Words ]] then go away.
 	let shown = untrack(() => data.item.id);
@@ -337,6 +343,7 @@ const embedItemSvelte = `<script lang="ts">
 		const id = data.item.id;
 		if (id === shown) return;
 		shown = id;
+		visit++;
 		confirming = false;
 		failure = '';
 	});
@@ -350,6 +357,7 @@ const embedItemSvelte = `<script lang="ts">
 		event.preventDefault();
 		const id = item.id;
 		if (deleting === id) return;
+		const started = visit;
 		deleting = id;
 		failure = '';
 		try {
@@ -359,8 +367,8 @@ const embedItemSvelte = `<script lang="ts">
 			});
 			// A [[ .Words ]] that is already gone is not an error.
 			const deleted = response.ok || response.status === 404;
-			// The page shows another [[ .Words ]] now: the answer changes nothing on it.
-			if (id !== data.item.id) {
+			// The user left this visit: the answer changes nothing on the page.
+			if (started !== visit) {
 				if (deleted) toast.success('[[ .Name ]] deleted.');
 				return;
 			}
@@ -373,12 +381,12 @@ const embedItemSvelte = `<script lang="ts">
 			await goto('[[ .Route ]]', { invalidate: [RESOURCE_DEP] });
 		} catch (err) {
 			console.error('[[ .Feed ]]: the delete failed:', err);
-			if (id !== data.item.id) return;
+			if (started !== visit) return;
 			failure = unreachable;
 			toast.error(failure);
 		} finally {
 			if (deleting === id) deleting = null;
-			if (id === data.item.id) confirming = false;
+			if (started === visit) confirming = false;
 		}
 	}
 </script>
@@ -485,19 +493,22 @@ func embedFormScript(head, navigation string) string {
 // formMarkup (pages_svelte.go) gives the form card of both pages, as in node
 // mode.
 var (
-	embedNewSvelte = embedFormScript("", "goto") + `	import Fields from '../fields.svelte';
+	embedNewSvelte = embedFormScript("\timport { onDestroy } from 'svelte';\n", "goto") + `	import Fields from '../fields.svelte';
 	import { applyFailure, unreachable } from '../form';
 	import { schema, toBody } from '../schema';
 
 	// SPA mode: the browser checks the values with the schema, then posts them to the Go API. The
 	// field errors of the API problem show at the inputs. A failed request keeps the values.
 	const adapter = zod4(schema);
+	// A late answer after the user left this page does not open the new [[ .Words ]].
+	let closed = false;
+	onDestroy(() => (closed = true));
 	const form = superForm(defaults(adapter), {
 		SPA: true,
 		id: '[[ .Feed ]]-new',
 		validators: adapter,
 		resetForm: false,
-		async onUpdate({ form }) {
+		async onUpdate({ form, cancel }) {
 			if (!form.valid) return;
 			const result = await api
 				.POST('[[ .APIPath ]]', { [[ if .Auth ]]fetch: observedFetch(fetch), [[ end ]]body: toBody(form.data) })
@@ -505,6 +516,12 @@ var (
 					console.error('[[ .Feed ]]: the create failed:', err);
 					return undefined;
 				});
+			if (closed) {
+				// The user left: the answer changes nothing and does not move the user.
+				cancel();
+				if (result?.data) toast.success('[[ .Name ]] created.');
+				return;
+			}
 			if (!result) {
 				// The request did not complete. The values stay, and the user can submit again.
 				setMessage(form, unreachable, { status: 503 });
@@ -538,7 +555,7 @@ var (
 	<PageHeader title="New [[ .Words ]]" description="Fill in the fields, then create the [[ .Words ]]." />
 ` + formMarkup("Create [[ .Words ]]", "[[ .Route ]]")
 
-	embedEditSvelte = embedFormScript("\timport { untrack } from 'svelte';\n\timport { toStore } from 'svelte/store';\n", "goto") + `	import Fields from '../../fields.svelte';
+	embedEditSvelte = embedFormScript("\timport { onDestroy, untrack } from 'svelte';\n\timport { SvelteSet } from 'svelte/reactivity';\n\timport { toStore } from 'svelte/store';\n", "goto") + `	import Fields from '../../fields.svelte';
 	import { RESOURCE_DEP, applyFailure, unreachable } from '../../form';
 	import { fromItem, itemTitle, schema, toBody } from '../../schema';
 	import type { PageProps } from './$types';
@@ -550,18 +567,34 @@ var (
 	// The form, its save, and its busy state belong to one [[ .Words ]]: original.
 	const adapter = zod4(schema);
 	let original = untrack(() => data.item);
-	// The id of the [[ .Words ]] whose save runs.
-	let saving: number | null = $state(null);
+	// The ids of the [[ .Words ]] items whose save runs.
+	const saving = new SvelteSet<number>();
+	// A visit of this page ends when the id changes or the page closes. A late answer of an older
+	// visit changes no value, error, or draft of the page that the user sees now, and it does not
+	// move the user. The id alone is not enough: the user can go from one [[ .Words ]] to another
+	// and back.
+	let visit = 0;
+	onDestroy(() => visit++);
 	const form = superForm(defaults(fromItem(original), adapter), {
 		SPA: true,
 		id: '[[ .Feed ]]-edit',
 		validators: adapter,
 		resetForm: false,
+		// superForm counts a submit as running until its onUpdate returns, also after the page shows
+		// another [[ .Words ]]. With 'prevent', a held save of one [[ .Words ]] would drop the submit of the
+		// next one without a message. The saving set below prevents a second save of one [[ .Words ]].
+		multipleSubmits: 'allow',
 		async onUpdate({ form, cancel }) {
 			if (!form.valid) return;
 			const item = original;
+			if (saving.has(item.id)) {
+				// A save of this [[ .Words ]] runs: a double submit sends no second request.
+				cancel();
+				return;
+			}
 			const path = { id: item.id };
-			saving = item.id;
+			const started = visit;
+			saving.add(item.id);
 			const result = await api
 				.PUT('[[ .APIPath ]]/{id}', {
 					[[ if .Auth ]]fetch: observedFetch(fetch),
@@ -573,11 +606,11 @@ var (
 					return undefined;
 				})
 				.finally(() => {
-					if (saving === path.id) saving = null;
+					saving.delete(path.id);
 				});
-			if (original.id !== path.id) {
-				// The page shows another [[ .Words ]] now. The answer belongs to the old form, so it
-				// changes no value, error, or message of the new form.
+			if (started !== visit) {
+				// The user left this visit. The answer belongs to the old form, so it changes no value,
+				// error, or message of the page that the user sees now.
 				cancel();
 				if (result?.data) toast.success('Changes saved.');
 				return;
@@ -603,7 +636,7 @@ var (
 	});
 	const { enhance, message } = form;
 	// The save button is busy only for the save of the [[ .Words ]] that the page shows.
-	const submitting = toStore(() => saving === data.item.id);
+	const submitting = toStore(() => saving.has(data.item.id));
 
 	// SvelteKit keeps this page when only the id changes, for example on a client navigation from
 	// [[ .Route ]]/1/edit to [[ .Route ]]/2/edit. The form then starts again with the new [[ .Words ]].
@@ -612,6 +645,7 @@ var (
 		const item = data.item;
 		if (item.id === original.id) return;
 		original = item;
+		visit++;
 		form.reset({ data: fromItem(item), newState: fromItem(item) });
 	});
 </script>
