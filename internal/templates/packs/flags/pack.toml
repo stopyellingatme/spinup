@@ -24,22 +24,46 @@ path = "web/src/lib/flags.ts"
 source = "files/web/src/lib/flags.ts"
 class = "managed"
 
+# Node mode calls the admin endpoints from the server. Embed mode calls them from the browser
+# (ADR 0039, section 10.3). The admin schema and lib/flags.ts serve both modes.
 [[files]]
 path = "web/src/lib/server/flags.ts"
 source = "files/web/src/lib/server/flags.ts"
 class = "managed"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/admin/flags/+page.server.ts"
 source = "files/web/src/routes/admin/flags/+page.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/admin/flags/+page.svelte"
 source = "files/web/src/routes/admin/flags/+page.svelte"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/admin/flags/schema.ts"
 source = "files/web/src/routes/admin/flags/schema.ts"
 class = "scaffold"
+
+# The browser admin page of embed mode. The Go API checks the admin role on every call.
+[[files]]
+path = "web/src/lib/flags-admin.ts"
+source = "embed/lib/flags-admin.ts"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/routes/admin/flags/+page.ts"
+source = "embed/routes/admin/flags/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = '[[ "web/src/routes/admin/flags/+page.svelte" ]]'
+source = "embed/routes/admin/flags/+page.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
