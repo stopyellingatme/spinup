@@ -113,7 +113,7 @@ Read them before you choose the mode.
 3. **The shell has a stable script hash.** The Content-Security-Policy lists the hash of the boot script in place of a nonce. The policy keeps the directives `form-action`, `img-src`, `font-src`, and `connect-src` of node mode.
 4. **A signed-out start prints one console error.** The browser reports the 401 of `GET /api/session`. The Go API keeps that status. Another tab that signs out makes this tab discard its protected data. The kit has no route that clears the cookie, so a failed sign-out keeps the session.
 5. **No Node server.** Node server telemetry and the first paint of server rendering do not apply. Browser trace coverage and the time of first paint are not checked.
-6. **The bundle is bigger.** The browser holds the forms, the validators, and the API client. BUNDLE-TOTALS
+6. **The bundle is bigger.** The browser holds the forms, the validators, and the API client. The test app of embed mode (`auth`, `flags`, `live`, `mail`, and one resource) has about 674,000 raw bytes and 189,000 Brotli bytes of client files. The test app of node mode (`auth` and one resource) has about 591,000 and 161,000. The repository checks the embed total against `perf/budgets-embed.json`.
 
 ## Build and run
 

@@ -701,3 +701,8 @@ The build lanes found points that sections 10.2 and 10.6 left open. These ruling
   The reset specs read the mail from a small SMTP sink inside the Playwright process. The log transport of the kit writes no link, so a log cannot give the token. No second server process starts.
 - The launcher fails when the budget file of its mode is missing. `perf/budgets-embed.json` holds the limits of the embed fixture: 707,000 raw bytes and 198,000 Brotli bytes (measured 672,925 and 188,370, plus 5 %, rounded up).
 - Known limit of the browser suite: sign-out aborts the held live stream, so a 401 that the stream gets later has no receiver. The suite proves only that the page stays at `/login` with one document load.
+- **The rulings of the second review.** The held reset token lives for one visit of `/reset/confirm`. A client navigation away drops it, also behind the retry card. A retry keeps it.
+  A fragment that arrives while the document is at `/reset/confirm` is taken at once, and the form starts again for the new token.
+  The edit page sets `multipleSubmits: 'allow'` and keeps a set of the item IDs whose save runs. So a held save of one item does not drop the submit of the next item, and a double submit of one item sends one request.
+  The edit page, the item page, and the new page ignore the answer of a visit that ended: no `goto`, and no change of a value, an error, a dialog, or a draft. A success still shows its toast.
+  Known effect: after a navigation from item A to item B and back, the save button of A shows busy until the held save of A answers.
