@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { apiURL, createTodo, register, uniqueEmail } from './helpers';
+import { apiURL, createTodo, embed, isToggleWrite, register, todoID, uniqueEmail } from './helpers';
 
 test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	await register(page, uniqueEmail('crud'));
@@ -14,6 +14,7 @@ test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	await expect(page.getByText('Todo created.')).toBeVisible();
 	// The flag leaves the address bar.
 	await expect(page).toHaveURL(/\/todos\/\d+$/);
+	const id = todoID(page.url());
 
 	// The title is the row link.
 	await page.goto('/todos');
@@ -23,10 +24,8 @@ test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	// Toggle done in the row. It persists after a reload.
 	const done = page.getByRole('checkbox', { name: 'Done: Buy milk' });
 	await expect(done).not.toBeChecked();
-	await Promise.all([
-		page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('toggle')),
-		done.click()
-	]);
+	// The wait starts before the click. Node mode posts ?/toggle, and embed mode sends PUT /api/todos/{id}.
+	await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id)), done.click()]);
 	await expect(done).toBeChecked();
 	await page.reload();
 	await expect(page.getByRole('checkbox', { name: 'Done: Buy milk' })).toBeChecked();
@@ -70,6 +69,9 @@ test("a user cannot see or open another user's todo", async ({ browser }) => {
 	await register(page, uniqueEmail('owner'));
 	await createTodo(page, 'Private note');
 	const url = page.url();
+	const id = todoID(url);
+	// The owner reads the todo through the API, so the id is right.
+	expect((await first.request.get(`${apiURL}/api/todos/${id}`)).status()).toBe(200);
 
 	const second = await browser.newContext();
 	const other = await second.newPage();
@@ -79,8 +81,13 @@ test("a user cannot see or open another user's todo", async ({ browser }) => {
 	await expect(other.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
 
 	const response = await other.goto(url);
-	expect(response?.status()).toBe(404);
+	// Node mode renders the page on the server and answers 404. In embed mode the binary answers
+	// each page path with the shell (200), and the browser shows the 404 view.
+	expect(response?.status()).toBe(embed ? 200 : 404);
 	await expect(other.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+	await expect(other.getByText('Private note')).toHaveCount(0);
+	// In both modes the API is the authority: the owner-scoped read of another user's todo is 404.
+	expect((await second.request.get(`${apiURL}/api/todos/${id}`)).status()).toBe(404);
 
 	await first.close();
 	await second.close();
@@ -151,11 +158,23 @@ test('the row menu opens with the keyboard and gives the focus back', async ({ p
 test('the checkbox of a row toggles without JavaScript', async ({ browser, page }) => {
 	await register(page, uniqueEmail('nojs'));
 	await createTodo(page, 'Plain form');
+	const id = todoID(page.url());
 
 	// The same session, in a context that runs no scripts.
 	const plain = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
 	const view = await plain.newPage();
-	await view.goto('/todos');
+	const response = await view.goto('/todos');
+	if (embed) {
+		// Embed mode serves a static shell. Without JavaScript it renders no list and no checkbox,
+		// so nothing can change the todo. The API still holds it unchanged.
+		expect(response?.status()).toBe(200);
+		await expect(view.getByRole('checkbox')).toHaveCount(0);
+		const read = await plain.request.get(`${apiURL}/api/todos/${id}`);
+		expect(read.status()).toBe(200);
+		expect((await read.json()).done).toBe(false);
+		await plain.close();
+		return;
+	}
 	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).not.toBeChecked();
 	await Promise.all([view.waitForURL(/\/todos/), view.getByRole('checkbox', { name: 'Done: Plain form' }).click()]);
 	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).toBeChecked();
@@ -190,7 +209,13 @@ test('the toggle on page 2 stays on page 2', async ({ page }) => {
 	}
 	await page.goto('/todos?page=2');
 	const box = page.getByRole('checkbox').first();
-	await Promise.all([page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('toggle')), box.click()]);
+	// The id of the todo comes from the title link of the first row (row 0 is the header row).
+	const row = page.getByRole('row').nth(1);
+	await expect(row.getByRole('checkbox')).toHaveCount(1);
+	const href = await row.getByRole('link', { name: /^Row \d\d$/ }).getAttribute('href');
+	const id = todoID(new URL(href ?? '', page.url()).href);
+	// The wait starts before the click. Node mode posts ?/toggle, and embed mode sends PUT /api/todos/{id}.
+	await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id)), box.click()]);
 	await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(1);
 	await expect(page).toHaveURL(/\/todos\?page=2/);
 });

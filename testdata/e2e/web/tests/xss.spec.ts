@@ -1,5 +1,15 @@
 import { expect, test, type Page, type Response } from '@playwright/test';
-import { createTodo, register, scriptNonce, uniqueEmail, watchCSP } from './helpers';
+import {
+	createTodo,
+	cspDirectives,
+	embed,
+	expectStrictScriptSrc,
+	inlineScriptHashes,
+	pagePolicy,
+	register,
+	uniqueEmail,
+	watchCSP
+} from './helpers';
 
 // ADR 0036 section 3.1. The title is markup. If a view renders it as HTML, the image fails to
 // load and its handler sets window.__xss. A safe view shows the title as literal text.
@@ -13,8 +23,9 @@ async function expectSafe(page: Page, response: Response | null, dialogs: string
 	expect(await page.evaluate(() => (window as unknown as { __xss?: unknown }).__xss)).toBeUndefined();
 	expect(dialogs).toEqual([]);
 	if (response) {
-		// SvelteKit renders the page with a new nonce in script-src (vite.config.js, csp mode auto).
-		expect(scriptNonce(response.headers()['content-security-policy'])).toBeTruthy();
+		// Node mode: SvelteKit renders the page with a new nonce in script-src (vite.config.js, csp
+		// mode auto). Embed mode: app.WithSPA sets the SHA-256 of the inline boot script.
+		expectStrictScriptSrc(response.headers()['content-security-policy']);
 	}
 }
 
@@ -58,9 +69,31 @@ test('a todo title with markup stays text on the list, read, and edit views', as
 });
 
 test('each page response has its own script nonce', async ({ page }) => {
-	const first = scriptNonce((await page.goto('/'))?.headers()['content-security-policy']);
-	const second = scriptNonce((await page.goto('/'))?.headers()['content-security-policy']);
-	expect(first).toBeTruthy();
-	expect(second).toBeTruthy();
-	expect(second).not.toBe(first);
+	const firstResponse = await page.goto('/');
+	const firstHeader = firstResponse?.headers()['content-security-policy'];
+	const secondResponse = await page.goto('/');
+	const secondHeader = secondResponse?.headers()['content-security-policy'];
+	const first = expectStrictScriptSrc(firstHeader);
+	const second = expectStrictScriptSrc(secondHeader);
+	for (const header of [firstHeader, secondHeader]) {
+		const directives = cspDirectives(header);
+		for (const [name, tokens] of Object.entries(pagePolicy)) {
+			expect(directives.get(name), `${name} of ${header}`).toEqual(tokens);
+		}
+	}
+	if (!embed) {
+		// Node mode renders each page on the server with a new nonce.
+		expect(first.nonces[0]).toBeTruthy();
+		expect(second.nonces[0]).toBeTruthy();
+		expect(second.nonces[0]).not.toBe(first.nonces[0]);
+		return;
+	}
+	// Embed mode serves one static shell. It has no nonce. Both responses carry the same hash, and
+	// that hash is the SHA-256 of the inline boot script of the shell that the binary sent.
+	expect(first.nonces).toEqual([]);
+	expect(second.hashes).toEqual(first.hashes);
+	const body = (await secondResponse?.text()) ?? '';
+	const actual = inlineScriptHashes(body);
+	expect(actual.length).toBeGreaterThan(0);
+	expect([...first.hashes].sort()).toEqual([...actual].sort());
 });
