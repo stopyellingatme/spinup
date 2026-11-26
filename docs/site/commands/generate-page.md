@@ -29,7 +29,7 @@ spinup generate page <route> [flags]
 | `--non-interactive` | `false` | never prompt |
 | `--offline` | `false` | never download template versions |
 | `--role` | `` | comma-separated roles that can use the server page |
-| `--server` | `false` | also write +page.server.ts with a load function |
+| `--server` | `false` | also write +page.server.ts (node) or +page.ts (embed) with a load function |
 | `--verbose` | `false` | write extra detail |
 | `-y, --yes` | `false` | answer yes to prompts |
 
