@@ -16,46 +16,55 @@ class = "seed"
 path = "web/src/lib/server/auth.ts"
 source = "files/web/src/lib/server/auth.ts"
 class = "managed"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/lib/server/auth.test.ts"
 source = "files/web/src/lib/server/auth.test.ts"
 class = "managed"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/login/+page.svelte"
 source = "files/web/src/routes/login/+page.svelte.tmpl"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/login/+page.server.ts"
 source = "files/web/src/routes/login/+page.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/register/+page.svelte"
 source = "files/web/src/routes/register/+page.svelte"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/register/+page.server.ts"
 source = "files/web/src/routes/register/+page.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/logout/+page.server.ts"
 source = "files/web/src/routes/logout/+page.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/account/+page.svelte"
 source = "files/web/src/routes/account/+page.svelte"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/routes/account/+page.server.ts"
 source = "files/web/src/routes/account/+page.server.ts"
 class = "scaffold"
+when = "frontend_mode != 'embed'"
 
 # The role column keeps existing users without an assigned role.
 [[files]]

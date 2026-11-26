@@ -1,0 +1,174 @@
+package templates_test
+
+import (
+	"errors"
+	"io/fs"
+	"strings"
+	"testing"
+
+	"github.com/stopyellingatme/spinup/internal/testutil"
+)
+
+// TestEmbedAuth checks the account pages of the auth pack in embed mode (ADR 0039, sections 10.1
+// and 10.3), with and without the mail module and OIDC, and in node mode.
+func TestEmbedAuth(t *testing.T) {
+	t.Parallel()
+	pages := []string{
+		"web/src/lib/auth-form.ts",
+		"web/src/routes/login/+page.ts",
+		"web/src/routes/login/+page.svelte",
+		"web/src/routes/login/schema.ts",
+		"web/src/routes/register/+page.ts",
+		"web/src/routes/register/+page.svelte",
+		"web/src/routes/account/+page.ts",
+		"web/src/routes/account/+page.svelte",
+	}
+	nodeFiles := []string{
+		"web/src/lib/server/auth.ts",
+		"web/src/lib/server/auth.test.ts",
+		"web/src/routes/login/+page.server.ts",
+		"web/src/routes/register/+page.server.ts",
+		"web/src/routes/account/+page.server.ts",
+		"web/src/routes/logout/+page.server.ts",
+	}
+	const oidcMarker = "spinup:oidc-pending"
+
+	for _, tc := range []struct {
+		name    string
+		modules string
+		oidc    bool
+	}{
+		{name: "plain", modules: "ci,auth"},
+		{name: "mail", modules: "ci,auth,mail"},
+		{name: "oidc", modules: "ci,auth", oidc: true},
+		{name: "mail and oidc", modules: "ci,auth,mail", oidc: true},
+	} {
+		mail := strings.Contains(tc.modules, "mail")
+		t.Run("embed "+tc.name, func(t *testing.T) {
+			t.Parallel()
+			packs := []string{"base", "api", "web", "auth"}
+			if mail {
+				packs = append(packs, "mail")
+			}
+			tree := testutil.RenderPack(t, packs, map[string]any{
+				"app_name": "todo", "module": "example.com/todo", "modules": tc.modules,
+				"frontend_mode": "embed", "auth_oidc": tc.oidc,
+			})
+			for _, name := range pages {
+				if _, err := fs.Stat(tree, name); err != nil {
+					t.Errorf("missing %s: %v", name, err)
+				}
+			}
+			for _, name := range nodeFiles {
+				if _, err := fs.Stat(tree, name); !errors.Is(err, fs.ErrNotExist) {
+					t.Errorf("unexpected %s: %v", name, err)
+				}
+			}
+			// No server file and no logout route stays in the tree. The reset pages belong to the
+			// mail module, and their embed twins come with another unit.
+			err := fs.WalkDir(tree, "web", func(path string, entry fs.DirEntry, err error) error {
+				if err != nil || entry.IsDir() {
+					return err
+				}
+				if mail && strings.HasPrefix(path, "web/src/routes/reset/") {
+					return nil
+				}
+				if strings.HasSuffix(path, "+page.server.ts") || strings.HasSuffix(path, "+layout.server.ts") ||
+					strings.Contains(path, "/lib/server/") || strings.Contains(path, "/routes/logout/") {
+					t.Errorf("unexpected node file %s in an embed render", path)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			login := embedFile(t, tree, "web/src/routes/login/+page.svelte")
+			for _, want := range []string{
+				"authForm(loginSchema, '/api/auth/login'",
+				`data-testid="form-error"`,
+				"Too many sign-in attempts. Try again later.",
+				"maxlength={512}",
+				`<Label for="email">Email</Label>`,
+				`<Label for="password">Password</Label>`,
+				">Sign in</Button>",
+			} {
+				if !strings.Contains(login, want) {
+					t.Errorf("login page lacks %q", want)
+				}
+			}
+			for _, tt := range []struct {
+				name string
+				want string
+				on   bool
+			}{
+				{"reset link", `<a href="/reset"`, mail},
+				{"provider buttons", `<OidcButtons next={data.redirectTo} />`, tc.oidc},
+				{"provider import", "import OidcButtons from '#lib/components/OidcButtons.svelte';", tc.oidc},
+				{"pending marker", oidcMarker, tc.oidc},
+			} {
+				if got := strings.Contains(login, tt.want); got != tt.on {
+					t.Errorf("login page %s: present=%v, want %v (%q)", tt.name, got, tt.on, tt.want)
+				}
+			}
+			if strings.Contains(login, "[[") || strings.Contains(login, "\n\n\n") {
+				t.Errorf("login page keeps template text or blank lines:\n%s", login)
+			}
+
+			register := embedFile(t, tree, "web/src/routes/register/+page.svelte")
+			for _, want := range []string{"authForm(registerSchema, '/api/auth/register'", `data-testid="form-error"`, "minlength={12}", "maxlength={512}", ">Create account</Button>"} {
+				if !strings.Contains(register, want) {
+					t.Errorf("register page lacks %q", want)
+				}
+			}
+			account := embedFile(t, tree, "web/src/routes/account/+page.svelte")
+			for _, want := range []string{"signOut()", `data-testid="account-email"`, ">Sign out</Button>"} {
+				if !strings.Contains(account, want) {
+					t.Errorf("account page lacks %q", want)
+				}
+			}
+			if strings.Contains(account, "/logout") {
+				t.Errorf("account page posts to the node logout route")
+			}
+			form := embedFile(t, tree, "web/src/lib/auth-form.ts")
+			for _, want := range []string{"SPA: true", "resetForm: false", "announceSessionChange()", "leaveSession(redirectTo())"} {
+				if !strings.Contains(form, want) {
+					t.Errorf("auth-form.ts lacks %q", want)
+				}
+			}
+			// The shared button component stays as it is: the pages add the marker around it.
+			if oidc := tc.oidc; oidc {
+				if buttons := embedFile(t, tree, "web/src/lib/components/OidcButtons.svelte"); strings.Contains(buttons, oidcMarker) {
+					t.Errorf("OidcButtons.svelte sets the pending marker")
+				}
+			}
+		})
+	}
+
+	// Node mode keeps its form actions and gets none of the browser twins.
+	t.Run("node", func(t *testing.T) {
+		t.Parallel()
+		tree := testutil.RenderPack(t, []string{"base", "api", "web", "auth"}, map[string]any{
+			"app_name": "todo", "module": "example.com/todo", "modules": "ci,auth",
+		})
+		for _, name := range nodeFiles {
+			if _, err := fs.Stat(tree, name); err != nil {
+				t.Errorf("missing %s: %v", name, err)
+			}
+		}
+		for _, name := range []string{
+			"web/src/lib/auth-form.ts",
+			"web/src/routes/login/+page.ts",
+			"web/src/routes/login/schema.ts",
+			"web/src/routes/register/+page.ts",
+			"web/src/routes/account/+page.ts",
+		} {
+			if _, err := fs.Stat(tree, name); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("unexpected %s: %v", name, err)
+			}
+		}
+		if login := embedFile(t, tree, "web/src/routes/login/+page.svelte"); !strings.Contains(login, "$app/forms") {
+			t.Errorf("node login page does not use the form action")
+		}
+	})
+}

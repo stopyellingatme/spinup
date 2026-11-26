@@ -1,0 +1,53 @@
+# The pages of embed mode (ADR 0039, section 10.1). The browser calls the Go API on the same origin.
+# Node mode keeps the form actions in pack.toml. An alternate path expression keeps the metadata key
+# of each page unique, because the node page has the same output path.
+
+# The superforms setup of the sign-in and register pages.
+[[files]]
+path = "web/src/lib/auth-form.ts"
+source = "embed/lib/auth-form.ts"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/routes/login/+page.ts"
+source = "embed/routes/login/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/routes/register/+page.ts"
+source = "embed/routes/register/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/routes/account/+page.ts"
+source = "embed/routes/account/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+# The sign-in page is a template: the mail module adds the reset link, and auth_oidc adds the provider buttons.
+[[files]]
+path = '[[ "web/src/routes/login/+page.svelte" ]]'
+source = "embed/routes/login/+page.svelte.tmpl"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/routes/login/schema.ts"
+source = "embed/routes/login/schema.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = '[[ "web/src/routes/register/+page.svelte" ]]'
+source = "embed/routes/register/+page.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = '[[ "web/src/routes/account/+page.svelte" ]]'
+source = "embed/routes/account/+page.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed'"
