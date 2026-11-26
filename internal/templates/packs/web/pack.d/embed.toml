@@ -6,14 +6,30 @@ source = "embed/vite.config.js"
 class = "managed"
 when = "frontend_mode == 'embed'"
 
+# The root layout of embed mode (ADR 0039, section 10.2). With auth it reads the session in the
+# browser. Without auth the template renders the plain single-page app layout.
 [[files]]
 path = '[[ "web/src/routes/+layout.ts" ]]'
-source = "embed/layout.ts"
+source = "embed/layout.ts.tmpl"
 class = "scaffold"
 when = "frontend_mode == 'embed'"
 
 [[files]]
 path = '[[ "web/src/routes/+layout.svelte" ]]'
-source = "files/web/src/routes/+layout.svelte.tmpl"
+source = "embed/layout.svelte.tmpl"
 class = "scaffold"
 when = "frontend_mode == 'embed'"
+
+# Signed-in users go from / to home. Node mode does this in +page.server.ts.
+[[files]]
+path = "web/src/routes/+page.ts"
+source = "embed/routes/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+# The user menu signs out through the Go API. The node menu posts to /logout.
+[[files]]
+path = '[[ "web/src/lib/components/app/user-menu.svelte" ]]'
+source = "embed/components/app/user-menu.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'auth'"

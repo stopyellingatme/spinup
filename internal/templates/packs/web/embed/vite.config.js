@@ -9,6 +9,20 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv } from 'vite';
 import { configDefaults } from 'vitest/config';
 
+// zod 4 calls `new Function('')` once in the browser to test if it can compile fast parsers. The
+// Content-Security-Policy of the Go binary blocks eval, so zod falls back to its normal parsers, but
+// the browser still reports a securitypolicyviolation. This plugin sets the `jitless` option of
+// z.config() before zod starts. zod then skips the test. It changes only the browser code.
+const zodCore = /[\\/]zod[\\/]v4[\\/]core[\\/]core\.js$/;
+/** @type {import('vite').Plugin} */
+const zodJitless = {
+	name: 'spinup:zod-jitless',
+	transform(code, id, options) {
+		if (options?.ssr || !zodCore.test(id)) return null;
+		return { code: `globalThis.__zod_globalConfig ??= { jitless: true };\n${code}`, map: null };
+	}
+};
+
 // buildVersion gives the version name of the build: a hash of the build inputs. The default of
 // SvelteKit is the build time. That value is in index.html, so each build would change the script
 // hash of the Content-Security-Policy, the ETag of the shell, and the Go binary. With this name,
@@ -59,6 +73,7 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		plugins: [
+			zodJitless,
 			tailwindcss(),
 			sveltekit({
 				adapter: {
@@ -86,6 +101,10 @@ export default defineConfig(({ mode }) => {
 		},
 		define: {
 			__PUBLIC_ORIGIN__: JSON.stringify(origin)
+		},
+		// The dev server bundles zod before the plugins above run, so the bundler needs the plugin too.
+		optimizeDeps: {
+			rolldownOptions: { plugins: [zodJitless] }
 		},
 		server: {
 			proxy: {
