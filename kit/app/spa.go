@@ -80,17 +80,19 @@ func WithSPAOptions(files fs.FS, opts SPAOptions) Option {
 					return
 				}
 			}
-			encoding, suffix := "", ""
-			if file.br || file.gzip {
+			encoding := ""
+			variant := spaVariant{name: name, etag: file.etag}
+			hasVariants := file.br.name != "" || file.gzip.name != ""
+			if hasVariants {
 				// A client can send the header in more than one field.
 				accept := strings.Join(r.Header.Values("Accept-Encoding"), ",")
-				if file.br && httpx.AcceptsEncoding(accept, "br") {
-					encoding, suffix = "br", ".br"
-				} else if file.gzip && httpx.AcceptsEncoding(accept, "gzip") {
-					encoding, suffix = "gzip", ".gz"
+				if file.br.name != "" && httpx.AcceptsEncoding(accept, "br") {
+					encoding, variant = "br", file.br
+				} else if file.gzip.name != "" && httpx.AcceptsEncoding(accept, "gzip") {
+					encoding, variant = "gzip", file.gzip
 				}
 			}
-			f, err := files.Open(name + suffix)
+			f, err := files.Open(variant.name)
 			if err != nil {
 				http.NotFound(w, r)
 				return
@@ -105,22 +107,19 @@ func WithSPAOptions(files fs.FS, opts SPAOptions) Option {
 				}
 				content = bytes.NewReader(data)
 			}
-			if file.br || file.gzip {
+			if hasVariants {
 				w.Header().Add("Vary", "Accept-Encoding")
 			}
 			if encoding != "" {
 				w.Header().Set("Content-Encoding", encoding)
 			}
 			w.Header().Set("Content-Type", file.contentType)
-			if file.etag != "" {
-				w.Header().Set("ETag", "\""+file.etag+suffix+"\"")
+			if variant.etag != "" {
+				w.Header().Set("ETag", variant.etag)
 			}
-			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Cache-Control", file.cacheControl)
 			if strings.HasPrefix(file.contentType, "text/html") {
 				w.Header().Set("Content-Security-Policy", csp)
-			}
-			if strings.HasPrefix(name, opts.ImmutablePrefix) {
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			}
 			http.ServeContent(w, r, name, time.Time{}, content)
 		}))

@@ -81,10 +81,11 @@ func New(opts ...Option) *App {
 	a.telemetryLogger()
 	mux := http.NewServeMux()
 	a.addRoute("GET /healthz")
+	healthBody := []byte("{\"status\":\"ok\"}\n")
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		_ = httpx.WriteJSON(w, http.StatusOK, struct {
-			Status string `json:"status"`
-		}{Status: "ok"})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(healthBody)
 	})
 	mux.HandleFunc("GET /readyz", a.ready)
 	a.addRoute("GET /readyz")

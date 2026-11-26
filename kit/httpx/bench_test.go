@@ -70,11 +70,11 @@ func BenchmarkDecodeJSON(b *testing.B) {
 }
 
 func BenchmarkCheckJSONBody(b *testing.B) {
-	body := benchmarkBodies(b)[0]
+	body := benchmarkSmallJSONBody()
 	rules := BodyRules{Required: []string{"title", "body", "published"}, Known: []string{"title", "body", "published"}}
 	b.ReportAllocs()
-	b.SetBytes(int64(len(body.data)))
-	run := benchmarkCheckJSONBody(body.data, rules)
+	b.SetBytes(int64(len(body)))
+	run := benchmarkCheckJSONBody(body, rules)
 	for b.Loop() {
 		run()
 	}

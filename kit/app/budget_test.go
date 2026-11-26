@@ -8,10 +8,12 @@ import (
 )
 
 const (
-	middlewareGeneratedAllocsCeiling = 30
-	middlewareProvidedAllocsCeiling  = 29
-	spaAssetAllocsCeiling            = 53
-	spaIndexAllocsCeiling            = 53
+	middlewareGeneratedAllocsCeiling = 26
+	middlewareProvidedAllocsCeiling  = 25
+	healthAllocsCeiling              = 29
+	spaAssetAllocsCeiling            = 48
+	spaIndexAllocsCeiling            = 48
+	spaIndexBrotliAllocsCeiling      = 50
 )
 
 func TestMiddlewareChainBudget(t *testing.T) {
@@ -32,20 +34,36 @@ func TestMiddlewareChainBudget(t *testing.T) {
 	assertAllocationBudget(t, providedAllocs, middlewareProvidedAllocsCeiling)
 }
 
+func TestHealthBudget(t *testing.T) {
+	if raceEnabled || testing.Short() {
+		t.Skip("allocation budgets do not run with race or short tests")
+	}
+	allocs := testing.AllocsPerRun(200, benchmarkHealthBody())
+	assertAllocationBudget(t, allocs, healthAllocsCeiling)
+}
+
 func TestSPAAssetBudget(t *testing.T) {
 	if raceEnabled || testing.Short() {
 		t.Skip("allocation budgets do not run with race or short tests")
 	}
-	allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/_app/immutable/app.js"))
+	allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/_app/immutable/app.js", false))
 	assertAllocationBudget(t, allocs, spaAssetAllocsCeiling)
+	t.Run("brotli", func(t *testing.T) {
+		allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/_app/immutable/app.js", true))
+		assertAllocationBudget(t, allocs, spaAssetAllocsCeiling)
+	})
 }
 
 func TestSPAIndexBudget(t *testing.T) {
 	if raceEnabled || testing.Short() {
 		t.Skip("allocation budgets do not run with race or short tests")
 	}
-	allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/deep/link"))
+	allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/deep/link", false))
 	assertAllocationBudget(t, allocs, spaIndexAllocsCeiling)
+	t.Run("brotli", func(t *testing.T) {
+		allocs := testing.AllocsPerRun(200, newBenchmarkSPABody("/deep/link", true))
+		assertAllocationBudget(t, allocs, spaIndexBrotliAllocsCeiling)
+	})
 }
 
 func assertAllocationBudget(t *testing.T, measured float64, ceiling int) {
