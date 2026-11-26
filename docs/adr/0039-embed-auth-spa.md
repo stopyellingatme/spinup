@@ -181,7 +181,7 @@ Do the stages in this order. The first stage helps embed mode without sign-in.
 - A cookie-clear route is declined for now. A failed sign-out shows an error and leaves the user signed in.
 - Sign-out stops every local live stream before it sends the request. Completion depends on events. There is no grace period.
 - The root reads public flags at bootstrap, on a session refresh, and after a successful admin write. Ordinary navigation reuses that result.
-- This run requires no changes in `kit/`.
+- This run makes one change in `kit/`: the option `auth.WithResetFragment` (section 10.10). The first plan had no kit change. A security finding of the build changed that.
 - Embed mode gets its own bundle budget, `perf/budgets-embed.json` (section 10.9). The node budget does not change.
 
 ## 9. Not done
@@ -683,3 +683,10 @@ The build lanes found points that sections 10.2 and 10.6 left open. These ruling
 - `web/package.json` has no `lint` script, and this release adds none. The launcher runs `check`, `test`, and `build`.
 - The embed launcher relies on the managed embed `vite.config.js`: its adapter writes the build into `api/internal/webdist/dist`. The launcher checks that `dist/index.html` exists before `go build -tags embedweb`.
 - The test title "each page response has its own script nonce" stays in both modes. In embed mode the test checks the stable SHA-256 source.
+- **The reset token of embed mode is in the URL fragment.** Sections 10.3 and 10.9 put the token in the path `/reset/<token>` and added response headers for that document.
+  The build found that the Go access log and the server span then record the token, because the one binary serves that path. Node mode has no such record in the Go API.
+  So the embed render passes `auth.WithResetURL(<origin>/reset/confirm)` and the new kit option `auth.WithResetFragment()`. The mail link is `<origin>/reset/confirm#<token>`.
+  A browser does not send a fragment to a server. No access log, trace, proxy log, or `Referer` header holds the token.
+  The page `/reset/confirm` reads the fragment one time, keeps the token in memory, and removes the fragment from the address bar with `history.replaceState`. The token goes only in the JSON body of the confirm call.
+  The middleware `resetPageHeaders` and the Caddy header block for `/reset/<token>` are not necessary and do not ship. `main.go` of the API has no change.
+  Node mode keeps the path link `/reset/<token>` and its bytes. A generated embed app with `mail` needs a kit version that has `auth.WithResetFragment`.
