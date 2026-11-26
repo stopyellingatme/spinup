@@ -152,6 +152,7 @@ kit/auth func WithLogger(*slog.Logger) Option
 kit/auth func WithMailer(mail.Mailer) ResetOption
 kit/auth func WithRateLimits(RateLimits) Option
 kit/auth func WithRegistration(RegistrationMode) Option
+kit/auth func WithResetFragment() ResetOption
 kit/auth func WithResetFrom(string) ResetOption
 kit/auth func WithResetTemplates(fs.FS) ResetOption
 kit/auth func WithResetURL(string) ResetOption
