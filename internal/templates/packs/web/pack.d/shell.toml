@@ -21,7 +21,7 @@ class = "scaffold"
 path = "web/src/lib/components/app/user-menu.svelte"
 source = "files/web/src/lib/components/app/user-menu.svelte.tmpl"
 class = "scaffold"
-when = "modules contains 'auth'"
+when = "frontend_mode != 'embed' && modules contains 'auth'"
 
 [[files]]
 path = "web/src/lib/components/app/page-header.svelte"
