@@ -35,7 +35,7 @@ func TestWebNodePerformance(t *testing.T) {
 				}
 			}
 			hooks := read("web/src/hooks.server.ts")
-			for _, want := range []string{"kit/auth CookieName", "cookie.split(';').some((part) => part.trim().split('=', 1)[0] === 'session')", "headers: { cookie, accept: 'application/json' }"} {
+			for _, want := range []string{"kit/auth CookieName", "cookie.split(';').some((part) => part.split('=', 1)[0].trim() === 'session')", "headers: { cookie, accept: 'application/json' }"} {
 				if !strings.Contains(hooks, want) {
 					t.Errorf("hooks missing %q", want)
 				}

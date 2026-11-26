@@ -8,8 +8,8 @@ const publicAPI = `${__PUBLIC_ORIGIN__}/api/`;
 
 /** loadUser asks the Go API who owns the session cookie. It never throws. */
 async function loadUser(cookie: string | null): Promise<App.User | null> {
-	// The session cookie name matches kit/auth CookieName.
-	if (!cookie || !cookie.split(';').some((part) => part.trim().split('=', 1)[0] === 'session')) return null;
+	// The session cookie name matches kit/auth CookieName. Go trims the name, so this does too.
+	if (!cookie || !cookie.split(';').some((part) => part.split('=', 1)[0].trim() === 'session')) return null;
 	try {
 		const res = await fetch(`${api}/api/session`, {
 			headers: { cookie, accept: 'application/json' }

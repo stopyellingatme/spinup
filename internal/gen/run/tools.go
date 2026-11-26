@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	exec "github.com/stopyellingatme/spinup/internal/exec"
 )
@@ -103,32 +102,12 @@ type goEnvironment struct {
 	GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK, GOVERSION string
 }
 
-var environmentCache sync.Map
-
+// toolEnvironment runs one `go env -json` probe for each lookup. It is not memoized: a Go
+// upgrade or a `go env -w` change between two lookups of one long process (spinup dev) must
+// reach the cache key.
 func toolEnvironment(ctx context.Context, dir string, runner exec.Runner) (goEnvironment, error) {
 	if err := ctx.Err(); err != nil {
 		return goEnvironment{}, err
-	}
-	// Cache only the real runner. Test runners and other implementations can
-	// return different environments on each call.
-	_, cacheable := runner.(exec.OSRunner)
-	cacheKey := dir + "\x00" + strings.Join(os.Environ(), "\x00")
-	// A workspace can appear after the first lookup. Probe again in that case.
-	for current := dir; ; current = filepath.Dir(current) {
-		info, err := os.Stat(filepath.Join(current, "go.work"))
-		if err == nil {
-			cacheKey += fmt.Sprintf("\x00%s:%d:%d", current, info.Size(), info.ModTime().UnixNano())
-		} else if !os.IsNotExist(err) {
-			cacheable = false
-		}
-		if filepath.Dir(current) == current {
-			break
-		}
-	}
-	if cacheable {
-		if value, ok := environmentCache.Load(cacheKey); ok {
-			return value.(goEnvironment), nil
-		}
 	}
 	result, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK", "GOVERSION"}, Dir: dir})
 	if err != nil {
@@ -140,9 +119,6 @@ func toolEnvironment(ctx context.Context, dir string, runner exec.Runner) (goEnv
 	}
 	if result.ExitCode != 0 || values.GOVERSION == "" || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
 		return goEnvironment{}, fmt.Errorf("go tool environment is unavailable")
-	}
-	if cacheable && values.GOWORK == "off" {
-		environmentCache.Store(cacheKey, values)
 	}
 	return values, nil
 }
