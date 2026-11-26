@@ -538,7 +538,7 @@ var (
 	<PageHeader title="New [[ .Words ]]" description="Fill in the fields, then create the [[ .Words ]]." />
 ` + formMarkup("Create [[ .Words ]]", "[[ .Route ]]")
 
-	embedEditSvelte = embedFormScript("\timport { untrack } from 'svelte';\n\timport { toStore } from 'svelte/store';\n", "goto") + `	import Fields from '../../fields.svelte';
+	embedEditSvelte = embedFormScript("\timport { untrack } from 'svelte';\n\timport { SvelteSet } from 'svelte/reactivity';\n\timport { toStore } from 'svelte/store';\n", "goto") + `	import Fields from '../../fields.svelte';
 	import { RESOURCE_DEP, applyFailure, unreachable } from '../../form';
 	import { fromItem, itemTitle, schema, toBody } from '../../schema';
 	import type { PageProps } from './$types';
@@ -550,18 +550,27 @@ var (
 	// The form, its save, and its busy state belong to one [[ .Words ]]: original.
 	const adapter = zod4(schema);
 	let original = untrack(() => data.item);
-	// The id of the [[ .Words ]] whose save runs.
-	let saving: number | null = $state(null);
+	// The ids of the [[ .Words ]] items whose save runs.
+	const saving = new SvelteSet<number>();
 	const form = superForm(defaults(fromItem(original), adapter), {
 		SPA: true,
 		id: '[[ .Feed ]]-edit',
 		validators: adapter,
 		resetForm: false,
+		// superForm counts a submit as running until its onUpdate returns, also after the page shows
+		// another [[ .Words ]]. With 'prevent', a held save of one [[ .Words ]] would drop the submit of the
+		// next one without a message. The saving set below prevents a second save of one [[ .Words ]].
+		multipleSubmits: 'allow',
 		async onUpdate({ form, cancel }) {
 			if (!form.valid) return;
 			const item = original;
+			if (saving.has(item.id)) {
+				// A save of this [[ .Words ]] runs: a double submit sends no second request.
+				cancel();
+				return;
+			}
 			const path = { id: item.id };
-			saving = item.id;
+			saving.add(item.id);
 			const result = await api
 				.PUT('[[ .APIPath ]]/{id}', {
 					[[ if .Auth ]]fetch: observedFetch(fetch),
@@ -573,7 +582,7 @@ var (
 					return undefined;
 				})
 				.finally(() => {
-					if (saving === path.id) saving = null;
+					saving.delete(path.id);
 				});
 			if (original.id !== path.id) {
 				// The page shows another [[ .Words ]] now. The answer belongs to the old form, so it
@@ -603,7 +612,7 @@ var (
 	});
 	const { enhance, message } = form;
 	// The save button is busy only for the save of the [[ .Words ]] that the page shows.
-	const submitting = toStore(() => saving === data.item.id);
+	const submitting = toStore(() => saving.has(data.item.id));
 
 	// SvelteKit keeps this page when only the id changes, for example on a client navigation from
 	// [[ .Route ]]/1/edit to [[ .Route ]]/2/edit. The form then starts again with the new [[ .Words ]].

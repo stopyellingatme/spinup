@@ -367,11 +367,15 @@ func TestEmbedPagesSameComponent(t *testing.T) {
 	for _, want := range []string{
 		"let original = untrack(() => data.item);",
 		"async onUpdate({ form, cancel }) {",
-		"const item = original;\n\t\t\tconst path = { id: item.id };\n\t\t\tsaving = item.id;",
-		"if (saving === path.id) saving = null;",
+		"const item = original;\n\t\t\tif (saving.has(item.id)) {\n\t\t\t\t// A save of this todo runs: a double submit sends no second request.\n\t\t\t\tcancel();\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tconst path = { id: item.id };\n\t\t\tsaving.add(item.id);",
+		"saving.delete(path.id);",
+		"const saving = new SvelteSet<number>();",
+		"import { SvelteSet } from 'svelte/reactivity';",
+		// A held save of one item must not drop the submit of the next item (FIX2 point C).
+		"multipleSubmits: 'allow',",
 		"if (original.id !== path.id) {\n",
 		"\t\t\t\tcancel();\n",
-		"const submitting = toStore(() => saving === data.item.id);",
+		"const submitting = toStore(() => saving.has(data.item.id));",
 		"$effect.pre(() => {\n\t\tconst item = data.item;\n\t\tif (item.id === original.id) return;\n\t\toriginal = item;\n\t\tform.reset({ data: fromItem(item), newState: fromItem(item) });\n\t});",
 		"import { toStore } from 'svelte/store';",
 	} {
