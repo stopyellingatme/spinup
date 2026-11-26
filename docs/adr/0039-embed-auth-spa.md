@@ -666,3 +666,20 @@ So the embed launcher checks against its own file, `perf/budgets-embed.json`, wi
 The main loop writes that file from the measured release fixture: each measured total plus 5 %, rounded up to the next 1,000 bytes.
 Before that, the build units remove browser code that two files hold two times. Do not skip the check, and do not update a baseline from the spike.
 The report of the run gives the measured raw and Brotli totals of both modes.
+
+### 10.10 Rulings during the build
+
+The build lanes found points that sections 10.2 and 10.6 left open. These rulings override the text above where it differs.
+
+- `loadSession` fails closed. Only a 401 means signed out. A transport failure or another status throws `error(503)`.
+- The root load does not throw. On a failed session read it returns the last verified session data and sets `sessionError` (a string, or `null`).
+  The root layout then hides every page and shows a card with a retry button (`data-testid="session-error"`). A thrown error in the root load leaves a blank page.
+- The 401 loop guard has no timer. `observedFetch` ignores a 401 of a request that was sent while a session check ran.
+- `watchSession` consumes the storage key `spinup:oidc-pending`. The login page sets the key on the provider click itself.
+- Any 2xx answer of the logout call counts as success.
+- The root layout imports `session-watch` for its side effect, calls `watchSession()` one time, and chains `flushSessionCheck` on the completed navigation.
+- `requireGuest` sends a signed-in visitor to `home`, as node mode does. It does not read `redirectTo` for a signed-in visitor.
+- The marker of an embed resource for the navigation is `form.ts` plus `+page.svelte`. The login page has a `schema.ts`, so `schema.ts` cannot be the marker.
+- `web/package.json` has no `lint` script, and this release adds none. The launcher runs `check`, `test`, and `build`.
+- The embed launcher relies on the managed embed `vite.config.js`: its adapter writes the build into `api/internal/webdist/dist`. The launcher checks that `dist/index.html` exists before `go build -tags embedweb`.
+- The test title "each page response has its own script nonce" stays in both modes. In embed mode the test checks the stable SHA-256 source.
