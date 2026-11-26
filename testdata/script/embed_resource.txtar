@@ -1,0 +1,88 @@
+# g resource in an embed app writes eleven browser pages and the navigation (ADR 0039 §10.5).
+# spinup destroy resource removes the unchanged pages and keeps the edited ones.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
+cd embedded
+
+# The client post-step needs pnpm and the installed packages.
+[!exec:pnpm] skip 'pnpm is required: put scripts/bin on PATH'
+[!exec:node] skip 'Node 24 is required on PATH'
+exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+
+exec spinup g resource todo title:string done:bool 'due:date?' 'priority:enum:low|normal|high'
+stdout '^Created 19, updated 2 files$'
+exists web/src/routes/todos/+page.svelte web/src/routes/todos/+page.ts
+exists web/src/routes/todos/new/+page.svelte web/src/routes/todos/new/+page.ts
+exists web/src/routes/todos/[id]/+page.svelte web/src/routes/todos/[id]/+page.ts
+exists web/src/routes/todos/[id]/edit/+page.svelte web/src/routes/todos/[id]/edit/+page.ts
+exists web/src/routes/todos/schema.ts web/src/routes/todos/fields.svelte web/src/routes/todos/form.ts
+! exists web/src/routes/todos/+page.server.ts web/src/routes/todos/new/+page.server.ts
+grep 'export const RESOURCE_DEP = ''app:resource:todos'';' web/src/routes/todos/form.ts
+grep 'depends\(RESOURCE_DEP\);' web/src/routes/todos/+page.ts
+! grep 'requireUser' web/src/routes/todos/+page.ts
+! grep 'session-watch' web/src/routes/todos/form.ts
+! grep '\{@html' web/src/routes/todos/+page.svelte
+grep '"web/src/routes/todos/form.ts": \{\n[[:space:]]+"class": "scaffold"' spinup.lock
+grep '"template": "gen/resource"' spinup.lock
+grep '\{ href: ''/todos'', label: ''Todos'' \}' web/src/lib/nav.gen.ts
+grep 'export const home: string = ''/todos'';' web/src/lib/nav.gen.ts
+
+# The same resource again reports the existing table.
+! exec spinup g resource todo title:string
+stderr 'the table todos already exists in api/db/migrations/00002_create_todos\.sql'
+stderr 'Try: pass --force'
+
+cd web
+exec sh $WORK/pnpm.sh check
+stdout '(?i)\b0 errors\b'
+stdout '(?i)\b0 warnings\b'
+exec sh $WORK/pnpm.sh build
+exists build/index.html ../api/internal/webdist/dist/index.html
+cd ..
+
+# destroy removes the unchanged pages and the empty directories, keeps the edited page, and
+# rebuilds the navigation.
+cp $WORK/fields.svelte web/src/routes/todos/fields.svelte
+exec spinup destroy resource todo
+stdout 'keep web/src/routes/todos/fields.svelte'
+stdout 'remove web/src/routes/todos/form.ts'
+stdout 'remove web/src/routes/todos/\[id\]/edit/\+page.ts'
+stdout 'update web/src/lib/nav.gen.ts'
+cmp web/src/routes/todos/fields.svelte $WORK/fields.svelte
+! exists web/src/routes/todos/+page.svelte web/src/routes/todos/+page.ts web/src/routes/todos/form.ts
+! exists web/src/routes/todos/new web/src/routes/todos/[id]
+! grep '"web/src/routes/todos/form.ts"' spinup.lock
+grep '"web/src/routes/todos/fields.svelte"' spinup.lock
+grep 'export const home: string = ''/'';' web/src/lib/nav.gen.ts
+! grep '/todos' web/src/lib/nav.gen.ts
+
+# The API-only path writes no page and leaves the navigation empty.
+exec spinup g resource note body:text --api-only
+! exists web/src/routes/notes
+grep '/api/notes: ' api/openapi/bundle.gen.yaml
+grep 'export const home: string = ''/'';' web/src/lib/nav.gen.ts
+
+# The auth cases need the ENABLE unit, because spinup new refuses auth in embed mode in this base.
+# AFTER-ENABLE: exec spinup new authed --module example.com/authed --frontend-mode embed --modules auth --no-git --non-interactive
+# AFTER-ENABLE: cd authed
+# AFTER-ENABLE: exec sh $WORK/pnpm.sh --dir web install --frozen-lockfile --offline
+# AFTER-ENABLE: exec spinup g resource todo title:string --role manager
+# AFTER-ENABLE: grep 'import \{ requireRole \} from ''#lib/auth.js'';' web/src/routes/todos/+page.ts
+# AFTER-ENABLE: grep 'requireRole\(user, url, ''manager''\);' web/src/routes/todos/[id]/edit/+page.ts
+# AFTER-ENABLE: grep 'observedFetch\(fetch\)' web/src/routes/todos/form.ts
+# AFTER-ENABLE: exec spinup g resource memo body:text
+# AFTER-ENABLE: grep 'requireUser\(user, url\);' web/src/routes/memos/new/+page.ts
+# AFTER-ENABLE: ! grep '/login' web/src/lib/nav.gen.ts
+# AFTER-ENABLE: cd web
+# AFTER-ENABLE: exec sh $WORK/pnpm.sh check
+# AFTER-ENABLE: stdout '(?i)\b0 errors\b'
+# AFTER-ENABLE: stdout '(?i)\b0 warnings\b'
+
+-- fields.svelte --
+<!-- An edit by the application. destroy keeps this file. -->
+-- pnpm.sh --
+# Scripts get their own HOME, but pnpm keeps the package metadata for offline installs under
+# the real home directory of the user.
+HOME=$(eval echo "~$(id -un)")
+export HOME
+exec pnpm "$@"

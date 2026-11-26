@@ -227,3 +227,103 @@ func TestPostSteps(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildPageFamilies checks the page paths of both families (ADR 0039
+// §10.5). Destroy removes the unchanged pages of either family and keeps an
+// edited page. A path that only the other family writes is a candidate only
+// when the lock records gen/resource as its template, so a page of another
+// generator stays and destroy does not report it.
+func TestBuildPageFamilies(t *testing.T) {
+	t.Parallel()
+	const dir = "web/src/routes/todos/"
+	tests := []struct {
+		name    string
+		embed   bool
+		files   map[string]string // path to lock template
+		edited  []string
+		remove  []string
+		kept    []string
+		ignored []string
+	}{
+		{
+			name:  "embed",
+			embed: true,
+			files: map[string]string{
+				dir + "+page.svelte": "gen/resource", dir + "+page.ts": "gen/resource", dir + "form.ts": "gen/resource",
+				dir + "schema.ts": "gen/resource", dir + "fields.svelte": "gen/resource", dir + "new/+page.ts": "gen/resource",
+				dir + "[id]/+page.ts": "gen/resource", dir + "[id]/edit/+page.svelte": "gen/resource",
+				// A server load of node mode that spinup g resource wrote before.
+				dir + "[id]/+page.server.ts": "gen/resource",
+				// A tracked file of another owner at a node-only path.
+				dir + "+page.server.ts": "web/files/web/src/routes/todos/+page.server.ts",
+			},
+			edited:  []string{dir + "[id]/edit/+page.svelte"},
+			remove:  []string{dir + "+page.svelte", dir + "+page.ts", dir + "[id]/+page.server.ts", dir + "[id]/+page.ts", dir + "fields.svelte", dir + "form.ts", dir + "new/+page.ts", dir + "schema.ts"},
+			kept:    []string{dir + "[id]/edit/+page.svelte"},
+			ignored: []string{dir + "+page.server.ts"},
+		},
+		{
+			name: "node",
+			files: map[string]string{
+				dir + "+page.svelte": "gen/resource", dir + "+page.server.ts": "gen/resource", dir + "schema.ts": "gen/resource",
+				// A legacy page file stays a candidate.
+				dir + "form.ts": "gen/resource",
+				// A page load of spinup g page at an embed-only path.
+				dir + "+page.ts": "gen/page",
+				// A browser load of embed mode that spinup g resource wrote.
+				dir + "new/+page.ts": "gen/resource",
+			},
+			remove:  []string{dir + "+page.server.ts", dir + "+page.svelte", dir + "form.ts", dir + "new/+page.ts", dir + "schema.ts"},
+			ignored: []string{dir + "+page.ts"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			lock := manifest.New()
+			if tc.embed {
+				lock.Answers["frontend_mode"] = "embed"
+			}
+			for path, template := range tc.files {
+				p := filepath.Join(root, filepath.FromSlash(path))
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte("original"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				lock.Files[path] = manifest.FileEntry{Class: manifest.Scaffold, Template: template, Hash: manifest.Hash([]byte("original")), Mode: "0644"}
+			}
+			for _, path := range tc.edited {
+				if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(path)), []byte("changed"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Build(context.Background(), Options{Root: root, Kind: "resource", Name: "todo"}, lock)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var removed []string
+			for _, f := range plan.Files.Files {
+				if f.Delete {
+					removed = append(removed, f.Path)
+				}
+			}
+			if strings.Join(removed, "\n") != strings.Join(tc.remove, "\n") {
+				t.Errorf("removed:\n%s\nwant:\n%s", strings.Join(removed, "\n"), strings.Join(tc.remove, "\n"))
+			}
+			if strings.Join(plan.Kept, "\n") != strings.Join(tc.kept, "\n") {
+				t.Errorf("kept %v, want %v", plan.Kept, tc.kept)
+			}
+			for _, path := range tc.ignored {
+				if _, ok := plan.Files.Get(path); ok {
+					t.Errorf("destroy claims %s", path)
+				}
+			}
+		})
+	}
+}
