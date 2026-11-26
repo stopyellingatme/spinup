@@ -40,7 +40,7 @@ func TestBundle(t *testing.T) {
 	put(t, api, "openapi/schemas/todo.yaml", "Todo: {type: object, properties: {title: {type: string}, error: {$ref: '#/components/schemas/Problem'}}}\n")
 	put(t, api, "openapi/paths/.gitkeep", "")
 	put(t, api, "openapi/paths/ignored.txt", "invalid")
-	got, err := Bundle(api)
+	got, _, err := Bundle(api)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestBundle(t *testing.T) {
 	if len(doc["paths"].(map[string]any)) != 2 {
 		t.Fatalf("paths: %s", got)
 	}
-	again, err := Bundle(api)
+	again, _, err := Bundle(api)
 	if err != nil || !bytes.Equal(got, again) {
 		t.Fatalf("not deterministic: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestBundleErrors(t *testing.T) {
 			for name, data := range tc.files {
 				put(t, api, "openapi/"+name, data)
 			}
-			_, err := Bundle(api)
+			_, _, err := Bundle(api)
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -139,7 +139,7 @@ func TestBundleEmptyAndComponentRefs(t *testing.T) {
 			if tc.name != "empty" {
 				put(t, api, "openapi/schemas/todo.yaml", "Todo: {type: object, required: [id], properties: {id: {type: integer}}}")
 			}
-			got, err := Bundle(api)
+			got, _, err := Bundle(api)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -164,7 +164,7 @@ func TestBundleNumericResponseKeys(t *testing.T) {
 				put(t, api, "openapi/paths/things.yaml", path)
 			}
 			put(t, api, "openapi/openapi.yaml", root)
-			got, err := Bundle(api)
+			got, _, err := Bundle(api)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -173,7 +173,7 @@ func TestBundleNumericResponseKeys(t *testing.T) {
 					t.Errorf("response key %s must be quoted:\n%s", code, got)
 				}
 			}
-			again, err := Bundle(api)
+			again, _, err := Bundle(api)
 			if err != nil || !bytes.Equal(got, again) {
 				t.Fatalf("bundle is not deterministic: %v", err)
 			}
@@ -200,7 +200,7 @@ func TestBundlePreservesScalarTextAndTags(t *testing.T) {
 					put(t, api, "openapi/schemas/sample.yaml", schema)
 				}
 				put(t, api, "openapi/openapi.yaml", root)
-				got, err := Bundle(api)
+				got, _, err := Bundle(api)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -258,7 +258,7 @@ Merged:
   default: 1e3
 Ref: {$ref: '#/components/schemas/Merged/type'}
 `)
-	got, err := Bundle(api)
+	got, _, err := Bundle(api)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,5 +271,22 @@ Ref: {$ref: '#/components/schemas/Merged/type'}
 		if node.Value != tc.value {
 			t.Errorf("%s default: got %q, want %q", tc.name, node.Value, tc.value)
 		}
+	}
+}
+
+func TestBundlePathCount(t *testing.T) {
+	api := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(api, "openapi", "paths"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(api, "openapi", "openapi.yaml"), []byte("paths:\n  /root: {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(api, "openapi", "paths", "extra.yaml"), []byte("/extra: {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, count, err := Bundle(api)
+	if err != nil || count != 2 {
+		t.Fatalf("count = %d, error = %v", count, err)
 	}
 }

@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	exec "github.com/stopyellingatme/spinup/internal/exec"
 )
 
-const testGoEnv = `{"GOOS":"linux","GOARCH":"amd64","GOFLAGS":"-mod=readonly","GOCACHE":"/cache/go"}`
+const testGoEnv = `{"GOOS":"linux","GOARCH":"amd64","GOFLAGS":"-mod=readonly","GOCACHE":"/cache/go","GOVERSION":"go1.27.2"}`
 
 func toolCacheFixture(t *testing.T) (string, string) {
 	t.Helper()
@@ -32,15 +33,17 @@ func toolCacheFixture(t *testing.T) (string, string) {
 }
 
 func expectToolEnvironment(fake *exec.Fake, version, environment string) {
-	fake.Expect("go", "version").Return(version, "", 0)
-	fake.Expect("go", "env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK").Return(environment, "", 0)
+	if strings.HasSuffix(environment, "}") {
+		environment = environment[:len(environment)-1] + `,"GOVERSION":"` + version + `"}`
+	}
+	fake.Expect("go", "env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK", "GOVERSION").Return(environment, "", 0)
 }
 
 func TestToolCommandCache(t *testing.T) {
 	dir, binary := toolCacheFixture(t)
 	for i := range 2 {
 		fake := &exec.Fake{}
-		expectToolEnvironment(fake, "go version go1.27.2 linux/amd64", testGoEnv)
+		expectToolEnvironment(fake, "go1.27.2", testGoEnv)
 		if i == 0 {
 			fake.Expect("go", "tool", "-modfile=tools.mod", "-n", "sqlc").Return(binary+"\n", "", 0)
 		}
@@ -63,14 +66,14 @@ func TestToolCommandKeyInputs(t *testing.T) {
 	for _, field := range []string{"tools.mod", "tools.sum", "version", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE"} {
 		t.Run(field, func(t *testing.T) {
 			dir, binary := toolCacheFixture(t)
-			version, environment := "go version go1.27.2 linux/amd64", testGoEnv
+			version, environment := "go1.27.2", testGoEnv
 			for i := range 2 {
 				if i == 1 {
 					switch field {
 					case "tools.mod", "tools.sum":
 						put(t, dir, field, "changed\n")
 					case "version":
-						version = "go version go1.27.3 linux/amd64"
+						version = "go1.27.3"
 					default:
 						environment = testGoEnv[:len(testGoEnv)-1] + `,"` + field + `":"changed"}`
 					}
@@ -90,7 +93,7 @@ func TestToolCommandKeyInputs(t *testing.T) {
 func TestToolCommandMissingBinaryFallsBack(t *testing.T) {
 	dir, binary := toolCacheFixture(t)
 	fake := &exec.Fake{}
-	expectToolEnvironment(fake, "go version go1.27.2 linux/amd64", testGoEnv)
+	expectToolEnvironment(fake, "go1.27.2", testGoEnv)
 	fake.Expect("go", "tool", "-modfile=tools.mod", "-n", "sqlc").Return(binary, "", 0)
 	if got := ToolCommand(context.Background(), dir, fake, "sqlc").Name; got != binary {
 		t.Fatalf("tool = %q", got)
@@ -98,7 +101,7 @@ func TestToolCommandMissingBinaryFallsBack(t *testing.T) {
 	if err := os.Remove(binary); err != nil {
 		t.Fatal(err)
 	}
-	expectToolEnvironment(fake, "go version go1.27.2 linux/amd64", testGoEnv)
+	expectToolEnvironment(fake, "go1.27.2", testGoEnv)
 	fake.Expect("go", "tool", "-modfile=tools.mod", "-n", "sqlc").Fail(errors.New("cache evicted"))
 	cmd := ToolCommand(context.Background(), dir, fake, "sqlc", "generate")
 	if cmd.Name != "go" || !reflect.DeepEqual(cmd.Args, []string{"tool", "-modfile=tools.mod", "sqlc", "generate"}) {
@@ -127,9 +130,8 @@ func TestToolCommandResolutionFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "version":
-				fake.Expect("go", "version").Fail(errors.New("version unavailable"))
+				fake.Expect("go", "env").Fail(errors.New("version unavailable"))
 			case "environment":
-				fake.Expect("go", "version").Return("go1.27.2", "", 0)
 				fake.Expect("go", "env").Fail(errors.New("environment unavailable"))
 			case "invalid environment":
 				expectToolEnvironment(fake, "go1.27.2", "not JSON")

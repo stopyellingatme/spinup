@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	exec "github.com/stopyellingatme/spinup/internal/exec"
 )
@@ -60,22 +61,9 @@ func toolKey(ctx context.Context, dir string, runner exec.Runner, name string) (
 	if err != nil {
 		return "", err
 	}
-	version, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"version"}, Dir: dir})
+	values, err := toolEnvironment(ctx, dir, runner)
 	if err != nil {
 		return "", err
-	}
-	environment, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK"}, Dir: dir})
-	if err != nil {
-		return "", err
-	}
-	var values struct {
-		GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK string
-	}
-	if err := json.Unmarshal(environment.Stdout, &values); err != nil {
-		return "", err
-	}
-	if version.ExitCode != 0 || environment.ExitCode != 0 || len(version.Stdout) == 0 || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
-		return "", fmt.Errorf("go tool environment is unavailable")
 	}
 	if values.GOWORK != "" && values.GOWORK != "off" {
 		return "", fmt.Errorf("go tool cache is disabled for workspaces")
@@ -104,11 +92,59 @@ func toolKey(ctx context.Context, dir string, runner exec.Runner, name string) (
 		}
 	}
 	// JSON frames each input, so different input boundaries cannot share a key.
-	data, err := json.Marshal([][]byte{mod, sum, version.Stdout, []byte(values.GOOS), []byte(values.GOARCH), []byte(values.GOFLAGS), []byte(values.GOCACHE), []byte(name)})
+	data, err := json.Marshal([][]byte{[]byte("v2"), mod, sum, []byte(values.GOVERSION), []byte(values.GOOS), []byte(values.GOARCH), []byte(values.GOFLAGS), []byte(values.GOCACHE), []byte(name)})
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+}
+
+type goEnvironment struct {
+	GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK, GOVERSION string
+}
+
+var environmentCache sync.Map
+
+func toolEnvironment(ctx context.Context, dir string, runner exec.Runner) (goEnvironment, error) {
+	if err := ctx.Err(); err != nil {
+		return goEnvironment{}, err
+	}
+	// Cache only the real runner. Test runners and other implementations can
+	// return different environments on each call.
+	_, cacheable := runner.(exec.OSRunner)
+	cacheKey := dir + "\x00" + strings.Join(os.Environ(), "\x00")
+	// A workspace can appear after the first lookup. Probe again in that case.
+	for current := dir; ; current = filepath.Dir(current) {
+		info, err := os.Stat(filepath.Join(current, "go.work"))
+		if err == nil {
+			cacheKey += fmt.Sprintf("\x00%s:%d:%d", current, info.Size(), info.ModTime().UnixNano())
+		} else if !os.IsNotExist(err) {
+			cacheable = false
+		}
+		if filepath.Dir(current) == current {
+			break
+		}
+	}
+	if cacheable {
+		if value, ok := environmentCache.Load(cacheKey); ok {
+			return value.(goEnvironment), nil
+		}
+	}
+	result, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK", "GOVERSION"}, Dir: dir})
+	if err != nil {
+		return goEnvironment{}, err
+	}
+	var values goEnvironment
+	if err := json.Unmarshal(result.Stdout, &values); err != nil {
+		return goEnvironment{}, err
+	}
+	if result.ExitCode != 0 || values.GOVERSION == "" || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
+		return goEnvironment{}, fmt.Errorf("go tool environment is unavailable")
+	}
+	if cacheable && values.GOWORK == "off" {
+		environmentCache.Store(cacheKey, values)
+	}
+	return values, nil
 }
 
 func executableTool(path string) bool {

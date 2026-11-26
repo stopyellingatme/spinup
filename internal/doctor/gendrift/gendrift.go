@@ -36,18 +36,12 @@ func openAPICheck(ctx context.Context, c *doctor.Context) doctor.Result {
 	} else if err != nil {
 		return fail(fix, "cannot inspect api/openapi: %v", err)
 	}
-	fresh, err := openapi.Bundle(apiDir)
+	fresh, count, err := openapi.Bundle(apiDir)
 	if err != nil {
 		return fail(fix, "%v", err)
 	}
-	var bundle struct {
-		Paths map[string]any `yaml:"paths"`
-	}
-	if err := yaml.Unmarshal(fresh, &bundle); err != nil {
-		return fail(fix, "cannot read bundled paths: %v", err)
-	}
 	disk, err := os.ReadFile(filepath.Join(apiDir, "openapi/bundle.gen.yaml"))
-	if errors.Is(err, os.ErrNotExist) && len(bundle.Paths) == 0 {
+	if errors.Is(err, os.ErrNotExist) && count == 0 {
 		// A new app has no routes, so no generator has written the bundle yet.
 		return skip("api/openapi/bundle.gen.yaml does not exist yet, and the document has no paths")
 	}
@@ -57,7 +51,7 @@ func openAPICheck(ctx context.Context, c *doctor.Context) doctor.Result {
 	if !bytes.Equal(fresh, disk) {
 		return fail(fix, "api/openapi/bundle.gen.yaml is stale")
 	}
-	if len(bundle.Paths) == 0 {
+	if count == 0 {
 		return doctor.Result{Status: doctor.OK, Message: "OpenAPI bundle matches its sources. No paths to generate"}
 	}
 
