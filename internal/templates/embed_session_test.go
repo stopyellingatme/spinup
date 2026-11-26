@@ -64,9 +64,11 @@ func TestEmbedSession(t *testing.T) {
 					"href: '/admin/flags'",
 					"<title>todo</title>",
 				},
-				"web/src/routes/+page.ts":                     {"await parent()", "if (user && home !== '/') redirect(303, home);"},
+				"web/src/routes/+page.ts":                     {"await parent()", "requireVerified();\n\tif (user && home !== '/') redirect(303, home);"},
 				"web/src/lib/components/app/user-menu.svelte": {"void signOut()", "disabled={session.signingOut}", "links = []"},
-				"web/src/lib/session.svelte.ts":               {"loadFlags(fetch)"},
+				"web/src/lib/session.svelte.ts":               {"loadFlags(fetch)", "if (unverified !== null) error(503, unverified);"},
+				// A guard decides only on a verified session (ADR 0039, section 10.10).
+				"web/src/lib/auth.ts": {"requireVerified();\n\tif (!user) redirect(303, loginHref(url));", "requireVerified();\n\tif (user) redirect(303, home);"},
 			},
 			lacks: contains{
 				"web/src/routes/+layout.svelte":               {"apikeys", "billing"},

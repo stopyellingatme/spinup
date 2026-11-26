@@ -1,7 +1,9 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 // The session state of embed mode (ADR 0039): the verified user, the public flags, the sign-out
-// pause, the identity change, and the generation that rejects late results. This module is the one
-// owner of that state. It keeps it in memory only: no storage, no cookie access.
+// pause, the identity change, the generation that rejects late results, and the verification
+// state of the last read. This module is the one owner of that state. It keeps it in memory only:
+// no storage, no cookie access.
+import { error, isHttpError } from '@sveltejs/kit';
 [[- if has "flags" .modules ]]
 import { loadFlags, loadSession, safeRedirect } from '#lib/auth.js';
 [[- else ]]
@@ -16,6 +18,10 @@ let data = $state.raw<SessionData>({ user: null, flags: {} });
 let signingOut = $state(false);
 let changingUser = $state(false);
 let generation = $state(0);
+// The message of the last failed session read, or null when the last read verified the session.
+let unverified = $state<string | null>(null);
+
+const notVerified = 'The session cannot be verified. Try again later.';
 
 /** The read-only session state. Pages read it. Only the functions of this module change it. */
 export const session = {
@@ -33,8 +39,24 @@ export const session = {
 	/** The generation advances on each sign-out and departure. Compare it before using a late result. */
 	get generation(): number {
 		return generation;
+	},
+	/**
+	 * The message of the last failed session read, or null. The first read counts as not verified
+	 * until it answers. A 401 is a verified answer: the visitor is signed out.
+	 */
+	get unverified(): string | null {
+		return unverified;
 	}
 };
+
+/**
+ * requireVerified throws a 503 error with the message of the last failed session read. A page
+ * guard calls it first: it must not redirect or return on data that the API did not verify. The
+ * root layout hides the error page and offers a retry, and the address bar keeps the deep link.
+ */
+export function requireVerified(): void {
+	if (unverified !== null) error(503, unverified);
+}
 
 type Pause = { stop: () => void; resume: () => void; stopped: boolean };
 
@@ -54,6 +76,7 @@ let pauseEnd: { promise: Promise<void>; resolve: () => void } | undefined;
  * for the outcome. During a departure it never settles, so no guard gets old data.
  */
 export function readSession(fetch: typeof globalThis.fetch): Promise<SessionData> {
+	if (!accepted && unverified === null) unverified = notVerified;
 	const read = settle(fetch, ++reads);
 	latest = read;
 	return read;
@@ -80,7 +103,10 @@ async function settle(fetch: typeof globalThis.fetch, n: number): Promise<Sessio
 		let next = interrupted(n, started);
 		if (next === 'again') continue;
 		if (next) return next;
-		if (user === undefined) throw failure;
+		if (user === undefined) {
+			unverified = isHttpError(failure) ? failure.body.message : notVerified;
+			throw failure;
+		}
 		// Compare the identity before the flags answer: a stalled flags read must not keep the
 		// page of one user visible after the session names another.
 		if (changed(user)) return departed;
@@ -117,6 +143,7 @@ function changed(user: App.User | null): boolean {
 function publish(next: SessionData): Promise<SessionData> | SessionData {
 	if (changed(next.user)) return departed;
 	accepted = true;
+	unverified = null;
 	data = next;
 	return next;
 }
