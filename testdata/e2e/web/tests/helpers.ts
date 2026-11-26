@@ -224,6 +224,36 @@ export function recordRequests(page: Page): string[] {
 }
 
 /**
+ * recordFetchOrder records, in the order of the page code, each fetch call of an API path as
+ * "fetch <method> <path>" and each abort of the signal of such a call as "abort <method> <path>".
+ * The network events of the browser can come in another order than the code ran, so they cannot
+ * prove the order. The record goes to the test process, so it stays after a document load. Call it
+ * before the first goto.
+ */
+export async function recordFetchOrder(page: Page): Promise<string[]> {
+	const log: string[] = [];
+	await page.exposeFunction('__e2eFetchEvent', (entry: string) => {
+		log.push(entry);
+	});
+	await page.addInitScript(() => {
+		const report = (window as unknown as { __e2eFetchEvent: (entry: string) => void }).__e2eFetchEvent;
+		const native = window.fetch;
+		window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+			const request = input instanceof Request ? input : null;
+			const url = new URL(request ? request.url : String(input), location.href);
+			if (url.origin === location.origin && url.pathname.startsWith('/api/')) {
+				const name = `${(init?.method ?? request?.method ?? 'GET').toUpperCase()} ${url.pathname}`;
+				void report(`fetch ${name}`);
+				const signal = init?.signal ?? request?.signal;
+				signal?.addEventListener('abort', () => void report(`abort ${name}`), { once: true });
+			}
+			return native.call(this, input, init);
+		};
+	});
+	return log;
+}
+
+/**
  * abortOnce makes the first matching request fail as a network failure. Later requests pass. The
  * returned function gives the number of aborted requests.
  */
@@ -300,4 +330,50 @@ export async function recordFirstRenderURL(page: Page): Promise<void> {
 /** firstRenderURL returns the address that recordFirstRenderURL recorded, or null. */
 export function firstRenderURL(page: Page): Promise<string | null> {
 	return page.evaluate(() => (window as unknown as { __e2eFirstRenderURL?: string }).__e2eFirstRenderURL ?? null);
+}
+
+/** A held request of holdOnce. */
+export type Hold = {
+	/** started resolves when the first matching request reaches the browser route. */
+	started: Promise<void>;
+	/** count gives the number of matching requests, the held one included. */
+	count: () => number;
+	/** release sends the held request on to the API, or answers it with the problem. */
+	release: (problem?: { status: number; body: unknown }) => void;
+};
+
+/**
+ * holdOnce holds the first request with the method and the path until the test releases it. Later
+ * matching requests pass. Each call adds one route, so a test can hold the same path again.
+ */
+export async function holdOnce(page: Page, method: string, pathname: string): Promise<Hold> {
+	let count = 0;
+	let markStarted: () => void = () => {};
+	const started = new Promise<void>((resolve) => (markStarted = resolve));
+	let release: Hold['release'] = () => {};
+	const gate = new Promise<{ status: number; body: unknown } | undefined>((resolve) => (release = resolve));
+	await page.route(
+		(url) => url.pathname === pathname,
+		async (route) => {
+			if (route.request().method() !== method) return route.fallback();
+			count += 1;
+			if (count > 1) return route.fallback();
+			markStarted();
+			const problem = await gate;
+			// The page can abort the request while it waits, so the answer can have no receiver.
+			if (problem) {
+				await route
+					.fulfill({ status: problem.status, contentType: 'application/problem+json', body: JSON.stringify(problem.body) })
+					.catch(() => {});
+			} else {
+				await route.continue().catch(() => {});
+			}
+		}
+	);
+	return { started, count: () => count, release };
+}
+
+/** roundTrip ends after a later request of the page, so the page handled each earlier answer. */
+export async function roundTrip(page: Page): Promise<void> {
+	await page.evaluate(() => fetch('/api/flags').then((r) => r.status));
 }
