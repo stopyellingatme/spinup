@@ -54,6 +54,19 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
 	}
+[[- if and (eq (index . "frontend_mode") "embed") (has "auth" .modules) (has "mail" .modules) ]]
+
+	# Defer these headers so they replace the site and upstream values.
+	@resetDocument {
+		method GET HEAD
+		path_regexp resetDocument ^/reset/[^/]+$
+	}
+	header @resetDocument {
+		defer
+		Referrer-Policy no-referrer
+		Cache-Control no-store
+	}
+[[- end ]]
 
 	import Caddyfile.d/*.caddy
 [[- if $web ]]
@@ -77,6 +90,12 @@
 		import upstream.caddy web 3000
 	}
 [[- else ]]
+[[- if and (eq (index . "frontend_mode") "embed") (has "live" .modules) ]]
+
+	handle /api/live/* {
+		import upstream.caddy api 8080 { flush_interval -1 }
+	}
+[[- end ]]
 
 	handle {
 		import upstream.caddy api 8080
