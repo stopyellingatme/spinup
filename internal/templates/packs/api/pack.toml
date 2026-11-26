@@ -38,6 +38,11 @@ source = "files/api/openapi/paths/.gitkeep"
 class = "seed"
 
 [[files]]
+path = "api/.dockerignore"
+source = "files/api/dockerignore"
+class = "managed"
+
+[[files]]
 path = "deploy/Dockerfile.api"
 source = "files/deploy/Dockerfile.api.tmpl"
 class = "managed"
