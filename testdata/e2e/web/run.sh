@@ -224,16 +224,15 @@ if [[ "$mode" == embed ]]; then
 else
   budgets="$repo/perf/budgets.json"
 fi
-if [[ -f "$budgets" ]]; then
-  echo "==> check the client bundle against ${budgets#"$repo"/}"
-  python3 -I "$repo/scripts/perf/bundle.py" check build "$budgets" ||
-    fail "the client bundle is above a budget of ${budgets#"$repo"/}." "make the client code smaller, or change the budget with a reason in the commit"
-else
-  echo "==> measure the client bundle"
-  python3 -I "$repo/scripts/perf/bundle.py" measure build ||
-    fail "the measure of the client bundle failed." "run python3 -I scripts/perf/bundle.py measure web/build in the app"
-  echo "budget file missing: ${budgets#"$repo"/}"
-fi
+# A missing budget file is a failure. A run with no limit proves nothing about the bundle.
+[[ -f "$budgets" ]] ||
+  fail "the budget file ${budgets#"$repo"/} is missing." "restore the file from git, or measure with python3 -I scripts/perf/bundle.py measure web/build and write the two limits"
+echo "==> check the client bundle against ${budgets#"$repo"/}"
+python3 -I "$repo/scripts/perf/bundle.py" check build "$budgets" ||
+  fail "the client bundle is above a budget of ${budgets#"$repo"/}." "make the client code smaller, or change the budget with a reason in the commit"
+# The report of a run needs the totals, so print them too.
+python3 -I "$repo/scripts/perf/bundle.py" measure build ||
+  fail "the measure of the client bundle failed." "run python3 -I scripts/perf/bundle.py measure web/build in the app"
 
 echo "==> start the API on $api_url"
 # exec, so the recorded PID is the API itself and cleanup stops it (a subshell PID would leave

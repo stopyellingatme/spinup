@@ -690,3 +690,14 @@ The build lanes found points that sections 10.2 and 10.6 left open. These ruling
   The page `/reset/confirm` reads the fragment one time, keeps the token in memory, and removes the fragment from the address bar with `history.replaceState`. The token goes only in the JSON body of the confirm call.
   The middleware `resetPageHeaders` and the Caddy header block for `/reset/<token>` are not necessary and do not ship. `main.go` of the API has no change.
   Node mode keeps the path link `/reset/<token>` and its bytes. A generated embed app with `mail` needs a kit version that has `auth.WithResetFragment`.
+- **A guard never acts on a session that is not verified.** The first review and the browser run found that a leaf guard redirected after a failed session read. The retry card then did not show, and the deep link was lost.
+  While the last session read failed, `requireUser`, `requireRole`, and `requireGuest` throw an HTTP error 503. They do not redirect, and they do not return.
+  The root layout hides its children and shows the retry card. The address bar keeps the deep link. After a successful retry, the leaf load runs again and the guard decides on verified data.
+  The signature of the guards does not change. The session module owns the state.
+- An identity change does not wait for the flags read. The session read decides the identity. A slow `GET /api/flags` cannot keep the page of the earlier user visible.
+- The resource edit page takes its form state from the item of the current load. A client navigation between two edit pages cannot save to the earlier item.
+- The reset page takes the token in its load, before the root load settles, and keeps it in module memory. A failed session read does not leave the token in the address bar.
+- The embed fixture of the e2e launcher is `ci,auth,flags,live,mail` with the `todo` resource (`--live`), a public flag `beta_banner`, and an admin account from the operator `user create` command.
+  The reset specs read the mail from a small SMTP sink inside the Playwright process. The log transport of the kit writes no link, so a log cannot give the token. No second server process starts.
+- The launcher fails when the budget file of its mode is missing. `perf/budgets-embed.json` holds the limits of the embed fixture: 707,000 raw bytes and 198,000 Brotli bytes (measured 672,925 and 188,370, plus 5 %, rounded up).
+- Known limit of the browser suite: sign-out aborts the held live stream, so a 401 that the stream gets later has no receiver. The suite proves only that the page stays at `/login` with one document load.
