@@ -1,0 +1,8 @@
+# Generate a browser load in an embed app.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec spinup new embedded --module example.com/embedded --frontend-mode embed --no-git --non-interactive
+cd embedded
+exec spinup g page reports --server
+exists web/src/routes/reports/+page.svelte web/src/routes/reports/+page.ts
+! exists web/src/routes/reports/+page.server.ts
+grep 'export const load' web/src/routes/reports/+page.ts

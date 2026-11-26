@@ -26,7 +26,7 @@ Next: cd web && pnpm check
 | What runs | Go API and a Node server | One Go binary |
 | Pages | Rendered on the server or in the browser | Static files, rendered in the browser |
 | Sign-in (`auth` module) | Yes | No |
-| Server pages (`g page --server`) | Yes | No |
+| Pages with a load function (`g page --server`) | `+page.server.ts` | `+page.ts`, in the browser |
 | Compose services | `api`, `web`, and more | `api` only |
 
 Choose `embed` for a dashboard or a tool that needs no sign-in pages.
@@ -35,13 +35,9 @@ Choose `node` when the app needs the `auth` module or server-side loading.
 ## What embed cannot do
 
 The auth pages use SvelteKit form actions, which need a server.
-So embed mode refuses these commands:
+So embed mode refuses this command:
 
 ```console
-$ spinup g page settings --server
-Error: generator "page" failed: cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server
-  Try: omit --server, or use an app with --frontend-mode node
-[exit 1]
 $ spinup module add auth
 Error: cannot use auth in embed mode: its pages require SvelteKit form actions
   Try: use --frontend-mode node, or remove auth from --modules

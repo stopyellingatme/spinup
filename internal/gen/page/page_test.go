@@ -143,22 +143,54 @@ func TestTitle(t *testing.T) {
 
 func TestEmbedPage(t *testing.T) {
 	t.Parallel()
-	for _, server := range []bool{false, true} {
-		t.Run(map[bool]string{false: "client", true: "server"}[server], func(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		auth   bool
+		args   []string
+		want   []string
+		absent []string
+	}{
+		{name: "plain", absent: []string{"+page.ts"}},
+		{name: "load", args: []string{"--server"}, want: []string{"export const load: PageLoad = () => {", "return { title: 'Pricing plans' };"}, absent: []string{"requireUser", "parent()"}},
+		{name: "auth", auth: true, args: []string{"--server"}, want: []string{"import { requireUser } from '#lib/auth';", "const { user } = await parent();", "requireUser(user, url);"}, absent: []string{"requireRole"}},
+		{name: "role", auth: true, args: []string{"--server", "--role", "manager,staff"}, want: []string{"import { requireRole } from '#lib/auth';", "const { user } = await parent();", "requireRole(user, url, 'manager', 'staff');"}, absent: []string{"requireUser"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lock := webLock()
 			lock.Answers["frontend_mode"] = "embed"
-			args := []string{}
-			if server {
-				args = append(args, "--server")
+			if tc.auth {
+				lock.Packs = append(lock.Packs, "auth")
 			}
-			out, err := plan(t.Context(), gen.Input{Lock: lock, Args: []string{"about"}, Flags: flags(t, args...)})
-			if server {
-				if err == nil || !strings.Contains(err.Error(), "Try:") {
-					t.Fatalf("server page: %v", err)
+			out, err := plan(t.Context(), gen.Input{Root: t.TempDir(), Lock: lock, Args: []string{"pricing-plans/[id]"}, Flags: flags(t, tc.args...)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := "web/src/routes/pricing-plans/[id]/"
+			page, ok := out.Plan.Get(dir + "+page.svelte")
+			if !ok || page.Class != string(manifest.Scaffold) {
+				t.Fatal("missing scaffold component")
+			}
+			load, hasLoad := out.Plan.Get(dir + "+page.ts")
+			if hasLoad != (len(tc.args) > 0) || len(out.Plan.Files) != map[bool]int{false: 1, true: 2}[hasLoad] {
+				t.Fatalf("paths: %v", out.Plan.Paths())
+			}
+			if hasLoad && (load.Class != string(manifest.Scaffold) || !strings.Contains(string(page.Data), "<code>+page.ts</code>")) {
+				t.Fatalf("files: %s %s", page.Data, load.Data)
+			}
+			if _, ok := out.Plan.Get(dir + "+page.server.ts"); ok {
+				t.Fatal("server load exists")
+			}
+			text := string(page.Data) + string(load.Data)
+			for _, want := range tc.want {
+				if !strings.Contains(text, want) {
+					t.Errorf("missing %q in %s", want, text)
 				}
-			} else if err != nil || len(out.Plan.Files) != 1 {
-				t.Fatalf("client page: %v %v", out, err)
+			}
+			for _, absent := range append(tc.absent, "$lib/server", "#lib/server") {
+				if strings.Contains(text, absent) {
+					t.Errorf("unexpected %q in %s", absent, text)
+				}
 			}
 		})
 	}
@@ -269,5 +301,23 @@ func TestRolePage(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "Try:") {
 			t.Fatalf("flags %v error = %v", args, err)
 		}
+	}
+}
+
+func TestRoleWithoutLoadDiagnostics(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ mode, want string }{
+		{"node", "cannot generate a role-guarded page without --server, because only a server load can guard a page\nTry: add --server"},
+		{"embed", "cannot generate a role-guarded page without a load function\nTry: add --server"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			lock := webLock()
+			lock.Answers["frontend_mode"] = tc.mode
+			lock.Packs = append(lock.Packs, "auth")
+			_, err := plan(t.Context(), gen.Input{Root: t.TempDir(), Lock: lock, Args: []string{"reports"}, Flags: flags(t, "--role", "manager")})
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }

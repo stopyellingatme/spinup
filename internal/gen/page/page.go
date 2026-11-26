@@ -35,7 +35,7 @@ func init() {
   spinup g page admin/reports --server --role admin`,
 		Usage: "<route>",
 		Flags: func(fs *pflag.FlagSet) {
-			fs.Bool("server", false, "also write +page.server.ts with a load function")
+			fs.Bool("server", false, "also write +page.server.ts (node) or +page.ts (embed) with a load function")
 			fs.String("role", "", "comma-separated roles that can use the server page")
 		},
 		Run: plan,
@@ -111,14 +111,15 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	if err != nil {
 		return nil, err
 	}
+	embed := in.Lock.Answers["frontend_mode"] == "embed"
 	if len(roles) > 0 && !server {
+		if embed {
+			return nil, fmt.Errorf("cannot generate a role-guarded page without a load function\nTry: add --server")
+		}
 		return nil, fmt.Errorf("cannot generate a role-guarded page without --server, because only a server load can guard a page\nTry: add --server")
 	}
 	if len(roles) > 0 && !slices.Contains(in.Lock.Packs, "auth") {
 		return nil, fmt.Errorf("cannot generate a role-guarded page because the auth module is missing\nTry: spinup module add auth")
-	}
-	if server && in.Lock.Answers["frontend_mode"] == "embed" {
-		return nil, fmt.Errorf("cannot generate a server page in embed mode: +page.server.ts needs a SvelteKit server\nTry: omit --server, or use an app with --frontend-mode node")
 	}
 	header, err := hasPageHeader(in.Root)
 	if err != nil {
@@ -126,10 +127,14 @@ func plan(_ context.Context, in gen.Input) (*gen.Output, error) {
 	}
 	dir := "web/src/routes/" + strings.Join(segments, "/")
 	name := title(segments)
-	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server, header), Class: string(manifest.Scaffold)}}
+	files := []vfs.File{{Path: dir + "/+page.svelte", Data: pageSvelte(dir, name, server, header, embed), Class: string(manifest.Scaffold)}}
 	if server {
 		auth := slices.Contains(in.Lock.Packs, "auth")
-		files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name, auth, roles), Class: string(manifest.Scaffold)})
+		if embed {
+			files = append(files, vfs.File{Path: dir + "/+page.ts", Data: pageLoadTS(name, auth, roles), Class: string(manifest.Scaffold)})
+		} else {
+			files = append(files, vfs.File{Path: dir + "/+page.server.ts", Data: pageServerTS(name, auth, roles), Class: string(manifest.Scaffold)})
+		}
 	}
 	var p vfs.Plan
 	for _, f := range files {
@@ -157,12 +162,16 @@ func hasPageHeader(root string) (bool, error) {
 
 // pageSvelte returns the page. With a page header component, the page uses
 // it. Otherwise the page has a plain heading.
-func pageSvelte(dir, name string, server, header bool) []byte {
+func pageSvelte(dir, name string, server, header, embed bool) []byte {
 	var b strings.Builder
 	edit := "<code>" + dir + "/+page.svelte</code>"
 	heading := name
 	if server {
-		edit += " and <code>+page.server.ts</code>"
+		if embed {
+			edit += " and <code>+page.ts</code>"
+		} else {
+			edit += " and <code>+page.server.ts</code>"
+		}
 		heading = "{data.title}"
 	}
 	if server || header {
@@ -213,6 +222,26 @@ export const load: PageServerLoad = (` + args + `) => {
 ` + guard + `	return { title: '` + name + `' };
 };
 `)
+}
+
+func pageLoadTS(name string, auth bool, roles []string) []byte {
+	imports, args, guard := "", "", ""
+	if len(roles) > 0 || auth {
+		guardName := "requireUser"
+		guardArgs := "user, url"
+		if len(roles) > 0 {
+			guardName = "requireRole"
+			for _, role := range roles {
+				guardArgs += ", '" + role + "'"
+			}
+		}
+		imports = "import { " + guardName + " } from '#lib/auth';\n"
+		args = "async ({ parent, url })"
+		guard = "\tconst { user } = await parent();\n\t" + guardName + "(" + guardArgs + ");\n"
+	} else {
+		args = "()"
+	}
+	return []byte(imports + "import type { PageLoad } from './$types';\n\nexport const load: PageLoad = " + args + " => {\n" + guard + "\treturn { title: '" + name + "' };\n};\n")
 }
 
 func pageRoles(root, value string, set bool) ([]string, error) {

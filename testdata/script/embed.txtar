@@ -18,10 +18,9 @@ cd embedded
 ! grep 'WEB_IMAGE' deploy/compose.yml
 grep 'ssr = false' web/src/routes/+layout.ts
 exec spinup g page about
-! exec spinup g page settings --server
-stderr 'embed mode'
-stderr 'Try:'
-! exists web/src/routes/settings/+page.svelte
+exec spinup g page settings --server
+exists web/src/routes/settings/+page.svelte web/src/routes/settings/+page.ts
+! exists web/src/routes/settings/+page.server.ts
 ! exec spinup g resource todo title:string --dry-run
 stderr 'embed mode'
 stderr 'Try:'
