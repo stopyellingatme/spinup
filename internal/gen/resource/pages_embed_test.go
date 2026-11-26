@@ -338,7 +338,7 @@ func TestEmbedPagesPendingFlags(t *testing.T) {
 	plan := planSpec(t, todoSpec(t, embedApp(t, nil, nil), goldenArgs[1:]...))
 	for name, wants := range map[string][]string{
 		"+page.svelte":           {"} catch (err) {", "toast.error(unreachable);", "} finally {\n\t\t\tdeleting = false;\n\t\t\tconfirming = false;\n\t\t}", "} finally {\n\t\t\tdelete pending[id];\n\t\t}"},
-		"[id]/+page.svelte":      {"failure = unreachable;", "} finally {\n\t\t\tif (deleting === id) deleting = null;\n\t\t\tif (id === data.item.id) confirming = false;\n\t\t}", "await goto('/todos', { invalidate: [RESOURCE_DEP] });", "toast.success('Todo deleted.');"},
+		"[id]/+page.svelte":      {"failure = unreachable;", "} finally {\n\t\t\tif (deleting === id) deleting = null;\n\t\t\tif (started === visit) confirming = false;\n\t\t}", "await goto('/todos', { invalidate: [RESOURCE_DEP] });", "toast.success('Todo deleted.');"},
 		"new/+page.svelte":       {"setMessage(form, unreachable, { status: 503 });", "toast.success('Todo created.');", "await goto(`/todos/${data.id}`);", "SPA: true,", "Create todo"},
 		"[id]/edit/+page.svelte": {"setMessage(form, unreachable, { status: 503 });", "toast.success('Changes saved.');", "await goto(`/todos/${saved.id}`, { invalidate: [RESOURCE_DEP] });", "SPA: true,", "Save changes"},
 		"+page.ts":               {"error(503, unreachable);", "limit: perPage, offset: (page - 1) * perPage", "redirect(303, last.pathname + last.search);"},
@@ -367,16 +367,18 @@ func TestEmbedPagesSameComponent(t *testing.T) {
 	for _, want := range []string{
 		"let original = untrack(() => data.item);",
 		"async onUpdate({ form, cancel }) {",
-		"const item = original;\n\t\t\tif (saving.has(item.id)) {\n\t\t\t\t// A save of this todo runs: a double submit sends no second request.\n\t\t\t\tcancel();\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tconst path = { id: item.id };\n\t\t\tsaving.add(item.id);",
+		"const item = original;\n\t\t\tif (saving.has(item.id)) {\n\t\t\t\t// A save of this todo runs: a double submit sends no second request.\n\t\t\t\tcancel();\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tconst path = { id: item.id };\n\t\t\tconst started = visit;\n\t\t\tsaving.add(item.id);",
 		"saving.delete(path.id);",
 		"const saving = new SvelteSet<number>();",
 		"import { SvelteSet } from 'svelte/reactivity';",
 		// A held save of one item must not drop the submit of the next item (FIX2 point C).
 		"multipleSubmits: 'allow',",
-		"if (original.id !== path.id) {\n",
+		"if (started !== visit) {\n",
+		// A visit ends when the id changes or the page closes (FIX2 point D).
+		"let visit = 0;\n\tonDestroy(() => visit++);",
 		"\t\t\t\tcancel();\n",
 		"const submitting = toStore(() => saving.has(data.item.id));",
-		"$effect.pre(() => {\n\t\tconst item = data.item;\n\t\tif (item.id === original.id) return;\n\t\toriginal = item;\n\t\tform.reset({ data: fromItem(item), newState: fromItem(item) });\n\t});",
+		"$effect.pre(() => {\n\t\tconst item = data.item;\n\t\tif (item.id === original.id) return;\n\t\toriginal = item;\n\t\tvisit++;\n\t\tform.reset({ data: fromItem(item), newState: fromItem(item) });\n\t});",
 		"import { toStore } from 'svelte/store';",
 	} {
 		if !strings.Contains(edit, want) {
@@ -384,11 +386,9 @@ func TestEmbedPagesSameComponent(t *testing.T) {
 		}
 	}
 	// The late-answer check comes before every write to the form and before each navigation.
-	check := strings.Index(edit, "if (original.id !== path.id)")
-	for _, later := range []string{"setMessage(form, unreachable", "applyFailure(form", "await goto("} {
-		if i := strings.Index(edit, later); i < check {
-			t.Errorf("%q comes before the check of the item id", later)
-		}
+	lateFirst(t, "the edit page", edit, "if (started !== visit)", "setMessage(form, unreachable", "applyFailure(form", "await goto(")
+	if strings.Contains(edit, "original.id !== path.id") {
+		t.Errorf("the edit page checks a late answer with the item id, which a visit of A, then B, then A defeats")
 	}
 	if strings.Contains(edit, "const { enhance, message, submitting } = form;") {
 		t.Errorf("the edit page uses the busy state of superForm, which does not know the item")
@@ -398,13 +398,45 @@ func TestEmbedPagesSameComponent(t *testing.T) {
 	for _, want := range []string{
 		"let deleting: number | null = $state(null);",
 		"const id = item.id;\n\t\tif (deleting === id) return;",
-		"if (id !== data.item.id) {",
+		"if (started !== visit) {",
 		"let shown = untrack(() => data.item.id);",
-		"confirming = false;\n\t\tfailure = '';",
+		"visit++;\n\t\tconfirming = false;\n\t\tfailure = '';",
+		"let visit = 0;\n\tonDestroy(() => visit++);",
+		"if (deleting === id) return;\n\t\tconst started = visit;",
 		"disabled={deleting === item.id}",
 	} {
 		if !strings.Contains(item, want) {
 			t.Errorf("the read view does not contain %q", want)
+		}
+	}
+	lateFirst(t, "the read view", item, "if (started !== visit) {", "failure = problemMessage(", "await goto(")
+
+	// The new page has one item at most: its lifetime is the visit.
+	create := file(t, plan, "new/+page.svelte")
+	for _, want := range []string{
+		"let closed = false;\n\tonDestroy(() => (closed = true));",
+		"async onUpdate({ form, cancel }) {",
+		"if (closed) {\n\t\t\t\t// The user left: the answer changes nothing and does not move the user.\n\t\t\t\tcancel();",
+	} {
+		if !strings.Contains(create, want) {
+			t.Errorf("the new page does not contain %q", want)
+		}
+	}
+	lateFirst(t, "the new page", create, "if (closed) {", "setMessage(form, unreachable", "applyFailure(form", "await goto(")
+}
+
+// lateFirst fails when one of the later texts comes before the check of a
+// late answer, or when the check is missing.
+func lateFirst(t *testing.T, name, page, check string, later ...string) {
+	t.Helper()
+	at := strings.Index(page, check)
+	if at < 0 {
+		t.Errorf("%s has no check %q", name, check)
+		return
+	}
+	for _, text := range later {
+		if i := strings.Index(page, text); i < at {
+			t.Errorf("%s: %q comes before the check of a late answer", name, text)
 		}
 	}
 }
