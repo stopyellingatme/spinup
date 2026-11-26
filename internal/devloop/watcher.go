@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,7 +27,8 @@ type Watcher struct {
 	Out io.Writer
 	// Interval and Debounce default to 200 ms and 150 ms. A poll of the inputs of a
 	// 20-resource app costs well under 1 % of one core at this interval. The debounce
-	// joins the writes of one editor save into one generation.
+	// usually joins the writes of one editor save into one generation. Writes that straddle
+	// a poll can start a second generation, which produces the same output.
 	Interval, Debounce time.Duration
 	// Dispatch overrides registry dispatch for tests or embedded callers.
 	Dispatch func(context.Context, []gen.PostStep) error
@@ -161,11 +163,12 @@ func snapshot(root string, extra []string) (map[string]stamp, error) {
 	return result, nil
 }
 
-func watched(path string) bool {
-	if strings.HasPrefix(path, "api/db/queries/") {
-		return filepath.Ext(path) == ".sql" && filepath.Dir(path) == "api/db/queries"
+// watched takes a slash-separated path. The path package keeps the slashes on Windows.
+func watched(name string) bool {
+	if strings.HasPrefix(name, "api/db/queries/") {
+		return path.Ext(name) == ".sql" && path.Dir(name) == "api/db/queries"
 	}
-	return strings.HasPrefix(path, "api/openapi/") && strings.HasSuffix(path, ".yaml") && filepath.Base(path) != "bundle.gen.yaml"
+	return strings.HasPrefix(name, "api/openapi/") && strings.HasSuffix(name, ".yaml") && path.Base(name) != "bundle.gen.yaml"
 }
 
 // changes maps the changed inputs to post-steps. A path in extra is a service OpenAPI file.

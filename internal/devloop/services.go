@@ -64,7 +64,8 @@ type goWatcher struct {
 	Interval, Debounce time.Duration
 }
 
-// skippedGoDirs mirrors exclude_dir of the managed api/.air.toml.
+// skippedGoDirs follows exclude_dir of the managed api/.air.toml. It also skips internal/gen,
+// because the worker does not import the OpenAPI server code.
 var skippedGoDirs = []string{"tmp", "node_modules", "internal/gen", "db/queries"}
 
 func (w goWatcher) Run(ctx context.Context) {

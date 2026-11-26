@@ -54,7 +54,7 @@ func (c *sessionCodec) Decode(b []byte) (time.Time, map[string]any, error) {
 func cacheableSessionValues(values map[string]any) bool {
 	for _, value := range values {
 		switch value.(type) {
-		case int64, int, int32, string, bool, float64, time.Time:
+		case int64, int, int32, string, bool, float64:
 		default:
 			return false
 		}

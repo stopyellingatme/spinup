@@ -37,7 +37,7 @@ func TestSessionCodecGobCompatibility(t *testing.T) {
 	values = map[string]any{
 		sessionUserKey: int64(42), sessionVersionKey: int64(1),
 		"int": int(2), "int32": int32(3), "string": "value",
-		"bool": true, "float64": float64(1.5), "time": deadline,
+		"bool": true, "float64": float64(1.5),
 	}
 	payload := encodeSession(t, deadline, values)
 	for range 2 {
@@ -65,6 +65,11 @@ func TestSessionCodecSkipsUncacheablePayloads(t *testing.T) {
 	payload := encodeSession(t, deadline, values)
 	got := checkSessionDecode(t, codec, payload, deadline, values)
 	got["value"].([]byte)[0] = 'M'
+	checkSessionDecode(t, codec, payload, deadline, values)
+
+	// A time.Time holds a *time.Location, which a cache hit would share.
+	values = map[string]any{"value": deadline}
+	payload = encodeSession(t, deadline, values)
 	checkSessionDecode(t, codec, payload, deadline, values)
 
 	values = map[string]any{"value": strings.Repeat("x", sessionCacheMaxBytes)}

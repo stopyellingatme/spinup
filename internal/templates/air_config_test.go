@@ -46,9 +46,9 @@ func TestAirConfig(t *testing.T) {
 	if !slices.Contains(build.ExcludeDir, "db/queries") {
 		t.Error("db/queries must not start a build")
 	}
-	// The binary embeds the migrations, and the store code comes from sqlc.
+	// The binary embeds the migrations. The store code comes from sqlc, and internal/gen from oapi-codegen.
 	for _, dir := range build.ExcludeDir {
-		for _, watched := range []string{"internal/store", "db/migrations", "db/kit", "cmd/api"} {
+		for _, watched := range []string{"internal/store", "internal/gen", "db/migrations", "db/kit", "cmd/api"} {
 			if watched == dir || strings.HasPrefix(watched, dir+"/") {
 				t.Errorf("exclude_dir %q hides %s", dir, watched)
 			}
