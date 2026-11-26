@@ -69,6 +69,7 @@ Find the row that matches your task. Run its command. Read the page when the com
 | Check the migrations for unsafe changes | `spinup db lint` | [db lint](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/db-lint.md) |
 | Fix the doctor checks `openapi-drift` and `sqlc-drift` | `spinup g openapi`, then `spinup db sqlc` | [Doctor checks](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/doctor-checks.md) |
 | Add a page | `spinup g page <route>` | [generate page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-page.md) |
+| Read the signed-in user in a page | `await parent()` in `+page.ts`, then `requireUser(user, url)` from `#lib/auth` | [Embed mode](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/embed.md) |
 | Add a shadcn-svelte component. This needs the network. | `spinup g component <name>` | [generate component](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-component.md) |
 | Rebuild the TypeScript client after an OpenAPI change | `spinup g client` | [generate client](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-client.md) |
 | Check the types and run the web tests | `cd web && pnpm run check`, then `cd web && pnpm run test` | [Test your app](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/testing.md) |
@@ -76,7 +77,7 @@ Find the row that matches your task. Run its command. Read the page when the com
 | Fix the doctor check `client-drift` | `spinup g client` | [Doctor checks](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/doctor-checks.md) |
 | Limit a resource to roles | `spinup g resource <name> <field:type>... --role <roles>` | [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md) |
 | Share the rows of a resource between users | `spinup g resource <name> <field:type>... --shared` | [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md) |
-| Limit a page to roles | `spinup g page <route> --server --role <roles>` | [generate page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-page.md) |
+| Limit a page to roles. This guard runs in the browser and controls navigation only. Protect the data in the Go handler. | `spinup g page <route> --server --role <roles>` | [generate page](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/commands/generate-page.md) |
 | Change the roles. Edit `[auth]` in `spinup.toml` first. | `spinup g roles` | [Roles](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/build/roles.md) |
 | List the accounts, or change the role of an account | `cd api && go run ./cmd/api user list`, then `cd api && go run ./cmd/api user set-role --email <email> --role <role>` | [App binary commands](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/reference/app-commands.md) |
 | Rebuild the CI workflows | `spinup ci generate` | [Generated CI](https://raw.githubusercontent.com/stopyellingatme/spinup/main/docs/ci.md) |
