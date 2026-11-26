@@ -103,7 +103,9 @@ run_logged cli-build "go build of the CLI" bash -c "cd '$repo' && go build -o '$
 echo "==> generate the app"
 cd "$work"
 if [[ "$mode" == embed ]]; then
-  modules=(--modules 'ci,auth,flags,live' --frontend-mode embed)
+  # mail adds the reset pages. The API sends each mail to SMTP_URL on a free loopback port, where
+  # reset.spec.ts listens with a small SMTP sink in the Playwright process. No other process starts.
+  modules=(--modules 'ci,auth,flags,live,mail' --frontend-mode embed)
   resource_flags=(--live)
 else
   modules=(--modules 'ci,auth')
@@ -117,6 +119,8 @@ api_port="$(free_port)"
 if [[ "$mode" == embed ]]; then
   # One Go binary serves the pages and the API, so all three origins are the same.
   origin="http://127.0.0.1:$api_port"
+  smtp_port="$(free_port "$api_port")"
+  smtp_url="smtp://127.0.0.1:$smtp_port"
 else
   web_port="$(free_port "$api_port")"
   origin="http://127.0.0.1:$web_port"
@@ -143,6 +147,20 @@ run_logged resource "spinup g resource todo" \
   "$work/spinup" g resource todo title:string done:bool 'due:date?' ${resource_flags[@]+"${resource_flags[@]}"}
 run_logged migrate "spinup db migrate up" "$work/spinup" db migrate up
 
+if [[ "$mode" == embed ]]; then
+  # A public flag for the flags admin case of todos.spec.ts (the root load reads /api/flags).
+  cat >>spinup.toml <<'TOML'
+
+[flags.beta_banner]
+description = "The beta banner"
+default = false
+public = true
+owner = "ops@example.com"
+expires = "2099-12-31"
+TOML
+  run_logged flags "spinup g flags" "$work/spinup" g flags
+fi
+
 offline=(--offline)
 if [[ -n "${E2E_ONLINE:-}" ]]; then offline=(); fi
 
@@ -159,6 +177,15 @@ if [[ "$mode" == embed ]]; then
   echo "==> build the API with the embedded web app"
   run_logged api-build "go build -tags embedweb of the API" \
     bash -c "cd ../api && go build -tags embedweb -o ../api.bin ./cmd/api"
+  # An account with the admin role of the flags module (ADR 0024: the operator user command).
+  # Registration gives the default role, so only this command can create the admin.
+  admin_email="e2e-admin@example.com"
+  admin_role="$(sed -n "s/^export const adminRole = '\(.*\)';\$/\1/p" src/lib/flags.gen.ts)"
+  [[ -n "$admin_role" ]] || fail "web/src/lib/flags.gen.ts names no admin role." "run spinup g flags in the app and read $work/logs/flags.log"
+  printf '%s' 'correct horse battery staple' |
+    (cd .. && SPINUP_ENV=dev DATABASE_URL="$DATABASE_URL" ./api.bin user create --email "$admin_email" \
+      --role "$admin_role" --password-stdin) >"$work/logs/admin-user.log" 2>&1 ||
+    fail "the creation of the admin account failed." "read $work/logs/admin-user.log"
 else
   echo "==> build the API"
   run_logged api-build "go build of the API" bash -c "cd api && go build -o ../api.bin ./cmd/api"
@@ -211,7 +238,9 @@ fi
 echo "==> start the API on $api_url"
 # exec, so the recorded PID is the API itself and cleanup stops it (a subshell PID would leave
 # the API running).
-(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" SPINUP_API_DOCS=true exec ./api.bin >"$work/logs/api.log" 2>&1) &
+# env execs the API in place, so the PID stays the API. Only embed mode sets SMTP_URL.
+(cd .. && PORT="$api_port" PUBLIC_ORIGIN="$origin" SPINUP_API_DOCS=true \
+  exec env ${smtp_url:+"SMTP_URL=$smtp_url"} ./api.bin >"$work/logs/api.log" 2>&1) &
 pids+=($!)
 if [[ "$mode" == node ]]; then
   echo "==> start the web app on $origin"
@@ -231,7 +260,8 @@ fi
 echo "==> run Playwright (mode $mode)"
 # In node mode a reverse proxy sends /api to the Go API in production. Here the tests call the API
 # directly. In embed mode the binary serves /api on the page origin.
-E2E_FRONTEND_MODE="$mode" E2E_BASE_URL="$origin" E2E_API_URL="$api_url" \
+E2E_FRONTEND_MODE="$mode" E2E_BASE_URL="$origin" E2E_API_URL="$api_url" E2E_ADMIN_EMAIL="${admin_email:-}" \
+  E2E_SMTP_PORT="${smtp_port:-}" \
   pnpm exec playwright test --config e2e/playwright.config.ts "$@"
 
 # The generated app's own smoke test (web/playwright.config.ts, web/e2e/smoke.spec.ts), the
