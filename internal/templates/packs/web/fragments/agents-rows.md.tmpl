@@ -1,4 +1,4 @@
-| Add a page | `spinup g page <route>` | [generate page]([[ docurl "commands/generate-page.md" ]]) |
+| Add a page | `spinup g page <route>` | [generate page]([[ docurl "commands/generate-page.md" ]]) |[[ if and (eq (index . "frontend_mode") "embed") (has "auth" .modules) ]][[ "\n" ]]| Read the signed-in user in a page | `await parent()` in `+page.ts`, then `requireUser(user, url)` from `#lib/auth` | [Embed mode]([[ docurl "embed.md" ]]) |[[ end ]]
 | Add a shadcn-svelte component. This needs the network. | `spinup g component <name>` | [generate component]([[ docurl "commands/generate-component.md" ]]) |
 | Rebuild the TypeScript client after an OpenAPI change | `spinup g client` | [generate client]([[ docurl "commands/generate-client.md" ]]) |
 | Check the types and run the web tests | `cd web && [[ .package_manager ]] run check`, then `cd web && [[ .package_manager ]] run test` | [Test your app]([[ docurl "build/testing.md" ]]) |

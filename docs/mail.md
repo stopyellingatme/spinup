@@ -145,6 +145,13 @@ With `auth` and `mail`, the app has a reset flow:
 The link uses `PUBLIC_ORIGIN`, which your app controls.
 The reset page turns off caching and referrer disclosure.
 
+In [embed mode](embed.md), the link is `<origin>/reset/confirm#<token>`.
+The token is in the URL fragment, so a browser never sends it to a server.
+Then the Go access log, the traces, a proxy log, and the `Referer` header do not hold the token.
+The page `/reset/confirm` reads the fragment once and removes it from the address bar.
+It sends the token only in the JSON body of `POST /api/auth/reset/confirm`.
+Node mode keeps the path link `/reset/<token>`.
+
 You can call the routes yourself:
 
 <!-- doctest: skip -->
@@ -197,6 +204,9 @@ msg := cap.Messages()[0]
 ## Reset routes in your own code
 
 If you wire the kit yourself, call `Auth.ResetRoutes` with `auth.WithMailer`, `auth.WithResetURL`, and `auth.WithResetFrom`.
+Add `auth.WithResetFragment()` for a single-page app. Then the link is the URL of `auth.WithResetURL`, a `#`, and the token.
+The page at that URL must read the token from `window.location.hash`, remove it from the address bar, and send it in the confirm call.
+A generated embed app needs a kit version that has this option.
 Install the auth middleware on these routes.
 Use `auth.WithResetTemplates` for your own templates.
 Without a mailer option, `ResetRoutes` registers no routes.

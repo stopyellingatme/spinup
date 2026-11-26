@@ -25,17 +25,73 @@ Next: cd web && pnpm check
 | --- | --- | --- |
 | What runs | Go API and a Node server | One Go binary |
 | Pages | Rendered on the server or in the browser | Static files, rendered in the browser |
-| Sign-in (`auth` module) | Yes | No |
+| Sign-in (`auth` module) | Yes, with form actions | Yes, with forms that call the Go API |
+| Feature flags (`flags` module) | Yes | Yes |
+| Live data (`live` module) | Yes | Yes |
+| Resource pages (`g resource`) | `+page.server.ts` and `+page.ts` | `+page.ts` and `form.ts`, in the browser |
 | Pages with a load function (`g page --server`) | `+page.server.ts` | `+page.ts`, in the browser |
+| Modules `apikeys`, `billing`, `audit`, `mcp` | Yes | No |
 | Compose services | `api`, `web`, and more | `api` only |
 
-Choose `embed` for a dashboard or a tool that needs no sign-in pages.
-Choose `node` when the app needs the `auth` module or server-side loading.
+Choose `embed` for a dashboard or a tool where one binary is the goal.
+Choose `node` when the app needs the `apikeys`, `billing`, `audit`, or `mcp` module.
+Choose `node` also when the app needs server-side loading or a Node server.
+
+## Sign-in, flags, live data, and resources
+
+Embed mode holds the `auth`, `flags`, and `live` modules.
+Pass `--modules auth,flags,live` to `spinup new`, or run `spinup module add`.
+The pages call the Go API from the browser.
+The Go API stays the authority for the session, the CSRF check, validation, roles, and ownership.
+
+A resource of an embed app gets browser pages.
+This command shows them for an app with no `auth` module, so the pages have no guard:
+
+```console
+$ spinup g resource note title:string --dry-run
+...
+create web/src/routes/notes/+page.svelte (scaffold)
+create web/src/routes/notes/+page.ts (scaffold)
+...
+create web/src/routes/notes/form.ts (scaffold)
+...
+```
+
+- **Sign-in.** The pages `/login`, `/register`, and `/account` post JSON to `/api/auth/*`. With `--auth-oidc`, the login page also shows the provider buttons.
+- **Password reset.** With the `mail` module, the pages `/reset` and `/reset/confirm` work. The mail link is `<origin>/reset/confirm#<token>`. The token is in the URL fragment, so a browser does not send it to a server. No access log, trace, proxy log, or `Referer` header holds it. The page reads the token once and removes it from the address bar. Node mode keeps the link `/reset/<token>`.
+- **The session.** The root load reads `GET /api/session` and the public flags. Only a 401 means that nobody is signed in. Any other failure hides the pages and shows a card with a retry button.
+- **Guards.** A page load calls `await parent()` and then `requireUser` or `requireRole` from `#lib/auth`. A guard controls navigation only. Protect the data in the Go handler.
+- **Several tabs.** A sign-in, a sign-out, or a password reset in one tab makes the other tabs read the session again. A tab that sees another user replaces its document.
+- **Flags.** The root reads the public flags at the start, after a session refresh, and after a successful save on `/admin/flags`. A page navigation reuses the result. See [Feature flags](build/flags.md).
+- **Live data.** The helper `web/src/lib/live.svelte.ts` has the same API as in node mode. A resource made with `--live` calls `liveRefresh` with a scoped `invalidate` key, so a patch reloads only the data of that resource. See [Live data](build/live.md).
+- **Resources.** `spinup g resource` writes the list, new, item, and edit pages as `+page.ts` and `+page.svelte`, with one `form.ts` for each resource. The sidebar link works as in node mode.
+- **Sign-out.** Sign-out stops every live stream of the tab. Then it sends `POST /api/auth/logout`. After a 2xx answer, the page goes to `/login`. If the call fails, the user stays signed in and sees `Sign-out failed.` with the reason.
 
 ## What embed cannot do
 
-The auth pages use SvelteKit form actions, which need a server.
-So embed mode refuses this command:
+Four modules need a SvelteKit server for their pages, so embed mode refuses them.
+Each refusal happens before the command writes a file.
+
+| Command | Error |
+| --- | --- |
+| `spinup module add apikeys` | `cannot use apikeys in embed mode: the API key pages require a SvelteKit server` |
+| `spinup module add billing` | `cannot use billing in embed mode: the billing pages require a SvelteKit server` |
+| `spinup module add audit` | `cannot use audit in embed mode: the history pages require a SvelteKit server` |
+| `spinup module add mcp` | `cannot use mcp in embed mode: the module requires apikeys` |
+
+Each error ends with `Try: use --frontend-mode node for <module>`.
+`spinup g resource --audit` gives the audit error in an embed app.
+`spinup new --frontend-mode embed --modules apikeys` gives the same errors.
+
+An old app can hold a locked template version that has no browser auth pages.
+Then `spinup module add auth` stops before it writes the preview:
+
+```text
+cannot add auth in embed mode: the locked templates lack the browser auth pages
+Try: run spinup upgrade, then repeat the module addition
+```
+
+In an app without the `auth` module, this command shows the plan for the browser pages:
 
 ```console
 $ spinup module add auth --dry-run --yes --non-interactive
@@ -47,9 +103,17 @@ Upgrade 0.0.0-dev -> 0.0.0-dev
 ...
 ```
 
-`spinup g resource` also stops, because it writes server pages.
-Pass `--api-only` to write only the API files.
-The app reads `/api/session` from the browser, and a missing session endpoint means that nobody is signed in.
+## What is different from node mode
+
+Embed mode changes six things that you can see.
+Read them before you choose the mode.
+
+1. **A signed-out document returns 200.** A request for a protected path gets the public shell. JavaScript reads the API, then redirects to `/login`. A deep link to a missing item, and an item of another owner, show a 404 view in the browser.
+2. **Forms need JavaScript.** The browser validates the input for fast feedback. The Go API validates again and stays responsible for the session, CSRF, roles, and ownership.
+3. **The shell has a stable script hash.** The Content-Security-Policy lists the hash of the boot script in place of a nonce. The policy keeps the directives `form-action`, `img-src`, `font-src`, and `connect-src` of node mode.
+4. **A signed-out start prints one console error.** The browser reports the 401 of `GET /api/session`. The Go API keeps that status. Another tab that signs out makes this tab discard its protected data. The kit has no route that clears the cookie, so a failed sign-out keeps the session.
+5. **No Node server.** Node server telemetry and the first paint of server rendering do not apply. Browser trace coverage and the time of first paint are not checked.
+6. **The bundle is bigger.** The browser holds the forms, the validators, and the API client. BUNDLE-TOTALS
 
 ## Build and run
 

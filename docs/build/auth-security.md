@@ -245,6 +245,18 @@ $ go run ./cmd/api audit list --resource users --action auth.sign_in --since 202
 $ go run ./cmd/api audit list --resource users --actor operator:ada
 ```
 
+## The reset token in embed mode
+
+A reset link must not put the token in a place that a server records.
+Node mode serves `/reset/<token>` from the Node server, and the Go API never sees that path.
+In embed mode, one Go binary serves every path, so a path token would reach the access log and the server trace.
+So the embed app passes `auth.WithResetURL(<origin>/reset/confirm)` and `auth.WithResetFragment()`.
+The mail link is `<origin>/reset/confirm#<token>`.
+
+- A browser does not send the fragment in a request. No access log, trace, proxy log, or `Referer` header holds the token.
+- The page reads the fragment once, keeps the token in memory, and removes the fragment with `history.replaceState`.
+- The token goes only in the JSON body of `POST /api/auth/reset/confirm`.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

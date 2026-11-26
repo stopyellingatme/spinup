@@ -42,6 +42,7 @@ With `--server`, the page shows the title that `load` returns.
 Edit `load` to read from the Go API with the typed client.
 If the app has the `auth` module, `load` also calls `requireUser`, so a visitor who is not signed in goes to `/login`.
 In embed mode, the browser guard controls navigation only.
+The load waits for the root load with `await parent()`, then calls `requireUser`.
 The Go API must authorize each data endpoint.
 
 ## Route rules
@@ -80,6 +81,8 @@ The `--role` flag needs `--server`.
 The load in `+page.server.ts` or `+page.ts` calls `requireRole`.
 A visitor who is not signed in goes to `/login`.
 A user with another role sees a 403 page.
+In embed mode, `+page.ts` runs in the browser, so the guard controls navigation only.
+The Go API must check the role of each data endpoint, because a visitor can call it without the page.
 
 ```console
 $ spinup g page reports --server --role manager --dry-run
@@ -162,8 +165,8 @@ It needs pnpm, and it runs `pnpm install` first when `web/node_modules` is missi
 | `the app has no web pack` | The app was made with `--api-only`. Pages need the web app. |
 | `has the invalid segment` | Use lower-case letters, digits, and hyphens in each part. |
 | `cannot generate resource pages: the app is missing ...` | The app is older than the page templates. Run `spinup upgrade`, then run the generator again. |
-| `cannot generate a role-guarded page without a load function` | In embed mode, add `--server` to write `+page.ts`. |
-| `cannot generate a role-guarded page without --server` | Add `--server` to the command. |
+| `cannot generate a role-guarded page without a load function` | Embed mode gives this text, and node mode gives the next one. Add `--server` to write `+page.ts`. |
+| `cannot generate a role-guarded page without --server` | Node mode gives this text. Add `--server` to write `+page.server.ts`. |
 
 ## See also
 

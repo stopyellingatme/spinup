@@ -18,6 +18,8 @@ M10 is opt-in work that the core does not depend on. The critique wanted these i
 - The web pack question `frontend_mode` (`node` default, `embed`) selects it. In embed mode the web app builds with `@sveltejs/adapter-static` as a single-page app (`fallback: 'index.html'`, `ssr = false` in the root layout), and the API binary embeds the build with `//go:embed` behind the build tag `embedweb`. kit `app` gains `WithSPA(fs.FS)`: it serves the assets with long cache headers for hashed files and `index.html` for every other non-`/api` path.
 - One binary serves both on one origin, so the session cookie works without changes. Deploy: no `web` service, and Caddy sends every path to the API.
 - Limits (documented, enforced with a `Try:` line): embed mode refuses the `auth` module (its pages use SvelteKit form actions) and the page generators that write `+page.server.ts`.
+
+> Amended 2026-11-25 by ADR 0039 section 10: embed mode now holds the `auth`, `flags`, and `live` modules, resource pages, and `g page --server` with a `+page.ts` load. Embed mode still refuses `apikeys`, `billing`, `audit`, and `mcp`, each with its own error. The limit text above is the historical decision.
 - The web `package.json` always lists `@sveltejs/adapter-static` (pre-seed), so the lockfile stays a superset.
 
 ## 3. Package manager and API client variants (unit M10.4)
