@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
@@ -68,35 +69,37 @@ type inflection struct {
 var (
 	sqlcUncountable = []string{"equipment", "information", "rice", "money", "species", "series", "fish", "sheep", "jeans", "police"}
 	sqlcIrregular   = [][2]string{{"people", "person"}, {"men", "man"}, {"children", "child"}, {"sexes", "sex"}, {"moves", "move"}, {"mombies", "mombie"}}
-	sqlcSingularOf  = compileSingular([][2]string{
-		{"s$", ""},
-		{"(ss)$", "${1}"},
-		{"(n)ews$", "${1}ews"},
-		{"([ti])a$", "${1}um"},
-		{"((a)naly|(b)a|(d)iagno|(p)arenthe|(p)rogno|(s)ynop|(t)he)(sis|ses)$", "${1}sis"},
-		{"(^analy)(sis|ses)$", "${1}sis"},
-		{"([^f])ves$", "${1}fe"},
-		{"(hive)s$", "${1}"},
-		{"(tive)s$", "${1}"},
-		{"([lr])ves$", "${1}f"},
-		{"([^aeiouy]|qu)ies$", "${1}y"},
-		{"(s)eries$", "${1}eries"},
-		{"(m)ovies$", "${1}ovie"},
-		{"(c)ookies$", "${1}ookie"},
-		{"(x|ch|ss|sh)es$", "${1}"},
-		{"^(m|l)ice$", "${1}ouse"},
-		{"(bus)(es)?$", "${1}"},
-		{"(o)es$", "${1}"},
-		{"(shoe)s$", "${1}"},
-		{"(cris|test)(is|es)$", "${1}is"},
-		{"^(a)x[ie]s$", "${1}xis"},
-		{"(octop|vir)(us|i)$", "${1}us"},
-		{"(alias|status)(es)?$", "${1}"},
-		{"^(ox)en", "${1}"},
-		{"(vert|ind)ices$", "${1}ex"},
-		{"(matr)ices$", "${1}ix"},
-		{"(quiz)zes$", "${1}"},
-		{"(database)s$", "${1}"},
+	sqlcSingularOf  = sync.OnceValue(func() []inflection {
+		return compileSingular([][2]string{
+			{"s$", ""},
+			{"(ss)$", "${1}"},
+			{"(n)ews$", "${1}ews"},
+			{"([ti])a$", "${1}um"},
+			{"((a)naly|(b)a|(d)iagno|(p)arenthe|(p)rogno|(s)ynop|(t)he)(sis|ses)$", "${1}sis"},
+			{"(^analy)(sis|ses)$", "${1}sis"},
+			{"([^f])ves$", "${1}fe"},
+			{"(hive)s$", "${1}"},
+			{"(tive)s$", "${1}"},
+			{"([lr])ves$", "${1}f"},
+			{"([^aeiouy]|qu)ies$", "${1}y"},
+			{"(s)eries$", "${1}eries"},
+			{"(m)ovies$", "${1}ovie"},
+			{"(c)ookies$", "${1}ookie"},
+			{"(x|ch|ss|sh)es$", "${1}"},
+			{"^(m|l)ice$", "${1}ouse"},
+			{"(bus)(es)?$", "${1}"},
+			{"(o)es$", "${1}"},
+			{"(shoe)s$", "${1}"},
+			{"(cris|test)(is|es)$", "${1}is"},
+			{"^(a)x[ie]s$", "${1}xis"},
+			{"(octop|vir)(us|i)$", "${1}us"},
+			{"(alias|status)(es)?$", "${1}"},
+			{"^(ox)en", "${1}"},
+			{"(vert|ind)ices$", "${1}ex"},
+			{"(matr)ices$", "${1}ix"},
+			{"(quiz)zes$", "${1}"},
+			{"(database)s$", "${1}"},
+		})
 	})
 )
 
@@ -130,7 +133,7 @@ func sqlcSingular(table string) string {
 			return strings.TrimSuffix(table, pair[0]) + pair[1]
 		}
 	}
-	for _, rule := range sqlcSingularOf {
+	for _, rule := range sqlcSingularOf() {
 		if rule.find.MatchString(table) {
 			return rule.find.ReplaceAllString(table, rule.replace)
 		}

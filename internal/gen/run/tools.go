@@ -60,22 +60,9 @@ func toolKey(ctx context.Context, dir string, runner exec.Runner, name string) (
 	if err != nil {
 		return "", err
 	}
-	version, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"version"}, Dir: dir})
+	values, err := toolEnvironment(ctx, dir, runner)
 	if err != nil {
 		return "", err
-	}
-	environment, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK"}, Dir: dir})
-	if err != nil {
-		return "", err
-	}
-	var values struct {
-		GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK string
-	}
-	if err := json.Unmarshal(environment.Stdout, &values); err != nil {
-		return "", err
-	}
-	if version.ExitCode != 0 || environment.ExitCode != 0 || len(version.Stdout) == 0 || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
-		return "", fmt.Errorf("go tool environment is unavailable")
 	}
 	if values.GOWORK != "" && values.GOWORK != "off" {
 		return "", fmt.Errorf("go tool cache is disabled for workspaces")
@@ -104,11 +91,36 @@ func toolKey(ctx context.Context, dir string, runner exec.Runner, name string) (
 		}
 	}
 	// JSON frames each input, so different input boundaries cannot share a key.
-	data, err := json.Marshal([][]byte{mod, sum, version.Stdout, []byte(values.GOOS), []byte(values.GOARCH), []byte(values.GOFLAGS), []byte(values.GOCACHE), []byte(name)})
+	data, err := json.Marshal([][]byte{[]byte("v2"), mod, sum, []byte(values.GOVERSION), []byte(values.GOOS), []byte(values.GOARCH), []byte(values.GOFLAGS), []byte(values.GOCACHE), []byte(name)})
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+}
+
+type goEnvironment struct {
+	GOOS, GOARCH, GOFLAGS, GOCACHE, GOWORK, GOVERSION string
+}
+
+// toolEnvironment runs one `go env -json` probe for each lookup. It is not memoized: a Go
+// upgrade or a `go env -w` change between two lookups of one long process (spinup dev) must
+// reach the cache key.
+func toolEnvironment(ctx context.Context, dir string, runner exec.Runner) (goEnvironment, error) {
+	if err := ctx.Err(); err != nil {
+		return goEnvironment{}, err
+	}
+	result, err := runner.Run(ctx, exec.Cmd{Name: "go", Args: []string{"env", "-json", "GOOS", "GOARCH", "GOFLAGS", "GOCACHE", "GOWORK", "GOVERSION"}, Dir: dir})
+	if err != nil {
+		return goEnvironment{}, err
+	}
+	var values goEnvironment
+	if err := json.Unmarshal(result.Stdout, &values); err != nil {
+		return goEnvironment{}, err
+	}
+	if result.ExitCode != 0 || values.GOVERSION == "" || values.GOOS == "" || values.GOARCH == "" || values.GOCACHE == "" {
+		return goEnvironment{}, fmt.Errorf("go tool environment is unavailable")
+	}
+	return values, nil
 }
 
 func executableTool(path string) bool {

@@ -47,9 +47,12 @@ RUN rm -rf internal/webdist/dist
 COPY --from=web-build /web/build ./internal/webdist/dist
 [[- end ]]
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build[[ if eq (index . "frontend_mode") "embed" ]] -tags embedweb[[ end ]] -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+# The cache mount keeps the Go build cache between image builds (BuildKit).
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build[[ if eq (index . "frontend_mode") "embed" ]] -tags embedweb[[ end ]] -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
 [[- if has "jobs" .modules ]]
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/worker ./cmd/worker
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/worker ./cmd/worker
 [[- end ]]
 [[- if has "console" .modules ]]
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/console ./cmd/console

@@ -5,7 +5,7 @@ import "testing"
 const (
 	decodeJSONAllocsCeiling    = 4
 	writeJSONAllocsCeiling     = 16
-	checkJSONBodyAllocsCeiling = 10
+	checkJSONBodyAllocsCeiling = 8
 )
 
 func TestDecodeJSONBudget(t *testing.T) {

@@ -86,7 +86,7 @@ func app(t *testing.T, paths bool) string {
 		spec = "openapi: 3.0.3\ninfo: {title: Test, version: '1'}\npaths:\n  /ping:\n    get:\n      responses:\n        '204': {description: OK}\n"
 	}
 	write(t, root, "api/openapi/openapi.yaml", spec)
-	bundle, err := openapi.Bundle(filepath.Join(root, "api"))
+	bundle, _, err := openapi.Bundle(filepath.Join(root, "api"))
 	if err != nil {
 		t.Fatal(err)
 	}

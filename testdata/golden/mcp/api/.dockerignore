@@ -1,0 +1,4 @@
+# Managed by spinup. The API build context is api/.
+bin/
+tmp/
+internal/webdist/dist/

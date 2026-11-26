@@ -26,6 +26,21 @@ func BenchmarkMiddlewareChain(b *testing.B) {
 	}
 }
 
+func BenchmarkHealth(b *testing.B) {
+	run := benchmarkHealthBody()
+	b.ReportAllocs()
+	for b.Loop() {
+		run()
+	}
+}
+
+func benchmarkHealthBody() func() {
+	handler := New(WithLogger(discardLogger())).Handler()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+	req.Header.Set("X-Request-ID", "benchmark-request-id")
+	return benchmarkMiddlewareChainBody(handler, req)
+}
+
 func benchmarkMiddlewareChainBody(handler http.Handler, req *http.Request) func() {
 	return func() {
 		recorder := httptest.NewRecorder()

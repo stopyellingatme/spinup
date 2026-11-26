@@ -22,35 +22,35 @@ type reference struct{ file, value string }
 
 // Bundle merges the root OpenAPI document and sorted path and schema fragments.
 // apiDir is the application's api directory. All references must resolve locally.
-func Bundle(apiDir string) ([]byte, error) {
-	data, err := bundle(apiDir)
+func Bundle(apiDir string) ([]byte, int, error) {
+	data, count, err := bundle(apiDir)
 	if err != nil {
-		return nil, fmt.Errorf("cannot bundle OpenAPI: %w\nTry: correct the files in api/openapi/, then run spinup g openapi", err)
+		return nil, 0, fmt.Errorf("cannot bundle OpenAPI: %w\nTry: correct the files in api/openapi/, then run spinup g openapi", err)
 	}
-	return data, nil
+	return data, count, nil
 }
 
-func bundle(apiDir string) ([]byte, error) {
+func bundle(apiDir string) ([]byte, int, error) {
 	rootFile := "openapi/openapi.yaml"
 	root, err := readMap(apiDir, rootFile)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	paths, err := object(root, "paths", rootFile)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	components, err := object(root, "components", rootFile)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	schemas, err := object(components, "schemas", rootFile)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var refs []reference
 	if err := references(root, rootFile, &refs); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	for _, group := range []struct {
 		dir    string
@@ -64,7 +64,7 @@ func bundle(apiDir string) ([]byte, error) {
 		}
 		files, err := os.ReadDir(filepath.Join(apiDir, "openapi", group.dir))
 		if err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("list openapi/%s: %w", group.dir, err)
+			return nil, 0, fmt.Errorf("list openapi/%s: %w", group.dir, err)
 		}
 		// ReadDir returns filenames in lexical order.
 		for _, file := range files {
@@ -74,15 +74,15 @@ func bundle(apiDir string) ([]byte, error) {
 			rel := "openapi/" + group.dir + "/" + file.Name()
 			fragment, err := readMap(apiDir, rel)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			if err := references(fragment, rel, &refs); err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			for i := 0; i < len(fragment.Content); i += 2 {
 				key := fragment.Content[i].Value
 				if first, exists := owners[key]; exists {
-					return nil, fmt.Errorf("duplicate %s key %q in %s and %s", group.dir, key, first, rel)
+					return nil, 0, fmt.Errorf("duplicate %s key %q in %s and %s", group.dir, key, first, rel)
 				}
 				group.target.Content = append(group.target.Content, fragment.Content[i], fragment.Content[i+1])
 				owners[key] = rel
@@ -91,7 +91,7 @@ func bundle(apiDir string) ([]byte, error) {
 	}
 	for _, ref := range refs {
 		if !resolves(root, ref.value) {
-			return nil, fmt.Errorf("%s: $ref %q does not resolve", ref.file, ref.value)
+			return nil, 0, fmt.Errorf("%s: $ref %q does not resolve", ref.file, ref.value)
 		}
 	}
 	var out bytes.Buffer
@@ -100,12 +100,12 @@ func bundle(apiDir string) ([]byte, error) {
 	encoder.SetIndent(2)
 	sortMappings(root)
 	if err := encoder.Encode(root); err != nil {
-		return nil, fmt.Errorf("encode bundle: %w", err)
+		return nil, 0, fmt.Errorf("encode bundle: %w", err)
 	}
 	if err := encoder.Close(); err != nil {
-		return nil, fmt.Errorf("close bundle encoder: %w", err)
+		return nil, 0, fmt.Errorf("close bundle encoder: %w", err)
 	}
-	return out.Bytes(), nil
+	return out.Bytes(), len(paths.Content) / 2, nil
 }
 
 func sortMappings(node *yaml.Node) {

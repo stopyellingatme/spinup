@@ -48,6 +48,10 @@ func TestBuiltinRoutes(t *testing.T) {
 			if w.Header().Get("X-Request-ID") == "" || w.Header().Get("X-Content-Type-Options") != "nosniff" {
 				t.Fatal(w.Header())
 			}
+			if tc.path == "/healthz" && (w.Body.String() != "{\"status\":\"ok\"}\n" ||
+				w.Header().Get("Content-Type") != "application/json" || w.Header().Get("Cache-Control") != "private, no-cache") {
+				t.Fatalf("health headers %v, body %q", w.Header(), w.Body.String())
+			}
 		})
 	}
 }
