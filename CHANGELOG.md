@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Security
 
 - Dependency updates close the Dependabot alerts of 2026-11-25. No spinup code changed.
-- The kit and the API of a new app use `github.com/go-jose/go-jose/v4` v4.1.9 (it was v4.1.4). The module comes in through `coreos/go-oidc`. An existing app needs one manual step (see "Upgrade steps"). go-jose now rejects an RSA key of more than 4096 bits in a JWK set. An OIDC provider that signs with a larger RSA key no longer works.
+- The kit and the API of a new app use `github.com/go-jose/go-jose/v4` v4.1.9 (it was v4.1.4). The module comes in through `coreos/go-oidc`. The kit pin of generated apps is `v0.1.0-alpha.988`, which requires this version, so `spinup upgrade` raises go-jose in an existing app. go-jose now rejects an RSA key of more than 4096 bits in a JWK set. An OIDC provider that signs with a larger RSA key no longer works.
 - The web pack pins `@sveltejs/kit` 3.1.1 (it was 3.0.1), `@sveltejs/adapter-node` 6.0.1, `@sveltejs/adapter-static` 4.0.1, and `zod` 4.6.6. The lockfiles hold `joi` 17.13.9. SvelteKit 3.1 sends a new `sveltekit.endpoint` span for each `+server` handler, because the web pack enables server tracing. Tempo shows more spans.
 - The web pack forces `js-yaml` 4.3.2, because `@hey-api/json-schema-ref-parser` pins 4.2.0. The override is in `web/pnpm-workspace.yaml` for pnpm and in `web/package.json` for bun.
 - The Node service template pins `hono` 4.13.18 and `@hono/node-server` 2.1.11.
@@ -124,7 +124,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - After the upgrade, run `spinup db migrate up` before you start the new binary. The first run prints one `adopted  kit <file>` line for each kit migration that the database already applied. `spinup deploy` runs the migration for you.
 - If the upgrade stops with `is a renamed kit migration`, follow its `Try:` line once for each database.
 - After `spinup upgrade`, run `pnpm update joi` in `web/` (`bun update joi` in a bun app). The upgrade refreshes the lockfile, but it does not move a transitive package that still fits its range.
-- In each existing app, run `go get github.com/go-jose/go-jose/v4@v4.1.9` and `go mod tidy` in `api/`. `spinup upgrade` keeps an edited `api/go.mod`, and the pinned kit tag still requires v4.1.4. The upgrade raises go-jose by itself only from the next kit tag.
+- `spinup upgrade` raises the kit to `v0.1.0-alpha.988`, and that kit requires go-jose v4.1.9. An app that does not upgrade yet can run `go get github.com/go-jose/go-jose/v4@v4.1.9` and `go mod tidy` in `api/`.
 - An existing service keeps its pins, because `services/<name>/` is scaffold output. In a Node service, set `hono` to 4.13.18 and `@hono/node-server` to 2.1.11 in `package.json`, then run `pnpm install`. In a PDF service, set `pypdf==7.1.1` in `pyproject.toml`, then run `uv lock`.
 - Review `spinup upgrade --plan` before each upgrade.
 - Commit the generated files and the lock file after a successful upgrade.
