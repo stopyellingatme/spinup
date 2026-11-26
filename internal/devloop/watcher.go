@@ -24,7 +24,9 @@ type Watcher struct {
 	Runner exec.Runner
 	// Out receives watcher failures.
 	Out io.Writer
-	// Interval and Debounce default to 500 ms and 300 ms.
+	// Interval and Debounce default to 200 ms and 150 ms. A poll of the inputs of a
+	// 20-resource app costs well under 1 % of one core at this interval. The debounce
+	// joins the writes of one editor save into one generation.
 	Interval, Debounce time.Duration
 	// Dispatch overrides registry dispatch for tests or embedded callers.
 	Dispatch func(context.Context, []gen.PostStep) error
@@ -32,6 +34,13 @@ type Watcher struct {
 	// with forward slashes. A change to one of them runs gen.PostServiceClients.
 	ServiceOpenAPI []string
 }
+
+// The default timing of the watcher. A query edit waits half an interval on average,
+// then the debounce, then sqlc.
+const (
+	defaultInterval = 200 * time.Millisecond
+	defaultDebounce = 150 * time.Millisecond
+)
 
 type stamp struct {
 	size  int64
@@ -42,10 +51,10 @@ type stamp struct {
 func (w Watcher) Run(ctx context.Context) error {
 	interval, debounce := w.Interval, w.Debounce
 	if interval <= 0 {
-		interval = 500 * time.Millisecond
+		interval = defaultInterval
 	}
 	if debounce <= 0 {
-		debounce = 300 * time.Millisecond
+		debounce = defaultDebounce
 	}
 	out := w.Out
 	if out == nil {

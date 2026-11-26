@@ -17,7 +17,7 @@ import (
 	"github.com/stopyellingatme/spinup/internal/manifest"
 )
 
-func writeInput(t *testing.T, root, path, content string) {
+func writeInput(t testing.TB, root, path, content string) {
 	t.Helper()
 	path = filepath.Join(root, filepath.FromSlash(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

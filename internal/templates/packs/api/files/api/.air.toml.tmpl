@@ -2,14 +2,19 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/api ./cmd/api"
+# -ldflags=-w drops the DWARF debug data. The link is about a third faster. Delve needs the
+# debug data: remove -ldflags=-w here, or build by hand (docs/commands/dev.md).
+cmd = "go build -ldflags=-w -o ./tmp/api ./cmd/api"
 entrypoint = ["./tmp/api"]
-delay = 300
+# The delay batches the writes of one generator run (sqlc, oapi-codegen) into one build.
+delay = 100
 include_ext = ["go", "sql"]
 include_dir = []
-# internal/store is watched: a query edit rebuilds on the .sql change, and again when sqlc
-# writes the new store code. exclude_unchanged stops a rebuild when sqlc writes the same bytes.
-exclude_dir = ["tmp", "node_modules", "internal/gen"]
+# db/queries holds sqlc inputs only: spinup dev runs sqlc, and the new code in internal/store
+# starts the build. internal/store stays watched, or a query edit never reaches a build.
+# exclude_unchanged stops a rebuild when sqlc writes the same bytes. db/migrations stays
+# watched, because the binary embeds the migrations.
+exclude_dir = ["tmp", "node_modules", "internal/gen", "db/queries"]
 exclude_regex = ["_test.go"]
 exclude_unchanged = true
 stop_on_error = true

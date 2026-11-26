@@ -147,9 +147,31 @@ Use `--no-worker` to run the worker yourself. See [Background jobs](../build/job
 ## How file watching works
 
 The watcher rebuilds the API after a Go or migration change.
-It also checks your SQL and OpenAPI files twice a second.
+It also checks your SQL and OpenAPI files five times a second.
 After a short pause, a query change runs `sqlc`, and an OpenAPI change regenerates the API and the web client.
 If a generation step fails, the command shows the error and keeps running.
+
+Air, the Go watcher, reads its settings from `api/.air.toml`:
+
+- Air waits 100 ms after a change before it builds. One `sqlc` run, which writes many files, gives one build.
+- Air does not watch `api/db/queries`. A query edit rebuilds the API once, after `sqlc` writes the new code in `api/internal/store`.
+- Air builds with `-ldflags=-w`. This drops the DWARF debug data, so the link takes about a third less time.
+
+The dev binary in `api/tmp/api` has no debug data, so a debugger such as Delve cannot read it.
+To debug the API, build a binary with the debug data yourself:
+
+<!-- doctest: skip -->
+```console
+$ cd api
+$ go build -o ./tmp/api-debug ./cmd/api
+$ dlv exec ./tmp/api-debug
+```
+
+You can also remove `-ldflags=-w` from the `cmd` line of `api/.air.toml`.
+The file is managed, so `spinup upgrade` merges your edit with the new version. See [Upgrade](../upgrading.md#what-happens-to-your-edits).
+
+On macOS, the first start of each new binary takes a few hundred milliseconds more.
+The system checks each new executable file before it runs it.
 
 ## Troubleshooting
 
