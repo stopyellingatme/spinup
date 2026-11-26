@@ -31,14 +31,23 @@ type resetOptions struct {
 	mailer        mail.Mailer
 	from, baseURL string
 	templates     fs.FS
+	fragment      bool
 }
 
 // WithMailer enables password resets with m. A nil mailer leaves the routes absent.
 func WithMailer(m mail.Mailer) ResetOption { return func(o *resetOptions) { o.mailer = m } }
 
 // WithResetURL sets the trusted public URL before the token, such as https://app.example/reset.
+// With WithResetFragment, the URL is the page that reads the token, such as https://app.example/reset/confirm.
 // The URL never comes from a request header.
 func WithResetURL(baseURL string) ResetOption { return func(o *resetOptions) { o.baseURL = baseURL } }
+
+// WithResetFragment puts the token in the URL fragment of the reset link: baseURL + "#" + token.
+// Without this option the link is baseURL + "/" + token. A browser never sends the fragment to a
+// server, so no access log, trace, proxy, or Referer header receives the token. The page at
+// baseURL must read the token from window.location.hash, remove it from the address bar, and send
+// it in the JSON body of POST /api/auth/reset/confirm. A base URL with its own fragment stays invalid.
+func WithResetFragment() ResetOption { return func(o *resetOptions) { o.fragment = true } }
 
 // WithResetFrom sets the sender address for password reset emails.
 func WithResetFrom(from string) ResetOption { return func(o *resetOptions) { o.from = from } }
@@ -163,6 +172,9 @@ func (h *resetHandler) deliver(ctx context.Context, email string) error {
 
 func resetMessage(o resetOptions, to, token string) (mail.Message, error) {
 	link := o.baseURL + "/" + token
+	if o.fragment {
+		link = o.baseURL + "#" + token
+	}
 	if o.templates != nil {
 		return mail.Render(o.templates, "password_reset", o.from, to, ResetData{URL: link})
 	}

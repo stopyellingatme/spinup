@@ -11,6 +11,11 @@ import (
 
 func passwordResetRoutes(a *auth.Auth,m *mailapp.Mailers,origin string) (func(*http.ServeMux),error) {
  resets := http.NewServeMux()
- if err := a.ResetRoutes(resets,auth.WithMailer(m),auth.WithResetFrom(m.From),auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset"),auth.WithResetTemplates(mailapp.Templates)); err != nil { return nil,err }
+ if err := a.ResetRoutes(resets,auth.WithMailer(m),auth.WithResetFrom(m.From),[[ if eq (index . "frontend_mode") "embed" -]]
+auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset/confirm"),auth.WithResetFragment(),
+[[- else -]]
+auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset"),
+[[- end -]]
+auth.WithResetTemplates(mailapp.Templates)); err != nil { return nil,err }
  return func(mux *http.ServeMux) { mux.Handle("/api/auth/reset/",resets) },nil
 }

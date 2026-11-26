@@ -3,6 +3,7 @@ package templates_test
 import (
 	"errors"
 	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,6 +31,21 @@ func TestEmbedAuth(t *testing.T) {
 		"web/src/routes/register/+page.server.ts",
 		"web/src/routes/account/+page.server.ts",
 		"web/src/routes/logout/+page.server.ts",
+	}
+	resetPages := []string{
+		"web/src/routes/reset/+page.ts",
+		"web/src/routes/reset/+page.svelte",
+		"web/src/routes/reset/schema.ts",
+		"web/src/routes/reset/confirm/+page.ts",
+		"web/src/routes/reset/confirm/+page.svelte",
+		"web/src/routes/reset/confirm/schema.ts",
+		"web/src/lib/reset-token.ts",
+		"web/src/lib/reset-token.test.ts",
+	}
+	resetNodeFiles := []string{
+		"web/src/routes/reset/+page.server.ts",
+		"web/src/routes/reset/[token]/+page.server.ts",
+		"web/src/routes/reset/[token]/+page.svelte",
 	}
 	const oidcMarker = "spinup:oidc-pending"
 
@@ -64,14 +80,10 @@ func TestEmbedAuth(t *testing.T) {
 					t.Errorf("unexpected %s: %v", name, err)
 				}
 			}
-			// No server file and no logout route stays in the tree. The reset pages belong to the
-			// mail module, and their embed twins come with another unit.
+			// No server file and no logout route stays in the tree, also for the reset pages.
 			err := fs.WalkDir(tree, "web", func(path string, entry fs.DirEntry, err error) error {
 				if err != nil || entry.IsDir() {
 					return err
-				}
-				if mail && strings.HasPrefix(path, "web/src/routes/reset/") {
-					return nil
 				}
 				if strings.HasSuffix(path, "+page.server.ts") || strings.HasSuffix(path, "+layout.server.ts") ||
 					strings.Contains(path, "/lib/server/") || strings.Contains(path, "/routes/logout/") {
@@ -81,6 +93,50 @@ func TestEmbedAuth(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+
+			for _, name := range append(append([]string{}, resetPages...), resetNodeFiles...) {
+				_, err := fs.Stat(tree, name)
+				wantPresent := mail && !slices.Contains(resetNodeFiles, name)
+				if (err == nil) != wantPresent {
+					t.Errorf("%s: present=%v, want %v (%v)", name, err == nil, wantPresent, err)
+				}
+			}
+			if mail {
+				testResetEmbed(t, tree)
+			}
+			// The reset link of embed mode holds the token in the fragment, so no render has a
+			// header middleware or a token route.
+			for _, name := range []string{"api/cmd/api/main.go", "api/cmd/api/reset.go"} {
+				data, err := fs.ReadFile(tree, name)
+				if errors.Is(err, fs.ErrNotExist) && name == "api/cmd/api/reset.go" && !mail {
+					continue
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.Contains(string(data), "resetPageHeaders") {
+					t.Errorf("%s mentions resetPageHeaders", name)
+				}
+			}
+			if mail {
+				reset := embedFile(t, tree, "api/cmd/api/reset.go")
+				for _, want := range []string{`"/reset/confirm"), auth.WithResetFragment(), auth.WithResetTemplates(`} {
+					if !strings.Contains(reset, want) {
+						t.Errorf("embed reset.go lacks %q", want)
+					}
+				}
+			} else if _, err := fs.Stat(tree, "api/cmd/api/reset.go"); err == nil {
+				t.Errorf("reset.go exists without the mail module")
+			}
+			walkErr := fs.WalkDir(tree, ".", func(path string, entry fs.DirEntry, err error) error {
+				if err == nil && strings.Contains(path, "[token]") {
+					t.Errorf("embed render has the token route %s", path)
+				}
+				return err
+			})
+			if walkErr != nil {
+				t.Fatal(walkErr)
 			}
 
 			login := embedFile(t, tree, "web/src/routes/login/+page.svelte")
@@ -167,8 +223,86 @@ func TestEmbedAuth(t *testing.T) {
 				t.Errorf("unexpected %s: %v", name, err)
 			}
 		}
+		node := testutil.RenderPack(t, []string{"base", "api", "web", "auth", "mail"}, map[string]any{
+			"app_name": "todo", "module": "example.com/todo", "modules": "ci,auth,mail",
+		})
+		for _, name := range resetNodeFiles {
+			if _, err := fs.Stat(node, name); err != nil {
+				t.Errorf("node mode lacks %s: %v", name, err)
+			}
+		}
+		for _, name := range resetPages {
+			if _, err := fs.Stat(node, name); name != "web/src/routes/reset/+page.svelte" && !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("node mode has the embed file %s: %v", name, err)
+			}
+		}
+		for _, name := range []string{"api/cmd/api/reset.go", "api/cmd/api/main.go"} {
+			data := embedFile(t, node, name)
+			for _, bad := range []string{"resetPageHeaders", "WithResetFragment", "/reset/confirm"} {
+				if strings.Contains(data, bad) {
+					t.Errorf("node %s mentions %s", name, bad)
+				}
+			}
+		}
+		if reset := embedFile(t, node, "api/cmd/api/reset.go"); !strings.Contains(reset, `"/reset"), auth.WithResetTemplates(`) {
+			t.Errorf("node reset.go lost the path link")
+		}
+		if page := embedFile(t, node, "web/src/routes/reset/[token]/+page.svelte"); !strings.Contains(page, "$app/forms") {
+			t.Errorf("node reset page does not use the form action")
+		}
 		if login := embedFile(t, tree, "web/src/routes/login/+page.svelte"); !strings.Contains(login, "$app/forms") {
 			t.Errorf("node login page does not use the form action")
 		}
 	})
+}
+
+// testResetEmbed checks the two reset pages of an embed render.
+func testResetEmbed(t *testing.T, tree fs.FS) {
+	t.Helper()
+	request := embedFile(t, tree, "web/src/routes/reset/+page.svelte")
+	for _, want := range []string{
+		"/api/auth/reset/request",
+		"If an account exists for this email address, you will receive a reset link.",
+		`<meta name="referrer" content="no-referrer" />`,
+		"<h1 class=\"text-2xl font-semibold\">Reset your password</h1>",
+		"Send a reset link",
+		"Return to sign in",
+		"SPA: true",
+	} {
+		if !strings.Contains(request, want) {
+			t.Errorf("reset page lacks %q", want)
+		}
+	}
+	confirm := embedFile(t, tree, "web/src/routes/reset/confirm/+page.svelte")
+	for _, want := range []string{
+		"/api/auth/reset/confirm",
+		"takeResetToken()",
+		"token === null",
+		"The reset link is not valid. Request a new link.",
+		`<meta name="referrer" content="no-referrer" />`,
+		"Choose a new password",
+		"New password",
+		"Save the new password",
+		"Request a new link",
+		"announceSessionChange();",
+		"leaveSession('/login');",
+		"minlength={12}",
+		"maxlength={512}",
+	} {
+		if !strings.Contains(confirm, want) {
+			t.Errorf("reset confirm page lacks %q", want)
+		}
+	}
+	// The token never goes to storage, a log line, or a request address.
+	for _, name := range []string{"web/src/routes/reset/confirm/+page.svelte", "web/src/routes/reset/confirm/+page.ts", "web/src/lib/reset-token.ts"} {
+		data := embedFile(t, tree, name)
+		for _, bad := range []string{"console.", "localStorage", "sessionStorage", "document.cookie", "observedFetch", "?token", "${token}", "params.token"} {
+			if strings.Contains(data, bad) {
+				t.Errorf("%s contains %q", name, bad)
+			}
+		}
+	}
+	if helper := embedFile(t, tree, "web/src/lib/reset-token.ts"); !strings.Contains(helper, "history.replaceState(history.state, '', location.pathname + location.search)") {
+		t.Errorf("reset-token.ts does not remove the fragment with replaceState")
+	}
 }

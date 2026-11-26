@@ -14,25 +14,25 @@ when = "modules contains 'mail'"
 path = "web/src/routes/reset/+page.server.ts"
 source = "files/web/src/routes/reset/+page.server.ts"
 class = "scaffold"
-when = "modules contains 'mail'"
+when = "frontend_mode != 'embed' && modules contains 'mail'"
 
 [[files]]
 path = "web/src/routes/reset/+page.svelte"
 source = "files/web/src/routes/reset/+page.svelte"
 class = "scaffold"
-when = "modules contains 'mail'"
+when = "frontend_mode != 'embed' && modules contains 'mail'"
 
 [[files]]
 path = "web/src/routes/reset/[token]/+page.server.ts"
 source = "files/web/src/routes/reset/[token]/+page.server.ts"
 class = "scaffold"
-when = "modules contains 'mail'"
+when = "frontend_mode != 'embed' && modules contains 'mail'"
 
 [[files]]
 path = "web/src/routes/reset/[token]/+page.svelte"
 source = "files/web/src/routes/reset/[token]/+page.svelte"
 class = "scaffold"
-when = "modules contains 'mail'"
+when = "frontend_mode != 'embed' && modules contains 'mail'"
 
 [[files]]
 path = "api/internal/mail/templates/password_reset.subject.tmpl"
@@ -52,3 +52,56 @@ source = "files/api/internal/mail/templates/password_reset.html.tmpl"
 class = "seed"
 when = "modules contains 'mail'"
 
+
+# The pages of embed mode (ADR 0039, sections 10.1 and 10.3). The browser calls the Go API on the same
+# origin. The node pages above keep the form actions. An alternate path expression keeps the metadata
+# key of a page unique, because the node page has the same output path. The mail link of embed mode is
+# /reset/confirm#<token>: the fragment never reaches a server (kit auth.WithResetFragment).
+
+[[files]]
+path = "web/src/routes/reset/+page.ts"
+source = "embed/routes/reset/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = '[[ "web/src/routes/reset/+page.svelte" ]]'
+source = "embed/routes/reset/+page.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/schema.ts"
+source = "embed/routes/reset/schema.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/confirm/+page.ts"
+source = "embed/routes/reset/confirm/+page.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/confirm/+page.svelte"
+source = "embed/routes/reset/confirm/+page.svelte"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/routes/reset/confirm/schema.ts"
+source = "embed/routes/reset/confirm/schema.ts"
+class = "scaffold"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/lib/reset-token.ts"
+source = "embed/lib/reset-token.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'mail'"
+
+[[files]]
+path = "web/src/lib/reset-token.test.ts"
+source = "embed/lib/reset-token.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'mail'"

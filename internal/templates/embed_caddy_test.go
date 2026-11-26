@@ -10,18 +10,18 @@ import (
 
 func TestEmbedCaddy(t *testing.T) {
 	const live = "\n\thandle /api/live/* {\n\t\timport upstream.caddy api 8080 { flush_interval -1 }\n\t}\n"
-	const reset = "\n\t# Defer these headers so they replace the site and upstream values.\n\t@resetDocument {\n\t\tmethod GET HEAD\n\t\tpath_regexp resetDocument ^/reset/[^/]+$\n\t}\n\theader @resetDocument {\n\t\tdefer\n\t\tReferrer-Policy no-referrer\n\t\tCache-Control no-store\n\t}\n"
 	for _, tc := range []struct {
 		name, mode, modules, golden string
-		live, reset                 bool
+		live                        bool
 	}{
-		{"embed", "embed", "", "web-embed", false, false},
-		{"embed-auth", "embed", "auth", "web-embed", false, false},
-		{"embed-mail", "embed", "mail", "web-embed", false, false},
-		{"embed-live", "embed", "auth,live", "web-embed", true, false},
-		{"embed-reset", "embed", "auth,mail", "web-embed", false, true},
-		{"embed-all", "embed", "auth,mail,live", "web-embed", true, true},
-		{"node-all", "node", "auth,mail,live", "live", false, false},
+		{"embed", "embed", "", "web-embed", false},
+		{"embed-auth", "embed", "auth", "web-embed", false},
+		{"embed-mail", "embed", "mail", "web-embed", false},
+		{"embed-live", "embed", "auth,live", "web-embed", true},
+		// The reset link holds the token in the fragment, so the Caddyfile has no reset block.
+		{"embed-reset", "embed", "auth,mail", "web-embed", false},
+		{"embed-all", "embed", "auth,mail,live", "web-embed", true},
+		{"node-all", "node", "auth,mail,live", "live", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fsys := testutil.RenderPack(t, []string{"base", "api", "web", "deploy"}, map[string]any{
@@ -31,19 +31,16 @@ func TestEmbedCaddy(t *testing.T) {
 			if tc.live && strings.Index(got, "handle /api/live/*") >= strings.Index(got, "\n\thandle {") {
 				t.Error("live route must precede the catch-all")
 			}
-			for _, block := range []struct {
-				text string
-				want bool
-			}{{live, tc.live}, {reset, tc.reset}} {
-				if tc.mode == "node" && block.text == live {
-					continue
+			if strings.Contains(got, "resetDocument") {
+				t.Error("the Caddyfile has a reset document block")
+			}
+			if tc.mode != "node" {
+				count := strings.Count(got, live)
+				if count != boolCount(tc.live) {
+					t.Errorf("block count = %d, want %d: %s", count, boolCount(tc.live), live)
 				}
-				count := strings.Count(got, block.text)
-				if count != boolCount(block.want) {
-					t.Errorf("block count = %d, want %d: %s", count, boolCount(block.want), block.text)
-				}
-				if block.want {
-					got = strings.Replace(got, block.text, "", 1)
+				if tc.live {
+					got = strings.Replace(got, live, "", 1)
 				}
 			}
 			want, err := os.ReadFile("../../testdata/golden/" + tc.golden + "/deploy/Caddyfile")

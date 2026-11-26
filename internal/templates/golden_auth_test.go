@@ -97,7 +97,7 @@ func TestAuthPackClasses(t *testing.T) {
 	for _, f := range p.Files {
 		want := "scaffold"
 		switch {
-		case f.Path == "api/db/kit/embed.go", f.Path == "web/src/lib/auth-form.ts":
+		case f.Path == "api/db/kit/embed.go", f.Path == "web/src/lib/auth-form.ts", f.Path == "web/src/lib/reset-token.ts", f.Path == "web/src/lib/reset-token.test.ts":
 			want = "managed"
 		case strings.HasPrefix(f.Path, "api/db/kit/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
 			want = "seed"
