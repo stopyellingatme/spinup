@@ -1,5 +1,12 @@
 module github.com/stopyellingatme/spinup
 
+// This file has no require line for the kit or the plugin SDK. go.work joins them.
+// GitHub builds the dependency graph of this module with go.work, so the graph also
+// lists the dependencies of kit/go.mod. GitHub scans this module only when this file
+// changes. After a security update in kit/go.mod, change this file in the same pull
+// request (for example the date below). If you do not, the alerts for this file stay open.
+// Last scan trigger: 2026-11-25 (go-jose v4.1.9 in kit/go.mod).
+
 go 1.27.0
 
 toolchain go1.27.2
