@@ -78,8 +78,9 @@ create web/src/routes/settings/profile/+page.server.ts (scaffold)
 create web/src/routes/settings/profile/+page.svelte (scaffold)
 ```
 
-`--server` adds a `+page.server.ts` file with a `load` function.
-[Embed mode](embed.md) cannot use server pages.
+`--server` adds a file with a `load` function.
+Node mode writes `+page.server.ts`, which runs on the Node server.
+[Embed mode](embed.md) writes `+page.ts`, which runs in the browser.
 
 ## Add a resource with pages
 
@@ -93,6 +94,8 @@ update web/src/lib/nav.gen.ts (managed)
 create web/src/routes/todos/+page.server.ts (scaffold)
 ...
 ```
+
+In embed mode, the same command writes `+page.ts` and `form.ts` files in place of the `+page.server.ts` files.
 
 See [generate resource](commands/generate-resource.md) for the field types and the options.
 
@@ -118,10 +121,37 @@ If you use heyapi, see [Package manager and API client](web-variants.md).
 
 ## The signed-in user
 
-For each request, the app asks the API who the user is (`GET /api/session`).
+In node mode, the server asks the API who the user is (`GET /api/session`) for each request.
+In embed mode with `auth`, the root load in the browser asks the API, and the page waits for the answer.
 The result is `data.user` in every page, or `null` for a visitor.
 Without the `auth` module, `data.user` is always `null`.
 See [Accounts and sign-in](auth.md) to add sign-in.
+
+In embed mode, a page that needs the user waits for the root load:
+
+```ts
+import { requireUser } from '#lib/auth';
+import type { PageLoad } from './$types';
+
+export const load: PageLoad = async ({ parent, url }) => {
+	const { user } = await parent();
+	return { user: requireUser(user, url) };
+};
+```
+
+## Where a load runs
+
+| | Node mode | Embed mode |
+| --- | --- | --- |
+| Root load | `+layout.server.ts` on the server | `+layout.ts` in the browser |
+| Page load | `+page.server.ts` on the server | `+page.ts` in the browser |
+| Forms | Form actions of SvelteKit | Forms with JavaScript that call the Go API |
+| API calls | The server passes `fetch` and `__PUBLIC_ORIGIN__` | The browser uses its own origin |
+
+In both modes, the Go API is the authority.
+It checks the session, the CSRF check, the input, the role, and the owner of each request.
+A guard in a page load controls navigation only.
+Client validation with zod improves the feedback and does not replace the Go checks.
 
 ## Forms: the field component
 

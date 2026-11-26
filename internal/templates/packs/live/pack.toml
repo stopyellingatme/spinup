@@ -26,8 +26,23 @@ class = "managed"
 path = "web/src/lib/live.svelte.ts"
 source = "files/web/src/lib/live.svelte.ts"
 class = "managed"
+when = "frontend_mode != 'embed'"
 
 [[files]]
 path = "web/src/lib/live.core.test.ts"
 source = "files/web/src/lib/live.core.test.ts"
 class = "managed"
+
+# The live helper of embed mode stops and resumes with the session (ADR 0039, section 10.2).
+# Both modes share live.core.ts and its test.
+[[files]]
+path = '[[ "web/src/lib/live.svelte.ts" ]]'
+source = "embed/lib/live.svelte.ts"
+class = "managed"
+when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/lib/live-session.test.ts"
+source = "embed/lib/live-session.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed'"

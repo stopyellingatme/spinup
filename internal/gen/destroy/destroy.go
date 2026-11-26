@@ -52,6 +52,10 @@ type Plan struct {
 // Build compares generator paths with the lock without changing the project.
 func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 	var paths []string
+	// other lists the page paths of the page family of the other frontend
+	// mode. Destroy removes one only when the lock records it as a file of
+	// spinup g resource (ADR 0039 §10.5).
+	other := map[string]bool{}
 	result := &Plan{}
 	switch o.Kind {
 	case "resource", "model":
@@ -62,6 +66,10 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 		paths = resource.Paths(name)
 		if o.Kind == "model" {
 			paths = []string{resource.QueriesPath(name), resource.SchemasPath(name)}
+		} else {
+			for _, path := range resource.OtherFamilyPagePaths(name, lock.Answers["frontend_mode"] == "embed") {
+				other[path] = true
+			}
 		}
 		result.Next = "spinup db new drop_" + name.PluralSnake()
 	case "handler":
@@ -81,6 +89,10 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 		}
 		if clean != path || (strings.HasPrefix(path, "api/db/migrations/") || strings.HasPrefix(path, "api/db/kit/")) {
 			return nil, destroyError(fmt.Errorf("unsafe generator path %q", path))
+		}
+		if entry, tracked := lock.Files[path]; other[path] && (!tracked || entry.Template != resourceTemplate) {
+			// Not a page of this resource: another generator or the user owns it.
+			continue
 		}
 		disk := filepath.Join(o.Root, filepath.FromSlash(path))
 		// Reject links in every path component, including directory links.
@@ -134,6 +146,10 @@ func Build(ctx context.Context, o Options, lock *manifest.Lock) (*Plan, error) {
 	result.Dirs = dirs
 	return result, nil
 }
+
+// resourceTemplate is the lock template of the files that spinup g resource
+// writes.
+const resourceTemplate = "gen/resource"
 
 func hasLink(root, path string) (bool, error) {
 	current := root

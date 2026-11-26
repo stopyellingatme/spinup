@@ -1,0 +1,18 @@
+{% comment %}
+  Dark mode. The site follows the color scheme of the browser. It has no button and it stores
+  no choice. The theme loads just-the-docs.js before this file, and jtd.setTheme points the
+  main stylesheet at assets/css/just-the-docs-<name>.css.
+{% endcomment %}
+<meta name="color-scheme" content="light dark">
+<script>
+  (function () {
+    var dark = window.matchMedia("(prefers-color-scheme: dark)");
+    function apply() {
+      jtd.setTheme(dark.matches ? "dark" : "default");
+    }
+    if (dark.matches) {
+      apply();
+    }
+    dark.addEventListener("change", apply);
+  })();
+</script>

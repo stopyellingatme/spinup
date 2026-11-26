@@ -1,0 +1,147 @@
+# Embed mode holds auth, flags, and live. It refuses apikeys, billing, audit, and mcp,
+# each with its own error, before any write (ADR 0039, section 10.4).
+# Tool shims keep the module verification offline.
+env SPINUP_KIT_REPLACE=$SPINUP_REPO/kit
+exec chmod +x tools/go tools/pnpm
+env PATH=$WORK/tools:$PATH
+env MODULE_TOOL_LOG=$WORK/tool-calls.txt
+
+# spinup new refuses the four modules and writes no directory.
+! exec spinup new a1 --frontend-mode embed --modules auth,apikeys --module example.com/a1 --no-git --non-interactive
+stderr 'cannot use apikeys in embed mode: the API key pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for apikeys'
+! exists a1
+! exec spinup new a2 --frontend-mode embed --modules auth,jobs,billing --module example.com/a2 --no-git --non-interactive
+stderr 'cannot use billing in embed mode: the billing pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for billing'
+! exists a2
+! exec spinup new a3 --frontend-mode embed --modules auth,audit --module example.com/a3 --no-git --non-interactive
+stderr 'cannot use audit in embed mode: the history pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for audit'
+! exists a3
+# A request for mcp names mcp, not its dependency apikeys or the missing auth.
+! exec spinup new a4 --frontend-mode embed --modules mcp --module example.com/a4 --no-git --non-interactive
+stderr 'cannot use mcp in embed mode: the module requires apikeys'
+stderr 'Try: use --frontend-mode node for mcp'
+! stderr 'apikeys in embed mode|missing pack'
+! exists a4
+
+# spinup new accepts auth, flags, and live with the browser pages and no server pages.
+exec spinup new full --frontend-mode embed --modules auth,flags,live --module example.com/full --no-git --non-interactive
+exists full/web/src/routes/login/+page.ts full/web/src/routes/admin/flags/+page.ts full/web/src/lib/live.svelte.ts
+! exists full/web/src/hooks.server.ts full/web/src/lib/server/auth.ts full/web/src/routes/login/+page.server.ts full/web/src/routes/admin/flags/+page.server.ts
+
+# spinup module add refuses the four modules before a branch, worktree, or upgrade state exists.
+exec spinup new demo --frontend-mode embed --modules ci --module example.com/demo --non-interactive
+cd demo
+cp spinup.lock $WORK/demo.lock
+cp spinup.toml $WORK/demo.toml
+! exec spinup module add apikeys --yes --non-interactive
+stderr 'cannot use apikeys in embed mode: the API key pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for apikeys'
+! exec spinup module add billing --yes --non-interactive
+stderr 'cannot use billing in embed mode: the billing pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for billing'
+! exec spinup module add audit --yes --non-interactive
+stderr 'cannot use audit in embed mode: the history pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for audit'
+! exec spinup module add mcp --yes --non-interactive
+stderr 'cannot use mcp in embed mode: the module requires apikeys'
+stderr 'Try: use --frontend-mode node for mcp'
+! exists .spinup/upgrade.json .spinup/upgrade
+exec git branch --list 'spinup/*'
+! stdout .
+exec git status --porcelain
+! stdout .
+cmp spinup.lock $WORK/demo.lock
+cmp spinup.toml $WORK/demo.toml
+
+# Adding flags adds auth, renders the browser pages on the review branch, and gives the embed advice.
+exec spinup module add flags --yes --non-interactive
+stdout 'Adding required modules: auth'
+stdout 'web/src/lib/session.svelte.ts'
+stdout 'the browser root load reads GET /api/flags'
+! stdout 'hooks.server.ts'
+stdout 'git merge spinup/module-flags'
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/admin/flags/+page.ts .spinup/upgrade/0.0.0-dev/web/src/lib/flags-admin.ts
+! exists .spinup/upgrade/0.0.0-dev/web/src/routes/admin/flags/+page.server.ts .spinup/upgrade/0.0.0-dev/web/src/lib/server/flags.ts
+grep 'Feature flags' .spinup/upgrade/0.0.0-dev/web/src/routes/+layout.svelte
+exec git status --porcelain
+! stdout .
+exec git merge spinup/module-flags
+exec git worktree remove .spinup/upgrade/0.0.0-dev
+exists web/src/routes/login/+page.ts
+
+# The live advice of embed mode names the scoped invalidation.
+exec spinup module add live --dry-run --yes --non-interactive
+stdout 'liveRefresh\(''<feed>'', \{ invalidate: RESOURCE_DEP \}\)'
+! exists .spinup/upgrade.json
+
+# The audit generators refuse audit in embed mode before the advice to add the module, with no writes.
+! exec spinup g audit users
+stderr 'cannot use audit in embed mode: the history pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for audit'
+! stderr 'spinup module add audit'
+! exec spinup g audit users --api-only
+stderr 'cannot use audit in embed mode'
+! exec spinup g resource note title:string --audit --api-only
+stderr 'cannot use audit in embed mode: the history pages require a SvelteKit server'
+! stderr 'spinup module add audit'
+! exec spinup g resource note title:string --audit
+stderr 'cannot use audit in embed mode'
+exec git status --porcelain
+! stdout .
+cd $WORK
+
+# A locked template archive from before the browser pages cannot add auth, also as a dependency.
+mkversion 0.0.1 stale
+mkversion 0.0.2
+env SPINUP_TEMPLATES_DIR=$WORK/templates
+exec spinup new old --frontend-mode embed --modules ci --module example.com/old --non-interactive
+cd old
+exec sh $WORK/stale-lock.sh
+exec git commit -qam 'Lock the stale template version'
+! exec spinup module add auth --yes --non-interactive
+stderr 'cannot add auth in embed mode: the locked templates lack the browser auth pages'
+stderr 'Try: run spinup upgrade, then repeat the module addition'
+! exec spinup module add live --yes --non-interactive
+stderr 'cannot add auth in embed mode: the locked templates lack the browser auth pages'
+! exists .spinup/upgrade.json .spinup/upgrade
+exec git branch --list 'spinup/*'
+! stdout .
+exec git status --porcelain
+! stdout .
+
+# Recovery: upgrade to a version with the browser pages, then repeat the module addition.
+exec spinup upgrade --yes --no-verify
+stdout 'git merge spinup/upgrade-0.0.2'
+exec git merge spinup/upgrade-0.0.2
+exec git worktree remove .spinup/upgrade/0.0.2
+grep '"template_version": "0.0.2"' spinup.lock
+exec spinup module add auth --yes --non-interactive
+stdout 'git merge spinup/module-auth'
+exists .spinup/upgrade/0.0.2/web/src/routes/login/+page.ts
+! exists .spinup/upgrade/0.0.2/web/src/routes/login/+page.server.ts
+
+-- stale/DELETE --
+packs/auth/pack.d/embed.toml
+
+-- stale-lock.sh --
+set -eu
+sed 's/"template_version": "0.0.0-dev"/"template_version": "0.0.1"/' spinup.lock > spinup.lock.new
+mv spinup.lock.new spinup.lock
+grep -q '"template_version": "0.0.1"' spinup.lock
+
+-- tools/go --
+#!/bin/sh
+printf 'go %s\n' "$*" >> "$MODULE_TOOL_LOG"
+case "$*" in
+  'mod edit -json') printf '%s\n' '{"Require":[]}' ;;
+  'version') printf '%s\n' 'go version go1.27.2 darwin/arm64' ;;
+esac
+exit 0
+
+-- tools/pnpm --
+#!/bin/sh
+printf 'pnpm %s\n' "$*" >> "$MODULE_TOOL_LOG"
+exit 0

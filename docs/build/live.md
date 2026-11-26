@@ -192,6 +192,18 @@ Both helpers use one stream for each feed in a tab. Two components on the feed `
 If the tab is hidden for 60 seconds, or the browser goes offline, the helper closes the stream and keeps the cursor. It connects again when the tab is visible.
 After a 401 answer, the helper runs `invalidateAll()` once, so the app sends the user to the sign-in page.
 
+## Embed mode
+
+The `live` module works in an app with `--frontend-mode embed`.
+The helper `web/src/lib/live.svelte.ts` has the same exports as in node mode.
+A resource made with `--live` calls `liveRefresh('<feed>', { invalidate: RESOURCE_DEP })`, where `RESOURCE_DEP` is a key from the `form.ts` of the resource.
+So a patch reloads the data of that resource and does not run the session load again.
+
+- A 401 answer of a stream or a snapshot asks the session watch to read the session again. The helper does not call `invalidateAll()` for it.
+- Sign-out stops every stream, snapshot request, and timer of the tab before it sends `POST /api/auth/logout`. No timer hides a race.
+- While sign-out runs, a new subscription starts paused. If the sign-out call fails, the streams start again.
+- Caddy sends `/api/live/*` to the API with `flush_interval -1` before the catch-all, so the stream is not buffered.
+
 ## Add a feed to an existing resource
 
 Run `spinup g live <resource>` for a resource that you made without `--live`.
@@ -382,7 +394,7 @@ The backup guides name this step: [Backups with pg_dump](../backups-pgdump.md) a
 
 - A write outside the handlers publishes nothing. This covers `psql`, a SQL migration, and a job that does not call `Publish`.
 - The server does not check access again for each patch. A role change takes effect at the next connect.
-- Embed mode is not supported, because the module needs `auth`.
+- In embed mode, the stream stops at sign-out and the page refreshes by scoped invalidation. See [Embed mode](#embed-mode).
 - The module has no WebSocket and no presence. SSE sends from the server to the client only.
 - The routes are not in the OpenAPI document, and the generated client has no operation for them.
 

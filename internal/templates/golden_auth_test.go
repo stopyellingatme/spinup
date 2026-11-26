@@ -84,7 +84,7 @@ func TestGoldenAuth(t *testing.T) {
 }
 
 // TestAuthPackClasses checks the file classes of ADR 0008 §3: the migration is a seed, the
-// pages are scaffolds, and the cookie helper, its test, and generated roles are managed.
+// pages are scaffolds, and the cookie helper, its test, the embed form helper, and generated roles are managed.
 func TestAuthPackClasses(t *testing.T) {
 	t.Parallel()
 	p, err := templates.Load(templates.Embedded(), "auth")
@@ -97,7 +97,7 @@ func TestAuthPackClasses(t *testing.T) {
 	for _, f := range p.Files {
 		want := "scaffold"
 		switch {
-		case f.Path == "api/db/kit/embed.go":
+		case f.Path == "api/db/kit/embed.go", f.Path == "web/src/lib/auth-form.ts", f.Path == "web/src/lib/reset-token.ts", f.Path == "web/src/lib/reset-token.test.ts":
 			want = "managed"
 		case strings.HasPrefix(f.Path, "api/db/kit/"), strings.HasPrefix(f.Path, "api/internal/mail/templates/"):
 			want = "seed"

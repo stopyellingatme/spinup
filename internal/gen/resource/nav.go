@@ -26,9 +26,7 @@ func PlanNav(root string, plan vfs.Plan, removed []string) (vfs.Plan, error) {
 	if err != nil {
 		return vfs.Plan{}, err
 	}
-	if lock.Answers["frontend_mode"] == "embed" {
-		return plan, nil
-	}
+	embed := lock.Answers["frontend_mode"] == "embed"
 
 	files, err := navRouteFiles(root, plan, removed)
 	if err != nil {
@@ -36,7 +34,7 @@ func PlanNav(root string, plan vfs.Plan, removed []string) (vfs.Plan, error) {
 	}
 	items := make([]navItem, 0, len(files))
 	for route, names := range files {
-		if names["+page.svelte"] && (names["schema.ts"] || names["form.ts"]) {
+		if isResourceRoute(names, embed) {
 			items = append(items, navItem{href: "/" + route, label: navLabel(route)})
 		}
 	}
@@ -49,6 +47,17 @@ func PlanNav(root string, plan vfs.Plan, removed []string) (vfs.Plan, error) {
 		return vfs.Plan{}, err
 	}
 	return plan.Sorted(), nil
+}
+
+// isResourceRoute reports whether the files of a route folder mark a resource.
+// A node resource has +page.svelte and schema.ts (form.ts in older apps). An
+// embed resource has +page.svelte and form.ts. The sign-in and reset pages of
+// embed mode have a schema.ts, so schema.ts is no marker there (ADR 0039 §10.10).
+func isResourceRoute(names map[string]bool, embed bool) bool {
+	if embed {
+		return names["+page.svelte"] && names["form.ts"]
+	}
+	return names["+page.svelte"] && (names["schema.ts"] || names["form.ts"])
 }
 
 type navItem struct {

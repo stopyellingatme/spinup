@@ -53,11 +53,27 @@ exec sh -c 'spinup doctor --quick || test "$?" -eq 1'
 stdout 'skip\tlive-wired\tno live module'
 cd $WORK
 
-# Live requires auth and cannot use embed mode.
+# Live requires auth. A request for live alone fails for the missing dependency in both modes.
 ! exec spinup new noauth --modules live --module example.com/noauth --no-git --non-interactive
 stderr 'pack "live" requires missing pack "auth"'
 stderr 'Try: select the required module with --modules'
 ! exists noauth/spinup.toml
-! exec spinup new embedded --frontend-mode embed --modules auth,live --module example.com/embedded --no-git --non-interactive
-stderr 'cannot use auth in embed mode'
-! exists embedded/spinup.toml
+! exec spinup new embednoauth --frontend-mode embed --modules live --module example.com/embednoauth --no-git --non-interactive
+stderr 'pack "live" requires missing pack "auth"'
+stderr 'Try: select the required module with --modules'
+! exists embednoauth/spinup.toml
+
+# Embed mode with auth and live has the Go wiring and the browser helper (ADR 0039).
+exec spinup new embedded --frontend-mode embed --modules auth,live --module example.com/embedded --no-git --non-interactive
+cd embedded
+exists api/db/kit/00011_live.sql api/internal/live/live.go api/internal/live/feeds_gen.go
+exists web/src/lib/live.core.ts web/src/lib/live.svelte.ts web/src/lib/live.core.test.ts web/src/lib/live-session.test.ts
+! exists web/src/hooks.server.ts web/src/lib/server/auth.ts
+grep 'applive "example.com/embedded/api/internal/live"' api/cmd/api/main.go
+grep 'app.WithRoutes\(applive.Routes\(liveHub, applive.Deps\{DB: pool\}\)\),' api/cmd/api/main.go
+grep 'app.WithDrain\(liveHub.Drain\),' api/cmd/api/main.go
+grep 'export function liveRefresh' web/src/lib/live.svelte.ts
+exec sh -c 'spinup doctor --quick --json || test "$?" -eq 1'
+stdout '(?s)"id": "live-wired",\s+"status": "ok"'
+cd api
+exec go build ./...

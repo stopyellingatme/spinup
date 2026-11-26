@@ -1,8 +1,21 @@
 package modules
 
-// LiveNextSteps returns the manual wiring steps for an existing app with live data (ADR 0033).
+// LiveNextSteps returns the manual wiring steps for an existing app with live data in node mode (ADR 0033).
 func LiveNextSteps() string {
-	return `Next: run spinup db migrate up. It adds the tables live_feeds and live_outbox.
+	return liveGoSteps + liveNodePageStep + liveTailSteps
+}
+
+// LiveNextStepsFor returns the manual wiring steps for the frontend mode of the lock. Embed mode
+// refreshes only the data of one resource: the page invalidates its RESOURCE_DEP (ADR 0039,
+// sections 10.5 and 10.7). Node mode gets the bytes of LiveNextSteps.
+func LiveNextStepsFor(frontendMode any) string {
+	if frontendMode == "embed" {
+		return liveGoSteps + liveEmbedPageStep + liveTailSteps
+	}
+	return LiveNextSteps()
+}
+
+const liveGoSteps = `Next: run spinup db migrate up. It adds the tables live_feeds and live_outbox.
 Next: in api/cmd/api/main.go, import:
  applive "<module>/api/internal/live"
  kitlive "github.com/stopyellingatme/spinup/kit/x/live"
@@ -33,7 +46,15 @@ Next: add these options to app.New(...), after the apikeys options:
  app.WithDrain(liveHub.Drain),
 Next: add app.WithShutdown(liveHub.Close), after the hook that closes the pool.
 Next: add a feed with spinup g live <resource>, or spinup g resource <Name> --live.
-Next: in a page, call liveRefresh('<feed>') from '#lib/live.svelte.js'. See docs/build/live.md.
-Next: run spinup doctor and inspect the live-wired check.
 `
-}
+
+const liveNodePageStep = `Next: in a page, call liveRefresh('<feed>') from '#lib/live.svelte.js'. See docs/build/live.md.
+`
+
+const liveEmbedPageStep = `Next: in a page, call liveRefresh('<feed>', { invalidate: RESOURCE_DEP }) from '#lib/live.svelte.js'.
+ RESOURCE_DEP is the dependency that the page load registers with depends(). A generated resource list does this.
+ See docs/build/live.md.
+`
+
+const liveTailSteps = `Next: run spinup doctor and inspect the live-wired check.
+`

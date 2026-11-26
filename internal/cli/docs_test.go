@@ -35,6 +35,44 @@ func TestDocsReference(t *testing.T) {
 	}
 }
 
+// TestDocsReferenceMatchesSite runs the real command. cobra changes the command tree when a
+// command runs (the help and completion commands, --help, merged flags). The pages must not
+// show that, or the command and TestDocsSiteIsCurrent disagree.
+func TestDocsReferenceMatchesSite(t *testing.T) {
+	t.Setenv("SPINUP_OFFLINE", "")
+	dir := t.TempDir()
+	code, out, errOut := run(t, "docs", "reference", "--out", dir)
+	if code != ui.ExitOK || out != "" || errOut != "" {
+		t.Fatalf("code=%d out=%q stderr=%q", code, out, errOut)
+	}
+	site := filepath.Join(repoRoot(t), "docs", "site", "commands")
+	written, err := os.ReadDir(filepath.Join(dir, "commands"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	committed, err := os.ReadDir(site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(written) != len(committed) {
+		t.Errorf("the command wrote %d pages, docs/site/commands has %d", len(written), len(committed))
+	}
+	for _, entry := range written {
+		got, err := os.ReadFile(filepath.Join(dir, "commands", entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := os.ReadFile(filepath.Join(site, entry.Name()))
+		if err != nil {
+			t.Errorf("%s: the command wrote a page that docs/site/commands does not have", entry.Name())
+			continue
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%s: the page of the command differs from docs/site/commands", entry.Name())
+		}
+	}
+}
+
 func TestDocsSiteIsCurrent(t *testing.T) {
 	// The --offline default reads SPINUP_OFFLINE. Clear it so the pages do not depend on the machine.
 	t.Setenv("SPINUP_OFFLINE", "")

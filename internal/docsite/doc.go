@@ -129,12 +129,46 @@ func commandTree(root *cobra.Command) []*cobra.Command {
 		children := command.Commands()
 		sort.Slice(children, func(i, j int) bool { return children[i].Name() < children[j].Name() })
 		for _, child := range children {
+			if command == root && cobraCommand(child) {
+				continue
+			}
 			visit(child)
 		}
 	}
 	visit(root)
 	sort.Slice(commands, func(i, j int) bool { return commands[i].CommandPath() < commands[j].CommandPath() })
 	return commands
+}
+
+// cobraCommand reports whether cobra adds this top-level command when the root runs. A tree
+// that did not run does not have it, so the reference leaves it out.
+func cobraCommand(command *cobra.Command) bool {
+	return command.Name() == "help" || command.Name() == "completion"
+}
+
+// useLine is the use line of a command. It has the suffix [flags] only when the command
+// declares a visible flag of its own. cobra decides from the merged flag set, and that set
+// grows when a command runs: it gets --help and the flags of its parents.
+func useLine(command *cobra.Command) string {
+	line := command.UseLine()
+	if command.DisableFlagsInUseLine || strings.Contains(command.Use, "[flags]") {
+		return line
+	}
+	line = strings.TrimSuffix(line, " [flags]")
+	inherited := command.InheritedFlags()
+	own := false
+	command.Flags().VisitAll(func(flag *pflag.Flag) {
+		if flag.Hidden || flag.Name == "help" {
+			return
+		}
+		if inherited.Lookup(flag.Name) == nil && command.PersistentFlags().Lookup(flag.Name) == nil {
+			own = true
+		}
+	})
+	if own {
+		line += " [flags]"
+	}
+	return line
 }
 
 func commandPath(command *cobra.Command) string {
@@ -180,7 +214,7 @@ func renderCommand(command *cobra.Command) string {
 		fmt.Fprintf(&out, "%s\n\n", command.Long)
 	}
 	out.WriteString("## Use\n\n```text\n")
-	out.WriteString(command.UseLine())
+	out.WriteString(useLine(command))
 	out.WriteString("\n```\n")
 	flags := commandFlags(command)
 	if len(flags) > 0 {
@@ -241,8 +275,14 @@ func dedent(text string) string {
 
 func commandFlags(command *cobra.Command) []*pflag.Flag {
 	flags := []*pflag.Flag{}
-	command.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) { flags = append(flags, flag) })
-	command.InheritedFlags().VisitAll(func(flag *pflag.Flag) { flags = append(flags, flag) })
+	// cobra adds --help to a command when the command runs. A tree that did not run does not have it.
+	add := func(flag *pflag.Flag) {
+		if flag.Name != "help" {
+			flags = append(flags, flag)
+		}
+	}
+	command.NonInheritedFlags().VisitAll(add)
+	command.InheritedFlags().VisitAll(add)
 	sort.Slice(flags, func(i, j int) bool { return flags[i].Name < flags[j].Name })
 	return flags
 }

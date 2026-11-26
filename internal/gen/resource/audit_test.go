@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"github.com/stopyellingatme/spinup/internal/gen"
+	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/testutil"
 )
 
@@ -188,6 +189,57 @@ func TestExistingResourceUsesRetrofit(t *testing.T) {
 			_, err := run(t.Context(), gen.Input{Root: root, Args: []string{"note", "title:string"}, Flags: flagSet(t, args...)})
 			if err == nil || !strings.Contains(err.Error(), "Try: spinup g audit notes") || strings.Contains(err.Error(), "--force") {
 				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
+// TestAuditEmbed refuses an explicit audit request in embed mode (ADR 0039, section 10.4).
+func TestAuditEmbed(t *testing.T) {
+	t.Parallel()
+	const auditErr = "cannot use audit in embed mode: the history pages require a SvelteKit server\nTry: use --frontend-mode node for audit"
+	const historyErr = "cannot generate history pages in embed mode: the history page requires a SvelteKit server\nTry: use an app with --frontend-mode node"
+	for _, tc := range []struct {
+		name   string
+		packs  []string
+		flags  []string
+		want   string
+		module bool
+	}{
+		{name: "missing module", packs: []string{"base", "api", "web", "auth"}, flags: []string{"--audit"}, want: auditErr},
+		{name: "missing module api-only", packs: []string{"base", "api", "web", "auth"}, flags: []string{"--audit", "--api-only"}, want: auditErr},
+		{name: "legacy lock with pages", packs: []string{"base", "api", "web", "auth", "audit"}, flags: []string{"--audit"}, want: historyErr},
+		{name: "legacy lock api-only", packs: []string{"base", "api", "web", "auth", "audit"}, flags: []string{"--audit", "--api-only"}, module: true},
+		{name: "no request", packs: []string{"base", "api", "web", "auth"}, flags: []string{"--api-only"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := auditApp(t)
+			lock := manifest.New()
+			lock.Packs = tc.packs
+			lock.Answers = map[string]any{"frontend_mode": "embed"}
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			out, err := run(t.Context(), gen.Input{Root: root, Args: []string{"note", "title:string"}, Flags: flagSet(t, tc.flags...)})
+			if tc.want != "" {
+				if err == nil || err.Error() != tc.want || out != nil {
+					t.Fatalf("error = %v, plan = %v, want %q", err, out, tc.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			history := false
+			for _, f := range out.Plan.Files {
+				history = history || strings.HasSuffix(f.Path, "_history.go")
+				if strings.Contains(f.Path, "/history/") {
+					t.Fatalf("embed plan holds the history page %s", f.Path)
+				}
+			}
+			if history != tc.module {
+				t.Fatalf("history handler = %v, want %v", history, tc.module)
 			}
 		})
 	}

@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 
 	"github.com/stopyellingatme/spinup/internal/manifest"
+	"github.com/stopyellingatme/spinup/internal/modules"
 	"github.com/stopyellingatme/spinup/internal/project"
 	"github.com/stopyellingatme/spinup/internal/ui"
 )
@@ -277,5 +278,48 @@ func TestModuleRepairsDisabledConfig(t *testing.T) {
 	cfg, err := project.Load(filepath.Join(root, ".spinup/upgrade/0.1.0"))
 	if err != nil || !slices.Contains(cfg.Modules, "jobs") {
 		t.Fatalf("configuration=%+v error=%v", cfg, err)
+	}
+}
+
+// TestModuleEmbedAdvice selects the web advice of flags and live from the locked frontend mode
+// (ADR 0039, section 10.7). Node mode keeps the bytes of FlagsNextSteps and LiveNextSteps.
+func TestModuleEmbedAdvice(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"node", "embed"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+			r, root := moduleFixture(t, false)
+			version := r.Source.(chainSource)["0.1.0"]
+			fsys := version.Packs.(fstest.MapFS)
+			fsys["flags/pack.toml"] = &fstest.MapFile{Data: []byte("name='flags'\nrequires=['api']\n[[files]]\npath='api/internal/flags/flags.gen.go'\nsource='flags.go'\nclass='managed'\n")}
+			fsys["flags/flags.go"] = &fstest.MapFile{Data: []byte("package flags\n")}
+			fsys["live/pack.toml"] = &fstest.MapFile{Data: []byte("name='live'\nrequires=['api']\n[[files]]\npath='api/internal/live/live.go'\nsource='live.go'\nclass='scaffold'\n")}
+			fsys["live/live.go"] = &fstest.MapFile{Data: []byte("package live\n")}
+			lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			lock.Answers["frontend_mode"] = mode
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			testGit(t, root, "commit", "-am", "frontend mode")
+			if err := r.AddModules(t.Context(), ModuleOptions{Names: []string{"flags", "live"}, Options: Options{DryRun: true, NoVerify: true}}); err != nil {
+				t.Fatal(err)
+			}
+			out := r.Out.(*bytes.Buffer).String()
+			flags := strings.ReplaceAll(modules.FlagsNextStepsFor(mode), "<module>", "example.com/demo")
+			live := strings.ReplaceAll(modules.LiveNextStepsFor(mode), "<module>", "example.com/demo")
+			if !strings.Contains(out, flags) || !strings.Contains(out, live) {
+				t.Fatalf("output=%s", out)
+			}
+			embed := strings.Contains(out, "liveRefresh('<feed>', { invalidate: RESOURCE_DEP })") && !strings.Contains(out, "hooks.server.ts")
+			if embed != (mode == "embed") {
+				t.Fatalf("mode %s: output=%s", mode, out)
+			}
+			if mode == "node" && (flags != strings.ReplaceAll(modules.FlagsNextSteps(), "<module>", "example.com/demo") || live != strings.ReplaceAll(modules.LiveNextSteps(), "<module>", "example.com/demo")) {
+				t.Fatal("node advice changed")
+			}
+		})
 	}
 }

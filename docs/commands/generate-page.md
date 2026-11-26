@@ -27,7 +27,9 @@ The file is `web/src/routes/about/+page.svelte`, and it is yours to edit.
 
 The argument is a route: a path below `web/src/routes`.
 Nested routes work.
-Add `--server` to also write `+page.server.ts`, where a `load` function can read data on the server.
+Add `--server` to write a load function.
+Node mode writes `+page.server.ts`.
+Embed mode writes `+page.ts`, which runs in the browser.
 
 ```console
 $ spinup g page settings/profile --server --dry-run
@@ -39,7 +41,9 @@ The page title comes from the last part of the route.
 With `--server`, the page shows the title that `load` returns.
 Edit `load` to read from the Go API with the typed client.
 If the app has the `auth` module, `load` also calls `requireUser`, so a visitor who is not signed in goes to `/login`.
-A server page needs a SvelteKit server, so `--server` fails in an app made with `--frontend-mode embed`.
+In embed mode, the browser guard controls navigation only.
+The load waits for the root load with `await parent()`, then calls `requireUser`.
+The Go API must authorize each data endpoint.
 
 ## Route rules
 
@@ -73,10 +77,12 @@ Use `--role` to let only some roles open the page.
 The flag takes a comma list of role names from the `[auth]` table of `spinup.toml`.
 The default roles are `manager` and `staff`.
 
-Only a server `load` can guard a page, so `--role` needs `--server`.
-The `load` function and the form actions call `requireRole`.
+The `--role` flag needs `--server`.
+The load in `+page.server.ts` or `+page.ts` calls `requireRole`.
 A visitor who is not signed in goes to `/login`.
 A user with another role sees a 403 page.
+In embed mode, `+page.ts` runs in the browser, so the guard controls navigation only.
+The Go API must check the role of each data endpoint, because a visitor can call it without the page.
 
 ```console
 $ spinup g page reports --server --role manager --dry-run
@@ -159,8 +165,8 @@ It needs pnpm, and it runs `pnpm install` first when `web/node_modules` is missi
 | `the app has no web pack` | The app was made with `--api-only`. Pages need the web app. |
 | `has the invalid segment` | Use lower-case letters, digits, and hyphens in each part. |
 | `cannot generate resource pages: the app is missing ...` | The app is older than the page templates. Run `spinup upgrade`, then run the generator again. |
-| `cannot generate a server page in embed mode` | Embed mode has no SvelteKit server. Drop `--server`. |
-| `cannot generate a role-guarded page without --server` | Add `--server` to the command. |
+| `cannot generate a role-guarded page without a load function` | Embed mode gives this text, and node mode gives the next one. Add `--server` to write `+page.ts`. |
+| `cannot generate a role-guarded page without --server` | Node mode gives this text. Add `--server` to write `+page.server.ts`. |
 
 ## See also
 

@@ -1,5 +1,22 @@
-import { expect, test } from '@playwright/test';
-import { apiURL, createTodo, register, uniqueEmail } from './helpers';
+import { expect, test, type APIRequestContext, type Page, type Route } from '@playwright/test';
+import {
+	abortOnce,
+	apiURL,
+	baseURL,
+	becomeVisible,
+	clientNavigate,
+	createTodo,
+	documentMarked,
+	embed,
+	holdOnce,
+	isToggleWrite,
+	markDocument,
+	messages,
+	register,
+	roundTrip,
+	todoID,
+	uniqueEmail
+} from './helpers';
 
 test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	await register(page, uniqueEmail('crud'));
@@ -14,6 +31,7 @@ test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	await expect(page.getByText('Todo created.')).toBeVisible();
 	// The flag leaves the address bar.
 	await expect(page).toHaveURL(/\/todos\/\d+$/);
+	const id = todoID(page.url());
 
 	// The title is the row link.
 	await page.goto('/todos');
@@ -23,10 +41,8 @@ test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	// Toggle done in the row. It persists after a reload.
 	const done = page.getByRole('checkbox', { name: 'Done: Buy milk' });
 	await expect(done).not.toBeChecked();
-	await Promise.all([
-		page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('toggle')),
-		done.click()
-	]);
+	// The wait starts before the click. Node mode posts ?/toggle, and embed mode sends PUT /api/todos/{id}.
+	await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id)), done.click()]);
 	await expect(done).toBeChecked();
 	await page.reload();
 	await expect(page.getByRole('checkbox', { name: 'Done: Buy milk' })).toBeChecked();
@@ -70,6 +86,9 @@ test("a user cannot see or open another user's todo", async ({ browser }) => {
 	await register(page, uniqueEmail('owner'));
 	await createTodo(page, 'Private note');
 	const url = page.url();
+	const id = todoID(url);
+	// The owner reads the todo through the API, so the id is right.
+	expect((await first.request.get(`${apiURL}/api/todos/${id}`)).status()).toBe(200);
 
 	const second = await browser.newContext();
 	const other = await second.newPage();
@@ -79,8 +98,13 @@ test("a user cannot see or open another user's todo", async ({ browser }) => {
 	await expect(other.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
 
 	const response = await other.goto(url);
-	expect(response?.status()).toBe(404);
+	// Node mode renders the page on the server and answers 404. In embed mode the binary answers
+	// each page path with the shell (200), and the browser shows the 404 view.
+	expect(response?.status()).toBe(embed ? 200 : 404);
 	await expect(other.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+	await expect(other.getByText('Private note')).toHaveCount(0);
+	// In both modes the API is the authority: the owner-scoped read of another user's todo is 404.
+	expect((await second.request.get(`${apiURL}/api/todos/${id}`)).status()).toBe(404);
 
 	await first.close();
 	await second.close();
@@ -151,11 +175,23 @@ test('the row menu opens with the keyboard and gives the focus back', async ({ p
 test('the checkbox of a row toggles without JavaScript', async ({ browser, page }) => {
 	await register(page, uniqueEmail('nojs'));
 	await createTodo(page, 'Plain form');
+	const id = todoID(page.url());
 
 	// The same session, in a context that runs no scripts.
 	const plain = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
 	const view = await plain.newPage();
-	await view.goto('/todos');
+	const response = await view.goto('/todos');
+	if (embed) {
+		// Embed mode serves a static shell. Without JavaScript it renders no list and no checkbox,
+		// so nothing can change the todo. The API still holds it unchanged.
+		expect(response?.status()).toBe(200);
+		await expect(view.getByRole('checkbox')).toHaveCount(0);
+		const read = await plain.request.get(`${apiURL}/api/todos/${id}`);
+		expect(read.status()).toBe(200);
+		expect((await read.json()).done).toBe(false);
+		await plain.close();
+		return;
+	}
 	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).not.toBeChecked();
 	await Promise.all([view.waitForURL(/\/todos/), view.getByRole('checkbox', { name: 'Done: Plain form' }).click()]);
 	await expect(view.getByRole('checkbox', { name: 'Done: Plain form' })).toBeChecked();
@@ -190,7 +226,397 @@ test('the toggle on page 2 stays on page 2', async ({ page }) => {
 	}
 	await page.goto('/todos?page=2');
 	const box = page.getByRole('checkbox').first();
-	await Promise.all([page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('toggle')), box.click()]);
+	// The id of the todo comes from the title link of the first row (row 0 is the header row).
+	const row = page.getByRole('row').nth(1);
+	await expect(row.getByRole('checkbox')).toHaveCount(1);
+	const href = await row.getByRole('link', { name: /^Row \d\d$/ }).getAttribute('href');
+	const id = todoID(new URL(href ?? '', page.url()).href);
+	// The wait starts before the click. Node mode posts ?/toggle, and embed mode sends PUT /api/todos/{id}.
+	await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id)), box.click()]);
 	await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(1);
 	await expect(page).toHaveURL(/\/todos\?page=2/);
 });
+
+// The cases below exist only in embed mode (ADR 0039 section 10.6). Each write goes from the browser
+// to the Go API. A write that does not complete must leave the page usable and the data right.
+if (embed) {
+	test('embed: an aborted create, edit, and delete show an error, and a retry works', async ({ page }) => {
+		await register(page, uniqueEmail('abort'));
+		const api = page.context().request;
+
+		// Create.
+		const creates = await abortOnce(page, 'POST', '/api/todos');
+		await page.goto('/todos/new');
+		await page.getByLabel('Title').fill('Aborted create');
+		const create = page.getByRole('button', { name: 'Create todo' });
+		await create.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(create).toBeEnabled();
+		await expect(page).toHaveURL(`${baseURL}/todos/new`);
+		await expect(page.getByLabel('Title')).toHaveValue('Aborted create');
+		await create.click();
+		await expect(page.getByText('Todo created.')).toBeVisible();
+		await expect(page).toHaveURL(/\/todos\/\d+$/);
+		const id = todoID(page.url());
+		expect(creates()).toBe(1);
+		const list = (await (await api.get(`${apiURL}/api/todos`)).json()) as { items: { title: string }[] };
+		expect(list.items.map((item) => item.title)).toEqual(['Aborted create']);
+
+		// Edit.
+		const edits = await abortOnce(page, 'PUT', `/api/todos/${id}`);
+		await page.goto(`/todos/${id}/edit`);
+		await page.getByLabel('Title').fill('Edited after abort');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await save.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(save).toBeEnabled();
+		await expect(page).toHaveURL(`${baseURL}/todos/${id}/edit`);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title).toBe('Aborted create');
+		await save.click();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Edited after abort', level: 1 })).toBeVisible();
+		expect(edits()).toBe(1);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title).toBe('Edited after abort');
+
+		// Delete from the list, through the row menu and the alert dialog.
+		const deletes = await abortOnce(page, 'DELETE', `/api/todos/${id}`);
+		await page.goto('/todos');
+		const actions = page.getByRole('button', { name: 'Actions for Edited after abort' });
+		const dialog = page.getByRole('alertdialog');
+		await actions.click();
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		await dialog.getByRole('button', { name: 'Delete' }).click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(dialog).toHaveCount(0);
+		await expect(actions).toBeEnabled();
+		expect((await api.get(`${apiURL}/api/todos/${id}`)).status()).toBe(200);
+		await actions.click();
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		await dialog.getByRole('button', { name: 'Delete' }).click();
+		await expect(page.getByText('Todo deleted.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
+		expect(deletes()).toBe(1);
+		expect((await api.get(`${apiURL}/api/todos/${id}`)).status()).toBe(404);
+	});
+
+	test('embed: an aborted toggle on page 2 goes back, and a retry saves it on page 2', async ({ page }) => {
+		await register(page, uniqueEmail('abort-toggle'));
+		const api = page.context().request;
+		for (let i = 1; i <= 21; i++) {
+			const res = await api.post(`${apiURL}/api/todos`, { data: { title: `Row ${String(i).padStart(2, '0')}`, done: false } });
+			expect(res.ok()).toBeTruthy();
+		}
+		await page.goto('/todos?page=2');
+		const row = page.getByRole('row').nth(1);
+		const box = row.getByRole('checkbox');
+		const href = await row.getByRole('link', { name: /^Row \d\d$/ }).getAttribute('href');
+		const id = todoID(new URL(href ?? '', page.url()).href);
+
+		const toggles = await abortOnce(page, 'PUT', `/api/todos/${id}`);
+		await box.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(box).not.toBeChecked();
+		await expect(box).toBeEnabled();
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { done: boolean }).done).toBe(false);
+
+		await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id) && res.ok()), box.click()]);
+		await expect(box).toBeChecked();
+		await expect(page).toHaveURL(`${baseURL}/todos?page=2`);
+		await expect(page.getByRole('row')).toHaveCount(2);
+		expect(toggles()).toBe(1);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { done: boolean }).done).toBe(true);
+	});
+
+	/** twoTodos creates the todos alpha and beta through the API and returns their ids. */
+	async function twoTodos(page: Page): Promise<{ api: APIRequestContext; a: number; b: number }> {
+		const api = page.context().request;
+		const ids: number[] = [];
+		for (const title of ['alpha', 'beta']) {
+			const res = await api.post(`${apiURL}/api/todos`, { data: { title, done: false } });
+			expect(res.ok()).toBeTruthy();
+			ids.push(((await res.json()) as { id: number }).id);
+		}
+		return { api, a: ids[0], b: ids[1] };
+	}
+
+	async function titleOf(api: APIRequestContext, id: number): Promise<string> {
+		return ((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title;
+	}
+
+	test('embed: a client navigation to the edit page of another todo shows it, and the save goes to it', async ({ page }) => {
+		await register(page, uniqueEmail('edit-switch'));
+		const { api, a, b } = await twoTodos(page);
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await markDocument(page);
+
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		expect(await documentMarked(page)).toBe(true);
+
+		await title.fill('beta 2');
+		const write = page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.startsWith('/api/todos/'));
+		await page.getByRole('button', { name: /^Save/ }).click();
+		expect(new URL((await write).url()).pathname).toBe(`/api/todos/${b}`);
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'beta 2', level: 1 })).toBeVisible();
+		expect(await titleOf(api, a)).toBe('alpha');
+		expect(await titleOf(api, b)).toBe('beta 2');
+	});
+
+	test('embed: a new load of the same todo keeps the draft of the edit form', async ({ page }) => {
+		await register(page, uniqueEmail('edit-draft'));
+		const { api, a } = await twoTodos(page);
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha draft');
+
+		// The tab becomes visible: the session check runs the root load and the edit load again.
+		const reread = page.waitForResponse(
+			(r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/todos/${a}`
+		);
+		await becomeVisible(page);
+		await reread;
+		await page.evaluate(() => fetch('/api/flags').then((r) => r.status));
+		await expect(title).toHaveValue('alpha draft');
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		expect(await titleOf(api, a)).toBe('alpha');
+	});
+
+	test('embed: a save that ends after a client navigation to another todo changes only the old todo', async ({ page }) => {
+		await register(page, uniqueEmail('edit-late'));
+		const { api, a, b } = await twoTodos(page);
+
+		// The save of alpha waits until the test releases it.
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let held: Route | null = null;
+		await page.route(
+			(url) => url.pathname === `/api/todos/${a}`,
+			async (route) => {
+				if (route.request().method() !== 'PUT') return route.fallback();
+				held = route;
+				await gate;
+				await route.continue();
+			}
+		);
+
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha late');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await save.click();
+		await expect.poll(() => held !== null).toBe(true);
+		await expect(save).toBeDisabled();
+
+		// The page moves to beta while the save of alpha waits. The busy state belongs to alpha.
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await expect(save).toBeEnabled();
+
+		const done = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		release();
+		expect((await done).ok()).toBeTruthy();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		// The answer of the old save sets no message on the form of beta.
+		await expect(page.locator('form').getByRole('alert')).toHaveCount(0);
+		await expect(save).toBeEnabled();
+		expect(await titleOf(api, a)).toBe('alpha late');
+		expect(await titleOf(api, b)).toBe('beta');
+	});
+
+	test('embed: a submit of another todo works while the save of the first waits, and a double submit sends one save', async ({ page }) => {
+		await register(page, uniqueEmail('edit-two'));
+		const { api, a, b } = await twoTodos(page);
+		const holdA = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await expect(title).toHaveValue('alpha');
+		await title.fill('A2');
+		await save.click();
+		await holdA.started;
+
+		// The page moves to beta. The held save of alpha must not drop the submit of beta.
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await expect(save).toBeEnabled();
+		await title.fill('B2');
+		// Keep this wait below the 8 second timeout of superforms: after it, superforms drops the old
+		// submit, and the submit of beta would pass also without the fix.
+		const writeB = page.waitForRequest(
+			(r) => r.method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${b}`,
+			{ timeout: 3000 }
+		);
+		await save.click();
+		await writeB;
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'B2', level: 1 })).toBeVisible();
+		expect(holdA.count()).toBe(1);
+
+		// The toast of beta goes away first, so the next toast can only come from alpha.
+		const toast = page.getByText('Changes saved.');
+		await expect(toast).toHaveCount(0, { timeout: 10_000 });
+		const doneA = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		holdA.release();
+		expect((await doneA).ok()).toBeTruthy();
+		await expect(toast).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		expect(await titleOf(api, a)).toBe('A2');
+		expect(await titleOf(api, b)).toBe('B2');
+
+		// Two submits of one todo start one save.
+		const again = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		await page.goto(`/todos/${a}/edit`);
+		await expect(title).toHaveValue('A2');
+		await title.fill('A3');
+		await page.locator('form').filter({ has: save }).evaluate((form: HTMLFormElement) => {
+			form.requestSubmit();
+			form.requestSubmit();
+		});
+		await again.started;
+		await roundTrip(page);
+		expect(again.count()).toBe(1);
+		const doneAgain = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		again.release();
+		expect((await doneAgain).ok()).toBeTruthy();
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}`);
+		await expect(page.getByRole('heading', { name: 'A3', level: 1 })).toBeVisible();
+		expect(again.count()).toBe(1);
+	});
+
+	test('embed: a late answer of a save or a create does not move a user who left the page', async ({ page }) => {
+		await register(page, uniqueEmail('late-leave'));
+		const { api, a } = await twoTodos(page);
+		const sidebarTodos = page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Todos' });
+		const listHeading = page.getByRole('heading', { name: 'Todos', level: 1 });
+
+		// Save: the user leaves the edit page through the sidebar while the save waits.
+		const save = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		await page.goto(`/todos/${a}/edit`);
+		await expect(page.getByLabel('Title')).toHaveValue('alpha');
+		await page.getByLabel('Title').fill('alpha left');
+		await page.getByRole('button', { name: /^Save/ }).click();
+		await save.started;
+		await sidebarTodos.click();
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		save.release();
+		expect((await saved).ok()).toBeTruthy();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		expect(await titleOf(api, a)).toBe('alpha left');
+
+		// Create: the user leaves the new page through the sidebar while the create waits.
+		const create = await holdOnce(page, 'POST', '/api/todos');
+		await page.goto('/todos/new');
+		await page.getByLabel('Title').fill('Created after leaving');
+		await page.getByRole('button', { name: 'Create todo' }).click();
+		await create.started;
+		await sidebarTodos.click();
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const created = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/todos');
+		create.release();
+		expect((await created).ok()).toBeTruthy();
+		await expect(page.getByText('Todo created.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const list = (await (await api.get(`${apiURL}/api/todos`)).json()) as { items: { title: string }[] };
+		expect(list.items.map((item) => item.title)).toContain('Created after leaving');
+	});
+
+	test('embed: a late field error of a save keeps the new draft after a visit of another todo and back', async ({ page }) => {
+		await register(page, uniqueEmail('late-draft'));
+		const { api, a, b } = await twoTodos(page);
+		const save = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		const title = page.getByLabel('Title');
+
+		await page.goto(`/todos/${a}/edit`);
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha first');
+		await page.getByRole('button', { name: /^Save/ }).click();
+		await save.started;
+
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await clientNavigate(page, `/todos/${a}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		await expect(title).toHaveValue('alpha');
+		await title.fill('draft');
+
+		// The first save answers late with a problem that names the title.
+		const lateError = 'The title of the late answer is wrong.';
+		const answered = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		save.release({
+			status: 422,
+			body: { status: 422, title: 'Unprocessable Entity', detail: 'invalid', errors: [{ field: 'title', message: lateError }] }
+		});
+		expect((await answered).status()).toBe(422);
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		await expect(title).toHaveValue('draft');
+		await expect(page.getByText(lateError)).toHaveCount(0);
+		await expect(title).not.toHaveAttribute('aria-invalid', 'true');
+		await expect(page.locator('form').getByRole('alert')).toHaveCount(0);
+		expect(await titleOf(api, a)).toBe('alpha');
+	});
+
+	test('embed: a late answer of a delete changes nothing on the page of another todo', async ({ page }) => {
+		await register(page, uniqueEmail('late-delete'));
+		const { api, a, b } = await twoTodos(page);
+		const dialog = page.getByRole('alertdialog');
+
+		/** startDelete opens alpha, confirms the delete, and moves to beta while the delete waits. */
+		const startDelete = async () => {
+			const hold = await holdOnce(page, 'DELETE', `/api/todos/${a}`);
+			await page.goto(`/todos/${a}`);
+			await expect(page.getByRole('heading', { name: 'alpha', level: 1 })).toBeVisible();
+			await page.getByRole('button', { name: 'Delete', exact: true }).click();
+			await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+			await hold.started;
+			await clientNavigate(page, `/todos/${b}`);
+			await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+			await expect(page.getByRole('heading', { name: 'beta', level: 1 })).toBeVisible();
+			await expect(dialog).toHaveCount(0);
+			return hold;
+		};
+		const deleteAnswer = () =>
+			page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/todos/${a}`);
+
+		// A late 500 shows no error on beta.
+		const failing = await startDelete();
+		const failed = deleteAnswer();
+		failing.release({ status: 500, body: { status: 500, title: 'Internal Server Error' } });
+		expect((await failed).status()).toBe(500);
+		await roundTrip(page);
+		await expect(page.getByRole('alert')).toHaveCount(0);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		expect((await api.get(`${apiURL}/api/todos/${a}`)).status()).toBe(200);
+
+		// A late success shows its toast, and the user stays on beta.
+		const passing = await startDelete();
+		const deleted = deleteAnswer();
+		passing.release();
+		expect((await deleted).ok()).toBeTruthy();
+		await expect(page.getByText('Todo deleted.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'beta', level: 1 })).toBeVisible();
+		expect((await api.get(`${apiURL}/api/todos/${a}`)).status()).toBe(404);
+	});
+}

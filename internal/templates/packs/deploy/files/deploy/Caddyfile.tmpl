@@ -77,6 +77,12 @@
 		import upstream.caddy web 3000
 	}
 [[- else ]]
+[[- if and (eq (index . "frontend_mode") "embed") (has "live" .modules) ]]
+
+	handle /api/live/* {
+		import upstream.caddy api 8080 { flush_interval -1 }
+	}
+[[- end ]]
 
 	handle {
 		import upstream.caddy api 8080

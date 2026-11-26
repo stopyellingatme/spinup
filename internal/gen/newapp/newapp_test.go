@@ -535,11 +535,68 @@ func TestCIWorkflowSelection(t *testing.T) {
 	}
 }
 
-func TestEmbedRefusesAuth(t *testing.T) {
+// TestEmbedModules checks the module policy of embed mode at creation (ADR 0039, section 10.4).
+func TestEmbedModules(t *testing.T) {
 	t.Parallel()
-	_, err := Generate(t.Context(), Options{Name: "demo", Dir: t.TempDir(), Answers: map[string]any{"module": "example.com/demo", "modules": "auth", "frontend_mode": "embed"}}, nil)
-	if err == nil || !strings.Contains(err.Error(), "embed") || !strings.Contains(err.Error(), "Try:") {
-		t.Fatalf("Generate error = %v", err)
+	for _, tc := range []struct {
+		name, modules string
+		apiOnly       bool
+		want          []string
+		err           string
+	}{
+		{name: "auth", modules: "auth", want: []string{"web/src/routes/login/+page.ts", "web/src/lib/session.svelte.ts"}},
+		{name: "flags with auth", modules: "auth,flags", want: []string{"web/src/lib/flags-admin.ts", "web/src/routes/admin/flags/+page.ts"}},
+		{name: "live with auth", modules: "auth,live", want: []string{"web/src/lib/live.svelte.ts", "api/internal/live/live.go"}},
+		{name: "live alone", modules: "live", err: `pack "live" requires missing pack "auth"`},
+		{name: "apikeys", modules: "auth,apikeys", err: "cannot use apikeys in embed mode: the API key pages require a SvelteKit server\nTry: use --frontend-mode node for apikeys"},
+		{name: "billing", modules: "auth,jobs,billing", err: "cannot use billing in embed mode: the billing pages require a SvelteKit server\nTry: use --frontend-mode node for billing"},
+		{name: "audit", modules: "audit", err: "cannot use audit in embed mode: the history pages require a SvelteKit server\nTry: use --frontend-mode node for audit"},
+		{name: "mcp before apikeys", modules: "mcp", err: "cannot use mcp in embed mode: the module requires apikeys\nTry: use --frontend-mode node for mcp"},
+		{name: "api-only", modules: "", apiOnly: true, err: "cannot embed a frontend with --api-only: the web pack is absent\nTry: remove --api-only, or use --frontend-mode node"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := Generate(t.Context(), Options{Name: "demo", Dir: t.TempDir(), APIOnly: tc.apiOnly, Answers: map[string]any{"module": "example.com/demo", "modules": tc.modules, "frontend_mode": "embed"}}, nil)
+			if tc.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.err) || !strings.Contains(err.Error(), "Try:") {
+					t.Fatalf("Generate error = %v, want %q", err, tc.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			paths := map[string]bool{}
+			for _, file := range result.Plan.Files {
+				paths[file.Path] = true
+			}
+			for _, path := range tc.want {
+				if !paths[path] {
+					t.Errorf("plan lacks %s", path)
+				}
+			}
+			for _, path := range []string{"web/src/hooks.server.ts", "web/src/routes/login/+page.server.ts", "web/src/lib/server/auth.ts", "web/src/routes/logout/+page.server.ts"} {
+				if paths[path] {
+					t.Errorf("embed plan holds the node file %s", path)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckEmbedModules(t *testing.T) {
+	t.Parallel()
+	if err := CheckEmbedModules("node", []string{"mcp", "apikeys", "billing", "audit"}, nil); err != nil {
+		t.Fatalf("node mode: %v", err)
+	}
+	if err := CheckEmbedModules("embed", []string{"auth", "flags", "live", "jobs", "mail", "ci", "deploy"}, []string{"base", "api", "web"}); err != nil {
+		t.Fatalf("allowed modules: %v", err)
+	}
+	if err := CheckEmbedModules("embed", []string{"mcp"}, []string{"apikeys", "mcp"}); err == nil || !strings.HasPrefix(err.Error(), "cannot use mcp ") {
+		t.Fatalf("requested first: %v", err)
+	}
+	if err := CheckEmbedModules("embed", []string{"jobs"}, []string{"audit"}); err == nil || !strings.HasPrefix(err.Error(), "cannot use audit ") {
+		t.Fatalf("resolved: %v", err)
 	}
 }
 
