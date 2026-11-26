@@ -2,6 +2,7 @@ import { createServer, type Server, type Socket } from 'node:net';
 import { expect, test, type Page } from '@playwright/test';
 import {
 	baseURL,
+	clientNavigate,
 	embed,
 	firstRenderURL,
 	messages,
@@ -9,6 +10,7 @@ import {
 	password,
 	recordFirstRenderURL,
 	register,
+	roundTrip,
 	signIn,
 	uniqueEmail
 } from './helpers';
@@ -111,6 +113,9 @@ function recordURLs(page: Page): string[] {
 
 /** A token of the right form that the API never issued: 32 bytes as unpadded base64url. */
 const wrongToken = 'A'.repeat(42) + 'E';
+
+/** A second token of the right form that the API never issued. */
+const secondToken = 'B'.repeat(42) + 'E';
 
 const newPassword = 'a new password that is long';
 
@@ -227,5 +232,90 @@ if (embed) {
 		expect((await answer).status()).toBe(422);
 		await expect(page.getByText(messages.resetInvalid)).toBeVisible();
 		expect(urls.filter((url) => url.includes(wrongToken))).toEqual([]);
+	});
+
+	test('embed: a later visit of the reset page without a fragment has no token, also after the retry card', async ({ page }) => {
+		const urls = recordURLs(page);
+		const invalid = page.getByText(messages.resetLinkInvalid);
+		const passwordField = page.getByLabel('New password');
+
+		// A visit with a token, a client navigation away, and a visit with no fragment.
+		await page.goto(`/reset/confirm#${wrongToken}`);
+		await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+		await clientNavigate(page, '/reset');
+		await expect(page.getByRole('button', { name: 'Send a reset link' })).toBeVisible();
+		await clientNavigate(page, '/reset/confirm');
+		await expect(page).toHaveURL(`${baseURL}/reset/confirm`);
+		await expect(invalid).toBeVisible();
+		await expect(passwordField).toHaveCount(0);
+
+		// The same while the session error card hides the page: the visit still ends.
+		const failing = (url: URL) => url.pathname === '/api/session';
+		await page.route(failing, (route) =>
+			route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"status":500}' })
+		);
+		// A document load of another path first: a goto that changes only the fragment loads no document.
+		await page.goto('/reset');
+		await page.goto(`/reset/confirm#${secondToken}`);
+		const card = page.getByTestId('session-error');
+		await expect(card).toBeVisible();
+		await clientNavigate(page, '/reset');
+		await expect(page).toHaveURL(`${baseURL}/reset`);
+		await page.unroute(failing);
+		await card.getByRole('button', { name: 'Try again' }).click();
+		await expect(page.getByRole('button', { name: 'Send a reset link' })).toBeVisible();
+		await clientNavigate(page, '/reset/confirm');
+		await expect(page).toHaveURL(`${baseURL}/reset/confirm`);
+		await expect(invalid).toBeVisible();
+		await expect(passwordField).toHaveCount(0);
+
+		await roundTrip(page);
+		expect(urls.filter((url) => url.includes('/api/auth/reset/confirm'))).toEqual([]);
+		expect(urls.filter((url) => url.includes(wrongToken) || url.includes(secondToken))).toEqual([]);
+	});
+
+	test('embed: a second link pasted while the reset page is open loses its fragment, and the form uses it', async ({ page }) => {
+		const urls = recordURLs(page);
+		await page.goto(`/reset/confirm#${wrongToken}`);
+		await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+		const passwordField = page.getByLabel('New password');
+		await passwordField.fill('typed for the first link');
+
+		// Only the fragment changes, as when the user pastes a second link: no document loads.
+		await page.goto(`${baseURL}/reset/confirm#${secondToken}`);
+		await expect.poll(() => page.url()).toBe(`${baseURL}/reset/confirm`);
+		// The form starts again for the new token.
+		await expect(passwordField).toHaveValue('');
+		const confirm = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		const answer = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		await passwordField.fill(newPassword);
+		await page.getByRole('button', { name: 'Save the new password' }).click();
+		expect(((await confirm).postDataJSON() as { token: string }).token).toBe(secondToken);
+		expect((await answer).status()).toBe(422);
+		await expect(page.getByText(messages.resetInvalid)).toBeVisible();
+		expect(page.url()).toBe(`${baseURL}/reset/confirm`);
+		expect(urls.filter((url) => url.includes(wrongToken) || url.includes(secondToken))).toEqual([]);
+	});
+
+	test('embed: a client navigation from another page to a reset link takes its token', async ({ page }) => {
+		const urls = recordURLs(page);
+		await page.goto('/reset');
+		await expect(page.getByRole('button', { name: 'Send a reset link' })).toBeVisible();
+
+		await clientNavigate(page, `/reset/confirm#${secondToken}`);
+		// The page can show the invalid-link text for a short time. The end state is the form.
+		await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+		const passwordField = page.getByLabel('New password');
+		await expect(passwordField).toBeVisible();
+		await expect.poll(() => page.url()).toBe(`${baseURL}/reset/confirm`);
+		await expect(page.getByText(messages.resetLinkInvalid)).toHaveCount(0);
+		const confirm = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		const answer = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		await passwordField.fill(newPassword);
+		await page.getByRole('button', { name: 'Save the new password' }).click();
+		expect(((await confirm).postDataJSON() as { token: string }).token).toBe(secondToken);
+		expect((await answer).status()).toBe(422);
+		expect(page.url()).toBe(`${baseURL}/reset/confirm`);
+		expect(urls.filter((url) => url.includes(secondToken))).toEqual([]);
 	});
 }

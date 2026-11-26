@@ -159,6 +159,20 @@ owner = "ops@example.com"
 expires = "2099-12-31"
 TOML
   run_logged flags "spinup g flags" "$work/spinup" g flags
+  # A fixture page that prints the public flag of the root load. shell.spec.ts opens it with a
+  # client navigation after a flags save, so the case reads the state of the browser.
+  mkdir -p web/src/routes/flag-probe
+  cat >web/src/routes/flag-probe/+page.svelte <<'SVELTE'
+<script lang="ts">
+	import { flag } from '#lib/flags.js';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+</script>
+
+<h1>Flag probe</h1>
+<p data-testid="flag-beta-banner">{flag(data, 'beta_banner') ? 'on' : 'off'}</p>
+SVELTE
 fi
 
 offline=(--offline)

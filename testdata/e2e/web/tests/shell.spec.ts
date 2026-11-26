@@ -3,10 +3,14 @@ import {
 	adminEmail,
 	apiURL,
 	baseURL,
+	clientNavigate,
 	createTodo,
+	documentMarked,
 	embed,
+	markDocument,
 	messages,
 	openSignOut,
+	recordFetchOrder,
 	recordRequests,
 	register,
 	signIn,
@@ -73,11 +77,13 @@ if (embed) {
 		const email = uniqueEmail('signout-live');
 		await register(page, email);
 		await createTodo(page, 'Live row');
+		// Both recorders start before the list page opens its stream.
+		const requests = recordRequests(page);
+		const calls = await recordFetchOrder(page);
 		const stream = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/live/todos/live');
 		await page.goto('/todos');
 		await expect(page.getByRole('link', { name: 'Live row' })).toBeVisible();
 		await stream;
-		const requests = recordRequests(page);
 
 		await (await openSignOut(page, email)).click();
 		await expect(page).toHaveURL(`${baseURL}/login`);
@@ -90,7 +96,19 @@ if (embed) {
 		const after = requests.slice(logout + 1);
 		expect(after.filter((r) => r.includes('/api/live/'))).toEqual([]);
 		expect(after.filter((r) => r.startsWith('doc '))).toEqual(['doc /login']);
-		expect(requests.slice(0, logout).filter((r) => r.startsWith('doc '))).toEqual([]);
+		const opened = requests.indexOf('doc /todos');
+		expect(opened).toBeGreaterThanOrEqual(0);
+		expect(requests.slice(opened + 1, logout).filter((r) => r.startsWith('doc '))).toEqual([]);
+
+		// The page aborted each stream before it called the logout. A stream that stays open until
+		// the document goes away has no abort before the logout call.
+		const logoutCall = calls.indexOf('fetch POST /api/auth/logout');
+		expect(logoutCall).toBeGreaterThanOrEqual(0);
+		const before = calls.slice(0, logoutCall);
+		const streamName = 'GET /api/live/todos/live';
+		const streams = before.filter((e) => e === `fetch ${streamName}`).length;
+		expect(streams).toBeGreaterThan(0);
+		expect(before.filter((e) => e === `abort ${streamName}`).length).toBe(streams);
 	});
 
 	test('embed: a live stream that answers 401 after the sign-out leaves the page on /login', async ({ page }) => {
@@ -123,7 +141,7 @@ if (embed) {
 		expect(requests.filter((r) => r.startsWith('doc '))).toEqual(['doc /login']);
 	});
 
-	test('embed: an admin saves a flag rule, and the public flags change without a reload', async ({ page }) => {
+	test('embed: an admin saves a flag rule, and the page data of the browser changes without a reload', async ({ page }) => {
 		expect(adminEmail, 'run.sh sets E2E_ADMIN_EMAIL in embed mode').not.toBe('');
 		await signIn(page, adminEmail);
 		const current = await page.context().request.get(`${apiURL}/api/flags`);
@@ -140,14 +158,33 @@ if (embed) {
 		const card = page.locator('form').filter({ has: page.locator('input[name="key"][value="beta_banner"]') }).first();
 		const everyone = card.getByRole('checkbox', { name: /On for everyone/ });
 		await everyone.setChecked(!before);
-		const reread = page.waitForResponse(
-			(r) => new URL(r.url()).pathname === '/api/flags' && r.request().method() === 'GET'
+		await markDocument(page);
+
+		// The waiter takes only a flags read that starts after the answer of the successful save.
+		// A read that a visibility event started earlier cannot satisfy it.
+		let saved = false;
+		page.on('response', (r) => {
+			if (r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/admin/flags/beta_banner' && r.ok()) {
+				saved = true;
+			}
+		});
+		const reread = page.waitForRequest(
+			(r) => saved && new URL(r.url()).pathname === '/api/flags' && r.method() === 'GET'
 		);
 		await card.getByRole('button', { name: 'Save rule' }).click();
 		await expect(page.getByText('Flag saved.')).toBeVisible();
-		const after = ((await (await reread).json()) as { flags: Record<string, boolean> }).flags.beta_banner;
+		const answer = await (await reread).response();
+		expect(answer?.ok()).toBeTruthy();
+		const after = ((await answer!.json()) as { flags: Record<string, boolean> }).flags.beta_banner;
 		expect(after).toBe(!before);
 		expect(requests).toContain('PUT /api/admin/flags/beta_banner');
+
+		// The fixture page of run.sh prints the flag from the data of the root load. A client
+		// navigation does not run the root load again, so the page shows the state of the browser.
+		await clientNavigate(page, '/flag-probe');
+		await expect(page).toHaveURL(`${baseURL}/flag-probe`);
+		await expect(page.getByTestId('flag-beta-banner')).toHaveText(after ? 'on' : 'off');
+		expect(await documentMarked(page)).toBe(true);
 		expect(requests.filter((r) => r.startsWith('doc '))).toEqual([]);
 	});
 

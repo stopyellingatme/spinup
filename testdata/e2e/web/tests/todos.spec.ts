@@ -8,10 +8,12 @@ import {
 	createTodo,
 	documentMarked,
 	embed,
+	holdOnce,
 	isToggleWrite,
 	markDocument,
 	messages,
 	register,
+	roundTrip,
 	todoID,
 	uniqueEmail
 } from './helpers';
@@ -429,5 +431,192 @@ if (embed) {
 		await expect(save).toBeEnabled();
 		expect(await titleOf(api, a)).toBe('alpha late');
 		expect(await titleOf(api, b)).toBe('beta');
+	});
+
+	test('embed: a submit of another todo works while the save of the first waits, and a double submit sends one save', async ({ page }) => {
+		await register(page, uniqueEmail('edit-two'));
+		const { api, a, b } = await twoTodos(page);
+		const holdA = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await expect(title).toHaveValue('alpha');
+		await title.fill('A2');
+		await save.click();
+		await holdA.started;
+
+		// The page moves to beta. The held save of alpha must not drop the submit of beta.
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await expect(save).toBeEnabled();
+		await title.fill('B2');
+		// Keep this wait below the 8 second timeout of superforms: after it, superforms drops the old
+		// submit, and the submit of beta would pass also without the fix.
+		const writeB = page.waitForRequest(
+			(r) => r.method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${b}`,
+			{ timeout: 3000 }
+		);
+		await save.click();
+		await writeB;
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'B2', level: 1 })).toBeVisible();
+		expect(holdA.count()).toBe(1);
+
+		// The toast of beta goes away first, so the next toast can only come from alpha.
+		const toast = page.getByText('Changes saved.');
+		await expect(toast).toHaveCount(0, { timeout: 10_000 });
+		const doneA = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		holdA.release();
+		expect((await doneA).ok()).toBeTruthy();
+		await expect(toast).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		expect(await titleOf(api, a)).toBe('A2');
+		expect(await titleOf(api, b)).toBe('B2');
+
+		// Two submits of one todo start one save.
+		const again = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		await page.goto(`/todos/${a}/edit`);
+		await expect(title).toHaveValue('A2');
+		await title.fill('A3');
+		await page.locator('form').filter({ has: save }).evaluate((form: HTMLFormElement) => {
+			form.requestSubmit();
+			form.requestSubmit();
+		});
+		await again.started;
+		await roundTrip(page);
+		expect(again.count()).toBe(1);
+		const doneAgain = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		again.release();
+		expect((await doneAgain).ok()).toBeTruthy();
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}`);
+		await expect(page.getByRole('heading', { name: 'A3', level: 1 })).toBeVisible();
+		expect(again.count()).toBe(1);
+	});
+
+	test('embed: a late answer of a save or a create does not move a user who left the page', async ({ page }) => {
+		await register(page, uniqueEmail('late-leave'));
+		const { api, a } = await twoTodos(page);
+		const sidebarTodos = page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Todos' });
+		const listHeading = page.getByRole('heading', { name: 'Todos', level: 1 });
+
+		// Save: the user leaves the edit page through the sidebar while the save waits.
+		const save = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		await page.goto(`/todos/${a}/edit`);
+		await expect(page.getByLabel('Title')).toHaveValue('alpha');
+		await page.getByLabel('Title').fill('alpha left');
+		await page.getByRole('button', { name: /^Save/ }).click();
+		await save.started;
+		await sidebarTodos.click();
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		save.release();
+		expect((await saved).ok()).toBeTruthy();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		expect(await titleOf(api, a)).toBe('alpha left');
+
+		// Create: the user leaves the new page through the sidebar while the create waits.
+		const create = await holdOnce(page, 'POST', '/api/todos');
+		await page.goto('/todos/new');
+		await page.getByLabel('Title').fill('Created after leaving');
+		await page.getByRole('button', { name: 'Create todo' }).click();
+		await create.started;
+		await sidebarTodos.click();
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const created = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/todos');
+		create.release();
+		expect((await created).ok()).toBeTruthy();
+		await expect(page.getByText('Todo created.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos`);
+		await expect(listHeading).toBeVisible();
+		const list = (await (await api.get(`${apiURL}/api/todos`)).json()) as { items: { title: string }[] };
+		expect(list.items.map((item) => item.title)).toContain('Created after leaving');
+	});
+
+	test('embed: a late field error of a save keeps the new draft after a visit of another todo and back', async ({ page }) => {
+		await register(page, uniqueEmail('late-draft'));
+		const { api, a, b } = await twoTodos(page);
+		const save = await holdOnce(page, 'PUT', `/api/todos/${a}`);
+		const title = page.getByLabel('Title');
+
+		await page.goto(`/todos/${a}/edit`);
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha first');
+		await page.getByRole('button', { name: /^Save/ }).click();
+		await save.started;
+
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await clientNavigate(page, `/todos/${a}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		await expect(title).toHaveValue('alpha');
+		await title.fill('draft');
+
+		// The first save answers late with a problem that names the title.
+		const lateError = 'The title of the late answer is wrong.';
+		const answered = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		save.release({
+			status: 422,
+			body: { status: 422, title: 'Unprocessable Entity', detail: 'invalid', errors: [{ field: 'title', message: lateError }] }
+		});
+		expect((await answered).status()).toBe(422);
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		await expect(title).toHaveValue('draft');
+		await expect(page.getByText(lateError)).toHaveCount(0);
+		await expect(title).not.toHaveAttribute('aria-invalid', 'true');
+		await expect(page.locator('form').getByRole('alert')).toHaveCount(0);
+		expect(await titleOf(api, a)).toBe('alpha');
+	});
+
+	test('embed: a late answer of a delete changes nothing on the page of another todo', async ({ page }) => {
+		await register(page, uniqueEmail('late-delete'));
+		const { api, a, b } = await twoTodos(page);
+		const dialog = page.getByRole('alertdialog');
+
+		/** startDelete opens alpha, confirms the delete, and moves to beta while the delete waits. */
+		const startDelete = async () => {
+			const hold = await holdOnce(page, 'DELETE', `/api/todos/${a}`);
+			await page.goto(`/todos/${a}`);
+			await expect(page.getByRole('heading', { name: 'alpha', level: 1 })).toBeVisible();
+			await page.getByRole('button', { name: 'Delete', exact: true }).click();
+			await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+			await hold.started;
+			await clientNavigate(page, `/todos/${b}`);
+			await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+			await expect(page.getByRole('heading', { name: 'beta', level: 1 })).toBeVisible();
+			await expect(dialog).toHaveCount(0);
+			return hold;
+		};
+		const deleteAnswer = () =>
+			page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/todos/${a}`);
+
+		// A late 500 shows no error on beta.
+		const failing = await startDelete();
+		const failed = deleteAnswer();
+		failing.release({ status: 500, body: { status: 500, title: 'Internal Server Error' } });
+		expect((await failed).status()).toBe(500);
+		await roundTrip(page);
+		await expect(page.getByRole('alert')).toHaveCount(0);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		expect((await api.get(`${apiURL}/api/todos/${a}`)).status()).toBe(200);
+
+		// A late success shows its toast, and the user stays on beta.
+		const passing = await startDelete();
+		const deleted = deleteAnswer();
+		passing.release();
+		expect((await deleted).ok()).toBeTruthy();
+		await expect(page.getByText('Todo deleted.')).toBeVisible();
+		await roundTrip(page);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'beta', level: 1 })).toBeVisible();
+		expect((await api.get(`${apiURL}/api/todos/${a}`)).status()).toBe(404);
 	});
 }
