@@ -43,6 +43,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Performance: the generated `deploy/Dockerfile.api` keeps the Go build cache between image builds, and `api/.dockerignore` keeps local files out of the build context. After a handler edit, the API image builds in about 5 s, against about 19 s. The generated `deploy/Dockerfile.web` installs the production packages in a stage of their own. After a web edit, the web image builds in about 10 s, against about 21 s. The images do not change in size.
 - Performance: the web server (Node mode) loads the OpenTelemetry packages only when an OTLP endpoint is set, and `hooks.server.ts` asks the API for the session only when the request has a `session` cookie. A server without an endpoint starts with about 20 % less memory.
 - The generated `deploy/Dockerfile.web` sets `NODE_OPTIONS=--max-semi-space-size=16`. Under load the peak RSS of the web server is about 300 MiB, not about 430 MiB, so it stays well below the 512 MiB limit of `WEB_MEMORY`. A signed-in page serves about 5 % fewer requests each second. To remove the cap, set `NODE_OPTIONS` in the environment of the web service.
+- The kit pin of generated apps is `v0.1.0-alpha.1095`. This kit tag holds the session decode cache, the allocation cuts, embed mode with sign-in (`auth.WithResetFragment`), and the other kit changes above. `spinup upgrade` raises the kit in an existing app.
 
 ### Fixed
 
