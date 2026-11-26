@@ -11,68 +11,11 @@ import (
 
 func passwordResetRoutes(a *auth.Auth,m *mailapp.Mailers,origin string) (func(*http.ServeMux),error) {
  resets := http.NewServeMux()
- if err := a.ResetRoutes(resets,auth.WithMailer(m),auth.WithResetFrom(m.From),auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset"),auth.WithResetTemplates(mailapp.Templates)); err != nil { return nil,err }
+ if err := a.ResetRoutes(resets,auth.WithMailer(m),auth.WithResetFrom(m.From),[[ if eq (index . "frontend_mode") "embed" -]]
+auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset/confirm"),auth.WithResetFragment(),
+[[- else -]]
+auth.WithResetURL(strings.TrimRight(origin,"/")+"/reset"),
+[[- end -]]
+auth.WithResetTemplates(mailapp.Templates)); err != nil { return nil,err }
  return func(mux *http.ServeMux) { mux.Handle("/api/auth/reset/",resets) },nil
 }
-[[- if eq (index . "frontend_mode") "embed" ]]
-
-// resetPageHeaders keeps the token of a reset link out of every later request of the page. A GET or
-// HEAD of /reset/<token> gets Referrer-Policy: no-referrer and Cache-Control: no-store. The headers
-// are set when the answer is committed, so they replace the Cache-Control of the SPA handler, and
-// they also cover an implicit write and a 304. Every other request passes unchanged.
-func resetPageHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !isResetTokenPath(r.URL.EscapedPath()) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		guarded := &resetPageWriter{ResponseWriter: w}
-		next.ServeHTTP(guarded, r)
-		// A handler that writes nothing still sends the headers with its empty answer.
-		guarded.commit()
-	})
-}
-
-// isResetTokenPath reports whether path is /reset/ followed by exactly one nonempty segment.
-func isResetTokenPath(path string) bool {
-	token, ok := strings.CutPrefix(path, "/reset/")
-	return ok && token != "" && !strings.Contains(token, "/")
-}
-
-type resetPageWriter struct {
-	http.ResponseWriter
-	committed bool
-}
-
-func (w *resetPageWriter) commit() {
-	if w.committed {
-		return
-	}
-	w.committed = true
-	header := w.Header()
-	header.Set("Referrer-Policy", "no-referrer")
-	header.Set("Cache-Control", "no-store")
-}
-
-func (w *resetPageWriter) WriteHeader(status int) {
-	// An informational answer (1xx) is not the final answer. 101 ends the HTTP exchange.
-	if status < 100 || status >= 200 || status == http.StatusSwitchingProtocols {
-		w.commit()
-	}
-	w.ResponseWriter.WriteHeader(status)
-}
-
-func (w *resetPageWriter) Write(data []byte) (int, error) {
-	w.commit()
-	return w.ResponseWriter.Write(data)
-}
-
-// Flush commits the answer, as an implicit 200 does, then flushes.
-func (w *resetPageWriter) Flush() {
-	w.commit()
-	_ = http.NewResponseController(w.ResponseWriter).Flush()
-}
-
-// Unwrap lets http.ResponseController reach the server writer.
-func (w *resetPageWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
-[[- end ]]

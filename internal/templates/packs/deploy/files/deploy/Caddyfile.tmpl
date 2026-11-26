@@ -54,19 +54,6 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
 	}
-[[- if and (eq (index . "frontend_mode") "embed") (has "auth" .modules) (has "mail" .modules) ]]
-
-	# Defer these headers so they replace the site and upstream values.
-	@resetDocument {
-		method GET HEAD
-		path_regexp resetDocument ^/reset/[^/]+$
-	}
-	header @resetDocument {
-		defer
-		Referrer-Policy no-referrer
-		Cache-Control no-store
-	}
-[[- end ]]
 
 	import Caddyfile.d/*.caddy
 [[- if $web ]]

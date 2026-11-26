@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/stopyellingatme/spinup/kit/httpx"
@@ -277,5 +278,61 @@ func TestResetRequestLimits(t *testing.T) {
 				t.Fatalf("admitted after window: %d, want %d", got, tc.want+1)
 			}
 		})
+	}
+}
+
+type nopResetMailer struct{}
+
+func (nopResetMailer) Send(context.Context, mail.Message) error { return nil }
+
+// TestResetLinkShape checks both link shapes, with and without templates. Without
+// WithResetFragment the token follows a slash. With it the token follows a number sign.
+func TestResetLinkShape(t *testing.T) {
+	t.Parallel()
+	const token = "abcDEF_-123"
+	templates := fstest.MapFS{
+		"password_reset.subject.tmpl": {Data: []byte("Reset")},
+		"password_reset.txt.tmpl":     {Data: []byte("Open {{.URL}}")},
+		"password_reset.html.tmpl":    {Data: []byte(`<a href="{{.URL}}">Open</a>`)},
+	}
+	for _, tc := range []struct {
+		name string
+		opts resetOptions
+		want string
+	}{
+		{"path", resetOptions{baseURL: "https://app.example/reset"}, "https://app.example/reset/" + token},
+		{"fragment", resetOptions{baseURL: "https://app.example/reset/confirm", fragment: true}, "https://app.example/reset/confirm#" + token},
+		{"path with templates", resetOptions{baseURL: "https://app.example/reset", templates: templates}, "https://app.example/reset/" + token},
+		{"fragment with templates", resetOptions{baseURL: "https://app.example/reset/confirm", fragment: true, templates: templates}, "https://app.example/reset/confirm#" + token},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.opts.from = "app@example.com"
+			msg, err := resetMessage(tc.opts, "ada@example.com", token)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantText := "Reset your password: " + tc.want + "\nThis link expires in one hour."
+			if tc.opts.templates != nil {
+				wantText = "Open " + tc.want
+				if wantHTML := `<a href="` + tc.want + `">Open</a>`; msg.HTML != wantHTML {
+					t.Errorf("html = %q, want %q", msg.HTML, wantHTML)
+				}
+			}
+			if msg.Text != wantText {
+				t.Errorf("text = %q, want %q", msg.Text, wantText)
+			}
+		})
+	}
+}
+
+// TestResetFragmentURLValidation checks that WithResetFragment keeps the validation of the base URL.
+func TestResetFragmentURLValidation(t *testing.T) {
+	t.Parallel()
+	for _, base := range []string{"https://app.example/reset#x", "https://app.example/reset?x=1", "ftp://app.example/reset", "/reset"} {
+		err := (&Auth{}).ResetRoutes(http.NewServeMux(), WithMailer(nopResetMailer{}), WithResetFrom("app@example.com"), WithResetURL(base), WithResetFragment())
+		if err == nil || !strings.Contains(err.Error(), "the public reset URL is invalid") {
+			t.Errorf("base %q: error = %v, want the invalid URL error", base, err)
+		}
 	}
 }
