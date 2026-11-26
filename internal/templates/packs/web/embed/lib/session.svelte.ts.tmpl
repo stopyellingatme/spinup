@@ -64,35 +64,58 @@ async function settle(fetch: typeof globalThis.fetch, n: number): Promise<Sessio
 		while (pauseEnd) await pauseEnd.promise;
 		if (leaving) return departed;
 		const started = generation;
-		let result: SessionData | undefined;
+		// Start both requests before the first await.
+		const reading = loadSession(fetch);
+[[- if has "flags" .modules ]]
+		// loadFlags never rejects: a failed flags read gives an empty map.
+		const flags = loadFlags(fetch);
+[[- end ]]
+		let user: App.User | null | undefined;
 		let failure: unknown;
 		try {
-			// Start both requests before the first await.
-			const user = loadSession(fetch);
-[[- if has "flags" .modules ]]
-			const flags = loadFlags(fetch);
-			result = { user: await user, flags: await flags };
-[[- else ]]
-			result = { user: await user, flags: {} };
-[[- end ]]
+			user = await reading;
 		} catch (err) {
 			failure = err;
 		}
-		if (leaving) return departed;
-		if (n !== reads) return latest;
-		// A sign-out started during the read: its answer belongs to the old generation.
-		if (started !== generation || signingOut) continue;
-		if (!result) throw failure;
-		return publish(result);
+		let next = interrupted(n, started);
+		if (next === 'again') continue;
+		if (next) return next;
+		if (user === undefined) throw failure;
+		// Compare the identity before the flags answer: a stalled flags read must not keep the
+		// page of one user visible after the session names another.
+		if (changed(user)) return departed;
+[[- if has "flags" .modules ]]
+		const published = { user, flags: await flags };
+		next = interrupted(n, started);
+		if (next === 'again') continue;
+		if (next) return next;
+		return publish(published);
+[[- else ]]
+		return publish({ user, flags: {} });
+[[- end ]]
 	}
 }
 
+// interrupted reports what a read does after an await. A departure ends it with a promise that
+// never settles. A newer read gives it the result of the newer read. A sign-out that started
+// during the read makes it read again: its answer belongs to the old generation.
+function interrupted(n: number, started: number): Promise<SessionData> | 'again' | undefined {
+	if (leaving) return departed;
+	if (n !== reads) return latest;
+	if (started !== generation || signingOut) return 'again';
+	return undefined;
+}
+
+// changed leaves the session when the verified identity differs from the accepted one. Another
+// tab, or the API, changed the identity. Never show one user's data to another.
+function changed(user: App.User | null): boolean {
+	if (!accepted || sameUser(data.user, user)) return false;
+	leaveSession(user ? home : '/login');
+	return true;
+}
+
 function publish(next: SessionData): Promise<SessionData> | SessionData {
-	if (accepted && !sameUser(data.user, next.user)) {
-		// Another tab, or the API, changed the identity. Never show one user's data to another.
-		leaveSession(next.user ? home : '/login');
-		return departed;
-	}
+	if (changed(next.user)) return departed;
 	accepted = true;
 	data = next;
 	return next;
