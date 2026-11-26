@@ -67,3 +67,9 @@ path = '[[ "web/src/routes/admin/flags/+page.svelte" ]]'
 source = "embed/routes/admin/flags/+page.svelte"
 class = "scaffold"
 when = "frontend_mode == 'embed'"
+
+[[files]]
+path = "web/src/lib/flags-admin.test.ts"
+source = "embed/lib/flags-admin.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed'"
