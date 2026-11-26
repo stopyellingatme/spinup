@@ -246,3 +246,13 @@ func TestGeneratedJobKitMigrations(t *testing.T) {
 		})
 	}
 }
+
+func TestLazyTemplatesRender(t *testing.T) {
+	out, err := generator(t).Run(context.Background(), gen.Input{Root: t.TempDir(), Lock: lock("base", "api", "jobs"), Args: []string{"send_digest"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Plan.Files) != 3 {
+		t.Fatalf("got %d generated files, want 3", len(out.Plan.Files))
+	}
+}
