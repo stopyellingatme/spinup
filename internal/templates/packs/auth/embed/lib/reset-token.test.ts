@@ -1,9 +1,12 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
 // The tests of lib/reset-token.ts: the read-and-strip step, the held token, the visit of the reset
-// page, the cases without a token, and the take at import. Each test gets a new module, so no token
-// stays from another test.
+// page, a link that arrives later, the cases without a token, and the take at import. Each test gets
+// a new module, so no token stays from another test.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TokenHistory } from './reset-token.js';
+
+const mocks = vi.hoisted(() => ({ invalidate: vi.fn() }));
+vi.mock('$app/navigation', () => ({ invalidate: mocks.invalidate }));
 
 const token = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
 const other = 'b3RoZXJ0b2tlbmZvcmFub3RoZXJsaW5rMDEyMzQ1Njc';
@@ -13,6 +16,8 @@ let followResetVisit: typeof import('./reset-token.js').followResetVisit;
 
 beforeEach(async () => {
 	vi.resetModules();
+	mocks.invalidate.mockReset();
+	mocks.invalidate.mockResolvedValue(undefined);
 	({ takeResetToken, followResetVisit } = await import('./reset-token.js'));
 });
 
@@ -91,7 +96,7 @@ describe('the visit of the reset page', () => {
 		// card can hide the page at that time: the token goes away all the same.
 		const away = fixture('');
 		away.location.pathname = '/reset';
-		followResetVisit(away.location);
+		followResetVisit(away.location, away.history);
 		// A later visit without a fragment gets no token, so the page shows the invalid-link message.
 		const later = fixture('');
 		expect(takeResetToken(later.location, later.history)).toBeNull();
@@ -102,21 +107,71 @@ describe('the visit of the reset page', () => {
 		expect(takeResetToken(location, history)).toBe(token);
 		// The first navigation of the document ends on the page. A retry of the session read is not
 		// a navigation at all.
-		followResetVisit(location);
+		followResetVisit(location, history);
 		expect(takeResetToken(location, history)).toBe(token);
+		expect(mocks.invalidate).not.toHaveBeenCalled();
+	});
+});
+
+// load imports a new module in a fake browser window at pathname with the fragment hash.
+async function load(pathname: string, hash: string) {
+	const { location, history, calls } = fixture(hash);
+	location.pathname = pathname;
+	const win = Object.assign(new EventTarget(), { location, history });
+	vi.stubGlobal('window', win);
+	vi.resetModules();
+	const module = await import('./reset-token.js');
+	return { module, win, location, history, calls };
+}
+
+describe('a reset link that arrives later', () => {
+	it('takes a fragment that arrives on the reset page', async () => {
+		const { module, win, location, history, calls } = await load('/reset/confirm', '#' + token);
+		// The user pastes a second link into the address bar. The browser sends popstate first.
+		location.hash = '#' + other;
+		win.dispatchEvent(new Event('popstate'));
+		expect(calls.map((call) => call.url)).toEqual(['/reset/confirm', '/reset/confirm']);
+		expect(location.hash).toBe('');
+		expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith(module.RESET_TOKEN_DEP);
+		expect(module.takeResetToken(location, history)).toBe(other);
+		// The hashchange event that follows finds no fragment and changes nothing.
+		win.dispatchEvent(new Event('hashchange'));
+		expect(calls).toHaveLength(2);
+		expect(mocks.invalidate).toHaveBeenCalledOnce();
+	});
+
+	it('takes a fragment on hashchange alone', async () => {
+		const { module, win, location, history, calls } = await load('/reset/confirm', '');
+		expect(module.takeResetToken(location, history)).toBeNull();
+		location.hash = '#' + other;
+		win.dispatchEvent(new Event('hashchange'));
+		expect(calls.map((call) => call.url)).toEqual(['/reset/confirm']);
+		expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith(module.RESET_TOKEN_DEP);
+		expect(module.takeResetToken(location, history)).toBe(other);
+	});
+
+	it('takes the token of a client navigation to the reset page', async () => {
+		const { module } = await load('/reset', '');
+		// The router committed /reset/confirm#<token>. Then the root layout calls followResetVisit.
+		const { location, history, calls } = fixture('#' + other);
+		module.followResetVisit(location, history);
+		expect(calls.map((call) => call.url)).toEqual(['/reset/confirm']);
+		expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith(module.RESET_TOKEN_DEP);
+		expect(module.takeResetToken(location, history)).toBe(other);
+	});
+
+	it('leaves a fragment of another page alone', async () => {
+		const { win, location, calls } = await load('/docs', '');
+		location.hash = '#install';
+		win.dispatchEvent(new Event('popstate'));
+		win.dispatchEvent(new Event('hashchange'));
+		expect(calls).toEqual([]);
+		expect(location.hash).toBe('#install');
+		expect(mocks.invalidate).not.toHaveBeenCalled();
 	});
 });
 
 describe('the take at import', () => {
-	async function load(pathname: string, hash: string) {
-		const { location, history, calls } = fixture(hash);
-		location.pathname = pathname;
-		vi.stubGlobal('window', { location, history });
-		vi.resetModules();
-		const module = await import('./reset-token.js');
-		return { module, location, history, calls };
-	}
-
 	it('takes the token of the reset page before the router reads the address', async () => {
 		const { module, location, history, calls } = await load('/reset/confirm', '#' + token);
 		expect(calls.map((call) => call.url)).toEqual(['/reset/confirm']);

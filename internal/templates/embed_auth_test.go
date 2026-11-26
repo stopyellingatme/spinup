@@ -317,14 +317,17 @@ func testResetEmbed(t *testing.T, tree fs.FS) {
 		"history.replaceState(history.state, '', location.pathname + location.search)",
 		"if (location.hash === '') return held;",
 		"window.location?.pathname === CONFIRM) takeResetToken();",
-		"if (location.pathname !== CONFIRM) held = null;",
+		"if (location.pathname !== CONFIRM) {\n\t\theld = null;",
+		"window.addEventListener('popstate', onAddress, { capture: true });",
+		"window.addEventListener('hashchange', onAddress);",
+		"void invalidate(RESET_TOKEN_DEP);",
 	} {
 		if !strings.Contains(helper, want) {
 			t.Errorf("reset-token.ts lacks %q", want)
 		}
 	}
 	// The universal load takes the token: it runs also when the root layout hides the page.
-	if load := embedFile(t, tree, "web/src/routes/reset/confirm/+page.ts"); !strings.Contains(load, "export const load: PageLoad = () => ({ token: takeResetToken() });") {
+	if load := embedFile(t, tree, "web/src/routes/reset/confirm/+page.ts"); !strings.Contains(load, "depends(RESET_TOKEN_DEP);\n\treturn { token: takeResetToken() };") {
 		t.Errorf("the reset confirm load does not take the token:\n%s", load)
 	}
 	if strings.Contains(confirm, "takeResetToken") {

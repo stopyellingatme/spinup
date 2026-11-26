@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { defaults, setError, setMessage, superForm, type ErrorStatus } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { postAuth } from '#lib/auth.js';
@@ -12,7 +13,7 @@
 	const token = $derived(data.token);
 	const adapter = zod4(resetConfirmSchema);
 	// The browser posts to /api/auth/reset/confirm. The token goes only in the JSON body.
-	const { form, errors, message, submitting, enhance } = superForm(defaults(adapter), {
+	const { form, errors, message, submitting, enhance, reset } = superForm(defaults(adapter), {
 		SPA: true,
 		id: '/api/auth/reset/confirm',
 		validators: adapter,
@@ -33,6 +34,16 @@
 			announceSessionChange();
 			leaveSession('/login');
 		}
+	});
+
+	// A second reset link can arrive while the page shows. The form then starts again: the password
+	// and the message of the old link do not belong to the new one.
+	let shownToken = untrack(() => data.token);
+	$effect.pre(() => {
+		const next = data.token;
+		if (next === shownToken) return;
+		shownToken = next;
+		reset();
 	});
 </script>
 
