@@ -249,6 +249,7 @@ func New(pool *pgxpool.Pool, opts ...Option) (*Auth, error) {
 	}))
 
 	a.sessions = scs.New()
+	a.sessions.Codec = &sessionCodec{}
 	// The store reads the session user in the same query as the session. The
 	// cleanup goroutine of Auth deletes expired rows, with logging and a clean stop.
 	a.sessions.Store = sessionStore{a: a}
