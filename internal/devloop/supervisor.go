@@ -153,11 +153,11 @@ func supervise(ctx context.Context, starter Starter, p Process, index int, log *
 			case runErr = <-exited:
 				dead = true
 				cancelReady()
-				<-checked
+				drain(checked)
 			case <-ctx.Done():
 				cancelReady()
 				stopChild(child, exited)
-				<-checked
+				drain(checked)
 				stdout.flush()
 				stderr.flush()
 				return ctx.Err()
@@ -211,6 +211,13 @@ func supervise(ctx context.Context, starter Starter, p Process, index int, log *
 	}
 }
 
+// drain waits for the one value of ch. The caller already has the outcome, so
+// it does not use the value.
+func drain(ch <-chan error) {
+	err := <-ch
+	_ = err
+}
+
 func stopChild(child Child, exited <-chan error) {
 	_ = child.Terminate()
 	timer := time.NewTimer(5 * time.Second)
@@ -223,14 +230,15 @@ func stopChild(child Child, exited <-chan error) {
 			return
 		}
 		select {
-		case <-exited:
+		case err := <-exited:
+			_ = err // The exit status of a child that this function stops has no use.
 			reaped = true
 			exited = nil
 		case <-ticker.C:
 		case <-timer.C:
 			_ = child.Kill()
 			if !reaped {
-				<-exited
+				drain(exited)
 			}
 			return
 		}
