@@ -291,7 +291,7 @@ func TestEmbedPagesFields(t *testing.T) {
 	if !strings.Contains(list, "body: { ...toBody(fromItem(current.data), current.data), done: value }") {
 		t.Errorf("the toggle does not keep the original time:\n%s", list)
 	}
-	if edit := file(t, embedPlan, "[id]/edit/+page.svelte"); !strings.Contains(edit, "body: toBody(form.data, original)") {
+	if edit := file(t, embedPlan, "[id]/edit/+page.svelte"); !strings.Contains(edit, "body: toBody(form.data, item)") {
 		t.Errorf("the edit page does not keep the original time:\n%s", edit)
 	}
 }
@@ -338,7 +338,7 @@ func TestEmbedPagesPendingFlags(t *testing.T) {
 	plan := planSpec(t, todoSpec(t, embedApp(t, nil, nil), goldenArgs[1:]...))
 	for name, wants := range map[string][]string{
 		"+page.svelte":           {"} catch (err) {", "toast.error(unreachable);", "} finally {\n\t\t\tdeleting = false;\n\t\t\tconfirming = false;\n\t\t}", "} finally {\n\t\t\tdelete pending[id];\n\t\t}"},
-		"[id]/+page.svelte":      {"failure = unreachable;", "} finally {\n\t\t\tdeleting = false;\n\t\t\tconfirming = false;\n\t\t}", "await goto('/todos', { invalidate: [RESOURCE_DEP] });", "toast.success('Todo deleted.');"},
+		"[id]/+page.svelte":      {"failure = unreachable;", "} finally {\n\t\t\tif (deleting === id) deleting = null;\n\t\t\tif (id === data.item.id) confirming = false;\n\t\t}", "await goto('/todos', { invalidate: [RESOURCE_DEP] });", "toast.success('Todo deleted.');"},
 		"new/+page.svelte":       {"setMessage(form, unreachable, { status: 503 });", "toast.success('Todo created.');", "await goto(`/todos/${data.id}`);", "SPA: true,", "Create todo"},
 		"[id]/edit/+page.svelte": {"setMessage(form, unreachable, { status: 503 });", "toast.success('Changes saved.');", "await goto(`/todos/${saved.id}`, { invalidate: [RESOURCE_DEP] });", "SPA: true,", "Save changes"},
 		"+page.ts":               {"error(503, unreachable);", "limit: perPage, offset: (page - 1) * perPage", "redirect(303, last.pathname + last.search);"},
@@ -349,6 +349,58 @@ func TestEmbedPagesPendingFlags(t *testing.T) {
 			if !strings.Contains(data, want) {
 				t.Errorf("%s does not contain %q", name, want)
 			}
+		}
+	}
+}
+
+// TestEmbedPagesSameComponent checks the pages that SvelteKit keeps when only
+// the id changes, for example on a client navigation from /todos/1/edit to
+// /todos/2/edit. The edit form, its save, and its busy state belong to one
+// item: a new id starts the form again, a new load of the same id keeps the
+// draft, and a late answer for the old item changes nothing. The read view
+// drops the dialog and the error of the old item.
+func TestEmbedPagesSameComponent(t *testing.T) {
+	t.Parallel()
+	// TestEmbedPagesClients shows that both API clients get the same pages.
+	plan := planSpec(t, todoSpec(t, embedAuthApp(t), "title:string", "done:bool", "due:date?"))
+	edit := file(t, plan, "[id]/edit/+page.svelte")
+	for _, want := range []string{
+		"let original = untrack(() => data.item);",
+		"async onUpdate({ form, cancel }) {",
+		"const item = original;\n\t\t\tconst path = { id: item.id };\n\t\t\tsaving = item.id;",
+		"if (saving === path.id) saving = null;",
+		"if (original.id !== path.id) {\n",
+		"\t\t\t\tcancel();\n",
+		"const submitting = toStore(() => saving === data.item.id);",
+		"$effect.pre(() => {\n\t\tconst item = data.item;\n\t\tif (item.id === original.id) return;\n\t\toriginal = item;\n\t\tform.reset({ data: fromItem(item), newState: fromItem(item) });\n\t});",
+		"import { toStore } from 'svelte/store';",
+	} {
+		if !strings.Contains(edit, want) {
+			t.Errorf("the edit page does not contain %q", want)
+		}
+	}
+	// The late-answer check comes before every write to the form and before each navigation.
+	check := strings.Index(edit, "if (original.id !== path.id)")
+	for _, later := range []string{"setMessage(form, unreachable", "applyFailure(form", "await goto("} {
+		if i := strings.Index(edit, later); i < check {
+			t.Errorf("%q comes before the check of the item id", later)
+		}
+	}
+	if strings.Contains(edit, "const { enhance, message, submitting } = form;") {
+		t.Errorf("the edit page uses the busy state of superForm, which does not know the item")
+	}
+
+	item := file(t, plan, "[id]/+page.svelte")
+	for _, want := range []string{
+		"let deleting: number | null = $state(null);",
+		"const id = item.id;\n\t\tif (deleting === id) return;",
+		"if (id !== data.item.id) {",
+		"let shown = untrack(() => data.item.id);",
+		"confirming = false;\n\t\tfailure = '';",
+		"disabled={deleting === item.id}",
+	} {
+		if !strings.Contains(item, want) {
+			t.Errorf("the read view does not contain %q", want)
 		}
 	}
 }
