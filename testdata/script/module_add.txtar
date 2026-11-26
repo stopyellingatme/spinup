@@ -69,18 +69,42 @@ stdout 'git merge spinup/module-monitoring'
 grep '^modules = .*deploy.*monitoring' .spinup/upgrade/0.0.0-dev/spinup.toml
 grep '"monitoring_profile": "lite"' .spinup/upgrade/0.0.0-dev/spinup.lock
 
-# Embed mode refuses auth before creating a branch, worktree, or upgrade state.
+# Embed mode refuses four modules before creating a branch, worktree, or upgrade state (ADR 0039).
 cd $WORK
 exec spinup new embedded --frontend-mode embed --modules ci --module example.com/embedded --non-interactive
 cd embedded
 cp spinup.lock $WORK/embed.lock
 cp spinup.toml $WORK/embed.toml
-! exec spinup module add auth --yes --non-interactive
-stderr 'cannot use auth in embed mode: its pages require SvelteKit form actions'
-stderr 'Try: use --frontend-mode node, or remove auth from --modules'
+! exec spinup module add apikeys --yes --non-interactive
+stderr 'cannot use apikeys in embed mode: the API key pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for apikeys'
 ! exists .spinup/upgrade.json .spinup/upgrade/0.0.0-dev
-exec git branch --list spinup/module-auth
+exec git branch --list spinup/module-apikeys
 ! stdout .
+exec git status --porcelain
+! stdout .
+cmp spinup.lock $WORK/embed.lock
+cmp spinup.toml $WORK/embed.toml
+
+# Adding auth makes a review branch with the browser pages and no server auth files.
+exec spinup module add auth --yes --non-interactive
+stdout 'git merge spinup/module-auth'
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/login/+page.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/routes/login/+page.svelte
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/auth.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/session.svelte.ts
+exists .spinup/upgrade/0.0.0-dev/web/src/lib/sign-out.ts
+! exists .spinup/upgrade/0.0.0-dev/web/src/routes/login/+page.server.ts
+! exists .spinup/upgrade/0.0.0-dev/web/src/routes/logout/+page.server.ts
+! exists .spinup/upgrade/0.0.0-dev/web/src/lib/server/auth.ts
+! exists .spinup/upgrade/0.0.0-dev/web/src/hooks.server.ts
+grep '^modules = .*auth' .spinup/upgrade/0.0.0-dev/spinup.toml
+grep 'auth/embed/routes/login/\+page.ts' .spinup/upgrade/0.0.0-dev/spinup.lock
+grep 'depends\(SESSION_DEP, FLAGS_DEP\)' .spinup/upgrade/0.0.0-dev/web/src/routes/+layout.ts
+exec git show spinup/module-auth:web/src/routes/login/+page.ts
+stdout 'requireGuest'
+# The main checkout stays clean.
+! exists web/src/routes/login web/src/lib/auth.ts
 exec git status --porcelain
 ! stdout .
 cmp spinup.lock $WORK/embed.lock

@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stopyellingatme/spinup/internal/gen/fields"
+	"github.com/stopyellingatme/spinup/internal/gen/newapp"
 	"github.com/stopyellingatme/spinup/internal/manifest"
 	"github.com/stopyellingatme/spinup/internal/project"
 )
@@ -54,6 +55,11 @@ func configureAudit(spec *Spec, flags *pflag.FlagSet, config *project.Config, co
 		return fmt.Errorf("read spinup.lock: %w\nTry: restore a valid spinup.lock", err)
 	}
 	module := lock != nil && slices.Contains(lock.Packs, "audit")
+	if Bool(flags, "audit") {
+		if err := checkEmbedAudit(lock, !Bool(flags, "api-only")); err != nil {
+			return err
+		}
+	}
 	if Bool(flags, "audit") && !module {
 		return fmt.Errorf("cannot audit the resource because the audit module is missing\nTry: spinup module add audit")
 	}
@@ -98,6 +104,25 @@ func configureAudit(spec *Spec, flags *pflag.FlagSet, config *project.Config, co
 		}
 	}
 	sort.Strings(spec.Audit.Redact)
+	return nil
+}
+
+// errEmbedHistory is the refusal of history pages in embed mode (ADR 0039, section 10.4).
+var errEmbedHistory = errors.New("cannot generate history pages in embed mode: the history page requires a SvelteKit server\nTry: use an app with --frontend-mode node")
+
+// checkEmbedAudit refuses an explicit audit request in embed mode (ADR 0039, section 10.4).
+// Without the audit pack it returns the module refusal of embed mode. A legacy or hand-edited
+// lock can hold audit already: then only history pages are refused, and the trail alone passes.
+func checkEmbedAudit(lock *manifest.Lock, pages bool) error {
+	if lock == nil || lock.Answers["frontend_mode"] != "embed" {
+		return nil
+	}
+	if !slices.Contains(lock.Packs, "audit") {
+		return newapp.EmbedModuleError("audit")
+	}
+	if pages {
+		return errEmbedHistory
+	}
 	return nil
 }
 
@@ -214,6 +239,14 @@ func ExistingAuditSpec(root, target string, flags *pflag.FlagSet) (Spec, bool, e
 		if err != nil {
 			return Spec{}, false, err
 		}
+	}
+	// spinup g audit is an explicit audit request. Embed mode refuses it before the advice to add audit.
+	lock, err := manifest.Load(filepath.Join(root, "spinup.lock"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return Spec{}, false, fmt.Errorf("read spinup.lock: %w\nTry: restore a valid spinup.lock", err)
+	}
+	if err := checkEmbedAudit(lock, isResource && !Bool(flags, "api-only")); err != nil {
+		return Spec{}, false, err
 	}
 	if err := configureAudit(&spec, flags, config, columns); err != nil {
 		return Spec{}, false, err

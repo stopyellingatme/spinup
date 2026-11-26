@@ -38,10 +38,13 @@ The auth pages use SvelteKit form actions, which need a server.
 So embed mode refuses this command:
 
 ```console
-$ spinup module add auth
-Error: cannot use auth in embed mode: its pages require SvelteKit form actions
-  Try: use --frontend-mode node, or remove auth from --modules
-[exit 1]
+$ spinup module add auth --dry-run --yes --non-interactive
+Upgrade 0.0.0-dev -> 0.0.0-dev
+...
+  web/src/lib/session.svelte.ts
+...
+  web/src/routes/login/+page.ts
+...
 ```
 
 `spinup g resource` also stops, because it writes server pages.

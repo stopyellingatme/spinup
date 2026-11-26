@@ -1,8 +1,21 @@
 package modules
 
-// FlagsNextSteps returns the manual wiring steps for an existing app with flags.
+// FlagsNextSteps returns the manual wiring steps for an existing app with flags in node mode.
 func FlagsNextSteps() string {
-	return `Next: declare a flag in spinup.toml, for example:
+	return flagsGoSteps + flagsNodeWebSteps + flagsTailSteps
+}
+
+// FlagsNextStepsFor returns the manual wiring steps for the frontend mode of the lock.
+// Embed mode reads the flags in the browser, so its web steps are checks of the browser root load
+// and the admin link (ADR 0039, section 10.7). Node mode gets the bytes of FlagsNextSteps.
+func FlagsNextStepsFor(frontendMode any) string {
+	if frontendMode == "embed" {
+		return flagsGoSteps + flagsEmbedWebSteps + flagsTailSteps
+	}
+	return FlagsNextSteps()
+}
+
+const flagsGoSteps = `Next: declare a flag in spinup.toml, for example:
  [flags.new_checkout]
  description = "The new checkout flow"
  public = true
@@ -18,10 +31,19 @@ Next: add these options to app.New(...), after app.WithMiddleware(authn.Middlewa
  app.WithCommand("flags", flagStore.Command()),
  app.WithReadiness("flags", flagStore.Ready),
  app.WithShutdown(flagStore.Close),
-Next: in web/src/hooks.server.ts, load GET /api/flags next to the session and set locals.flags.
+`
+
+const flagsNodeWebSteps = `Next: in web/src/hooks.server.ts, load GET /api/flags next to the session and set locals.flags.
  In web/src/app.d.ts add flags: Record<string, boolean> to Locals. In web/src/routes/+layout.server.ts return flags.
  In web/src/routes/+layout.svelte pass the Feature flags link to UserMenu. See docs/build/flags.md.
-Next: run spinup db migrate up before starting the new binary.
+`
+
+const flagsEmbedWebSteps = `Next: check web/src/lib/session.svelte.ts: the browser root load reads GET /api/flags next to the session.
+ The file is managed, so the module branch updates it. Do not add a server hook.
+ Check that web/src/routes/+layout.svelte passes the Feature flags link (/admin/flags) to UserMenu for the admin role.
+ The layout is a scaffold: review its merge on the module branch. See docs/build/flags.md.
+`
+
+const flagsTailSteps = `Next: run spinup db migrate up before starting the new binary.
 Next: run spinup doctor and inspect the flags-drift and flags-wired checks.
 `
-}

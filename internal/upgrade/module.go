@@ -120,6 +120,8 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 	if _, err := r.preview(ctx, lock, versions, o.Options, change); err != nil {
 		return err
 	}
+	// Embed mode reads flags and live data in the browser, so its web advice differs (ADR 0039, section 10.7).
+	mode := lock.Answers["frontend_mode"]
 	if slices.Contains(selection.Added, "audit") {
 		// main.go is a scaffold file, so the owner wires the audit module by hand (ADR 0025).
 		if _, err := fmt.Fprint(r.Out, modules.AuditNextSteps()); err != nil {
@@ -127,7 +129,7 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 		}
 	}
 	if slices.Contains(selection.Added, "flags") {
-		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.FlagsNextSteps(), "<module>", cfg.App.Module)); err != nil {
+		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.FlagsNextStepsFor(mode), "<module>", cfg.App.Module)); err != nil {
 			return err
 		}
 	}
@@ -147,7 +149,7 @@ func (r *Runner) AddModules(ctx context.Context, o ModuleOptions) error {
 		}
 	}
 	if slices.Contains(selection.Added, "live") {
-		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.LiveNextSteps(), "<module>", cfg.App.Module)); err != nil {
+		if _, err := fmt.Fprint(r.Out, strings.ReplaceAll(modules.LiveNextStepsFor(mode), "<module>", cfg.App.Module)); err != nil {
 			return err
 		}
 	}

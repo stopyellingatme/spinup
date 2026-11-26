@@ -19,7 +19,7 @@ func planHistoryPages(spec Spec) (vfs.Plan, error) {
 		return vfs.Plan{}, err
 	}
 	if lock.Answers["frontend_mode"] == "embed" {
-		return vfs.Plan{}, fmt.Errorf("cannot generate history pages in embed mode\nTry: use an app with --frontend-mode node")
+		return vfs.Plan{}, errEmbedHistory
 	}
 	if err := checkPageInputs(spec.Root, true); err != nil {
 		return vfs.Plan{}, err

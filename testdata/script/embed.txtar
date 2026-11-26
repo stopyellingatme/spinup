@@ -26,9 +26,16 @@ stderr 'embed mode'
 stderr 'Try:'
 ! exists api/db/migrations/00002_create_todos.sql
 cd ..
-! exec spinup new invalid --module example.com/invalid --frontend-mode embed --modules auth --no-git --non-interactive
-stderr 'cannot use auth in embed mode'
-stderr 'Try:'
+# Embed mode creates an app with auth: the browser pages call the Go API (ADR 0039).
+exec spinup new withauth --module example.com/withauth --frontend-mode embed --modules auth --no-git --non-interactive
+exists withauth/web/src/routes/login/+page.ts withauth/web/src/routes/login/+page.svelte withauth/web/src/lib/auth.ts withauth/web/src/lib/session.svelte.ts
+! exists withauth/web/src/hooks.server.ts withauth/web/src/lib/server/auth.ts withauth/web/src/routes/login/+page.server.ts withauth/web/src/routes/logout/+page.server.ts
+grep 'ssr = false' withauth/web/src/routes/+layout.ts
+grep 'auth.WithTrustedOrigins' withauth/api/cmd/api/main.go
+# Embed mode still refuses the modules whose pages need a SvelteKit server.
+! exec spinup new invalid --module example.com/invalid --frontend-mode embed --modules auth,apikeys --no-git --non-interactive
+stderr 'cannot use apikeys in embed mode: the API key pages require a SvelteKit server'
+stderr 'Try: use --frontend-mode node for apikeys'
 ! exists invalid
 cd embedded
 env GOWORK=off
