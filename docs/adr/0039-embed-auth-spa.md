@@ -182,6 +182,7 @@ Do the stages in this order. The first stage helps embed mode without sign-in.
 - Sign-out stops every local live stream before it sends the request. Completion depends on events. There is no grace period.
 - The root reads public flags at bootstrap, on a session refresh, and after a successful admin write. Ordinary navigation reuses that result.
 - This run makes one change in `kit/`: the option `auth.WithResetFragment` (section 10.10). The first plan had no kit change. A security finding of the build changed that.
+  The owner confirmed this default on 2026-11-25. The other choice was the path link with a log filter. The owner declined it.
 - Embed mode gets its own bundle budget, `perf/budgets-embed.json` (section 10.9). The node budget does not change.
 
 ## 9. Not done
