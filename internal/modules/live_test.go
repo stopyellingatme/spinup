@@ -28,3 +28,17 @@ func TestLiveNextSteps(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveNextStepsFor(t *testing.T) {
+	t.Parallel()
+	if LiveNextStepsFor("node") != LiveNextSteps() || LiveNextStepsFor(nil) != LiveNextSteps() {
+		t.Fatal("node advice changed")
+	}
+	embed := LiveNextStepsFor("embed")
+	if !strings.Contains(embed, "liveRefresh('<feed>', { invalidate: RESOURCE_DEP })") || strings.Contains(embed, "liveRefresh('<feed>') ") {
+		t.Fatalf("embed advice=%s", embed)
+	}
+	if !strings.Contains(embed, "app.WithDrain(liveHub.Drain)") || !strings.HasSuffix(embed, "Next: run spinup doctor and inspect the live-wired check.\n") {
+		t.Fatalf("embed advice lost the Go steps: %s", embed)
+	}
+}

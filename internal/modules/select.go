@@ -59,15 +59,21 @@ func Select(ctx context.Context, o SelectOptions) (*Selection, error) {
 		}
 		requested[name] = true
 	}
+	// Embed mode refuses some modules (ADR 0039, section 10.4). Check the requested names
+	// before the dependencies, so a request for mcp names mcp and not apikeys.
+	mode := o.Lock.Answers["frontend_mode"]
+	if err := newapp.CheckEmbedModules(mode, o.Names, nil); err != nil {
+		return nil, err
+	}
 	selected := map[string]*templates.Pack{}
 	visiting := map[string]bool{}
 	var add func(string) error
 	add = func(name string) error {
-		if name == "auth" && o.Lock.Answers["frontend_mode"] == "embed" {
-			return fmt.Errorf("cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules")
-		}
 		if selected[name] != nil {
 			return nil
+		}
+		if err := newapp.CheckEmbedModules(mode, nil, []string{name}); err != nil {
+			return err
 		}
 		if visiting[name] {
 			return fmt.Errorf("select module %q: dependency cycle\nTry: use packs without cyclic requirements", name)
@@ -79,6 +85,9 @@ func Select(ctx context.Context, o SelectOptions) (*Selection, error) {
 		p, err := templates.Load(o.FS, name)
 		if err != nil {
 			return err
+		}
+		if name == "auth" && mode == "embed" && !slices.Contains(o.Lock.Packs, "auth") && !hasEmbedAuth(p) {
+			return fmt.Errorf("cannot add auth in embed mode: the locked templates lack the browser auth pages\nTry: run spinup upgrade, then repeat the module addition")
 		}
 		for _, dep := range p.Requires {
 			if err := add(dep); err != nil {
@@ -196,6 +205,15 @@ func Select(ctx context.Context, o SelectOptions) (*Selection, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// embedLoginSource is the browser sign-in load of the auth pack (ADR 0039, section 10.1).
+// A template archive before stage 2 of ADR 0039 lacks it and would render the node pages.
+const embedLoginSource = "embed/routes/login/+page.ts"
+
+// hasEmbedAuth reports whether the locked auth pack declares the browser pages of embed mode.
+func hasEmbedAuth(p *templates.Pack) bool {
+	return slices.ContainsFunc(p.Files, func(f templates.FileSpec) bool { return f.Source == embedLoginSource })
 }
 
 func allDone(names []string, done map[string]bool) bool {

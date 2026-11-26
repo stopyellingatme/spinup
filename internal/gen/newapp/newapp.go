@@ -147,12 +147,23 @@ func Generate(ctx context.Context, o Options, prompter Prompter) (*Result, error
 		if o.APIOnly {
 			return nil, fmt.Errorf("cannot embed a frontend with --api-only: the web pack is absent\nTry: remove --api-only, or use --frontend-mode node")
 		}
-		if modules, ok := answers["modules"].([]string); ok && slices.Contains(modules, "auth") {
-			return nil, fmt.Errorf("cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules")
+		// Check the requested modules before pack selection, so that a refused module is named
+		// before a missing dependency. A request for live alone still fails for the missing auth.
+		if modules, ok := answers["modules"].([]string); ok {
+			if err := CheckEmbedModules(answers["frontend_mode"], modules, nil); err != nil {
+				return nil, err
+			}
 		}
 	}
 	selected, err := selectPacks(packs, answers, o.APIOnly)
 	if err != nil {
+		return nil, err
+	}
+	resolved := make([]string, 0, len(selected))
+	for _, p := range selected {
+		resolved = append(resolved, p.Name)
+	}
+	if err := CheckEmbedModules(answers["frontend_mode"], nil, resolved); err != nil {
 		return nil, err
 	}
 	questions, err = Questions(selected)

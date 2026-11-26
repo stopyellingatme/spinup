@@ -77,6 +77,7 @@ func TestSelect(t *testing.T) {
 		flags                   map[string]any
 		web, interactive        bool
 		wantAdded, wantRequired []string
+		wantPacks               []string
 		wantError               string
 	}{
 		{name: "dependency closure", names: []string{"monitoring"}, wantAdded: []string{"deploy", "monitoring"}, wantRequired: []string{"deploy"}},
@@ -86,7 +87,17 @@ func TestSelect(t *testing.T) {
 		{name: "unknown", names: []string{"bogus"}, wantError: "Try: spinup module list"},
 		{name: "core", names: []string{"web"}, wantError: "unknown module"},
 		{name: "web required", names: []string{"auth"}, wantError: "API-only"},
-		{name: "embed auth refused", frontendMode: "embed", names: []string{"auth"}, web: true, wantError: "cannot use auth in embed mode: its pages require SvelteKit form actions\nTry: use --frontend-mode node, or remove auth from --modules"},
+		{name: "embed auth allowed", frontendMode: "embed", names: []string{"auth"}, web: true, wantAdded: []string{"auth"}, wantPacks: []string{"base", "api", "web", "auth"}},
+		{name: "embed flags adds auth", frontendMode: "embed", names: []string{"flags"}, web: true, wantAdded: []string{"auth", "flags"}, wantRequired: []string{"auth"}, wantPacks: []string{"base", "api", "web", "auth", "flags"}},
+		{name: "embed live adds auth", frontendMode: "embed", names: []string{"live"}, web: true, wantAdded: []string{"auth", "live"}, wantRequired: []string{"auth"}, wantPacks: []string{"base", "api", "web", "auth", "live"}},
+		{name: "embed flags and live with auth", frontendMode: "embed", modules: []string{"auth"}, names: []string{"live", "flags"}, web: true, wantAdded: []string{"flags", "live"}, wantPacks: []string{"base", "api", "web", "auth", "flags", "live"}},
+		{name: "embed apikeys refused", frontendMode: "embed", names: []string{"apikeys"}, web: true, wantError: "cannot use apikeys in embed mode: the API key pages require a SvelteKit server\nTry: use --frontend-mode node for apikeys"},
+		{name: "embed billing refused", frontendMode: "embed", names: []string{"billing"}, web: true, wantError: "cannot use billing in embed mode: the billing pages require a SvelteKit server\nTry: use --frontend-mode node for billing"},
+		{name: "embed audit refused", frontendMode: "embed", names: []string{"audit"}, web: true, wantError: "cannot use audit in embed mode: the history pages require a SvelteKit server\nTry: use --frontend-mode node for audit"},
+		{name: "embed mcp refused by name", frontendMode: "embed", names: []string{"mcp"}, web: true, wantError: "cannot use mcp in embed mode: the module requires apikeys\nTry: use --frontend-mode node for mcp"},
+		{name: "embed requested name before dependency", frontendMode: "embed", modules: []string{"auth"}, names: []string{"jobs", "mcp"}, web: true, wantError: "cannot use mcp in embed mode"},
+		{name: "embed refused locked pack", frontendMode: "embed", modules: []string{"auth", "audit"}, names: []string{"jobs"}, web: true, wantError: "cannot use audit in embed mode"},
+		{name: "node apikeys allowed", frontendMode: "node", modules: []string{"auth"}, names: []string{"mcp"}, web: true, wantAdded: []string{"apikeys", "mcp"}, wantRequired: []string{"apikeys"}},
 		{name: "embed jobs allowed", frontendMode: "embed", names: []string{"jobs"}, web: true, wantAdded: []string{"jobs"}},
 		{name: "node auth allowed", frontendMode: "node", names: []string{"auth"}, web: true, wantAdded: []string{"auth"}},
 		{name: "web available", names: []string{"auth"}, web: true, wantAdded: []string{"auth"}},
@@ -120,6 +131,16 @@ func TestSelect(t *testing.T) {
 			}
 			if !slices.Equal(got.Added, tc.wantAdded) || !slices.Equal(got.Required, tc.wantRequired) {
 				t.Fatalf("selection=%+v", got)
+			}
+			if tc.wantPacks != nil {
+				if !slices.Equal(got.Packs, tc.wantPacks) {
+					t.Fatalf("packs=%v, want %v", got.Packs, tc.wantPacks)
+				}
+				enabled := slices.DeleteFunc(slices.Clone(tc.wantPacks), core)
+				slices.Sort(enabled)
+				if !reflect.DeepEqual(got.Answers["modules"], enabled) || got.Answers["frontend_mode"] != tc.frontendMode {
+					t.Fatalf("answers=%v", got.Answers)
+				}
 			}
 			if !slices.Equal(original, lock.Packs) || !reflect.DeepEqual(cfg.Modules, tc.modules) {
 				t.Fatal("mutated input")
@@ -161,5 +182,55 @@ func TestSelectLockedQuestions(t *testing.T) {
 		} else if err != nil || got.Answers["queue_name"] != "priority" {
 			t.Fatalf("selection=%v error=%v", got, err)
 		}
+	}
+}
+
+// TestSelectEmbedOldArchive refuses to add auth to an embed app when the locked auth pack predates
+// the browser pages. A new CLI never renders an old node sign-in page into an embed app.
+func TestSelectEmbedOldArchive(t *testing.T) {
+	t.Parallel()
+	old := fstest.MapFS{
+		"base/pack.toml":      {Data: []byte("name='base'\n")},
+		"api/pack.toml":       {Data: []byte("name='api'\n")},
+		"web/pack.toml":       {Data: []byte("name='web'\nrequires=['api']\n")},
+		"auth/pack.toml":      {Data: []byte("name='auth'\nrequires=['web']\n[[files]]\npath='web/src/routes/login/+page.server.ts'\nsource='files/login.ts'\nclass='scaffold'\n")},
+		"auth/files/login.ts": {Data: []byte("export {};\n")},
+		"flags/pack.toml":     {Data: []byte("name='flags'\nrequires=['auth']\n")},
+	}
+	current := fstest.MapFS{}
+	for name, file := range old {
+		current[name] = file
+	}
+	current["auth/pack.toml"] = &fstest.MapFile{Data: []byte("name='auth'\nrequires=['web']\n[[files]]\npath='web/src/routes/login/+page.ts'\nsource='embed/routes/login/+page.ts'\nclass='scaffold'\nwhen=\"frontend_mode == 'embed'\"\n")}
+	current["auth/embed/routes/login/+page.ts"] = &fstest.MapFile{Data: []byte("export {};\n")}
+	const want = "cannot add auth in embed mode: the locked templates lack the browser auth pages\nTry: run spinup upgrade, then repeat the module addition"
+	for _, tc := range []struct {
+		name  string
+		mode  string
+		fsys  fstest.MapFS
+		names []string
+		err   bool
+	}{
+		{"direct", "embed", old, []string{"auth"}, true},
+		{"transitive", "embed", old, []string{"flags"}, true},
+		{"current archive", "embed", current, []string{"flags"}, false},
+		{"node mode", "node", old, []string{"auth"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			lock := manifest.New()
+			lock.Packs = []string{"base", "api", "web"}
+			lock.Answers = map[string]any{"frontend_mode": tc.mode}
+			got, err := Select(context.Background(), SelectOptions{Config: &project.Config{}, Lock: lock, FS: tc.fsys, Names: tc.names})
+			if tc.err {
+				if err == nil || err.Error() != want {
+					t.Fatalf("error=%v", err)
+				}
+				return
+			}
+			if err != nil || !slices.Contains(got.Added, "auth") {
+				t.Fatalf("selection=%+v error=%v", got, err)
+			}
+		})
 	}
 }

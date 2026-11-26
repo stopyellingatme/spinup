@@ -46,3 +46,21 @@ func TestFlagsNextSteps(t *testing.T) {
 		}
 	}
 }
+
+func TestFlagsNextStepsFor(t *testing.T) {
+	t.Parallel()
+	if FlagsNextStepsFor("node") != FlagsNextSteps() || FlagsNextStepsFor(nil) != FlagsNextSteps() {
+		t.Fatal("node advice changed")
+	}
+	embed := FlagsNextStepsFor("embed")
+	for _, absent := range []string{"hooks.server.ts", "+layout.server.ts", "Locals"} {
+		if strings.Contains(embed, absent) {
+			t.Errorf("embed advice names the node file %q", absent)
+		}
+	}
+	for _, want := range []string{"web/src/lib/session.svelte.ts", "GET /api/flags", "/admin/flags", "app.WithRoutes(flagStore.Routes(authn)),", "flags-wired"} {
+		if !strings.Contains(embed, want) {
+			t.Errorf("embed advice lacks %q", want)
+		}
+	}
+}

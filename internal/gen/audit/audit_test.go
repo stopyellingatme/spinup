@@ -222,3 +222,47 @@ END $$;`)
 		t.Fatalf("migration = %+v", file)
 	}
 }
+
+// TestAuditEmbed refuses spinup g audit in embed mode (ADR 0039, section 10.4), with no partial plan.
+func TestAuditEmbed(t *testing.T) {
+	t.Parallel()
+	const auditErr = "cannot use audit in embed mode: the history pages require a SvelteKit server\nTry: use --frontend-mode node for audit"
+	const historyErr = "cannot generate history pages in embed mode: the history page requires a SvelteKit server\nTry: use an app with --frontend-mode node"
+	for _, tc := range []struct {
+		name  string
+		packs []string
+		args  []string
+		want  string
+	}{
+		{name: "missing module", packs: []string{"base", "api", "web", "auth"}, want: auditErr},
+		{name: "missing module api-only", packs: []string{"base", "api", "web", "auth"}, args: []string{"--api-only"}, want: auditErr},
+		{name: "legacy lock with pages", packs: []string{"base", "api", "web", "auth", "audit"}, want: historyErr},
+		{name: "legacy lock api-only", packs: []string{"base", "api", "web", "auth", "audit"}, args: []string{"--api-only"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := fixture(t)
+			lock := manifest.New()
+			lock.Packs = tc.packs
+			lock.Answers = map[string]any{"frontend_mode": "embed"}
+			if err := lock.Save(filepath.Join(root, "spinup.lock")); err != nil {
+				t.Fatal(err)
+			}
+			out, err := run(t.Context(), gen.Input{Root: root, Args: []string{"notes"}, Flags: flags(t, tc.args...)})
+			if tc.want != "" {
+				if err == nil || err.Error() != tc.want || out != nil {
+					t.Fatalf("error = %v, plan = %v, want %q", err, out, tc.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range out.Plan.Files {
+				if strings.Contains(f.Path, "/history/") {
+					t.Fatalf("embed plan holds the history page %s", f.Path)
+				}
+			}
+		})
+	}
+}
