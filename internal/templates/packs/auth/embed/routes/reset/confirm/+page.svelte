@@ -2,14 +2,14 @@
 	import { defaults, setError, setMessage, superForm, type ErrorStatus } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { postAuth } from '#lib/auth.js';
-	import { takeResetToken } from '#lib/reset-token.js';
 	import { announceSessionChange } from '#lib/session-watch.js';
 	import { leaveSession } from '#lib/session.svelte.js';
 	import { resetConfirmSchema } from './schema';
+	import type { PageProps } from './$types';
 
-	// The mail link is /reset/confirm#<token>. The browser never sends the fragment to a server. This
-	// call reads it once and removes it from the address bar. The token stays in memory only.
-	const token = takeResetToken();
+	let { data }: PageProps = $props();
+	// The load took the token from the fragment of the mail link. It stays in memory only.
+	const token = $derived(data.token);
 	const adapter = zod4(resetConfirmSchema);
 	// The browser posts to /api/auth/reset/confirm. The token goes only in the JSON body.
 	const { form, errors, message, submitting, enhance } = superForm(defaults(adapter), {

@@ -296,6 +296,7 @@ const embedListSvelte = `<script lang="ts">
 `
 
 const embedItemSvelte = `<script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -322,10 +323,23 @@ const embedItemSvelte = `<script lang="ts">
 	const item = $derived(data.item);
 	const title = $derived(itemTitle(item));
 
-	// The delete button asks first. The dialog sends the delete to the Go API.
+	// The delete button asks first. The dialog sends the delete to the Go API. The dialog, the busy
+	// state, and the error belong to the [[ .Words ]] that the page shows.
 	let confirming = $state(false);
-	let deleting = $state(false);
+	// The id of the [[ .Words ]] whose delete runs.
+	let deleting: number | null = $state(null);
 	let failure = $state('');
+
+	// SvelteKit keeps this page when only the id changes. The dialog and the error of the old
+	// [[ .Words ]] then go away.
+	let shown = untrack(() => data.item.id);
+	$effect.pre(() => {
+		const id = data.item.id;
+		if (id === shown) return;
+		shown = id;
+		confirming = false;
+		failure = '';
+	});
 
 	function confirmDelete(event: MouseEvent) {
 		event.preventDefault();
@@ -334,16 +348,23 @@ const embedItemSvelte = `<script lang="ts">
 
 	async function remove(event: SubmitEvent) {
 		event.preventDefault();
-		if (deleting) return;
-		deleting = true;
+		const id = item.id;
+		if (deleting === id) return;
+		deleting = id;
 		failure = '';
 		try {
 			const { error: problem, response } = await api.DELETE('[[ .APIPath ]]/{id}', {
 				[[ if .Auth ]]fetch: observedFetch(fetch),
-				[[ end ]]params: { path: { id: item.id } }
+				[[ end ]]params: { path: { id } }
 			});
 			// A [[ .Words ]] that is already gone is not an error.
-			if (!response.ok && response.status !== 404) {
+			const deleted = response.ok || response.status === 404;
+			// The page shows another [[ .Words ]] now: the answer changes nothing on it.
+			if (id !== data.item.id) {
+				if (deleted) toast.success('[[ .Name ]] deleted.');
+				return;
+			}
+			if (!deleted) {
 				failure = problemMessage(problem, response.status);
 				toast.error(failure);
 				return;
@@ -352,11 +373,12 @@ const embedItemSvelte = `<script lang="ts">
 			await goto('[[ .Route ]]', { invalidate: [RESOURCE_DEP] });
 		} catch (err) {
 			console.error('[[ .Feed ]]: the delete failed:', err);
+			if (id !== data.item.id) return;
 			failure = unreachable;
 			toast.error(failure);
 		} finally {
-			deleting = false;
-			confirming = false;
+			if (deleting === id) deleting = null;
+			if (id === data.item.id) confirming = false;
 		}
 	}
 </script>
@@ -424,9 +446,9 @@ const embedItemSvelte = `<script lang="ts">
 			<AlertDialog.Description>“{title}” will be deleted. You cannot undo this.</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel disabled={deleting}>Cancel</AlertDialog.Cancel>
-			<Button type="submit" form="delete-item" variant="destructive" disabled={deleting}>
-				{#if deleting}<LoaderCircleIcon aria-hidden="true" class="animate-spin" />{/if}
+			<AlertDialog.Cancel disabled={deleting === item.id}>Cancel</AlertDialog.Cancel>
+			<Button type="submit" form="delete-item" variant="destructive" disabled={deleting === item.id}>
+				{#if deleting === item.id}<LoaderCircleIcon aria-hidden="true" class="animate-spin" />{/if}
 				Delete
 			</Button>
 		</AlertDialog.Footer>
@@ -456,8 +478,10 @@ func embedFormScript(head, navigation string) string {
 }
 
 // The new page checks the values in the browser with the schema, then posts
-// them to the collection and opens the new item. The edit page reads the
-// loaded item once, then sends the full body with PUT and returns to the item.
+// them to the collection and opens the new item. The edit page starts its form
+// with the loaded item, then sends the full body with PUT and returns to the
+// item. When only the id changes, SvelteKit keeps the page, so the edit page
+// starts the form again for the new item.
 // formMarkup (pages_svelte.go) gives the form card of both pages, as in node
 // mode.
 var (
@@ -514,35 +538,50 @@ var (
 	<PageHeader title="New [[ .Words ]]" description="Fill in the fields, then create the [[ .Words ]]." />
 ` + formMarkup("Create [[ .Words ]]", "[[ .Route ]]")
 
-	embedEditSvelte = embedFormScript("\timport { untrack } from 'svelte';\n", "goto") + `	import Fields from '../../fields.svelte';
+	embedEditSvelte = embedFormScript("\timport { untrack } from 'svelte';\n\timport { toStore } from 'svelte/store';\n", "goto") + `	import Fields from '../../fields.svelte';
 	import { RESOURCE_DEP, applyFailure, unreachable } from '../../form';
 	import { fromItem, itemTitle, schema, toBody } from '../../schema';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	// SPA mode: superForm reads the loaded [[ .Words ]] once. The browser checks the values with the
+	// SPA mode: superForm starts with the loaded [[ .Words ]]. The browser checks the values with the
 	// schema, then sends the full [[ .Words ]] to the Go API with PUT. A failed request keeps the values.
+	// The form, its save, and its busy state belong to one [[ .Words ]]: original.
 	const adapter = zod4(schema);
-	const original = untrack(() => data.item);
+	let original = untrack(() => data.item);
+	// The id of the [[ .Words ]] whose save runs.
+	let saving: number | null = $state(null);
 	const form = superForm(defaults(fromItem(original), adapter), {
 		SPA: true,
 		id: '[[ .Feed ]]-edit',
 		validators: adapter,
 		resetForm: false,
-		async onUpdate({ form }) {
+		async onUpdate({ form, cancel }) {
 			if (!form.valid) return;
-			const path = { id: original.id };
+			const item = original;
+			const path = { id: item.id };
+			saving = item.id;
 			const result = await api
 				.PUT('[[ .APIPath ]]/{id}', {
 					[[ if .Auth ]]fetch: observedFetch(fetch),
 					[[ end ]]params: { path },
-					body: toBody(form.data[[ if .Time ]], original[[ end ]])
+					body: toBody(form.data[[ if .Time ]], item[[ end ]])
 				})
 				.catch((err: unknown) => {
 					console.error('[[ .Feed ]]: the save failed:', err);
 					return undefined;
+				})
+				.finally(() => {
+					if (saving === path.id) saving = null;
 				});
+			if (original.id !== path.id) {
+				// The page shows another [[ .Words ]] now. The answer belongs to the old form, so it
+				// changes no value, error, or message of the new form.
+				cancel();
+				if (result?.data) toast.success('Changes saved.');
+				return;
+			}
 			if (!result) {
 				// The request did not complete. The values stay, and the user can submit again.
 				setMessage(form, unreachable, { status: 503 });
@@ -562,7 +601,19 @@ var (
 			await goto(` + "`" + `[[ .Route ]]/${saved.id}` + "`" + `, { invalidate: [RESOURCE_DEP] });
 		}
 	});
-	const { enhance, message, submitting } = form;
+	const { enhance, message } = form;
+	// The save button is busy only for the save of the [[ .Words ]] that the page shows.
+	const submitting = toStore(() => saving === data.item.id);
+
+	// SvelteKit keeps this page when only the id changes, for example on a client navigation from
+	// [[ .Route ]]/1/edit to [[ .Route ]]/2/edit. The form then starts again with the new [[ .Words ]].
+	// A new load of the same [[ .Words ]] (an invalidation) keeps the draft of the user.
+	$effect.pre(() => {
+		const item = data.item;
+		if (item.id === original.id) return;
+		original = item;
+		form.reset({ data: fromItem(item), newState: fromItem(item) });
+	});
 </script>
 
 <svelte:head>

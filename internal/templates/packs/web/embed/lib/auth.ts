@@ -4,6 +4,8 @@
 // clears the HttpOnly session cookie. No code here reads or writes a cookie.
 import { error, redirect } from '@sveltejs/kit';
 import { home } from '#lib/nav.gen.js';
+// The two modules import each other. Each one uses the other only inside function bodies.
+import { requireVerified } from '#lib/session.svelte.js';
 
 /** The dependency key of the session read. The session watch invalidates it. */
 export const SESSION_DEP = 'app:session';
@@ -53,13 +55,17 @@ export function loginHref(url: URL): string {
 	return '/login?redirectTo=' + encodeURIComponent(url.pathname + url.search);
 }
 
-/** Require a signed-in user, or redirect to sign-in with the current path and query. */
+/**
+ * Require a signed-in user, or redirect to sign-in with the current path and query. While the last
+ * session read failed, it throws a 503 error instead, so no redirect drops the deep link.
+ */
 export function requireUser(user: App.User | null, url: URL): App.User {
+	requireVerified();
 	if (!user) redirect(303, loginHref(url));
 	return user;
 }
 
-/** Require a signed-in user with a listed role, or show the access error. */
+/** Require a signed-in user with a listed role, or show the access error. It checks like requireUser. */
 export function requireRole(user: App.User | null, url: URL, ...roles: string[]): App.User {
 	const signedIn = requireUser(user, url);
 	if (!roles.includes(signedIn.role)) {
@@ -68,8 +74,12 @@ export function requireRole(user: App.User | null, url: URL, ...roles: string[])
 	return signedIn;
 }
 
-/** Send a signed-in visitor home. Otherwise return the safe return path of the sign-in pages. */
+/**
+ * Send a signed-in visitor home. Otherwise return the safe return path of the sign-in pages. While
+ * the last session read failed, it throws a 503 error instead.
+ */
 export function requireGuest(user: App.User | null, url: URL): string {
+	requireVerified();
 	if (user) redirect(303, home);
 	return safeRedirect(url.searchParams.get('redirectTo'), home);
 }

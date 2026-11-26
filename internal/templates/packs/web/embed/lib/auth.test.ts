@@ -134,6 +134,88 @@ describe('requireGuest', () => {
 	});
 });
 
+describe('the guards on a session that is not verified', () => {
+	const url = new URL('https://app.example.com/todos?page=2');
+	const signIn = new URL('https://app.example.com/login?redirectTo=%2Ftodos');
+	const unverified = { status: 503, body: { message: 'The session cannot be verified. Try again later.' } };
+
+	// Each test gets a new session module, so no read stays from another test.
+	async function fresh() {
+		vi.resetModules();
+		return { guards: await import('./auth.js'), state: await import('./session.svelte.js') };
+	}
+
+	// serve answers the session read with the next answer and the flags read with no flags.
+	function serve(...answers: (() => Promise<Response>)[]): typeof globalThis.fetch {
+		return (async (input: RequestInfo | URL) => {
+			if (String(input) !== '/api/session') return response(200, { flags: {} });
+			const next = answers.shift();
+			if (!next) throw new Error('no more session answers');
+			return next();
+		}) as unknown as typeof globalThis.fetch;
+	}
+	const answer = (status: number, body?: unknown) => async () => response(status, body);
+
+	function expectNoDecision(guards: typeof import('./auth.js'), body: { message: string }) {
+		for (const run of [
+			() => guards.requireUser(null, url),
+			() => guards.requireUser(ada, url),
+			() => guards.requireRole(null, url, 'manager'),
+			() => guards.requireRole(ada, url, 'staff'),
+			() => guards.requireGuest(null, signIn),
+			() => guards.requireGuest(ada, signIn)
+		]) {
+			const reason = thrown(run);
+			expect(reason).toMatchObject({ status: 503, body });
+			expect(reason).not.toHaveProperty('location');
+		}
+	}
+
+	it('answers 503 and never redirects after a failed read', async () => {
+		const { guards, state } = await fresh();
+		await expect(state.readSession(serve(answer(500)))).rejects.toMatchObject(unverified);
+		expect(state.session.unverified).toBe(unverified.body.message);
+		expectNoDecision(guards, unverified.body);
+	});
+
+	it('shows the message of the failed read', async () => {
+		const { guards, state } = await fresh();
+		const down = serve(async () => {
+			throw new TypeError('Failed to fetch');
+		});
+		await expect(state.readSession(down)).rejects.toMatchObject({ status: 503 });
+		expectNoDecision(guards, { message: 'The server is not available. Try again later.' });
+	});
+
+	it('counts the first read as not verified until it answers', async () => {
+		const { guards, state } = await fresh();
+		let open: (res: Response) => void = () => {};
+		const read = state.readSession(serve(() => new Promise<Response>((done) => (open = done))));
+		expectNoDecision(guards, unverified.body);
+		// A 401 is a verified answer: the visitor is signed out.
+		open(response(401));
+		await read;
+		expect(state.session.unverified).toBeNull();
+		expect(thrown(() => guards.requireUser(null, url))).toMatchObject({ status: 303, location: '/login?redirectTo=%2Ftodos%3Fpage%3D2' });
+		expect(guards.requireGuest(null, signIn)).toBe('/todos');
+	});
+
+	it('decides again on the data of a successful read', async () => {
+		const { guards, state } = await fresh();
+		const fetch = serve(answer(500), answer(200, { user: ada }), answer(502));
+		await expect(state.readSession(fetch)).rejects.toMatchObject(unverified);
+		// The retry of the root layout reads the session again, and the leaf load runs again.
+		await state.readSession(fetch);
+		expect(guards.requireUser(ada, url)).toBe(ada);
+		expect(guards.requireRole(ada, url, 'staff')).toBe(ada);
+		expect(thrown(() => guards.requireGuest(ada, signIn))).toMatchObject({ status: 303, location: '/workspace' });
+		// A later failed read keeps the last verified user, and the guards stop deciding again.
+		await expect(state.readSession(fetch)).rejects.toMatchObject(unverified);
+		expect(state.session.data.user).toEqual(ada);
+		expectNoDecision(guards, unverified.body);
+	});
+});
+
 describe('postAuth', () => {
 	it('posts JSON to the same origin and reports success', async () => {
 		let seen: Request | undefined;

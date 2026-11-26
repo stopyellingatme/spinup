@@ -197,6 +197,29 @@ describe('readSession', () => {
 		expect(await pending(state.readSession(serve(ada)))).toBe(true);
 		expect(replace).toHaveBeenCalledExactlyOnceWith('/workspace');
 	});
+
+	it('replaces the document for another user before the flags read answers', async () => {
+		await state.readSession(serve(ada, { beta: true }));
+		const { fetch, calls } = held();
+		const read = state.readSession(fetch);
+		// The flags request never settles. The session answer alone must change the document.
+		calls.find((call) => call.url === '/api/session')?.resolve(Response.json({ user: { ...ada, id: 2 } }));
+		expect(await pending(read)).toBe(true);
+		expect(replace).toHaveBeenCalledExactlyOnceWith('/workspace');
+		expect(state.session.changingUser).toBe(true);
+		expect(state.session.data).toEqual({ user: null, flags: {} });
+	});
+
+	it('does not change the document for another user in a superseded read', async () => {
+		await state.readSession(serve(ada));
+		const first = held();
+		const older = state.readSession(first.fetch);
+		const newer = state.readSession(serve(ada));
+		const snapshot = await newer;
+		first.calls.find((call) => call.url === '/api/session')?.resolve(Response.json({ user: { ...ada, id: 2 } }));
+		expect(await older).toBe(snapshot);
+		expect(replace).not.toHaveBeenCalled();
+	});
 });
 
 describe('watchSession', () => {

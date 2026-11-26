@@ -2,7 +2,16 @@
 	import { invalidate } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { FLAGS_DEP } from '#lib/auth.js';
-	import { FLAGS_ADMIN_DEP, clearUser, putRule, putUser, type FlagErrors, type FlagResult } from '#lib/flags-admin.js';
+	import {
+		FLAGS_ADMIN_DEP,
+		clearUser,
+		pendingKey,
+		putRule,
+		putUser,
+		type FlagErrors,
+		type FlagForm,
+		type FlagResult
+	} from '#lib/flags-admin.js';
 	import { session } from '#lib/session.svelte.js';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -17,7 +26,7 @@
 
 	// Each form checks its values with the schema of node mode, then calls the Go API from the
 	// browser. The errors of the last failed form show at that form.
-	type Kind = 'rule' | 'user' | 'clearUser';
+	type Kind = FlagForm;
 	type Failed = { kind: Kind; key: string; fields: Record<string, string>; message?: string };
 	let failed: Failed | undefined = $state();
 	// The forms that wait for the API. A form clears its entry on every outcome.
@@ -72,7 +81,7 @@
 		event.preventDefault();
 		const raw = values(event.currentTarget as HTMLFormElement);
 		const key = String(raw.key);
-		const id = `${kind}:${key}:${String(raw.email)}`;
+		const id = pendingKey(kind, key, String(raw.email));
 		if (pending[id]) return;
 		const started = session.generation;
 		pending[id] = true;
@@ -103,7 +112,7 @@
 	}
 
 	function busy(kind: Kind, key: string, email = ''): boolean {
-		return pending[`${kind}:${key}:${email}`] === true;
+		return pending[pendingKey(kind, key, email)] === true;
 	}
 
 	const live = $derived(data.admin.flags.filter((f) => !f.stale));

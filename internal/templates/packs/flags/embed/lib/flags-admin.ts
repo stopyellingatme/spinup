@@ -53,6 +53,18 @@ export interface FlagErrors {
 /** FlagResult is ok with the data, or an HTTP status and the messages to show. */
 export type FlagResult<T> = { ok: true; data: T } | { ok: false; status: number; errors: FlagErrors };
 
+/** FlagForm names one form of the admin page. */
+export type FlagForm = 'rule' | 'user' | 'clearUser';
+
+/**
+ * pendingKey names the pending state of one form and its button. A rule form and an add form are
+ * one for each flag, so their key has no email address, also when the add form holds one. Each
+ * clear button belongs to one account, so its key has the email address.
+ */
+export function pendingKey(form: FlagForm, key: string, email = ''): string {
+	return form === 'clearUser' ? `clearUser:${key}:${email}` : `${form}:${key}`;
+}
+
 interface Problem {
 	detail?: string;
 	errors?: { field?: string; message?: string }[];
