@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 import {
 	apiURL,
 	baseURL,
@@ -7,6 +7,7 @@ import {
 	documentMarked,
 	embed,
 	markDocument,
+	todoID,
 	openSignOut,
 	password,
 	recordRequests,
@@ -134,6 +135,8 @@ if (embed) {
 		await page.goto('/todos');
 		const card = page.getByTestId('session-error');
 		await expect(card).toBeVisible();
+		// No guard redirects on a session that is not verified: the address keeps the deep link.
+		await expect(page).toHaveURL(`${baseURL}/todos`);
 		await expect(page.getByRole('heading', { name: 'Todos', level: 1 })).toHaveCount(0);
 		await expect(page.getByText('Retry note')).toHaveCount(0);
 		await expect(page.getByTestId('user-email')).toHaveCount(0);
@@ -145,5 +148,104 @@ if (embed) {
 		await expect(page.getByTestId('user-email')).toHaveText(email);
 		await expect(page.getByRole('link', { name: 'Retry note' })).toBeVisible();
 		await expect(page).toHaveURL(`${baseURL}/todos`);
+	});
+
+	test('embed: one failed session read keeps the deep link of an item, and Try again opens it', async ({ page }) => {
+		const email = uniqueEmail('deep');
+		await register(page, email);
+		await createTodo(page, 'Deep note');
+		const id = todoID(page.url());
+		const deepLink = `${baseURL}/todos/${id}`;
+
+		// Only the first session read of the next document answers 500.
+		let failed = 0;
+		await page.route(
+			(url) => url.pathname === '/api/session',
+			async (route) => {
+				if (failed === 0) {
+					failed += 1;
+					await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"status":500}' });
+					return;
+				}
+				await route.fallback();
+			}
+		);
+		await page.goto(`/todos/${id}`);
+		const card = page.getByTestId('session-error');
+		await expect(card).toBeVisible();
+		await expect(page).toHaveURL(deepLink);
+		await expect(page.getByRole('heading', { name: 'Deep note' })).toHaveCount(0);
+		await expect(page.getByTestId('user-email')).toHaveCount(0);
+
+		// Try again reads the session. The leaf load runs again on verified data, at the same address.
+		await card.getByRole('button', { name: 'Try again' }).click();
+		await expect(card).toHaveCount(0);
+		await expect(page.getByRole('heading', { name: 'Deep note', level: 1 })).toBeVisible();
+		await expect(page.getByTestId('user-email')).toHaveText(email);
+		await expect(page).toHaveURL(deepLink);
+		expect(failed).toBe(1);
+	});
+
+	test('embed: a signed-out visitor with one failed session read goes to sign in with the deep link', async ({ page }) => {
+		let failed = 0;
+		await page.route(
+			(url) => url.pathname === '/api/session',
+			async (route) => {
+				if (failed === 0) {
+					failed += 1;
+					await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"status":500}' });
+					return;
+				}
+				await route.fallback();
+			}
+		);
+		await page.goto('/todos/4242?tab=notes');
+		const card = page.getByTestId('session-error');
+		await expect(card).toBeVisible();
+		await expect(page).toHaveURL(`${baseURL}/todos/4242?tab=notes`);
+
+		// The retry gets 401: signed out. The guard sends the visitor to sign in, with the deep link.
+		await card.getByRole('button', { name: 'Try again' }).click();
+		await expect(page).toHaveURL(`${baseURL}/login?redirectTo=${encodeURIComponent('/todos/4242?tab=notes')}`);
+		await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+		await expect(card).toHaveCount(0);
+		expect(failed).toBe(1);
+	});
+
+	test('embed: an identity change replaces the document while the flags read still waits', async ({ context }) => {
+		const tabA = await context.newPage();
+		const first = uniqueEmail('slow-flags');
+		await register(tabA, first);
+		await createTodo(tabA, 'Secret behind flags');
+		await tabA.goto('/todos');
+		await expect(tabA.getByRole('link', { name: 'Secret behind flags' })).toBeVisible();
+		await markDocument(tabA);
+
+		// From now on, each flags read of tab A waits until the test releases it.
+		const held: Route[] = [];
+		const flagsRead = (url: URL) => url.pathname === '/api/flags';
+		await tabA.route(flagsRead, (route) => {
+			held.push(route);
+		});
+
+		const tabB = await context.newPage();
+		await tabB.goto('/todos');
+		await (await openSignOut(tabB, first)).click();
+		await expect(tabB).toHaveURL(`${baseURL}/login`);
+		const second = uniqueEmail('slow-flags-b');
+		await register(tabB, second);
+
+		// Tab A read the session again and asked for the flags. It replaces its document while that
+		// flags read waits.
+		await expect.poll(() => held.length).toBeGreaterThan(0);
+		await expect.poll(() => documentMarked(tabA).catch(() => false)).toBe(false);
+		await expect(tabA.getByText('Secret behind flags')).toHaveCount(0);
+		await expect(tabA.getByText(first)).toHaveCount(0);
+		expect(new URL(tabA.url()).pathname).toMatch(/^\/(login|todos)$/);
+
+		await tabA.unroute(flagsRead);
+		for (const route of held) await route.continue().catch(() => {});
+		await expect(tabA.getByTestId('user-email')).toHaveText(second);
+		await expect(tabA.getByText('Secret behind flags')).toHaveCount(0);
 	});
 }

@@ -1,11 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page, type Route } from '@playwright/test';
 import {
 	abortOnce,
 	apiURL,
 	baseURL,
+	becomeVisible,
+	clientNavigate,
 	createTodo,
+	documentMarked,
 	embed,
 	isToggleWrite,
+	markDocument,
 	messages,
 	register,
 	todoID,
@@ -319,5 +323,111 @@ if (embed) {
 		await expect(page.getByRole('row')).toHaveCount(2);
 		expect(toggles()).toBe(1);
 		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { done: boolean }).done).toBe(true);
+	});
+
+	/** twoTodos creates the todos alpha and beta through the API and returns their ids. */
+	async function twoTodos(page: Page): Promise<{ api: APIRequestContext; a: number; b: number }> {
+		const api = page.context().request;
+		const ids: number[] = [];
+		for (const title of ['alpha', 'beta']) {
+			const res = await api.post(`${apiURL}/api/todos`, { data: { title, done: false } });
+			expect(res.ok()).toBeTruthy();
+			ids.push(((await res.json()) as { id: number }).id);
+		}
+		return { api, a: ids[0], b: ids[1] };
+	}
+
+	async function titleOf(api: APIRequestContext, id: number): Promise<string> {
+		return ((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title;
+	}
+
+	test('embed: a client navigation to the edit page of another todo shows it, and the save goes to it', async ({ page }) => {
+		await register(page, uniqueEmail('edit-switch'));
+		const { api, a, b } = await twoTodos(page);
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await markDocument(page);
+
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		expect(await documentMarked(page)).toBe(true);
+
+		await title.fill('beta 2');
+		const write = page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.startsWith('/api/todos/'));
+		await page.getByRole('button', { name: /^Save/ }).click();
+		expect(new URL((await write).url()).pathname).toBe(`/api/todos/${b}`);
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}`);
+		await expect(page.getByRole('heading', { name: 'beta 2', level: 1 })).toBeVisible();
+		expect(await titleOf(api, a)).toBe('alpha');
+		expect(await titleOf(api, b)).toBe('beta 2');
+	});
+
+	test('embed: a new load of the same todo keeps the draft of the edit form', async ({ page }) => {
+		await register(page, uniqueEmail('edit-draft'));
+		const { api, a } = await twoTodos(page);
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha draft');
+
+		// The tab becomes visible: the session check runs the root load and the edit load again.
+		const reread = page.waitForResponse(
+			(r) => r.request().method() === 'GET' && new URL(r.url()).pathname === `/api/todos/${a}`
+		);
+		await becomeVisible(page);
+		await reread;
+		await page.evaluate(() => fetch('/api/flags').then((r) => r.status));
+		await expect(title).toHaveValue('alpha draft');
+		await expect(page).toHaveURL(`${baseURL}/todos/${a}/edit`);
+		expect(await titleOf(api, a)).toBe('alpha');
+	});
+
+	test('embed: a save that ends after a client navigation to another todo changes only the old todo', async ({ page }) => {
+		await register(page, uniqueEmail('edit-late'));
+		const { api, a, b } = await twoTodos(page);
+
+		// The save of alpha waits until the test releases it.
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let held: Route | null = null;
+		await page.route(
+			(url) => url.pathname === `/api/todos/${a}`,
+			async (route) => {
+				if (route.request().method() !== 'PUT') return route.fallback();
+				held = route;
+				await gate;
+				await route.continue();
+			}
+		);
+
+		await page.goto(`/todos/${a}/edit`);
+		const title = page.getByLabel('Title');
+		await expect(title).toHaveValue('alpha');
+		await title.fill('alpha late');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await save.click();
+		await expect.poll(() => held !== null).toBe(true);
+		await expect(save).toBeDisabled();
+
+		// The page moves to beta while the save of alpha waits. The busy state belongs to alpha.
+		await clientNavigate(page, `/todos/${b}/edit`);
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		await expect(save).toBeEnabled();
+
+		const done = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/todos/${a}`);
+		release();
+		expect((await done).ok()).toBeTruthy();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page).toHaveURL(`${baseURL}/todos/${b}/edit`);
+		await expect(title).toHaveValue('beta');
+		// The answer of the old save sets no message on the form of beta.
+		await expect(page.locator('form').getByRole('alert')).toHaveCount(0);
+		await expect(save).toBeEnabled();
+		expect(await titleOf(api, a)).toBe('alpha late');
+		expect(await titleOf(api, b)).toBe('beta');
 	});
 }
