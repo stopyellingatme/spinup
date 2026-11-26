@@ -1,6 +1,17 @@
 import { createServer, type Server, type Socket } from 'node:net';
 import { expect, test, type Page } from '@playwright/test';
-import { baseURL, embed, messages, openSignOut, password, register, signIn, uniqueEmail } from './helpers';
+import {
+	baseURL,
+	embed,
+	firstRenderURL,
+	messages,
+	openSignOut,
+	password,
+	recordFirstRenderURL,
+	register,
+	signIn,
+	uniqueEmail
+} from './helpers';
 
 // Password reset of embed mode (ADR 0039 section 10.10). The mail link is /reset/confirm#<token>.
 // A browser never sends the fragment to a server, so no request URL and no Referer holds the token.
@@ -130,9 +141,12 @@ if (embed) {
 			// Open the link. The page removes the fragment, and no request carries the token.
 			const urls = recordURLs(page);
 			const confirm = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+			await recordFirstRenderURL(page);
 			await page.goto(link);
 			await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
 			expect(page.url()).toBe(`${baseURL}/reset/confirm`);
+			// The fragment was gone already when the app showed its first element.
+			expect(await firstRenderURL(page)).toBe(`${baseURL}/reset/confirm`);
 			await page.getByLabel('New password').fill(newPassword);
 			await page.getByRole('button', { name: 'Save the new password' }).click();
 			expect(((await confirm).postDataJSON() as { token: string }).token).toBe(token);
@@ -182,6 +196,35 @@ if (embed) {
 		await page.getByLabel('New password').fill(newPassword);
 		await page.getByRole('button', { name: 'Save the new password' }).click();
 		expect((await confirm).status()).toBe(422);
+		await expect(page.getByText(messages.resetInvalid)).toBeVisible();
+		expect(urls.filter((url) => url.includes(wrongToken))).toEqual([]);
+	});
+
+	test('embed: a reset link keeps its token while the session read fails, and Try again uses it', async ({ page }) => {
+		const urls = recordURLs(page);
+		// Each session read answers 500 until the route goes away.
+		const failing = (url: URL) => url.pathname === '/api/session';
+		await page.route(failing, (route) =>
+			route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"status":500}' })
+		);
+		await page.goto(`/reset/confirm#${wrongToken}`);
+		const card = page.getByTestId('session-error');
+		await expect(card).toBeVisible();
+		// The root layout took the token when it loaded: the address has no fragment, also behind the card.
+		expect(page.url()).toBe(`${baseURL}/reset/confirm`);
+		await expect(page.getByLabel('New password')).toHaveCount(0);
+
+		await page.unroute(failing);
+		await card.getByRole('button', { name: 'Try again' }).click();
+		await expect(card).toHaveCount(0);
+		await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+		expect(page.url()).toBe(`${baseURL}/reset/confirm`);
+		const confirm = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		const answer = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auth/reset/confirm');
+		await page.getByLabel('New password').fill(newPassword);
+		await page.getByRole('button', { name: 'Save the new password' }).click();
+		expect(((await confirm).postDataJSON() as { token: string }).token).toBe(wrongToken);
+		expect((await answer).status()).toBe(422);
 		await expect(page.getByText(messages.resetInvalid)).toBeVisible();
 		expect(urls.filter((url) => url.includes(wrongToken))).toEqual([]);
 	});

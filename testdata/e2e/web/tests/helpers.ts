@@ -252,3 +252,52 @@ export const messages = {
 	resetInvalid: 'The reset link is invalid or expired. Request a new link.',
 	resetLinkInvalid: 'The reset link is not valid. Request a new link.'
 };
+
+/**
+ * clientNavigate adds a link to the document and clicks it, so the SvelteKit router handles the
+ * navigation without a document load. Use markDocument and documentMarked to prove it.
+ */
+export async function clientNavigate(page: Page, href: string): Promise<void> {
+	await page.evaluate((target) => {
+		const link = document.createElement('a');
+		link.href = target;
+		link.textContent = 'e2e client navigation';
+		document.body.append(link);
+		link.click();
+		link.remove();
+	}, href);
+}
+
+/**
+ * recordFirstRenderURL records location.href at the first element that the app adds to the page,
+ * before any test step can run. Call it before the goto. firstRenderURL reads the record.
+ */
+export async function recordFirstRenderURL(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		const w = window as unknown as { __e2eFirstRenderURL?: string };
+		const observer = new MutationObserver((records) => {
+			for (const record of records) {
+				for (const node of record.addedNodes) {
+					// The parser adds the static shell. The app adds preload links to the head and its
+					// elements to the body. Only an element in the body is visible.
+					if (
+						node instanceof HTMLElement &&
+						node.tagName !== 'SCRIPT' &&
+						document.body?.contains(node) &&
+						document.readyState !== 'loading'
+					) {
+						w.__e2eFirstRenderURL ??= location.href;
+						observer.disconnect();
+						return;
+					}
+				}
+			}
+		});
+		observer.observe(document, { childList: true, subtree: true });
+	});
+}
+
+/** firstRenderURL returns the address that recordFirstRenderURL recorded, or null. */
+export function firstRenderURL(page: Page): Promise<string | null> {
+	return page.evaluate(() => (window as unknown as { __e2eFirstRenderURL?: string }).__e2eFirstRenderURL ?? null);
+}

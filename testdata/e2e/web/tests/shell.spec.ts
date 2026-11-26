@@ -167,4 +167,55 @@ if (embed) {
 		// The guard runs before the admin read.
 		expect(requests).not.toContain('GET /api/admin/flags');
 	});
+
+	test('embed: the Add user rule button is busy while its save runs', async ({ browser, page }) => {
+		expect(adminEmail, 'run.sh sets E2E_ADMIN_EMAIL in embed mode').not.toBe('');
+		// The rule is for a new account. A rule for the admin would change the flag of the other case.
+		const other = await browser.newContext();
+		const target = uniqueEmail('flag-user');
+		await register(await other.newPage(), target);
+		await other.close();
+
+		await signIn(page, adminEmail);
+		await page.goto('/admin/flags');
+		await expect(page.getByRole('heading', { name: 'Feature flags', level: 1 })).toBeVisible();
+
+		// The save of the user rule waits until the test releases it.
+		const userPath = `/api/admin/flags/beta_banner/users/${encodeURIComponent(target)}`;
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let held: Route | null = null;
+		await page.route(
+			(url) => url.pathname === userPath,
+			async (route) => {
+				if (route.request().method() !== 'PUT') return route.fallback();
+				held = route;
+				await gate;
+				await route.continue();
+			}
+		);
+
+		const form = page
+			.locator('form')
+			.filter({ has: page.locator('input[name="key"][value="beta_banner"]') })
+			.filter({ has: page.getByRole('button', { name: 'Add user rule' }) });
+		const add = form.getByRole('button', { name: 'Add user rule' });
+		await form.getByLabel('Email address').fill(target);
+		await expect(add).toBeEnabled();
+		await add.click();
+		await expect.poll(() => held !== null).toBe(true);
+		await expect(add).toBeDisabled();
+
+		const done = page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === userPath);
+		release();
+		expect((await done).ok()).toBeTruthy();
+		await expect(page.getByText('Flag saved.')).toBeVisible();
+		await expect(add).toBeEnabled();
+		const clear = page.getByRole('button', { name: `Clear the rule of ${target}` });
+		await expect(clear).toBeVisible();
+
+		// Remove the rule again, so a repeat run starts from the same list.
+		await clear.click();
+		await expect(clear).toHaveCount(0);
+	});
 }
