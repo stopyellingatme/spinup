@@ -1,0 +1,44 @@
+# The browser session layer of embed mode with auth (ADR 0039, section 10.2): the guards, the
+# session state, the session watch, sign-out, and their tests.
+
+[[files]]
+path = "web/src/lib/auth.ts"
+source = "embed/lib/auth.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/session.svelte.ts"
+source = "embed/lib/session.svelte.ts.tmpl"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/session-watch.ts"
+source = "embed/lib/session-watch.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/sign-out.ts"
+source = "embed/lib/sign-out.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/auth.test.ts"
+source = "embed/lib/auth.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/session-watch.test.ts"
+source = "embed/lib/session-watch.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
+
+[[files]]
+path = "web/src/lib/sign-out.test.ts"
+source = "embed/lib/sign-out.test.ts"
+class = "managed"
+when = "frontend_mode == 'embed' && modules contains 'auth'"
