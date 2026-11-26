@@ -12,7 +12,10 @@ export type TokenHistory = { state: unknown; replaceState(data: unknown, unused:
 // A token is the base64url text of 32 random bytes. The Go API checks the exact value.
 const TOKEN = /^[A-Za-z0-9_-]+$/;
 
-// The token that the last fragment held. It stays in memory only, until the document goes away.
+// The path of the reset page. The mail link opens it.
+const CONFIRM = '/reset/confirm';
+
+// The token that the last fragment held. It stays in memory only, for one visit of the reset page.
 let held: string | null = null;
 
 /**
@@ -34,9 +37,19 @@ export function takeResetToken(
 	return held;
 }
 
+/**
+ * followResetVisit ends the visit of the reset page. The root layout calls it after each client
+ * navigation. When the address is not the reset page, it drops the held token. This also works
+ * while the session error card hides the page. A retry of the session read is not a navigation, so
+ * it keeps the token. A later visit without a fragment then gets no token.
+ */
+export function followResetVisit(location: Pick<TokenLocation, 'pathname'> = window.location): void {
+	if (location.pathname !== CONFIRM) held = null;
+}
+
 // The root layout load imports this module, so this code runs before the router reads the
 // address of the first document. The router then never sees the token: page.url has no fragment,
 // and the history entry that the router writes after the loads does not put it back in the address
 // bar. The page load gets the held token. This also works when the root layout hides the page
 // behind its session error card.
-if (typeof window !== 'undefined' && window.location?.pathname === '/reset/confirm') takeResetToken();
+if (typeof window !== 'undefined' && window.location?.pathname === CONFIRM) takeResetToken();

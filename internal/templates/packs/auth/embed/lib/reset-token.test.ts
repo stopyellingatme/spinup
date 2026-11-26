@@ -1,6 +1,7 @@
 // Managed by spinup: `spinup upgrade` keeps this file current.
-// The tests of lib/reset-token.ts: the read-and-strip step, the held token, the cases without a
-// token, and the take at import. Each test gets a new module, so no token stays from another test.
+// The tests of lib/reset-token.ts: the read-and-strip step, the held token, the visit of the reset
+// page, the cases without a token, and the take at import. Each test gets a new module, so no token
+// stays from another test.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TokenHistory } from './reset-token.js';
 
@@ -8,10 +9,11 @@ const token = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
 const other = 'b3RoZXJ0b2tlbmZvcmFub3RoZXJsaW5rMDEyMzQ1Njc';
 
 let takeResetToken: typeof import('./reset-token.js').takeResetToken;
+let followResetVisit: typeof import('./reset-token.js').followResetVisit;
 
 beforeEach(async () => {
 	vi.resetModules();
-	({ takeResetToken } = await import('./reset-token.js'));
+	({ takeResetToken, followResetVisit } = await import('./reset-token.js'));
 });
 
 afterEach(() => {
@@ -78,6 +80,30 @@ describe('takeResetToken', () => {
 			expect(takeResetToken(location, history), hash).toBeNull();
 			expect(calls.length, hash).toBe(1);
 		}
+	});
+});
+
+describe('the visit of the reset page', () => {
+	it('drops the token when a navigation leaves the page', () => {
+		const first = fixture('#' + token);
+		expect(takeResetToken(first.location, first.history)).toBe(token);
+		// The root layout calls followResetVisit after the navigation to /reset. The session error
+		// card can hide the page at that time: the token goes away all the same.
+		const away = fixture('');
+		away.location.pathname = '/reset';
+		followResetVisit(away.location);
+		// A later visit without a fragment gets no token, so the page shows the invalid-link message.
+		const later = fixture('');
+		expect(takeResetToken(later.location, later.history)).toBeNull();
+	});
+
+	it('keeps the token while the address stays on the page', () => {
+		const { location, history } = fixture('#' + token);
+		expect(takeResetToken(location, history)).toBe(token);
+		// The first navigation of the document ends on the page. A retry of the session read is not
+		// a navigation at all.
+		followResetVisit(location);
+		expect(takeResetToken(location, history)).toBe(token);
 	});
 });
 

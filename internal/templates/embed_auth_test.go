@@ -110,6 +110,11 @@ func TestEmbedAuth(t *testing.T) {
 			if layout := embedFile(t, tree, "web/src/routes/+layout.ts"); strings.Contains(layout, "import '#lib/reset-token.js';") != mail {
 				t.Errorf("+layout.ts imports the reset token module: %v, want %v", !mail, mail)
 			}
+			// The root layout component ends the visit of the reset page after each navigation, so
+			// a held token lives for one visit (ADR 0039, section 10.10).
+			if layout := embedFile(t, tree, "web/src/routes/+layout.svelte"); strings.Contains(layout, "afterNavigate(() => followResetVisit());") != mail {
+				t.Errorf("+layout.svelte ends the visit of the reset page: %v, want %v", !mail, mail)
+			}
 			// The reset link of embed mode holds the token in the fragment, so no render has a
 			// header middleware or a token route.
 			for _, name := range []string{"api/cmd/api/main.go", "api/cmd/api/reset.go"} {
@@ -311,7 +316,8 @@ func testResetEmbed(t *testing.T, tree fs.FS) {
 	for _, want := range []string{
 		"history.replaceState(history.state, '', location.pathname + location.search)",
 		"if (location.hash === '') return held;",
-		"window.location?.pathname === '/reset/confirm') takeResetToken();",
+		"window.location?.pathname === CONFIRM) takeResetToken();",
+		"if (location.pathname !== CONFIRM) held = null;",
 	} {
 		if !strings.Contains(helper, want) {
 			t.Errorf("reset-token.ts lacks %q", want)

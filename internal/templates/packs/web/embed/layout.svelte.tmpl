@@ -2,7 +2,11 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+[[- if has "mail" .modules ]]
+	import { afterNavigate, onNavigate } from '$app/navigation';
+[[- else ]]
 	import { onNavigate } from '$app/navigation';
+[[- end ]]
 	import { page } from '$app/state';
 	import AppSidebar from '#lib/components/app/app-sidebar.svelte';
 	import TopBar from '#lib/components/app/top-bar.svelte';
@@ -14,6 +18,9 @@
 [[- end ]]
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import { nav } from '#lib/nav.gen.js';
+[[- if has "mail" .modules ]]
+	import { followResetVisit } from '#lib/reset-token.js';
+[[- end ]]
 	import { session } from '#lib/session.svelte.js';
 	import { flushSessionCheck, recheckSession, watchSession } from '#lib/session-watch.js';
 	import type { LayoutProps } from './$types';
@@ -27,6 +34,11 @@
 	onNavigate((navigation) => {
 		navigation.complete.finally(flushSessionCheck).catch(() => {});
 	});
+[[- if has "mail" .modules ]]
+	// The token of a reset link lives for one visit of the reset page. A navigation away ends the
+	// visit, also while the session error card hides the page (ADR 0039, section 10.10).
+	afterNavigate(() => followResetVisit());
+[[- end ]]
 
 	// Hide the pages while the document goes to another identity, and while the session is not
 	// verified. Signed-out visitors get no sidebar. The sign-in pages stay centered.
