@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect, type Page, type Response } from '@playwright/test';
+import { expect, type Locator, type Page, type Response } from '@playwright/test';
 
 /**
  * embed is true when run.sh tests an app in embed mode (E2E_FRONTEND_MODE=embed): one Go binary
@@ -164,3 +164,91 @@ export async function createTodo(page: Page, title: string): Promise<void> {
 	await page.getByRole('button', { name: 'Create todo' }).click();
 	await expect(page).toHaveURL(/\/todos\/\d+/);
 }
+
+/** The origin of the pages. In embed mode the Go binary serves the pages and the API on it. */
+export const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:4173';
+
+/** The account with the admin role of the flags module. run.sh creates it in embed mode. */
+export const adminEmail = process.env.E2E_ADMIN_EMAIL ?? '';
+
+/** signIn signs in on the sign-in page. The user then lands on the home route. */
+export async function signIn(page: Page, email: string, secret = password): Promise<void> {
+	await page.goto('/login');
+	await page.getByLabel('Email').fill(email);
+	await page.getByLabel('Password').fill(secret);
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByTestId('user-email')).toHaveText(email);
+}
+
+/** openSignOut opens the user menu and returns its sign-out item. */
+export async function openSignOut(page: Page, email: string): Promise<Locator> {
+	await page.getByRole('banner').getByRole('button', { name: email }).click();
+	return page.getByRole('menuitem', { name: 'Sign out' });
+}
+
+/** markDocument marks the current document. documentMarked is false after a full document load. */
+export async function markDocument(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		(window as unknown as { __e2eOldDocument?: boolean }).__e2eOldDocument = true;
+	});
+}
+
+/** documentMarked tells whether the document of markDocument is still loaded. */
+export function documentMarked(page: Page): Promise<boolean> {
+	return page.evaluate(() => (window as unknown as { __e2eOldDocument?: boolean }).__e2eOldDocument === true);
+}
+
+/** becomeVisible fires the event that a browser fires when the tab of the page becomes visible. */
+export async function becomeVisible(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		if (document.visibilityState !== 'visible') throw new Error('the page is not visible');
+		document.dispatchEvent(new Event('visibilitychange'));
+	});
+}
+
+/**
+ * recordRequests records the requests of the main frame in order: each document load as
+ * "doc <path>", and each API request as "<method> <path>". Read the returned array at any time.
+ */
+export function recordRequests(page: Page): string[] {
+	const log: string[] = [];
+	page.on('request', (request) => {
+		const url = new URL(request.url());
+		if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+			log.push(`doc ${url.pathname}${url.search}`);
+		} else if (url.pathname.startsWith('/api/')) {
+			log.push(`${request.method()} ${url.pathname}`);
+		}
+	});
+	return log;
+}
+
+/**
+ * abortOnce makes the first matching request fail as a network failure. Later requests pass. The
+ * returned function gives the number of aborted requests.
+ */
+export async function abortOnce(page: Page, method: string, pathname: string): Promise<() => number> {
+	let aborted = 0;
+	await page.route(
+		(url) => url.pathname === pathname,
+		async (route) => {
+			if (aborted === 0 && route.request().method() === method) {
+				aborted += 1;
+				await route.abort('failed');
+				return;
+			}
+			await route.fallback();
+		}
+	);
+	return () => aborted;
+}
+
+/** The fixed messages of the generated embed pages that the specs assert. */
+export const messages = {
+	unreachable: 'The server did not answer. Check the connection and try again.',
+	signOutUnavailable: 'Sign-out failed. The server is not available. Try again later.',
+	signOutServerError: 'Sign-out failed. Something went wrong on the server. Try again later.',
+	roleDenied: 'Your role cannot open this page. Try: sign in with an account that has a required role.',
+	resetInvalid: 'The reset link is invalid or expired. Request a new link.',
+	resetLinkInvalid: 'The reset link is not valid. Request a new link.'
+};

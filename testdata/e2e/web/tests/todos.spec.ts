@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { apiURL, createTodo, embed, isToggleWrite, register, todoID, uniqueEmail } from './helpers';
+import {
+	abortOnce,
+	apiURL,
+	baseURL,
+	createTodo,
+	embed,
+	isToggleWrite,
+	messages,
+	register,
+	todoID,
+	uniqueEmail
+} from './helpers';
 
 test('a user creates, toggles, edits, and deletes a todo', async ({ page }) => {
 	await register(page, uniqueEmail('crud'));
@@ -219,3 +230,94 @@ test('the toggle on page 2 stays on page 2', async ({ page }) => {
 	await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(1);
 	await expect(page).toHaveURL(/\/todos\?page=2/);
 });
+
+// The cases below exist only in embed mode (ADR 0039 section 10.6). Each write goes from the browser
+// to the Go API. A write that does not complete must leave the page usable and the data right.
+if (embed) {
+	test('embed: an aborted create, edit, and delete show an error, and a retry works', async ({ page }) => {
+		await register(page, uniqueEmail('abort'));
+		const api = page.context().request;
+
+		// Create.
+		const creates = await abortOnce(page, 'POST', '/api/todos');
+		await page.goto('/todos/new');
+		await page.getByLabel('Title').fill('Aborted create');
+		const create = page.getByRole('button', { name: 'Create todo' });
+		await create.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(create).toBeEnabled();
+		await expect(page).toHaveURL(`${baseURL}/todos/new`);
+		await expect(page.getByLabel('Title')).toHaveValue('Aborted create');
+		await create.click();
+		await expect(page.getByText('Todo created.')).toBeVisible();
+		await expect(page).toHaveURL(/\/todos\/\d+$/);
+		const id = todoID(page.url());
+		expect(creates()).toBe(1);
+		const list = (await (await api.get(`${apiURL}/api/todos`)).json()) as { items: { title: string }[] };
+		expect(list.items.map((item) => item.title)).toEqual(['Aborted create']);
+
+		// Edit.
+		const edits = await abortOnce(page, 'PUT', `/api/todos/${id}`);
+		await page.goto(`/todos/${id}/edit`);
+		await page.getByLabel('Title').fill('Edited after abort');
+		const save = page.getByRole('button', { name: /^Save/ });
+		await save.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(save).toBeEnabled();
+		await expect(page).toHaveURL(`${baseURL}/todos/${id}/edit`);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title).toBe('Aborted create');
+		await save.click();
+		await expect(page.getByText('Changes saved.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Edited after abort', level: 1 })).toBeVisible();
+		expect(edits()).toBe(1);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { title: string }).title).toBe('Edited after abort');
+
+		// Delete from the list, through the row menu and the alert dialog.
+		const deletes = await abortOnce(page, 'DELETE', `/api/todos/${id}`);
+		await page.goto('/todos');
+		const actions = page.getByRole('button', { name: 'Actions for Edited after abort' });
+		const dialog = page.getByRole('alertdialog');
+		await actions.click();
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		await dialog.getByRole('button', { name: 'Delete' }).click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(dialog).toHaveCount(0);
+		await expect(actions).toBeEnabled();
+		expect((await api.get(`${apiURL}/api/todos/${id}`)).status()).toBe(200);
+		await actions.click();
+		await page.getByRole('menuitem', { name: 'Delete' }).click();
+		await dialog.getByRole('button', { name: 'Delete' }).click();
+		await expect(page.getByText('Todo deleted.')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'No todos yet' })).toBeVisible();
+		expect(deletes()).toBe(1);
+		expect((await api.get(`${apiURL}/api/todos/${id}`)).status()).toBe(404);
+	});
+
+	test('embed: an aborted toggle on page 2 goes back, and a retry saves it on page 2', async ({ page }) => {
+		await register(page, uniqueEmail('abort-toggle'));
+		const api = page.context().request;
+		for (let i = 1; i <= 21; i++) {
+			const res = await api.post(`${apiURL}/api/todos`, { data: { title: `Row ${String(i).padStart(2, '0')}`, done: false } });
+			expect(res.ok()).toBeTruthy();
+		}
+		await page.goto('/todos?page=2');
+		const row = page.getByRole('row').nth(1);
+		const box = row.getByRole('checkbox');
+		const href = await row.getByRole('link', { name: /^Row \d\d$/ }).getAttribute('href');
+		const id = todoID(new URL(href ?? '', page.url()).href);
+
+		const toggles = await abortOnce(page, 'PUT', `/api/todos/${id}`);
+		await box.click();
+		await expect(page.getByText(messages.unreachable)).toBeVisible();
+		await expect(box).not.toBeChecked();
+		await expect(box).toBeEnabled();
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { done: boolean }).done).toBe(false);
+
+		await Promise.all([page.waitForResponse((res) => isToggleWrite(res, id) && res.ok()), box.click()]);
+		await expect(box).toBeChecked();
+		await expect(page).toHaveURL(`${baseURL}/todos?page=2`);
+		await expect(page.getByRole('row')).toHaveCount(2);
+		expect(toggles()).toBe(1);
+		expect(((await (await api.get(`${apiURL}/api/todos/${id}`)).json()) as { done: boolean }).done).toBe(true);
+	});
+}
