@@ -30,16 +30,16 @@
     "import-in-the-middle": "3.5.2",
     "openapi-fetch": "0.17.0",
     "sveltekit-superforms": "3.0.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "@internationalized/date": "3.12.4",
     "@lucide/svelte": "1.49.0",
     "@playwright/test": "1.64.0",
-    "@sveltejs/adapter-node": "6.0.0",
-    "@sveltejs/adapter-static": "4.0.0",
-    "@sveltejs/kit": "3.0.1",
+    "@sveltejs/adapter-node": "6.0.1",
+    "@sveltejs/adapter-static": "4.0.1",
+    "@sveltejs/kit": "3.1.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tailwindcss/vite": "4.3.3",
     "bits-ui": "2.19.5",
@@ -55,5 +55,8 @@
     "typescript": "6.0.3",
     "vite": "8.3.4",
     "vitest": "5.0.4"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2"
   }
 }

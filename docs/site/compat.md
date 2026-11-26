@@ -7,7 +7,7 @@
 - PostgreSQL majors: 14, 15, 16, 17, 18
 - Go: go1.27.2 (generated apps require Go 1.27)
 - Node: 24-bookworm-slim
-- SvelteKit: 3.0.1
+- SvelteKit: 3.1.1
 
 ## Pinned images
 
