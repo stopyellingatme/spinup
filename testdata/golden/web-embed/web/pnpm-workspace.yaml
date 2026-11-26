@@ -3,3 +3,7 @@
 allowBuilds:
   esbuild: true
   protobufjs: false
+# @hey-api/json-schema-ref-parser pins js-yaml 4.2.0, which has security advisories. Remove this
+# override when that package requires js-yaml 4.3.2 or later.
+overrides:
+  "js-yaml@<4.3.2": 4.3.2

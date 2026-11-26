@@ -35,3 +35,10 @@ SvelteKit 2 is not needed as a fallback.
 
 shadcn-svelte, bits-ui, vitest, svelte-check, Playwright, `vite dev`, and a real OTLP backend. M4.1 and M4.7 cover them.
 The spike source is in the session scratchpad (`step0/sveltekit-spike/`) and is not part of the repository.
+
+## Amendment (2026-11-25): security updates
+
+The pins are now SvelteKit 3.1.1, adapter-node 6.0.1, and adapter-static 4.0.1.
+These releases fix security advisories in 3.0.1, 6.0.0, and 4.0.0.
+The peer ranges and the rules above did not change.
+`internal/stackversions/stackversions.yaml` holds the present pins.

@@ -263,6 +263,7 @@ The pre-seed (unit P0 of run 20261031-201904) and the main loop measured these f
 ### Python packages and wheels
 
 1. Direct pins: `weasyprint==70.0`, `jinja2==3.1.6`, and `pypdf==6.21.1` (dev). They are in `python_pdf_packages` of `stackversions.yaml`.
+   Amended 2026-11-25: the `pypdf` pin is 7.1.1, because the releases before it have security advisories.
    `templates/python-pdf/pyproject.toml` repeats the pins of `python_packages` and adds these three.
 2. The main loop made `uv.lock` with uv 0.13.6 in `python:3.15.2-slim-trixie`. The pre-seed copied `pyproject.toml` and `uv.lock` into `internal/gen/service/templates/python-pdf/` without a new lock.
 3. Resolved transitive versions of note: `brotli` 1.2.1 and `brotlicffi` 1.2.1.0, `fonttools` 4.68.0, `markupsafe` 3.0.4, and `pillow` 13.0.0. Each has a cp315 wheel.

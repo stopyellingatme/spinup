@@ -59,5 +59,8 @@
     "typescript": "[[ npm "typescript" ]]",
     "vite": "[[ npm "vite" ]]",
     "vitest": "[[ npm "vitest" ]]"
-  }
+  }[[- if eq .package_manager "bun" ]],
+  "overrides": {
+    "js-yaml": "4.3.2"
+  }[[- end ]]
 }
