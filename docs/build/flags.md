@@ -403,11 +403,23 @@ If your files merge with conflicts, copy these blocks from a new app that has th
 Run `spinup db migrate up` before you start the new binary.
 Then run `spinup g flags` and `spinup doctor`. The default `flags.gen.ts` names `manager` as the `admin_role`. An app with other roles needs `spinup g flags`.
 
+## Embed mode
+
+The `flags` module works in an app with `--frontend-mode embed`.
+It needs the `auth` module, and embed mode holds `auth`.
+The browser root load reads `GET /api/flags` next to the session, so `data.flags` and `flag(data, key)` work as in node mode.
+
+- The root reads the public flags at the start of the app, after a session refresh, and after a successful save on `/admin/flags`. A page navigation reuses the result.
+- If the read of the flags fails, the browser logs a warning and every public flag is off. The API still evaluates all rules.
+- A save on `/admin/flags` refreshes the admin data and the public flags in one step.
+- The admin link shows only for the `admin_role`. The page calls `requireRole` first, then reads the admin endpoint.
+- The browser guard controls navigation only. The Go API checks the role on every admin call, so a direct request without the role fails.
+
 ## Limits
 
 - A change takes up to `FLAGS_REFRESH` (10 seconds by default) to reach another process.
 - A percentage applies to signed-in users only. A signed-out visitor gets the global value. There is no rollout by percentage for visitors.
-- Embed mode has no flags. The module needs `auth`, and `auth` needs the Node frontend. Use `--frontend-mode node`.
+- Embed mode has flags. The browser reads the public flags (see [Embed mode](#embed-mode)). The `apikeys`, `billing`, `audit`, and `mcp` modules are not available there.
 - `spinup new` needs `--modules auth,flags`. `spinup module add flags` adds `auth` for you.
 - A flag is a boolean. There are no strings, numbers, or variants beyond `on` and `off`.
 - The declarations live in `spinup.toml`. You cannot create a flag at run time.

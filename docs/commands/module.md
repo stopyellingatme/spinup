@@ -81,9 +81,10 @@ If you pass a flag for a module that is already on, the command fails with `it d
 The web app and the Go module are core parts of every app, so they are never "added".
 These flags are listed in `module add --help`, but they only work in `spinup new`:
 `--frontend-mode`, `--package-manager`, `--api-client`, `--shadcn-registry`, and `--module`.
-The `auth` module needs `--frontend-mode node`, which is the default.
-If the app uses `--frontend-mode embed`, `module add auth` fails with `cannot use auth in embed mode`.
-See [Embed mode](../embed.md).
+An app with `--frontend-mode embed` can add `auth`, `flags`, and `live`.
+It cannot add `apikeys`, `billing`, `audit`, or `mcp`.
+Each of these four fails with `cannot use <module> in embed mode`, before the command writes a file.
+See [Embed mode](../embed.md) for the four errors.
 
 ## Preview the change
 
@@ -138,6 +139,27 @@ $ spinup module add --abort --yes
 
 The steps are the same as for an app upgrade.
 Read [upgrade](upgrade.md) for the full flow.
+
+## Add auth to an embed app
+
+In an embed app, `module add auth` writes the browser pages: `/login`, `/register`, `/account`, and the session files.
+It writes no SvelteKit server auth files.
+The command renders the template version in `spinup.lock`, on a review branch.
+If that version has no browser auth pages, it stops before the preview:
+
+```text
+cannot add auth in embed mode: the locked templates lack the browser auth pages
+Try: run spinup upgrade, then repeat the module addition
+```
+
+Run `spinup upgrade --yes`, then add the module again.
+The change also updates the generated API wiring on the review branch, so read that branch before you merge it.
+The modules `flags` and `live` require `auth`, so they add `auth` for you, and the same rules apply.
+The `flags` module prints `Next:` lines that name the browser root load and the admin link, in place of the server hook.
+
+Adding `auth` does not protect resources that you made before.
+Their pages stay public, and their rows and API routes keep the guards that the generator wrote.
+Add the guards yourself, and protect the data in the Go handlers.
 
 ## Remove a module
 

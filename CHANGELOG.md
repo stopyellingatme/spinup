@@ -30,6 +30,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A development build of the CLI now warns on `spinup new` when no kit replace is set, because the pinned kit can lack packages that the templates import. The warning names `SPINUP_KIT_REPLACE=<checkout>/kit`. The doctor check `kit-version` also warns for a development CLI without a local replace.
 
 ### Added
+- Embed mode holds the `auth`, `flags`, and `live` modules, and resource pages (ADR 0039). The Go binary serves the sign-in, register, account, and reset pages, the OIDC buttons, the flags admin page, and the live helper. The pages call the Go API from the browser. `spinup g resource` writes `+page.ts` and `form.ts` pages, and `spinup g page --server` writes `+page.ts`. Sign-out stops every live stream, then calls the API, and a failed sign-out keeps the session.
+- The kit option `auth.WithResetFragment`. The reset link of an embed app is `<origin>/reset/confirm#<token>`, so no log or `Referer` header holds the token. Node mode keeps `/reset/<token>`.
+- The browser load flag: `spinup g page --server` writes the load file of the mode (`+page.server.ts` in node mode, `+page.ts` in embed mode), also with `--role`.
+- Embed mode refuses `apikeys`, `billing`, `audit`, and `mcp` with one error for each module. These modules still need a SvelteKit server for their pages. Use `--frontend-mode node` for them.
 - spinup has a license: MIT (`LICENSE`). The files that spinup writes into your app are yours, with no notice duty (`README.md`, "Generated code"). `THIRD_PARTY_NOTICES.md` lists the third-party files in the repository (ADR 0040).
 - Files for contributors: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue forms, and a pull request template.
 - Rules for the repository: three rulesets in `.github/rulesets/` protect `main` and the release tags, and `scripts/github/apply-rulesets.sh` applies them. `main` needs a pull request and the checks `lint`, `actionlint`, `test`, `windows`, `upgrade`, and `test-macos`. Read `docs/contributing/repository-rules.md`.
