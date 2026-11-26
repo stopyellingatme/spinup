@@ -485,8 +485,8 @@ class DevApp:
 # The suite
 # ---------------------------------------------------------------------------
 
-DEV_NOTE = ("`spinup dev --no-web --no-infra --no-worker` (preflight, migrate up, then air with delay 300 ms; "
-            "the dev watcher polls api/db/queries and api/openapi every 500 ms with a 300 ms debounce)")
+DEV_NOTE = ("`spinup dev --no-web --no-infra --no-worker` (preflight, migrate up, then air with delay 100 ms; "
+            "the dev watcher polls api/db/queries and api/openapi every 200 ms with a 150 ms debounce)")
 
 METRICS = [
     ("dev_cold_start", None), ("dev_handler_edit", None),
