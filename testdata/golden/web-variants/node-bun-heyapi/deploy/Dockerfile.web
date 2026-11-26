@@ -1,18 +1,21 @@
 # Managed by spinup. Build context is web/:
 #   docker build -f deploy/Dockerfile.web --build-arg PUBLIC_ORIGIN=https://app.example.com web
-FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS build
+FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS dependencies
 RUN npm install --global bun@1.4.2
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --ignore-scripts
+FROM dependencies AS production-dependencies
+RUN rm -rf node_modules && bun install --production --frozen-lockfile --ignore-scripts
+
+FROM dependencies AS build
 COPY . .
 # adapter-node does not read ORIGIN at run time: the build bakes the public origin into
 # paths.origin, the CSRF check, and handleFetch.
 ARG PUBLIC_ORIGIN=http://localhost:3000
 ENV PUBLIC_ORIGIN=${PUBLIC_ORIGIN}
 # --ignore-scripts skips the prepare script, so run svelte-kit sync before the build.
-RUN bunx --no-install svelte-kit sync && bun run build \
- && rm -rf node_modules && bun install --production --frozen-lockfile --ignore-scripts
+RUN bunx --no-install svelte-kit sync && bun run build
 
 FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 WORKDIR /app
@@ -28,7 +31,7 @@ ENV NODE_ENV=production \
 # Lower OTEL_TRACES_SAMPLER_ARG (0 to 1) to keep a fraction of the new traces. A request that
 # arrives with a sampled traceparent stays sampled.
 COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 USER node
 EXPOSE 3000
